@@ -345,6 +345,73 @@ Keep all execution history. Folders named by date ensure:
 
 ## Items Marked for Follow-up
 
-1. **Default plugins**: Need details on which plugins to include by default
-2. **Stdio proxy documentation**: How to connect via stdio for standard MCP clients
-3. **IntelliJ code resolution**: Make IntelliJ resolve code in same classpath (suggestion)
+1. ~~**Default plugins**: Need details on which plugins to include by default~~ → **RESOLVED**: Use `AllPluginsLoader.INSTANCE` from `IdeScriptEngineManagerImpl.java` which automatically delegates to ALL plugin classloaders
+2. ~~**Stdio proxy documentation**: How to connect via stdio for standard MCP clients~~ → **RESOLVED**: See [STDIO_PROXY.md](STDIO_PROXY.md)
+3. **IntelliJ code resolution**: Make IntelliJ resolve code in same classpath (suggestion) - still open
+
+---
+
+## Research Findings (2024-01-15)
+
+### Script Engine API
+
+IntelliJ has a built-in script engine infrastructure that handles all plugin classloading:
+
+**Key discovery**: `AllPluginsLoader.INSTANCE` in `IdeScriptEngineManagerImpl.java`:
+- Custom ClassLoader that delegates `findClass()` to ALL plugin classloaders
+- Used by default when no explicit loader is provided
+- Includes smart caching (LRU) for performance
+
+**Usage pattern**:
+```kotlin
+val engine = IdeScriptEngineManager.getInstance().getEngineByFileExtension("kts", null)
+// null loader = AllPluginsLoader.INSTANCE = all plugins available
+engine.setBinding("ctx", myContext)
+engine.eval(script)
+```
+
+**Source files**:
+- `platform/ide-core-impl/src/com/intellij/ide/script/IdeScriptEngineManagerImpl.java`
+- `platform/ide-core-impl/src/com/intellij/ide/script/IdeScriptEngine.java`
+- `platform/lang-impl/src/com/intellij/ide/script/IDE.java`
+
+### HTTP Server
+
+IntelliJ has a built-in HTTP server (Netty-based) with extension points:
+
+**Extension point**: `com.intellij.httpRequestHandler`
+
+**Base class**: `RestService` provides:
+- Automatic routing by service name (`/api/{serviceName}`)
+- JSON reading/writing with Gson
+- CORS handling
+- Rate limiting
+- Error reporting
+
+**Port**: Uses IntelliJ's built-in server port range (63342-63361)
+
+**Alternative**: `CustomPortServerManager` for dedicated port (11993)
+
+**Source files**:
+- `platform/built-in-server/src/org/jetbrains/ide/RestService.kt`
+- `platform/built-in-server/src/org/jetbrains/io/BuiltInServer.kt`
+
+### Editor Notification Panel
+
+**Extension point**: `com.intellij.editorNotificationProvider`
+
+**Pattern**:
+```kotlin
+class MyProvider : EditorNotificationProvider {
+    override fun collectNotificationData(project, file) = Function { fileEditor ->
+        EditorNotificationPanel(fileEditor, Status.Warning).apply {
+            text("Message")
+            createActionLabel("Action") { /* handler */ }
+        }
+    }
+}
+```
+
+**Source files**:
+- `platform/platform-api/src/com/intellij/ui/EditorNotificationProvider.java`
+- `platform/platform-api/src/com/intellij/ui/EditorNotificationPanel.java`

@@ -10,14 +10,18 @@ This IntelliJ plugin starts an MCP server that exposes the IDE's internal APIs t
 
 ## MCP Server API
 
-The MCP server uses HTTP/TCP transport on port **11993** (default, configurable via IntelliJ Registry). If the port is busy, the server automatically allocates another available port.
+The MCP server uses IntelliJ's built-in HTTP server (Netty-based) available at `/api/mcp`. The port is typically **63342** (range 63342-63361). Check IntelliJ settings or the IDE log for the actual port.
+
+Alternative: A dedicated port (e.g., 11993) can be configured via `CustomPortServerManager`.
 
 ### Connecting via stdio
 
-For standard MCP clients that expect stdio transport, use a proxy:
+For standard MCP clients (like Claude Desktop) that expect stdio transport, use a proxy.
+See [STDIO_PROXY.md](STDIO_PROXY.md) for detailed setup instructions.
+
+Quick example using socat:
 ```bash
-# Example: socat proxy from stdio to TCP
-socat - TCP:localhost:11993
+socat - TCP:localhost:63342
 ```
 
 ### Available Tools
@@ -353,3 +357,4 @@ To target a different IntelliJ Platform version, update `platformVersion` in `gr
 - [Plan.md](Plan.md) - Implementation plan
 - [Suggestions.md](Suggestions.md) - Open questions and design suggestions
 - [Discussions.md](Discussions.md) - Design discussions and decisions
+- [STDIO_PROXY.md](STDIO_PROXY.md) - Stdio proxy setup for MCP clients

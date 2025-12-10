@@ -12,6 +12,7 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 - [Plan.md](Plan.md) - Implementation plan and phases
 - [Suggestions.md](Suggestions.md) - Open questions and design decisions
 - [Discussions.md](Discussions.md) - Design discussions and decisions from Q&A sessions
+- [STDIO_PROXY.md](STDIO_PROXY.md) - Setup instructions for stdio-to-HTTP proxy
 
 ## Build Commands
 
