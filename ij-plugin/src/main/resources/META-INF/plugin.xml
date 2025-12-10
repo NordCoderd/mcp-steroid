@@ -1,0 +1,9 @@
+<idea-plugin>
+    <id>com.jonnyzzz.intellij.mcp-steroid</id>
+    <name>IntelliJ MCP Steroid</name>
+    <vendor>jonnyzzz</vendor>
+
+    <description>An MCP on Steroids for IntelliJ</description>
+
+    <depends>com.intellij.modules.platform</depends>
+</idea-plugin>
