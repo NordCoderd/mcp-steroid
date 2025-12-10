@@ -415,3 +415,222 @@ class MyProvider : EditorNotificationProvider {
 **Source files**:
 - `platform/platform-api/src/com/intellij/ui/EditorNotificationProvider.java`
 - `platform/platform-api/src/com/intellij/ui/EditorNotificationPanel.java`
+
+---
+
+## Clarification Session (2024-12-10)
+
+### Issues Identified in Review
+
+1. **Port Inconsistency**: README said 11993, but we use IntelliJ's built-in server
+2. **Entry Point vs JSR-223**: `suspend fun main` doesn't match script engine eval
+3. **`plugins` parameter vs AllPluginsLoader**: Contradictory
+4. **Review mode default**: Unclear
+5. **Dynamic commands classloader**: Potential issue
+
+### Resolutions
+
+**1. Port → Use IntelliJ's built-in server**
+- Endpoint: `/api/steroids-mcp` on IntelliJ's port (63342+)
+- No custom port management needed
+
+**1+ MAJOR FINDING: IntelliJ has built-in MCP server!**
+
+IntelliJ Community includes a full MCP server plugin (`com.intellij.mcpServer`) with extension points:
+
+```xml
+<extensionPoints>
+  <extensionPoint name="mcpToolsProvider" interface="com.intellij.mcpserver.McpToolsProvider"/>
+  <extensionPoint name="mcpToolset" interface="com.intellij.mcpserver.McpToolset"/>
+</extensionPoints>
+```
+
+**Option A**: Implement `McpToolset` and register via:
+```xml
+<extensions defaultExtensionNs="com.intellij.mcpServer">
+  <mcpToolset implementation="com.jonnyzzz.intellij.mcp.SteroidsMcpToolset"/>
+</extensions>
+```
+
+**Option B**: Keep separate REST endpoint at `/api/steroids-mcp` for compatibility
+
+**Decision**: Investigate both. If MCP server plugin is bundled in target IntelliJ versions, prefer Option A.
+
+**2. Entry Point → McpScriptScope with execute { }**
+
+New architecture:
+- Bind `McpScriptScope` to script engine (not `McpScriptContext`)
+- `McpScriptScope` has single method: `execute { ctx -> ... }`
+- Script MUST call `execute { }` to do anything useful
+- The lambda receives `McpScriptContext` with full API
+
+```kotlin
+// What user writes:
+execute { ctx ->
+    ctx.println("Hello")
+    val project = ctx.project
+    // ... actual work
+}
+
+// McpScriptScope interface:
+interface McpScriptScope {
+    fun execute(block: suspend McpScriptContext.() -> Unit)
+}
+```
+
+This ensures:
+- We control when/how the suspend block runs
+- We can set up proper coroutine context
+- We can wait for indexes, etc.
+
+**3. `plugins` parameter → REMOVED**
+
+AllPluginsLoader.INSTANCE is used internally by IdeScriptEngine. We don't need to expose this. Simplifies API.
+
+**4. Review mode → Enabled by default, Registry configurable**
+
+- `mcp.steroids.review.mode` = `ALWAYS` | `TRUSTED` | `NEVER`
+- Default: `ALWAYS`
+- All requests logged to disk regardless of review mode
+
+**5. Review mode configuration → IntelliJ Registry**
+
+Registry keys:
+- `mcp.steroids.review.mode` (string): ALWAYS, TRUSTED, NEVER
+- `mcp.steroids.review.timeout` (int): seconds to wait for review
+- `mcp.steroids.execution.timeout` (int): script execution timeout
+
+**6. Dynamic commands → Deferred**
+
+Not implementing in v1. Classloaders won't be explicitly disposed - they'll be GC-ed naturally when no references remain. If handler lambdas reference classes, those classloaders stay alive.
+
+**7. Execution ID → Include project hash**
+
+Format: `{3-char-project-hash}/{YYYYMMDD}/{HHMMSS}-{random8}`
+Example: `abc/20241210/143025-x7k9m2p1`
+
+Project hash: first 3 chars of base32-encoded hash of project name.
+
+### New Architecture: McpScriptScope
+
+```kotlin
+// User-facing scope (bound to script engine)
+interface McpScriptScope {
+    /**
+     * Execute a suspend block with full MCP context.
+     * This is the ONLY way to interact with the IDE.
+     */
+    fun execute(block: suspend McpScriptContext.() -> Unit)
+}
+
+// Full context (passed to execute block)
+interface McpScriptContext : Disposable {
+    val project: Project
+    val coroutineScope: CoroutineScope  // Bound to this Disposable
+
+    // Output
+    fun println(message: Any?)
+    fun print(message: Any?)
+    fun printJson(obj: Any?)
+    fun logInfo(message: String)
+    fun logWarn(message: String)
+    fun logError(message: String, throwable: Throwable? = null)
+
+    // Slots
+    fun readSlot(name: String): String?
+    fun writeSlot(name: String, value: String)
+
+    // Utilities
+    suspend fun waitForSmartMode()  // Wait for indexes
+    suspend fun <T> readAction(block: () -> T): T
+    suspend fun <T> writeAction(block: () -> T): T
+
+    // Reflection helpers
+    fun listServices(): List<String>
+    fun listExtensionPoints(): List<String>
+    fun describeClass(className: String): String
+}
+```
+
+### waitForSmartMode() Implementation
+
+Based on `com.jetbrains.performancePlugin.ProjectLoaded#runScriptAfterDumb`:
+
+```kotlin
+suspend fun waitForSmartMode() {
+    suspendCancellableCoroutine { cont ->
+        fun runAfterDumb() {
+            DumbService.getInstance(project).smartInvokeLater {
+                if (DumbService.isDumb(project)) {
+                    runAfterDumb()
+                } else {
+                    cont.resume(Unit)
+                }
+            }
+        }
+        runAfterDumb()
+    }
+}
+```
+
+### CoroutineScope Best Practices (from IntelliJ codebase)
+
+**Recommended pattern**: Use service-injected CoroutineScope
+
+```kotlin
+@Service(Service.Level.PROJECT)
+class ExecutionManager(val coroutineScope: CoroutineScope) {
+    private val backgroundScope = coroutineScope.childScope(
+        "MCP Script Execution",
+        Dispatchers.Default.limitedParallelism(1)  // Sequential execution
+    )
+}
+```
+
+**Key utilities**:
+- `Job.cancelOnDispose(disposable)` - Cancel job when disposable is disposed
+- `Disposable.disposeOnCompletion(scope)` - Dispose when scope completes
+- `CoroutineScope.childScope(name, context)` - Create child scope
+
+**For McpScriptContext**:
+```kotlin
+class McpScriptContextImpl(
+    override val project: Project,
+    parentScope: CoroutineScope
+) : McpScriptContext, Disposable {
+
+    override val coroutineScope = parentScope.childScope(
+        "McpScriptContext",
+        SupervisorJob()
+    )
+
+    init {
+        // Cancel scope when disposed
+        coroutineScope.coroutineContext.job.cancelOnDispose(this)
+    }
+
+    override fun dispose() {
+        // Scope automatically cancelled via cancelOnDispose
+    }
+}
+```
+
+### Kotlin-Only Focus
+
+Groovy support deferred. Focus on Kotlin scripting only for v1.
+
+### Updated Decisions Summary
+
+| Topic | Decision |
+|-------|----------|
+| **MCP Integration** | Investigate IntelliJ's built-in MCP server plugin |
+| **Endpoint** | `/api/steroids-mcp` or MCP toolset extension |
+| **Entry Point** | `execute { ctx -> ... }` via McpScriptScope |
+| **Plugins param** | REMOVED - AllPluginsLoader used internally |
+| **Review mode** | ALWAYS by default, Registry configurable |
+| **Registry keys** | review.mode, review.timeout, execution.timeout |
+| **Dynamic commands** | Deferred to v2 |
+| **Execution ID** | `{project-hash}/{date}/{time}-{random}` |
+| **Language** | Kotlin only (no Groovy for v1) |
+| **CoroutineScope** | Service-injected, childScope pattern |
+| **Disposable** | McpScriptContext is Disposable, bound to scope |

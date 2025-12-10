@@ -1,49 +1,46 @@
 # intellij-mcp-steroid
 
-An MCP (Model Context Protocol) Server for IntelliJ IDEA that provides a Kotlin/Groovy console interface, allowing LLM agents to execute code directly within the IDE's runtime environment.
+An MCP (Model Context Protocol) Server for IntelliJ IDEA that provides a Kotlin console interface, allowing LLM agents to execute code directly within the IDE's runtime environment.
 
 ## Overview
 
-This IntelliJ plugin starts an MCP server that exposes the IDE's internal APIs to LLM agents. The key capability is executing Kotlin or Groovy code in the context of IntelliJ's own classpath, giving agents programmatic access to the IDE's full functionality.
+This IntelliJ plugin exposes IDE APIs to LLM agents via Kotlin script execution. Code runs in IntelliJ's own classpath with access to all installed plugins.
 
-**Primary Use Case**: An LLM agent submits code that runs inside IntelliJ, accessing project structure, PSI (Program Structure Interface), refactoring tools, VFS (Virtual File System), and any other IDE APIs.
+**Primary Use Case**: An LLM agent submits Kotlin code that runs inside IntelliJ, accessing project structure, PSI (Program Structure Interface), refactoring tools, VFS (Virtual File System), and any other IDE APIs.
 
-## MCP Server API
+## MCP Server Integration
 
-The MCP server uses IntelliJ's built-in HTTP server (Netty-based) available at `/api/mcp`. The port is typically **63342** (range 63342-63361). Check IntelliJ settings or the IDE log for the actual port.
+### Option A: IntelliJ's Built-in MCP Server (Preferred)
 
-Alternative: A dedicated port (e.g., 11993) can be configured via `CustomPortServerManager`.
+IntelliJ 2024.3+ includes a built-in MCP server plugin (`com.intellij.mcpServer`). This plugin registers tools via the `mcpToolset` extension point:
 
-### Connecting via stdio
-
-For standard MCP clients (like Claude Desktop) that expect stdio transport, use a proxy.
-See [STDIO_PROXY.md](STDIO_PROXY.md) for detailed setup instructions.
-
-Quick example using socat:
-```bash
-socat - TCP:localhost:63342
+```xml
+<extensions defaultExtensionNs="com.intellij.mcpServer">
+  <mcpToolset implementation="com.jonnyzzz.intellij.mcp.SteroidsMcpToolset"/>
+</extensions>
 ```
 
-### Available Tools
+### Option B: REST Endpoint
 
-### `list_projects`
-Lists all currently open projects with their directories.
+For compatibility with older IntelliJ versions or standalone use:
+- Endpoint: `/api/steroids-mcp` on IntelliJ's built-in HTTP server
+- Port: typically 63342 (range 63342-63361)
 
-**Response**: Array of `{ name: string, path: string }`
+See [STDIO_PROXY.md](STDIO_PROXY.md) for connecting stdio-based MCP clients.
+
+## API
 
 ### `execute_code`
-Compiles and starts execution of Kotlin or Groovy code in the IDE's runtime context.
+Compiles and executes Kotlin code in the IDE's runtime context.
 
 **Parameters**:
 - `project_path` (required): Path to the project directory (must match an open project)
-- `language`: `"kotlin"` (default) or `"groovy"`
-- `code`: The code to execute
-- `plugins`: List of plugin IDs to include in classpath (default: all enabled plugins)
+- `code` (required): Kotlin code to execute
 - `timeout`: Execution timeout in seconds (default: 60)
-- `show_review_on_error`: If true, show code in editor even on compilation error (for user help)
+- `show_review_on_error`: If true, show code in editor even on compilation error
 
 **Execution Model**:
-- **Blocks during compilation only**
+- **Blocks during compilation**
 - On success: assigns `execution_id`, starts async execution (or review if enabled)
 - On compilation error: returns error immediately (unless `show_review_on_error=true`)
 - Use `get_result` to get execution output
@@ -52,20 +49,35 @@ Compiles and starts execution of Kotlin or Groovy code in the IDE's runtime cont
 **Response**:
 ```json
 {
-    "execution_id": "20240115/103025-a1b2c3d4",
+    "execution_id": "abc/20241210/143025-x7k9m2p1",
     "status": "running" | "pending_review" | "compilation_error",
-    "errors": [...]  // if compilation_error
+    "errors": [...]
 }
 ```
 
-**Entry Point Semantics**:
+### Script Entry Point
+
+Scripts **must** call `execute { }` to interact with the IDE:
+
 ```kotlin
-// The submitted code must define a suspend `main` function that receives the context
-suspend fun main(ctx: McpScriptContext) {
-    // Your code here
-    // Access the current project via ctx.project
-    // Output via ctx.println(), ctx.printJson(), ctx.log()
-    // Register new MCP commands via ctx.registerCommand(...)
+execute { ctx ->
+    // ctx is McpScriptContext - your gateway to the IDE
+    ctx.println("Hello from IntelliJ!")
+
+    // Wait for indexes to be ready
+    ctx.waitForSmartMode()
+
+    // Access the project
+    val project = ctx.project
+
+    // Read/write actions for PSI
+    ctx.readAction {
+        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
+    }
+
+    ctx.writeAction {
+        psiFile.add(newElement)
+    }
 }
 ```
 
@@ -81,63 +93,33 @@ import com.intellij.psi.*
 import kotlinx.coroutines.*
 ```
 
-Package declaration is optional.
-
 ### `get_result`
 Gets execution output and status. Can stream via SSE.
 
 **Parameters**:
 - `execution_id` (required): ID returned from execute_code
 - `stream`: If true, use SSE to stream output until completion (default: false)
-- `offset`: Skip first N messages (default: 0, returns from beginning)
+- `offset`: Skip first N messages (default: 0)
 
 **Response**:
 ```json
 {
-    "execution_id": "20240115/103025-a1b2c3d4",
+    "execution_id": "abc/20241210/143025-x7k9m2p1",
     "status": "running" | "pending_review" | "success" | "error" | "timeout" | "cancelled",
     "output": [
-        {"ts": 1705312201123, "type": "out", "msg": "Hello world"},
-        {"ts": 1705312201125, "type": "log", "level": "info", "msg": "Processing..."},
-        {"ts": 1705312201200, "type": "json", "data": {"files": 3}}
+        {"ts": 1733840000000, "type": "out", "msg": "Hello from IntelliJ!"},
+        {"ts": 1733840000100, "type": "log", "level": "info", "msg": "Processing..."}
     ],
     "errors": [...],
     "exception": {...}
 }
 ```
 
-**Output message types**:
-- `out` - stdout from ctx.println()
-- `json` - structured data from ctx.printJson()
-- `log` - log messages with level (info/warn/error)
-- `err` - exceptions/errors
-
-**SSE Streaming** (`stream=true`):
-```
-event: message
-data: {"ts":1705312201123,"type":"out","msg":"Hello world"}
-
-event: status
-data: {"status":"running"}
-
-event: complete
-data: {"status":"success","duration_ms":1523}
-```
-
 ### `cancel_execution`
-Cancels a running code execution or pending review.
+Cancels a running execution or pending review.
 
 **Parameters**:
 - `execution_id` (required): ID returned from execute_code
-
-**Response**:
-```json
-{
-    "execution_id": "20240115/103025-a1b2c3d4",
-    "status": "cancelled",
-    "message": "Execution cancelled by user"
-}
-```
 
 ### `read_slot` / `write_slot`
 Named storage slots for persisting data between executions. Slots are project-scoped.
@@ -145,186 +127,124 @@ Named storage slots for persisting data between executions. Slots are project-sc
 **Parameters**:
 - `project_path` (required): Path to the project directory
 - `slot_name`: Name of the slot
-- `value` (write only): String or JSON value to store
-
-**Note**: Slots store strings only. For structured data, serialize to JSON. Objects cannot be stored directly due to classloader isolation.
-
-### `list_commands`
-Lists dynamically registered MCP commands (registered via `McpScriptContext.registerCommand()`).
-
-### `call_command`
-Invokes a dynamically registered command.
+- `value` (write only): String value to store
 
 ## McpScriptContext API
 
-The `McpScriptContext` class is provided to executed code and offers:
+The `McpScriptContext` is provided inside the `execute { }` block:
 
 ```kotlin
-interface McpScriptContext {
+interface McpScriptContext : Disposable {
     /** The IntelliJ Project this execution is associated with */
-    val project: com.intellij.openapi.project.Project
+    val project: Project
+
+    /** CoroutineScope bound to this context's lifecycle */
+    val coroutineScope: CoroutineScope
 
     // === Output Methods ===
-
-    /** Print text output (returned to LLM) */
     fun println(message: Any?)
     fun print(message: Any?)
-
-    /** Serialize object to JSON and output (uses Gson/Jackson) */
-    fun printJson(obj: Any?)
-
-    /** Log messages (info/warn/error levels) */
+    fun printJson(obj: Any?)  // Serialize to JSON
     fun logInfo(message: String)
     fun logWarn(message: String)
     fun logError(message: String, throwable: Throwable? = null)
 
     // === Slot Storage ===
-
-    /** Read from a named slot (project-scoped) */
     fun readSlot(name: String): String?
-
-    /** Write to a named slot (project-scoped) */
     fun writeSlot(name: String, value: String)
 
-    // === Dynamic Commands ===
-
-    /** Register a new MCP command that persists until plugin restart */
-    fun registerCommand(
-        name: String,
-        description: String,
-        handler: suspend (parameters: String) -> String
-    )
-
-    /** Unregister a previously registered command */
-    fun unregisterCommand(name: String)
+    // === IDE Utilities ===
+    suspend fun waitForSmartMode()  // Wait for indexing to complete
+    suspend fun <T> readAction(block: () -> T): T
+    suspend fun <T> writeAction(block: () -> T): T
 
     // === Reflection Helpers ===
-
-    /** List all registered services */
     fun listServices(): List<String>
-
-    /** List all extension points */
     fun listExtensionPoints(): List<String>
-
-    /** Describe a class (methods, fields, annotations) */
     fun describeClass(className: String): String
 }
 ```
 
-**Threading**: Scripts run as suspend functions. For UI operations or write actions:
+### Disposable Hierarchy
+
+`McpScriptContext` implements `Disposable`. Use it as a parent for any resources that should be cleaned up when the script execution completes:
+
 ```kotlin
-suspend fun main(ctx: McpScriptContext) {
-    // Read action (thread-safe read)
-    readAction {
-        val psiFile = PsiManager.getInstance(ctx.project).findFile(virtualFile)
-    }
+execute { ctx ->
+    val myResource = Disposer.newDisposable()
+    Disposer.register(ctx, myResource)
 
-    // Write action (modifies PSI/VFS)
-    writeAction {
-        psiFile.add(newElement)
-    }
-
-    // EDT operations (UI)
-    withContext(Dispatchers.EDT) {
-        // UI code here
-    }
+    // myResource will be disposed when execution completes
 }
 ```
 
 ## Code Execution Architecture
 
-1. **Code Submission**: MCP server receives code via `execute_code` tool
-2. **Compilation** (blocking): Kotlin compiler compiles code, assigns `execution_id` on success
+1. **Code Submission**: MCP server receives code via `execute_code`
+2. **Compilation** (blocking): Kotlin script engine compiles code
 3. **Review** (if enabled): Code opened in editor, waits for human approval
-4. **Execution** (async): `suspend fun main(McpScriptContext)` invoked via `runBlocking`
-5. **Output Streaming**: Output written to file, streamed via `get_result`
-6. **Cleanup**: Classloader released for GC after execution
+4. **Execution**: The `execute { }` block runs with McpScriptContext
+5. **Output**: Written to file, streamed via `get_result`
+6. **Cleanup**: McpScriptContext disposed, resources cleaned up
 
 **Storage Structure**:
 ```
 .idea/mcp-run/
-├── 2024-01-15/                    # Date folder (alphabetic = chronological)
-│   └── 103025-a1b2c3d4/           # HHMMSS-random execution ID
-│       ├── script.kt              # Submitted code
-│       ├── parameters.json        # project_path, plugins, timeout
-│       ├── output.jsonl           # Output log (JSON lines, appended)
-│       └── result.json            # Final status, errors, exception
+├── abc/                           # Project hash (3 chars)
+│   └── 20241210/                  # Date folder
+│       └── 143025-x7k9m2p1/       # HHMMSS-random
+│           ├── script.kt          # Submitted code
+│           ├── parameters.json    # Execution parameters
+│           ├── output.jsonl       # Output log (JSON lines)
+│           └── result.json        # Final status
 ```
 
-**Classloader per execution**:
-- Fresh classloader created for each execution
-- IntelliJ platform classes as parent
-- Specified plugin dependencies (default: all enabled plugins)
-- Classloader released for GC after execution (no memory retention)
+**Execution ID Format**: `{project-hash}/{YYYYMMDD}/{HHMMSS}-{random8}`
+
+## Code Review Mode
+
+By default, all submitted code is opened in the IDE editor for human review before execution.
+
+**Configuration** (IntelliJ Registry):
+- `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
+- `mcp.steroids.review.timeout`: Seconds to wait for review (default: 300)
+- `mcp.steroids.execution.timeout`: Script execution timeout (default: 60)
+
+**Workflow**:
+1. Code submitted → opened in editor with review panel
+2. Human reviews, can add comments/edits
+3. Approve: code executes, result returned
+4. Reject: rejection message returned with any edits/comments
+
+All requests are logged to disk regardless of review mode.
+
+## Runtime Reflection for API Discovery
+
+**LLM agents should use reflection to discover available APIs at runtime:**
+
+```kotlin
+execute { ctx ->
+    // List methods on any class
+    PsiManager::class.java.methods.forEach { method ->
+        ctx.println("${method.name}(${method.parameterTypes.joinToString()})")
+    }
+
+    // Use helper to describe a class
+    ctx.println(ctx.describeClass("com.intellij.psi.PsiManager"))
+}
+```
 
 ## IntelliJ API Reference
 
-For LLM agents working with this MCP server, refer to the IntelliJ Platform SDK:
 - **Source Code**: https://github.com/intellij-community
 - **Documentation**: https://plugins.jetbrains.com/docs/intellij/
 
 Key packages:
 - `com.intellij.openapi.project` - Project management
 - `com.intellij.openapi.vfs` - Virtual File System
-- `com.intellij.psi` - Program Structure Interface (code model)
-- `com.intellij.openapi.application` - Application-level services
+- `com.intellij.psi` - Program Structure Interface
+- `com.intellij.openapi.application` - Application services
 - `com.intellij.openapi.editor` - Editor APIs
-
-## Runtime Reflection for API Discovery
-
-**LLM agents should use reflection to discover available APIs at runtime.** IntelliJ's API surface is vast and varies by version and installed plugins. Instead of assuming an API exists, introspect first:
-
-```kotlin
-fun main(ctx: McpScriptContext) {
-    // List methods on any class
-    PsiManager::class.java.methods.forEach { method ->
-        println("${method.name}(${method.parameterTypes.joinToString()})")
-    }
-
-    // Discover extension points
-    Extensions.getRootArea().extensionPoints.forEach { ep ->
-        println("Extension: ${ep.name}")
-    }
-}
-```
-
-Benefits:
-- Self-documenting: explore what's actually available
-- Version-agnostic: works across IntelliJ versions
-- Plugin-aware: discovers APIs from installed plugins
-- Reduces hallucination: agent sees real API, not imagined one
-
-## Code Review Mode
-
-By default, all submitted code is opened in the IDE editor for human review before execution. The MCP call blocks until the human decides.
-
-**Review modes**:
-- `ALWAYS` (default): All code requires human approval
-- `TRUSTED`: Auto-approve code matching trusted patterns
-- `NEVER`: Auto-execute all code (use with caution)
-
-**Workflow**:
-1. Code submitted → opened in editor with review panel
-2. Human reviews, can add comments/edits
-3. Approve: code executes, result returned
-4. Reject: rejection message returned, includes any edits/comments human made
-
-See [Suggestions.md](Suggestions.md) for details on the review workflow and third-party verification integration.
-
-## Special Case: IntelliJ Project Detection
-
-When the MCP server detects it's running within an IntelliJ-based IDE project (intellij-community or derived), it provides enhanced context to the LLM including:
-- Available internal APIs specific to IDE development
-- Plugin extension points
-- Testing utilities for plugin development
-
-## Project Structure
-
-This is an IntelliJ IDEA plugin project built with:
-- **Gradle**: 8.11.1 (latest stable)
-- **Kotlin**: 2.1.0 (latest stable)
-- **IntelliJ Platform**: 2024.2.4 (configurable via `gradle.properties`)
-- **Java Toolchain**: 21
 
 ## Building and Running
 
@@ -332,7 +252,7 @@ This is an IntelliJ IDEA plugin project built with:
 # Build the plugin
 ./gradlew build
 
-# Run the plugin in IntelliJ (starts MCP server on port 11993)
+# Run the plugin in IntelliJ sandbox
 ./gradlew runIde
 
 # Build distributable plugin ZIP
@@ -344,17 +264,14 @@ This is an IntelliJ IDEA plugin project built with:
 
 ## Configuration
 
-- `build.gradle.kts`: Main build script with explicit plugin configuration
-- `settings.gradle.kts`: Project name configuration
-- `gradle.properties`: Build properties and IntelliJ platform version
-- `gradle/wrapper/`: Gradle wrapper for consistent builds
-
-To target a different IntelliJ Platform version, update `platformVersion` in `gradle.properties`.
+- `build.gradle.kts`: Build configuration
+- `gradle.properties`: IntelliJ platform version (`platformVersion=2024.2.4`)
+- `settings.gradle.kts`: Project name
 
 ## Documentation
 
 - [CLAUDE.md](CLAUDE.md) - Guidance for Claude Code
 - [Plan.md](Plan.md) - Implementation plan
-- [Suggestions.md](Suggestions.md) - Open questions and design suggestions
-- [Discussions.md](Discussions.md) - Design discussions and decisions
-- [STDIO_PROXY.md](STDIO_PROXY.md) - Stdio proxy setup for MCP clients
+- [Suggestions.md](Suggestions.md) - Design suggestions
+- [Discussions.md](Discussions.md) - Design decisions
+- [STDIO_PROXY.md](STDIO_PROXY.md) - Stdio proxy setup
