@@ -186,6 +186,155 @@ fun main(ctx: McpScriptContext) { ... }
 - Provide `ctx.log(message)` for script-level logging
 - Consider adding a "debug mode" that captures more detail
 
+## Runtime Reflection for API Discovery
+
+LLM agents should use reflection to discover available APIs at runtime. This is essential because:
+- IntelliJ's API surface is vast and constantly evolving
+- Plugin availability varies per installation
+- Runtime introspection reveals actual capabilities
+
+### Recommended Reflection Patterns
+
+```kotlin
+fun main(ctx: McpScriptContext) {
+    // Discover available services
+    val serviceManager = ctx.project.getService(Any::class.java)
+
+    // List all registered extension points
+    val extensionArea = Extensions.getRootArea()
+    extensionArea.extensionPoints.forEach { ep ->
+        println("Extension point: ${ep.name}")
+    }
+
+    // Introspect a class to understand its API
+    val psiManager = PsiManager.getInstance(ctx.project)
+    psiManager::class.java.methods.forEach { method ->
+        println("${method.name}(${method.parameterTypes.joinToString()})")
+    }
+
+    // Find implementations of an interface
+    val implementations = ServiceLoader.load(SomeInterface::class.java)
+}
+```
+
+### MCP Server Should Document
+
+The MCP server's tool descriptions should include:
+1. **Encourage reflection-first approach** - before assuming an API exists, introspect
+2. **Provide reflection helpers** in `McpScriptContext`:
+   - `ctx.listServices()` - all registered services
+   - `ctx.listExtensionPoints()` - all extension points
+   - `ctx.describeClass(className)` - methods, fields, annotations
+3. **Include examples** of common reflection patterns in tool descriptions
+4. **Warn about internal APIs** - classes in `*.impl.*` packages may change
+
+### Benefits for LLM Agents
+- Self-documenting: agent can explore what's available
+- Version-agnostic: works across IntelliJ versions
+- Plugin-aware: discovers APIs from installed plugins
+- Reduces hallucination: agent sees real API, not imagined one
+
+## Code Review Mode (Human-in-the-Loop)
+
+### Overview
+A safety mode where submitted code is opened in the IDE editor for human review before execution. This is **enabled by default** to ensure safety.
+
+### Workflow
+1. Agent submits code via `execute_code` tool
+2. MCP server saves code to `.idea/mcp-run/pending/<id>.kt`
+3. Code is opened in IntelliJ editor with a review panel
+4. Human reviews code and clicks "Approve" or "Reject"
+5. MCP server returns result (execution output or rejection message)
+
+### Configuration
+```kotlin
+// In MCP server settings
+enum class ReviewMode {
+    ALWAYS,      // Always require human approval (default)
+    TRUSTED,     // Auto-approve code matching trusted patterns
+    NEVER        // Auto-execute all code (dangerous, for development only)
+}
+```
+
+### UI Components
+- **Review Panel**: Shows code with syntax highlighting
+- **Approve Button**: Executes the code
+- **Reject Button**: Returns rejection to agent with optional reason
+- **Edit Button**: Allow human to modify code before approval
+- **Trust Checkbox**: "Trust similar code in future" (pattern-based)
+
+### MCP Response During Review
+```json
+{
+    "status": "pending_review",
+    "message": "Code is awaiting human approval in the IDE",
+    "review_id": "abc123"
+}
+```
+
+### Timeout Handling
+- Default review timeout: 5 minutes
+- After timeout: return `review_timeout` status
+- Agent can re-submit or ask user to check IDE
+
+## Third-Party Code Verification Integration
+
+### Overview
+Extensible system for automated code verification before execution, complementing or replacing human review.
+
+### Architecture
+```kotlin
+interface CodeVerifier {
+    /** Verify code before execution. Return null to approve, or error message to reject. */
+    suspend fun verify(code: String, language: String, context: VerificationContext): VerificationResult
+}
+
+data class VerificationResult(
+    val approved: Boolean,
+    val reason: String?,
+    val suggestions: List<String>? // Optional improvements
+)
+```
+
+### Built-in Verifiers
+1. **Static Analysis** - run IntelliJ inspections on the code
+2. **Pattern Blocklist** - reject code matching dangerous patterns (e.g., `Runtime.exec`, `File.delete`)
+3. **Scope Limiter** - reject code accessing certain packages
+
+### Third-Party Integration Points
+1. **AI-based Review** - send code to another LLM for safety analysis
+2. **Custom Webhook** - POST code to external service for verification
+3. **Plugin-based** - IntelliJ plugins can register custom verifiers
+
+### Configuration
+```kotlin
+// Verification pipeline (executed in order, all must pass)
+verifiers = [
+    PatternBlocklistVerifier(patterns = ["Runtime.exec", "ProcessBuilder"]),
+    StaticAnalysisVerifier(minSeverity = WARNING),
+    WebhookVerifier(url = "https://my-company.com/code-review"),
+    AiVerifier(model = "gpt-4", prompt = "Is this code safe to run in an IDE?")
+]
+```
+
+### Verification Modes
+- **Strict**: All verifiers must approve
+- **Majority**: >50% of verifiers approve
+- **Any**: At least one verifier approves
+- **Advisory**: Log results but don't block (for monitoring)
+
+### MCP Response with Verification
+```json
+{
+    "status": "rejected",
+    "verification_results": [
+        {"verifier": "pattern_blocklist", "approved": false, "reason": "Contains Runtime.exec"},
+        {"verifier": "static_analysis", "approved": true},
+        {"verifier": "ai_review", "approved": false, "reason": "Code attempts to delete files"}
+    ]
+}
+```
+
 ## Future Extensions
 
 1. **File watching** - notify when files change

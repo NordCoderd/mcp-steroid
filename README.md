@@ -107,6 +107,41 @@ Key packages:
 - `com.intellij.openapi.application` - Application-level services
 - `com.intellij.openapi.editor` - Editor APIs
 
+## Runtime Reflection for API Discovery
+
+**LLM agents should use reflection to discover available APIs at runtime.** IntelliJ's API surface is vast and varies by version and installed plugins. Instead of assuming an API exists, introspect first:
+
+```kotlin
+fun main(ctx: McpScriptContext) {
+    // List methods on any class
+    PsiManager::class.java.methods.forEach { method ->
+        println("${method.name}(${method.parameterTypes.joinToString()})")
+    }
+
+    // Discover extension points
+    Extensions.getRootArea().extensionPoints.forEach { ep ->
+        println("Extension: ${ep.name}")
+    }
+}
+```
+
+Benefits:
+- Self-documenting: explore what's actually available
+- Version-agnostic: works across IntelliJ versions
+- Plugin-aware: discovers APIs from installed plugins
+- Reduces hallucination: agent sees real API, not imagined one
+
+## Code Review Mode
+
+By default, all submitted code is opened in the IDE editor for human review before execution. The human can approve, reject, or edit the code.
+
+**Review modes**:
+- `ALWAYS` (default): All code requires human approval
+- `TRUSTED`: Auto-approve code matching trusted patterns
+- `NEVER`: Auto-execute all code (use with caution)
+
+See [Suggestions.md](Suggestions.md) for details on the review workflow and third-party verification integration.
+
 ## Special Case: IntelliJ Project Detection
 
 When the MCP server detects it's running within an IntelliJ-based IDE project (intellij-community or derived), it provides enhanced context to the LLM including:
