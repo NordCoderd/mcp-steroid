@@ -2,6 +2,9 @@
 package com.jonnyzzz.intellij.mcp
 
 /**
- * Main plugin class for IntelliJ MCP Steroid
+ * Main plugin class for IntelliJ MCP Steroid.
+ * 
+ * This is a placeholder class for the plugin structure.
+ * Plugin functionality will be implemented through extensions defined in plugin.xml.
  */
 class McpSteroidPlugin
