@@ -2,36 +2,29 @@
 
 This plan reflects decisions from [Discussions.md](Discussions.md).
 
+**Target Version**: IntelliJ 2025.3+
+
 ---
 
 ## Key Architecture Decisions
 
-### MCP Integration Options
+### MCP Integration
 
-**Option A: IntelliJ's Built-in MCP Server (Preferred for 2024.3+)**
-
-IntelliJ has a bundled MCP server plugin (`com.intellij.mcpServer`):
+Uses IntelliJ's built-in MCP server plugin (`com.intellij.mcpServer`):
 
 ```kotlin
 class SteroidsMcpToolset : McpToolset {
     @McpTool
     @McpDescription("Execute Kotlin code in IDE context")
     suspend fun execute_code(
-        @McpDescription("Project directory path") projectPath: String,
+        @McpDescription("Project name") projectName: String,
         @McpDescription("Kotlin code to execute") code: String,
         @McpDescription("Execution timeout in seconds") timeout: Int = 60
     ): ExecuteCodeResult { ... }
 }
 ```
 
-Registration in plugin.xml:
-```xml
-<depends optional="true" config-file="mcp-integration.xml">com.intellij.mcpServer</depends>
-```
-
-**Option B: REST Endpoint (Fallback)**
-
-For older IntelliJ versions, use RestService at `/api/steroids-mcp`.
+No REST endpoint fallback - McpToolset only.
 
 ### Script Execution Model
 
@@ -57,8 +50,14 @@ Use `IdeScriptEngineManager` with `AllPluginsLoader.INSTANCE` (automatic, no con
 ### Review Mode
 
 - Enabled by default (`ALWAYS`)
+- `TRUSTED` = trust all MCP callers, auto-approve
 - Configurable via IntelliJ Registry
 - All requests logged regardless of mode
+
+### Response Model
+
+IntelliJ MCP tools return complete `McpToolCallResult` objects (no streaming at tool level).
+Use polling via `get_result` to retrieve execution output.
 
 ---
 
@@ -74,7 +73,7 @@ plugins {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaCommunity("2024.2.4")
+        intellijIdeaCommunity("2025.3")
         bundledPlugin("com.intellij.java")
     }
 }
@@ -89,21 +88,15 @@ dependencies {
 
     <depends>com.intellij.modules.platform</depends>
     <depends>com.intellij.modules.lang</depends>
-
-    <!-- Optional MCP server integration -->
-    <depends optional="true" config-file="mcp-integration.xml">com.intellij.mcpServer</depends>
+    <depends>com.intellij.mcpServer</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <!-- REST endpoint fallback -->
-        <httpRequestHandler implementation="com.jonnyzzz.intellij.mcp.server.McpRestService"/>
-
         <!-- Review panel -->
         <editorNotificationProvider
             implementation="com.jonnyzzz.intellij.mcp.review.McpReviewNotificationProvider"/>
 
         <!-- Project services -->
         <projectService serviceImplementation="com.jonnyzzz.intellij.mcp.execution.ExecutionManager"/>
-        <projectService serviceImplementation="com.jonnyzzz.intellij.mcp.storage.SlotStorage"/>
         <projectService serviceImplementation="com.jonnyzzz.intellij.mcp.storage.ExecutionStorage"/>
 
         <!-- Registry keys -->
@@ -114,27 +107,18 @@ dependencies {
         <registryKey key="mcp.steroids.execution.timeout" defaultValue="60"
             description="Execution timeout in seconds"/>
     </extensions>
-</idea-plugin>
-```
 
-### 1.3 Create mcp-integration.xml
-
-```xml
-<idea-plugin>
     <extensions defaultExtensionNs="com.intellij.mcpServer">
         <mcpToolset implementation="com.jonnyzzz.intellij.mcp.SteroidsMcpToolset"/>
     </extensions>
 </idea-plugin>
 ```
 
-### 1.4 Package Structure
+### 1.3 Package Structure
 
 ```
 src/main/kotlin/com/jonnyzzz/intellij/mcp/
-├── SteroidsMcpToolset.kt          # MCP toolset (Option A)
-├── server/
-│   ├── McpRestService.kt          # REST endpoint (Option B)
-│   └── McpProtocol.kt             # JSON-RPC handling
+├── SteroidsMcpToolset.kt          # MCP toolset with all tools
 ├── execution/
 │   ├── ExecutionManager.kt        # Project service, queue
 │   ├── ScriptExecutor.kt          # Uses IdeScriptEngine
@@ -143,13 +127,13 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 │   ├── McpScriptContextImpl.kt    # Implementation
 │   └── OutputCapture.kt           # Writer for output
 ├── storage/
-│   ├── ExecutionStorage.kt        # File-based history
-│   └── SlotStorage.kt             # Key-value slots
+│   └── ExecutionStorage.kt        # File-based history
 ├── review/
 │   ├── ReviewManager.kt           # Manages pending reviews
 │   └── McpReviewNotificationProvider.kt
 └── util/
-    └── ProjectHash.kt             # 3-char project hash
+    ├── ProjectHash.kt             # 3-char project hash
+    └── PayloadHash.kt             # 10-char payload hash
 ```
 
 ---
@@ -180,10 +164,6 @@ interface McpScriptContext : Disposable {
     fun logWarn(message: String)
     fun logError(message: String, throwable: Throwable? = null)
 
-    // Slots
-    fun readSlot(name: String): String?
-    fun writeSlot(name: String, value: String)
-
     // IDE Utilities
     suspend fun waitForSmartMode()
     suspend fun <T> readAction(block: () -> T): T
@@ -203,7 +183,6 @@ class McpScriptContextImpl(
     override val project: Project,
     private val executionId: ExecutionId,
     private val outputCapture: OutputCapture,
-    private val slotStorage: SlotStorage,
     parentScope: CoroutineScope
 ) : McpScriptContext {
 
@@ -249,7 +228,6 @@ class McpScriptContextImpl(
 class ScriptExecutor(
     private val project: Project,
     private val executionStorage: ExecutionStorage,
-    private val slotStorage: SlotStorage,
     private val parentScope: CoroutineScope
 ) {
     suspend fun execute(executionId: ExecutionId, code: String): ExecutionResult {
@@ -262,7 +240,7 @@ class ScriptExecutor(
         engine.setStdErr(outputCapture.stderrWriter)
 
         val context = McpScriptContextImpl(
-            project, executionId, outputCapture, slotStorage, parentScope
+            project, executionId, outputCapture, parentScope
         )
 
         var capturedBlock: (suspend McpScriptContext.() -> Unit)? = null
@@ -329,7 +307,6 @@ class ExecutionManager(
     private val executor = ScriptExecutor(
         project,
         project.service<ExecutionStorage>(),
-        project.service<SlotStorage>(),
         executionScope
     )
 
@@ -373,11 +350,11 @@ class ExecutionStorage(private val project: Project) {
 
     fun createExecution(code: String, params: ExecutionParams): ExecutionId {
         val projectHash = ProjectHash.compute(project.name)
-        val date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE)
-        val time = LocalTime.now().format(DateTimeFormatter.ofPattern("HHmmss"))
-        val random = UUID.randomUUID().toString().take(8)
+        val timestamp = LocalDateTime.now()
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss"))
+        val payloadHash = PayloadHash.compute(code, params)
 
-        val id = ExecutionId("$projectHash/$date/$time-$random")
+        val id = ExecutionId("$projectHash-$timestamp-$payloadHash")
         val dir = baseDir.resolve(id.value)
         Files.createDirectories(dir)
 
@@ -411,31 +388,34 @@ class ExecutionStorage(private val project: Project) {
 }
 ```
 
-### 3.2 SlotStorage
+### 3.2 Hash Utilities
 
 ```kotlin
-@Service(Service.Level.PROJECT)
-class SlotStorage(private val project: Project) {
-    private val slotsDir: Path
-        get() = Path.of(project.basePath!!, ".idea", "mcp-run", "slots")
-
-    fun read(name: String): String? {
-        val file = slotsDir.resolve("$name.txt")
-        return if (Files.exists(file)) Files.readString(file) else null
+object ProjectHash {
+    fun compute(projectName: String): String {
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(projectName.toByteArray())
+        return Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(hash).take(3)
     }
+}
 
-    fun write(name: String, value: String) {
-        Files.createDirectories(slotsDir)
-        Files.writeString(slotsDir.resolve("$name.txt"), value)
+object PayloadHash {
+    fun compute(code: String, params: ExecutionParams): String {
+        val payload = code + Gson().toJson(params)
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(payload.toByteArray())
+        return Base64.getUrlEncoder().withoutPadding()
+            .encodeToString(hash).take(10)
     }
 }
 ```
 
 ---
 
-## Phase 4: MCP Integration
+## Phase 4: MCP Toolset
 
-### 4.1 SteroidsMcpToolset (Option A)
+### 4.1 SteroidsMcpToolset
 
 ```kotlin
 class SteroidsMcpToolset : McpToolset {
@@ -451,24 +431,33 @@ class SteroidsMcpToolset : McpToolset {
     @McpTool
     @McpDescription("Execute Kotlin code in IDE context")
     suspend fun execute_code(
-        @McpDescription("Project directory path") projectPath: String,
+        @McpDescription("Project name (from list_projects)") projectName: String,
         @McpDescription("Kotlin code to execute") code: String,
         @McpDescription("Timeout in seconds") timeout: Int = 60,
         @McpDescription("Show review on error") showReviewOnError: Boolean = false
     ): ExecuteCodeResult {
-        val project = findProject(projectPath) ?: mcpFail("Project not found")
+        val project = findProject(projectName) ?: mcpFail("Project not found: $projectName")
         val manager = project.service<ExecutionManager>()
         val id = manager.submit(code, ExecutionParams(timeout, showReviewOnError))
         return ExecuteCodeResult(id.value, manager.getStatus(id))
     }
 
     @McpTool
-    @McpDescription("Get execution result")
-    suspend fun get_result(
+    @McpDescription("Get execution result (poll for status and output)")
+    fun get_result(
         @McpDescription("Execution ID") executionId: String,
         @McpDescription("Message offset") offset: Int = 0
     ): GetResultResponse {
-        // Implementation
+        val id = ExecutionId(executionId)
+        val project = findProjectByExecutionId(id) ?: mcpFail("Project not found for execution")
+        val manager = project.service<ExecutionManager>()
+        val storage = project.service<ExecutionStorage>()
+
+        return GetResultResponse(
+            executionId = executionId,
+            status = manager.getStatus(id),
+            output = storage.readOutput(id, offset)
+        )
     }
 
     @McpTool
@@ -476,23 +465,21 @@ class SteroidsMcpToolset : McpToolset {
     fun cancel_execution(
         @McpDescription("Execution ID") executionId: String
     ): CancelResult {
-        // Implementation
+        val id = ExecutionId(executionId)
+        val project = findProjectByExecutionId(id) ?: mcpFail("Project not found for execution")
+        val manager = project.service<ExecutionManager>()
+        val cancelled = manager.cancel(id)
+        return CancelResult(cancelled)
     }
-}
-```
 
-### 4.2 McpRestService (Option B)
+    private fun findProject(name: String): Project? =
+        ProjectManager.getInstance().openProjects.find { it.name == name }
 
-```kotlin
-class McpRestService : RestService() {
-    override fun getServiceName() = "steroids-mcp"
-
-    override fun execute(
-        urlDecoder: QueryStringDecoder,
-        request: FullHttpRequest,
-        context: ChannelHandlerContext
-    ): String? {
-        // Parse JSON-RPC, route to handlers
+    private fun findProjectByExecutionId(id: ExecutionId): Project? {
+        val projectHash = id.value.split("-").firstOrNull() ?: return null
+        return ProjectManager.getInstance().openProjects.find {
+            ProjectHash.compute(it.name) == projectHash
+        }
     }
 }
 ```
@@ -509,6 +496,11 @@ class ReviewManager(private val project: Project) {
     private val pending = ConcurrentHashMap<ExecutionId, CompletableDeferred<ReviewResult>>()
 
     suspend fun requestReview(id: ExecutionId, code: String): ReviewResult {
+        val reviewMode = Registry.stringValue("mcp.steroids.review.mode")
+        if (reviewMode == "TRUSTED" || reviewMode == "NEVER") {
+            return ReviewResult.Approved
+        }
+
         val file = saveToPendingFolder(id, code)
 
         withContext(Dispatchers.EDT) {
@@ -538,7 +530,8 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
         project: Project,
         file: VirtualFile
     ): Function<FileEditor, JComponent?>? {
-        if (!file.path.contains(".idea/mcp-run/pending/")) return null
+        if (!file.path.contains(".idea/mcp-run/") || !file.name.endsWith(".kt")) return null
+        if (!file.path.contains("/pending/")) return null
 
         val id = extractExecutionId(file) ?: return null
 
@@ -604,9 +597,6 @@ class McpIntegrationTest : HeavyPlatformTestCase() {
 
     @Test
     fun `get_result returns output`() { ... }
-
-    @Test
-    fun `slots persist between executions`() { ... }
 }
 ```
 
@@ -616,11 +606,10 @@ class McpIntegrationTest : HeavyPlatformTestCase() {
 
 1. **Phase 1**: Project setup, plugin.xml, package structure
 2. **Phase 2**: McpScriptScope, McpScriptContext, ScriptExecutor
-3. **Phase 3**: ExecutionStorage, SlotStorage
-4. **Phase 4.2**: McpRestService (simpler, test first)
+3. **Phase 3**: ExecutionStorage with new ID format
+4. **Phase 4**: SteroidsMcpToolset
 5. **Phase 6**: Tests
 6. **Phase 5**: Code review (can defer)
-7. **Phase 4.1**: SteroidsMcpToolset (if targeting 2024.3+)
 
 ---
 
@@ -628,12 +617,15 @@ class McpIntegrationTest : HeavyPlatformTestCase() {
 
 | Topic | Decision |
 |-------|----------|
-| MCP Integration | Option A (McpToolset) for 2024.3+, Option B (REST) fallback |
+| MCP Integration | McpToolset only (no REST fallback) |
+| Target Version | IntelliJ 2025.3+ |
 | Entry Point | `execute { ctx -> }` via McpScriptScope |
 | Script Engine | IdeScriptEngineManager + AllPluginsLoader |
 | CoroutineScope | Service-injected, childScope pattern |
 | McpScriptContext | Implements Disposable, bound to scope |
-| Review Mode | ALWAYS default, Registry configurable |
-| Execution ID | `{hash}/{date}/{time}-{random}` |
+| Review Mode | ALWAYS default, TRUSTED = trust all callers |
+| Execution ID | `{hash-3}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-10}` |
+| Response Model | Polling via get_result (no streaming) |
 | Language | Kotlin only (v1) |
-| Dynamic Commands | Deferred to v2 |
+| Slots/Commands | Deferred to v2 |
+| Compilation | Synchronous (blocks tool call) |

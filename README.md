@@ -1,6 +1,6 @@
 # intellij-mcp-steroid
 
-An MCP (Model Context Protocol) Server for IntelliJ IDEA that provides a Kotlin console interface, allowing LLM agents to execute code directly within the IDE's runtime environment.
+An MCP (Model Context Protocol) plugin for IntelliJ IDEA that provides a Kotlin console interface, allowing LLM agents to execute code directly within the IDE's runtime environment.
 
 ## Overview
 
@@ -8,11 +8,11 @@ This IntelliJ plugin exposes IDE APIs to LLM agents via Kotlin script execution.
 
 **Primary Use Case**: An LLM agent submits Kotlin code that runs inside IntelliJ, accessing project structure, PSI (Program Structure Interface), refactoring tools, VFS (Virtual File System), and any other IDE APIs.
 
+**Target Version**: IntelliJ 2025.3+
+
 ## MCP Server Integration
 
-### Option A: IntelliJ's Built-in MCP Server (Preferred)
-
-IntelliJ 2024.3+ includes a built-in MCP server plugin (`com.intellij.mcpServer`). This plugin registers tools via the `mcpToolset` extension point:
+This plugin registers tools with IntelliJ's built-in MCP server (`com.intellij.mcpServer`) via the `mcpToolset` extension point:
 
 ```xml
 <extensions defaultExtensionNs="com.intellij.mcpServer">
@@ -20,36 +20,41 @@ IntelliJ 2024.3+ includes a built-in MCP server plugin (`com.intellij.mcpServer`
 </extensions>
 ```
 
-### Option B: REST Endpoint
+No separate server or port configuration needed - uses IntelliJ's MCP infrastructure.
 
-For compatibility with older IntelliJ versions or standalone use:
-- Endpoint: `/api/steroids-mcp` on IntelliJ's built-in HTTP server
-- Port: typically 63342 (range 63342-63361)
+## MCP Tools
 
-See [STDIO_PROXY.md](STDIO_PROXY.md) for connecting stdio-based MCP clients.
+### `list_projects`
+Lists all open projects in the IDE.
 
-## API
+**Returns**:
+```json
+[
+  {"name": "my-project", "path": "/path/to/my-project"},
+  {"name": "another-project", "path": "/path/to/another-project"}
+]
+```
 
 ### `execute_code`
 Compiles and executes Kotlin code in the IDE's runtime context.
 
 **Parameters**:
-- `project_path` (required): Path to the project directory (must match an open project)
+- `project_name` (required): Name of an open project (from `list_projects`)
 - `code` (required): Kotlin code to execute
 - `timeout`: Execution timeout in seconds (default: 60)
 - `show_review_on_error`: If true, show code in editor even on compilation error
 
 **Execution Model**:
-- **Blocks during compilation**
+- **Compilation is synchronous** - blocks until compiled
 - On success: assigns `execution_id`, starts async execution (or review if enabled)
 - On compilation error: returns error immediately (unless `show_review_on_error=true`)
-- Use `get_result` to get execution output
+- Use `get_result` to poll for execution output
 - Requests are executed sequentially (queued)
 
 **Response**:
 ```json
 {
-    "execution_id": "abc/20241210/143025-x7k9m2p1",
+    "execution_id": "abc-2024-12-10T14-30-25-a1B2c3D4e5",
     "status": "running" | "pending_review" | "compilation_error",
     "errors": [...]
 }
@@ -94,17 +99,16 @@ import kotlinx.coroutines.*
 ```
 
 ### `get_result`
-Gets execution output and status. Can stream via SSE.
+Gets execution output and status via polling.
 
 **Parameters**:
 - `execution_id` (required): ID returned from execute_code
-- `stream`: If true, use SSE to stream output until completion (default: false)
 - `offset`: Skip first N messages (default: 0)
 
 **Response**:
 ```json
 {
-    "execution_id": "abc/20241210/143025-x7k9m2p1",
+    "execution_id": "abc-2024-12-10T14-30-25-a1B2c3D4e5",
     "status": "running" | "pending_review" | "success" | "error" | "timeout" | "cancelled",
     "output": [
         {"ts": 1733840000000, "type": "out", "msg": "Hello from IntelliJ!"},
@@ -120,14 +124,6 @@ Cancels a running execution or pending review.
 
 **Parameters**:
 - `execution_id` (required): ID returned from execute_code
-
-### `read_slot` / `write_slot`
-Named storage slots for persisting data between executions. Slots are project-scoped.
-
-**Parameters**:
-- `project_path` (required): Path to the project directory
-- `slot_name`: Name of the slot
-- `value` (write only): String value to store
 
 ## McpScriptContext API
 
@@ -148,10 +144,6 @@ interface McpScriptContext : Disposable {
     fun logInfo(message: String)
     fun logWarn(message: String)
     fun logError(message: String, throwable: Throwable? = null)
-
-    // === Slot Storage ===
-    fun readSlot(name: String): String?
-    fun writeSlot(name: String, value: String)
 
     // === IDE Utilities ===
     suspend fun waitForSmartMode()  // Wait for indexing to complete
@@ -180,26 +172,27 @@ execute { ctx ->
 
 ## Code Execution Architecture
 
-1. **Code Submission**: MCP server receives code via `execute_code`
-2. **Compilation** (blocking): Kotlin script engine compiles code
+1. **Code Submission**: MCP tool receives code via `execute_code`
+2. **Compilation** (synchronous): Kotlin script engine compiles code
 3. **Review** (if enabled): Code opened in editor, waits for human approval
 4. **Execution**: The `execute { }` block runs with McpScriptContext
-5. **Output**: Written to file, streamed via `get_result`
+5. **Output**: Written to file, polled via `get_result`
 6. **Cleanup**: McpScriptContext disposed, resources cleaned up
 
 **Storage Structure**:
 ```
 .idea/mcp-run/
-├── abc/                           # Project hash (3 chars)
-│   └── 20241210/                  # Date folder
-│       └── 143025-x7k9m2p1/       # HHMMSS-random
-│           ├── script.kt          # Submitted code
-│           ├── parameters.json    # Execution parameters
-│           ├── output.jsonl       # Output log (JSON lines)
-│           └── result.json        # Final status
+├── abc-2024-12-10T14-30-25-a1B2c3D4e5/   # execution_id as directory
+│   ├── script.kt                          # Submitted code
+│   ├── parameters.json                    # Execution parameters
+│   ├── output.jsonl                       # Output log (JSON lines)
+│   └── result.json                        # Final status
 ```
 
-**Execution ID Format**: `{project-hash}/{YYYYMMDD}/{HHMMSS}-{random8}`
+**Execution ID Format**: `{project-hash-3chars}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-hash-10chars}`
+- Project hash: first 3 chars of base64url-encoded hash of project name
+- Timestamp: ISO-like format without timezone
+- Payload hash: first 10 chars of base64url-encoded hash of (code + parameters)
 
 ## Code Review Mode
 
@@ -207,6 +200,9 @@ By default, all submitted code is opened in the IDE editor for human review befo
 
 **Configuration** (IntelliJ Registry):
 - `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
+  - `ALWAYS`: Every script requires human approval
+  - `TRUSTED`: Auto-approve all (trust MCP callers)
+  - `NEVER`: Auto-execute all (development only)
 - `mcp.steroids.review.timeout`: Seconds to wait for review (default: 300)
 - `mcp.steroids.execution.timeout`: Script execution timeout (default: 60)
 
@@ -265,7 +261,7 @@ Key packages:
 ## Configuration
 
 - `build.gradle.kts`: Build configuration
-- `gradle.properties`: IntelliJ platform version (`platformVersion=2024.2.4`)
+- `gradle.properties`: IntelliJ platform version
 - `settings.gradle.kts`: Project name
 
 ## Documentation
@@ -274,4 +270,3 @@ Key packages:
 - [Plan.md](Plan.md) - Implementation plan
 - [Suggestions.md](Suggestions.md) - Design suggestions
 - [Discussions.md](Discussions.md) - Design decisions
-- [STDIO_PROXY.md](STDIO_PROXY.md) - Stdio proxy setup

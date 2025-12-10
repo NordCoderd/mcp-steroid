@@ -623,14 +623,58 @@ Groovy support deferred. Focus on Kotlin scripting only for v1.
 
 | Topic | Decision |
 |-------|----------|
-| **MCP Integration** | Investigate IntelliJ's built-in MCP server plugin |
-| **Endpoint** | `/api/steroids-mcp` or MCP toolset extension |
+| **MCP Integration** | McpToolset only (no REST fallback) |
+| **Target Version** | IntelliJ 2025.3+ |
 | **Entry Point** | `execute { ctx -> ... }` via McpScriptScope |
 | **Plugins param** | REMOVED - AllPluginsLoader used internally |
-| **Review mode** | ALWAYS by default, Registry configurable |
+| **Review mode** | ALWAYS by default, TRUSTED = trust all callers |
 | **Registry keys** | review.mode, review.timeout, execution.timeout |
 | **Dynamic commands** | Deferred to v2 |
-| **Execution ID** | `{project-hash}/{date}/{time}-{random}` |
+| **Slots API** | Deferred to v2 |
+| **Execution ID** | `{hash-3}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-10}` |
 | **Language** | Kotlin only (no Groovy for v1) |
 | **CoroutineScope** | Service-injected, childScope pattern |
 | **Disposable** | McpScriptContext is Disposable, bound to scope |
+| **Response Model** | Polling via get_result (no streaming at tool level) |
+| **Compilation** | Synchronous (blocks tool call) |
+
+---
+
+## Final Clarifications (2024-12-10)
+
+### Execution ID Format
+
+**Final format**: `{project-hash-3}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-hash-10}`
+
+- No slashes (use `-` separator)
+- No timezone in timestamp
+- Project hash: first 3 chars of base64url-encoded SHA-256 of project name
+- Payload hash: first 10 chars of base64url-encoded SHA-256 of (code + parameters JSON)
+- Example: `abc-2024-12-10T14-30-25-a1B2c3D4e5`
+
+Used as directory name: `.idea/mcp-run/abc-2024-12-10T14-30-25-a1B2c3D4e5/`
+
+### Response Model
+
+IntelliJ MCP tools return complete `McpToolCallResult` objects - no streaming at the tool level.
+Streaming exists at the transport level (SSE), but individual tool calls are request-response.
+
+**Conclusion**: Use polling via `get_result` tool. This is acceptable for v1.
+
+### Project Identification
+
+- `list_projects` returns all open projects with name and path
+- Other tools use `project_name` parameter (not path)
+- Project must be open in IDE
+
+### Review Modes
+
+- `ALWAYS` (default): Every script requires human approval
+- `TRUSTED`: Trust all MCP callers, auto-approve everything
+- `NEVER`: Auto-execute all (development/testing only)
+
+### Deferred to v2
+
+- Slots API (read_slot/write_slot) - both MCP tools and context methods
+- Dynamic commands (register_command/unregister_command)
+- SSE streaming for output (if feasible with McpToolset)
