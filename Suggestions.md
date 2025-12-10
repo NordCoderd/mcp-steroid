@@ -167,6 +167,34 @@ fun main(ctx: McpScriptContext) { ... }
 3. **Incremental compilation** - for iterative development
 4. **Parallel compilation** - if multiple requests queue up
 
+## Output Storage and Streaming
+
+### Design Decisions
+- Output written to file (`output.jsonl`), not kept in memory
+- File is appended during execution, streamed to client on demand
+- JSON lines format for easy parsing and streaming
+- Offset parameter allows resuming from specific message
+
+### Why File-Based
+- Memory efficient for long-running scripts
+- Survives IDE restart (can retrieve past execution results)
+- Easy to inspect manually
+- Natural streaming via file tailing
+
+### JSON Lines Format
+Each line is a complete JSON object:
+```jsonl
+{"ts":1705312201123,"type":"out","msg":"Hello world"}
+{"ts":1705312201125,"type":"log","level":"info","msg":"Processing"}
+{"ts":1705312201200,"type":"json","data":{"files":3,"errors":0}}
+```
+
+### SSE Implementation Notes
+- Use Ktor's SSE support or implement manually with chunked response
+- Send heartbeat every 15 seconds to keep connection alive
+- Include message sequence number for offset tracking
+- Close stream on completion, timeout, or cancellation
+
 ## API Versioning
 
 ### Questions

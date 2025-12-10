@@ -28,7 +28,7 @@ Lists all currently open projects with their directories.
 **Response**: Array of `{ name: string, path: string }`
 
 ### `execute_code`
-Executes Kotlin or Groovy code in the IDE's runtime context.
+Compiles and starts execution of Kotlin or Groovy code in the IDE's runtime context.
 
 **Parameters**:
 - `project_path` (required): Path to the project directory (must match an open project)
@@ -36,13 +36,23 @@ Executes Kotlin or Groovy code in the IDE's runtime context.
 - `code`: The code to execute
 - `plugins`: List of plugin IDs to include in classpath (default: all enabled plugins)
 - `timeout`: Execution timeout in seconds (default: 60)
+- `show_review_on_error`: If true, show code in editor even on compilation error (for user help)
 
 **Execution Model**:
-- Code runs as a suspend function in the IDE process
-- The call blocks until completion, timeout, or cancellation
-- Output is streamed as it appears
-- Compilation and runtime errors are reported separately with details
+- **Blocks during compilation only**
+- On success: assigns `execution_id`, starts async execution (or review if enabled)
+- On compilation error: returns error immediately (unless `show_review_on_error=true`)
+- Use `get_result` to get execution output
 - Requests are executed sequentially (queued)
+
+**Response**:
+```json
+{
+    "execution_id": "20240115/103025-a1b2c3d4",
+    "status": "running" | "pending_review" | "compilation_error",
+    "errors": [...]  // if compilation_error
+}
+```
 
 **Entry Point Semantics**:
 ```kotlin
@@ -69,11 +79,61 @@ import kotlinx.coroutines.*
 
 Package declaration is optional.
 
-### `cancel_execution`
-Cancels a running code execution.
+### `get_result`
+Gets execution output and status. Can stream via SSE.
 
 **Parameters**:
-- `execution_id`: ID returned from execute_code
+- `execution_id` (required): ID returned from execute_code
+- `stream`: If true, use SSE to stream output until completion (default: false)
+- `offset`: Skip first N messages (default: 0, returns from beginning)
+
+**Response**:
+```json
+{
+    "execution_id": "20240115/103025-a1b2c3d4",
+    "status": "running" | "pending_review" | "success" | "error" | "timeout" | "cancelled",
+    "output": [
+        {"ts": 1705312201123, "type": "out", "msg": "Hello world"},
+        {"ts": 1705312201125, "type": "log", "level": "info", "msg": "Processing..."},
+        {"ts": 1705312201200, "type": "json", "data": {"files": 3}}
+    ],
+    "errors": [...],
+    "exception": {...}
+}
+```
+
+**Output message types**:
+- `out` - stdout from ctx.println()
+- `json` - structured data from ctx.printJson()
+- `log` - log messages with level (info/warn/error)
+- `err` - exceptions/errors
+
+**SSE Streaming** (`stream=true`):
+```
+event: message
+data: {"ts":1705312201123,"type":"out","msg":"Hello world"}
+
+event: status
+data: {"status":"running"}
+
+event: complete
+data: {"status":"success","duration_ms":1523}
+```
+
+### `cancel_execution`
+Cancels a running code execution or pending review.
+
+**Parameters**:
+- `execution_id` (required): ID returned from execute_code
+
+**Response**:
+```json
+{
+    "execution_id": "20240115/103025-a1b2c3d4",
+    "status": "cancelled",
+    "message": "Execution cancelled by user"
+}
+```
 
 ### `read_slot` / `write_slot`
 Named storage slots for persisting data between executions. Slots are project-scoped.
@@ -170,28 +230,28 @@ suspend fun main(ctx: McpScriptContext) {
 ## Code Execution Architecture
 
 1. **Code Submission**: MCP server receives code via `execute_code` tool
-2. **Review** (if enabled): Code opened in editor, waits for human approval
-3. **Storage**: Code saved to `.idea/mcp-run/<timestamp>-<hash>.kt`
-4. **Classloader Creation**: Fresh classloader per execution with:
-   - IntelliJ platform classes as parent
-   - Specified plugin dependencies (default: all enabled plugins)
-5. **Compilation**: Kotlin compiler (bundled) compiles code in the classloader context
-6. **Execution**: `suspend fun main(McpScriptContext)` invoked via `runBlocking`
-7. **Output Streaming**: Output streamed to LLM as it appears
-8. **Cleanup**: Classloader released for GC after execution
-9. **Result**: Compilation errors, runtime errors, or output returned with clear status
+2. **Compilation** (blocking): Kotlin compiler compiles code, assigns `execution_id` on success
+3. **Review** (if enabled): Code opened in editor, waits for human approval
+4. **Execution** (async): `suspend fun main(McpScriptContext)` invoked via `runBlocking`
+5. **Output Streaming**: Output written to file, streamed via `get_result`
+6. **Cleanup**: Classloader released for GC after execution
 
-**Error Response Structure**:
-```json
-{
-    "status": "compilation_error" | "runtime_error" | "success" | "timeout" | "cancelled",
-    "output": "streamed output...",
-    "errors": [
-        {"line": 5, "message": "Unresolved reference: foo", "severity": "error"}
-    ],
-    "exception": {"type": "NullPointerException", "message": "...", "stackTrace": "..."}
-}
+**Storage Structure**:
 ```
+.idea/mcp-run/
+├── 2024-01-15/                    # Date folder (alphabetic = chronological)
+│   └── 103025-a1b2c3d4/           # HHMMSS-random execution ID
+│       ├── script.kt              # Submitted code
+│       ├── parameters.json        # project_path, plugins, timeout
+│       ├── output.jsonl           # Output log (JSON lines, appended)
+│       └── result.json            # Final status, errors, exception
+```
+
+**Classloader per execution**:
+- Fresh classloader created for each execution
+- IntelliJ platform classes as parent
+- Specified plugin dependencies (default: all enabled plugins)
+- Classloader released for GC after execution (no memory retention)
 
 ## IntelliJ API Reference
 

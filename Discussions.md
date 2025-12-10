@@ -200,62 +200,117 @@ suspend fun main(ctx: McpScriptContext) { ... }
 
 ---
 
-## Open Questions Requiring Recommendation
+## Final Execution Flow Design
 
-### Streaming vs Polling for Long-Running Operations
+After discussion, here is the finalized execution model:
 
-**Context**: Need to handle:
-1. Code review waiting for human approval
-2. Long-running script execution
-3. Streaming output to LLM
-4. Timeout and cancellation
+### Flow Diagram
 
-**Options**:
+```
+execute_code(project, code, plugins, show_review_on_error?)
+    │
+    ├── Compilation Phase (blocking)
+    │   │
+    │   ├── Success → assign execution_id → continue to review/execution
+    │   │
+    │   └── Fail:
+    │       ├── show_review_on_error=false → return compilation_error immediately
+    │       └── show_review_on_error=true → assign execution_id → show in editor for user help
+    │
+    ├── Review Phase (if enabled, blocking)
+    │   ├── User approves → continue to execution
+    │   └── User rejects → return rejection with edits/comments
+    │
+    └── Return: { execution_id, status: "running" | "pending_review" | "compilation_error" }
 
-**Option A: Polling**
-- `execute_code` returns immediately with `execution_id`
-- LLM calls `get_execution_status(execution_id)` periodically
-- Returns: pending/running/completed/failed/cancelled
-- Pros: Simple, stateless, works with any MCP client
-- Cons: Latency, extra round trips, LLM must implement polling logic
+get_result(execution_id, stream?: boolean, offset?: number)
+    │
+    ├── Returns full payload:
+    │   { status, output, errors, ... }
+    │
+    ├── offset=N → skip first N messages
+    ├── stream=false → returns current state immediately
+    └── stream=true → SSE stream until completion
 
-**Option B: Streaming (SSE/WebSocket)**
-- `execute_code` opens stream
-- Server pushes: status updates, stdout lines, completion
-- Pros: Real-time, efficient
-- Cons: More complex, may not be supported by all MCP clients
+cancel_execution(execution_id)
+    └── Stops the running execution or cancels pending review
+```
 
-**Option C: Long-polling**
-- `execute_code` blocks until completion or timeout
-- If timeout, returns partial result + continuation token
-- LLM calls again with token to continue
-- Pros: Works with HTTP, feels synchronous
-- Cons: Connection management, timeout handling
+### API Details
 
-**Option D: Hybrid**
-- Default: blocking call with configurable timeout
-- Optional: streaming endpoint for real-time output
-- `cancel_execution(execution_id)` available regardless
-- Separate `get_output(execution_id)` to retrieve buffered output
+**execute_code** - Compile and start execution
+- Blocks during compilation
+- Returns execution_id once compilation succeeds (or on error if show_review_on_error=true)
+- Does NOT block for execution - use get_result for that
 
-**Recommendation**:
+**get_result** - Get execution output and status
+- `execution_id`: Required
+- `stream`: If true, use SSE to stream output as it appears
+- `offset`: Skip first N messages (for pagination/resumption)
+- Always returns from beginning (offset 0) unless specified
+- Same response structure regardless of stream mode
 
-For MCP protocol compatibility and simplicity, I recommend **Option D (Hybrid)** with emphasis on:
+**cancel_execution** - Cancel running or pending execution
+- Works during review wait or during execution
+- Returns confirmation
 
-1. **Primary mode**: Blocking call with timeout (e.g., 60 seconds default)
-   - Simple for LLM to use
-   - Returns complete result when done
-   - If times out, returns what's available + `execution_id`
+### Storage Structure
 
-2. **Cancellation**: Always available via `cancel_execution(execution_id)`
-   - Works even during code review wait
+```
+.idea/mcp-run/
+├── 2024-01-15/                    # Date-based folders (alphabetic ordering)
+│   └── 103025-a1b2c3d4/           # HHMMSS-random
+│       ├── script.kt              # The submitted code
+│       ├── parameters.json        # project_path, plugins, timeout, etc.
+│       ├── output.jsonl           # Streamed output (JSON lines, appended)
+│       └── result.json            # Final status, errors, exception
+├── 2024-01-16/
+│   └── ...
+```
 
-3. **Output buffering**: All output buffered and returned in response
-   - For long operations, LLM can retrieve via `get_output(execution_id)` if needed
+### Output Format (JSON Lines)
 
-4. **Future streaming**: Add optional streaming endpoint later for real-time UX
+Using JSON lines format but with minimal quoting for LLM readability:
 
-This keeps the basic API simple (one blocking call) while providing escape hatches for complex scenarios.
+```jsonl
+{ts:1705312201123,type:out,msg:Hello world}
+{ts:1705312201125,type:log,level:info,msg:Processing file.kt}
+{ts:1705312201200,type:json,data:{files:3,errors:0}}
+{ts:1705312201300,type:err,msg:NullPointerException at line 42}
+```
+
+Message types:
+- `out` - stdout from ctx.println()
+- `json` - structured data from ctx.printJson()
+- `log` - log messages (info/warn/error)
+- `err` - exceptions/errors
+
+### Streaming (SSE)
+
+For `stream=true`, use Server-Sent Events:
+
+```
+GET /execution/{id}/result?stream=true&offset=0
+
+event: message
+data: {ts:1705312201123,type:out,msg:Hello world}
+
+event: message
+data: {ts:1705312201125,type:log,level:info,msg:Processing}
+
+event: status
+data: {status:running,progress:50}
+
+event: complete
+data: {status:success,duration_ms:1523}
+```
+
+### Retention Policy
+
+Keep all execution history. Folders named by date ensure:
+- Alphabetic sorting = chronological order
+- Easy manual cleanup by deleting old date folders
+- No automatic deletion (user controls retention)
 
 ---
 
@@ -265,20 +320,26 @@ This keeps the basic API simple (one blocking call) while providing escape hatch
 |-------|----------|
 | Transport | HTTP/TCP, document stdio proxy |
 | Port | 11993 default, configurable via Registry, auto-allocate if busy |
-| Output | Context methods: println, JSON serialization, logging |
+| Output | Context methods: println, printJson, log* |
 | Imports | Predefined * imports, documented |
 | Package | Optional |
-| Review blocking | Call waits, rejection includes user edits/comments |
+| Review blocking | Blocks during review, rejection includes user edits/comments |
+| Review on error | Optional `show_review_on_error` to let user help fix compilation errors |
 | Classloader | Fresh per execution, GC-ed after |
 | Slots | String and JSON, project-scoped |
 | Commands | String parameters, fresh classloader per invocation |
-| Dependencies | Parameter to execute_code |
+| Dependencies | Parameter to execute_code (default: all plugins) |
 | Default plugins | All plugins (details TBD) |
 | Errors | Distinct compilation vs runtime errors |
-| Output streaming | Stream as available, status at end |
 | Concurrency | Sequential execution (queue) |
 | Entry point | `suspend fun main(ctx: McpScriptContext)` |
 | Timeout | Yes, with cancellation API |
+| **API Flow** | `execute_code` (compile) → `get_result` (output) → `cancel_execution` |
+| **Streaming** | SSE for `get_result` with `stream=true` |
+| **Output storage** | File-based (output.jsonl), not in memory |
+| **Offset** | All APIs support `offset` parameter to skip N messages |
+| **Storage** | Date folders, keep all history, manual cleanup |
+| **Execution ID** | Format: `YYYYMMDD/HHMMSS-random` |
 
 ---
 
@@ -287,4 +348,3 @@ This keeps the basic API simple (one blocking call) while providing escape hatch
 1. **Default plugins**: Need details on which plugins to include by default
 2. **Stdio proxy documentation**: How to connect via stdio for standard MCP clients
 3. **IntelliJ code resolution**: Make IntelliJ resolve code in same classpath (suggestion)
-4. **Polling vs Streaming**: Recommendation provided above, awaiting confirmation
