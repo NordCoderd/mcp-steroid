@@ -10,7 +10,17 @@ This IntelliJ plugin starts an MCP server that exposes the IDE's internal APIs t
 
 ## MCP Server API
 
-The MCP server listens on port **11993** and provides the following tools:
+The MCP server uses HTTP/TCP transport on port **11993** (default, configurable via IntelliJ Registry). If the port is busy, the server automatically allocates another available port.
+
+### Connecting via stdio
+
+For standard MCP clients that expect stdio transport, use a proxy:
+```bash
+# Example: socat proxy from stdio to TCP
+socat - TCP:localhost:11993
+```
+
+### Available Tools
 
 ### `list_projects`
 Lists all currently open projects with their directories.
@@ -24,30 +34,56 @@ Executes Kotlin or Groovy code in the IDE's runtime context.
 - `project_path` (required): Path to the project directory (must match an open project)
 - `language`: `"kotlin"` (default) or `"groovy"`
 - `code`: The code to execute
+- `plugins`: List of plugin IDs to include in classpath (default: all enabled plugins)
+- `timeout`: Execution timeout in seconds (default: 60)
 
 **Execution Model**:
-- Code runs as a blocking function in the IDE process
-- The call completes when the function exits
-- Output and errors are captured and returned
-- Compilation errors are reported with line numbers
+- Code runs as a suspend function in the IDE process
+- The call blocks until completion, timeout, or cancellation
+- Output is streamed as it appears
+- Compilation and runtime errors are reported separately with details
+- Requests are executed sequentially (queued)
 
 **Entry Point Semantics**:
 ```kotlin
-// The submitted code must define a `main` function that receives the context
-fun main(ctx: McpScriptContext) {
+// The submitted code must define a suspend `main` function that receives the context
+suspend fun main(ctx: McpScriptContext) {
     // Your code here
     // Access the current project via ctx.project
+    // Output via ctx.println(), ctx.printJson(), ctx.log()
     // Register new MCP commands via ctx.registerCommand(...)
 }
 ```
 
+**Predefined Imports** (auto-imported):
+```kotlin
+import com.intellij.openapi.project.*
+import com.intellij.openapi.application.*
+import com.intellij.openapi.vfs.*
+import com.intellij.openapi.editor.*
+import com.intellij.openapi.fileEditor.*
+import com.intellij.openapi.command.*
+import com.intellij.psi.*
+import kotlinx.coroutines.*
+```
+
+Package declaration is optional.
+
+### `cancel_execution`
+Cancels a running code execution.
+
+**Parameters**:
+- `execution_id`: ID returned from execute_code
+
 ### `read_slot` / `write_slot`
-Named storage slots for persisting data between executions.
+Named storage slots for persisting data between executions. Slots are project-scoped.
 
 **Parameters**:
 - `project_path` (required): Path to the project directory
 - `slot_name`: Name of the slot
-- `value` (write only): String value to store
+- `value` (write only): String or JSON value to store
+
+**Note**: Slots store strings only. For structured data, serialize to JSON. Objects cannot be stored directly due to classloader isolation.
 
 ### `list_commands`
 Lists dynamically registered MCP commands (registered via `McpScriptContext.registerCommand()`).
@@ -64,35 +100,98 @@ interface McpScriptContext {
     /** The IntelliJ Project this execution is associated with */
     val project: com.intellij.openapi.project.Project
 
-    /** Register a new MCP command that persists and runs in background */
+    // === Output Methods ===
+
+    /** Print text output (returned to LLM) */
+    fun println(message: Any?)
+    fun print(message: Any?)
+
+    /** Serialize object to JSON and output (uses Gson/Jackson) */
+    fun printJson(obj: Any?)
+
+    /** Log messages (info/warn/error levels) */
+    fun logInfo(message: String)
+    fun logWarn(message: String)
+    fun logError(message: String, throwable: Throwable? = null)
+
+    // === Slot Storage ===
+
+    /** Read from a named slot (project-scoped) */
+    fun readSlot(name: String): String?
+
+    /** Write to a named slot (project-scoped) */
+    fun writeSlot(name: String, value: String)
+
+    // === Dynamic Commands ===
+
+    /** Register a new MCP command that persists until plugin restart */
     fun registerCommand(
         name: String,
         description: String,
-        parameters: Map<String, ParameterSpec>,
-        handler: (Map<String, Any?>) -> Any?
+        handler: suspend (parameters: String) -> String
     )
 
     /** Unregister a previously registered command */
     fun unregisterCommand(name: String)
 
-    /** Read from a named slot */
-    fun readSlot(name: String): String?
+    // === Reflection Helpers ===
 
-    /** Write to a named slot */
-    fun writeSlot(name: String, value: String)
+    /** List all registered services */
+    fun listServices(): List<String>
+
+    /** List all extension points */
+    fun listExtensionPoints(): List<String>
+
+    /** Describe a class (methods, fields, annotations) */
+    fun describeClass(className: String): String
+}
+```
+
+**Threading**: Scripts run as suspend functions. For UI operations or write actions:
+```kotlin
+suspend fun main(ctx: McpScriptContext) {
+    // Read action (thread-safe read)
+    readAction {
+        val psiFile = PsiManager.getInstance(ctx.project).findFile(virtualFile)
+    }
+
+    // Write action (modifies PSI/VFS)
+    writeAction {
+        psiFile.add(newElement)
+    }
+
+    // EDT operations (UI)
+    withContext(Dispatchers.EDT) {
+        // UI code here
+    }
 }
 ```
 
 ## Code Execution Architecture
 
 1. **Code Submission**: MCP server receives code via `execute_code` tool
-2. **Storage**: Code is saved to `.idea/mcp-run/` folder in the project
-3. **Classloader Creation**: A dedicated classloader is created with:
+2. **Review** (if enabled): Code opened in editor, waits for human approval
+3. **Storage**: Code saved to `.idea/mcp-run/<timestamp>-<hash>.kt`
+4. **Classloader Creation**: Fresh classloader per execution with:
    - IntelliJ platform classes as parent
-   - Configurable plugin dependencies (via `list_plugins` / `add_plugin_dependency` tools)
-4. **Compilation**: Code is compiled using Java Compiler API (`javax.tools.JavaCompiler`) running in the execution classloader
-5. **Execution**: Compiled classes are loaded and `main(McpScriptContext)` is invoked
-6. **Result**: Output, return value, or errors are returned to the caller
+   - Specified plugin dependencies (default: all enabled plugins)
+5. **Compilation**: Kotlin compiler (bundled) compiles code in the classloader context
+6. **Execution**: `suspend fun main(McpScriptContext)` invoked via `runBlocking`
+7. **Output Streaming**: Output streamed to LLM as it appears
+8. **Cleanup**: Classloader released for GC after execution
+9. **Result**: Compilation errors, runtime errors, or output returned with clear status
+
+**Error Response Structure**:
+```json
+{
+    "status": "compilation_error" | "runtime_error" | "success" | "timeout" | "cancelled",
+    "output": "streamed output...",
+    "errors": [
+        {"line": 5, "message": "Unresolved reference: foo", "severity": "error"}
+    ],
+    "exception": {"type": "NullPointerException", "message": "...", "stackTrace": "..."}
+}
+```
 
 ## IntelliJ API Reference
 
@@ -133,12 +232,18 @@ Benefits:
 
 ## Code Review Mode
 
-By default, all submitted code is opened in the IDE editor for human review before execution. The human can approve, reject, or edit the code.
+By default, all submitted code is opened in the IDE editor for human review before execution. The MCP call blocks until the human decides.
 
 **Review modes**:
 - `ALWAYS` (default): All code requires human approval
 - `TRUSTED`: Auto-approve code matching trusted patterns
 - `NEVER`: Auto-execute all code (use with caution)
+
+**Workflow**:
+1. Code submitted → opened in editor with review panel
+2. Human reviews, can add comments/edits
+3. Approve: code executes, result returned
+4. Reject: rejection message returned, includes any edits/comments human made
 
 See [Suggestions.md](Suggestions.md) for details on the review workflow and third-party verification integration.
 
@@ -187,3 +292,4 @@ To target a different IntelliJ Platform version, update `platformVersion` in `gr
 - [CLAUDE.md](CLAUDE.md) - Guidance for Claude Code
 - [Plan.md](Plan.md) - Implementation plan
 - [Suggestions.md](Suggestions.md) - Open questions and design suggestions
+- [Discussions.md](Discussions.md) - Design discussions and decisions

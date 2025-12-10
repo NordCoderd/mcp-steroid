@@ -277,6 +277,13 @@ enum class ReviewMode {
 - After timeout: return `review_timeout` status
 - Agent can re-submit or ask user to check IDE
 
+### Code Resolution in Editor
+**Suggestion**: When code is opened for review, IntelliJ should resolve it in the same classpath that will be used for execution. This means:
+- Setting up a temporary module or using scratch file with proper SDK
+- Configuring the classpath to match the execution classloader (platform + selected plugins)
+- Enabling code completion, inspections, and error highlighting during review
+- This helps the human reviewer understand the code better and catch issues before execution
+
 ## Third-Party Code Verification Integration
 
 ### Overview

@@ -11,6 +11,7 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 - [README.md](README.md) - Full API documentation and architecture
 - [Plan.md](Plan.md) - Implementation plan and phases
 - [Suggestions.md](Suggestions.md) - Open questions and design decisions
+- [Discussions.md](Discussions.md) - Design discussions and decisions from Q&A sessions
 
 ## Build Commands
 
