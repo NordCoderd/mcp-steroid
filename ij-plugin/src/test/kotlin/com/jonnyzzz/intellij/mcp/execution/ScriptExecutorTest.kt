@@ -21,13 +21,11 @@ import kotlin.time.Duration.Companion.seconds
  */
 class ScriptExecutorTest : BasePlatformTestCase() {
 
-    private lateinit var storage: ExecutionStorage
-    private lateinit var executor: ScriptExecutor
+    private val storage: ExecutionStorage  get() = project.service()
+    private val executor: ScriptExecutor get() = project.service()
 
     override fun setUp() {
         super.setUp()
-        storage = project.service()
-        executor = ScriptExecutor(project, storage)
     }
 
     /**

@@ -2,6 +2,7 @@
 package com.jonnyzzz.intellij.mcp.storage
 
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -16,6 +17,7 @@ import java.util.Base64
 
 @Serializable
 enum class OutputType {
+    COMPILER, //output from the compiler
     OUT,   // stdout from ctx.println()
     JSON,  // structured data from ctx.printJson()
     LOG,   // log messages (info/warn/error)
@@ -32,13 +34,13 @@ data class OutputMessage(
 
 @Serializable
 data class ExecutionParams(
-    val timeout: Int = 60,
+    val timeout: Int? = 120,
     val showReviewOnError: Boolean = false
 )
 
 @Serializable
 enum class ExecutionStatus {
-    COMPILING,
+    SUBMITTED,
     PENDING_REVIEW,
     RUNNING,
     SUCCESS,
@@ -162,6 +164,18 @@ class ExecutionStorage(private val project: Project) {
             line,
             StandardOpenOption.CREATE,
             StandardOpenOption.APPEND
+        )
+    }
+
+    fun appendOutput(executionId: String, type: OutputType, message: String, level: String? = null) {
+        appendOutput(
+            executionId,
+            OutputMessage(
+                ts = System.currentTimeMillis(),
+                type = type,
+                msg = message,
+                level = level
+            )
         )
     }
 

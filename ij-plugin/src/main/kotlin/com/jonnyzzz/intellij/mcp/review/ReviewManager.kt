@@ -9,6 +9,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.DumbProgressIndicator
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -16,6 +17,7 @@ import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.ReviewOutcome
 import kotlinx.coroutines.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Result of a code review.
@@ -71,7 +73,7 @@ class ReviewManager(private val project: Project) {
         // Check review mode
         val reviewMode = try {
             Registry.stringValue("mcp.steroids.review.mode")
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             "ALWAYS"
         }
 
@@ -85,14 +87,17 @@ class ReviewManager(private val project: Project) {
         val reviewFile = storage.saveReviewCode(executionId, code)
 
         // Open in editor on EDT
-        withContext(Dispatchers.Main) {
+        val edtActionResult = withContext(Dispatchers.Main) {
             val vFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(reviewFile.toString())
             if (vFile != null) {
                 FileEditorManager.getInstance(project).openFile(vFile, true)
+                null
             } else {
                 log.warn("Could not open review file: $reviewFile")
+                ReviewResult.Rejected(code, "Failed to open review file", null, false)
             }
         }
+        if (edtActionResult != null) return edtActionResult
 
         // Create deferred for this review
         val deferred = CompletableDeferred<ReviewResult>()
@@ -101,16 +106,16 @@ class ReviewManager(private val project: Project) {
         // Get timeout
         val timeoutSeconds = try {
             Registry.intValue("mcp.steroids.review.timeout")
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             300
         }
 
         // Wait for approval/rejection with timeout
         return try {
-            withTimeout(timeoutSeconds * 1000L) {
+            withTimeout(timeoutSeconds.seconds) {
                 deferred.await()
             }
-        } catch (e: TimeoutCancellationException) {
+        } catch (_: TimeoutCancellationException) {
             log.info("Review timeout for $executionId")
             pendingReviews.remove(executionId)
             ReviewResult.Timeout
@@ -126,10 +131,12 @@ class ReviewManager(private val project: Project) {
         val pending = pendingReviews.remove(executionId) ?: return
 
         // Save review result
-        storage.saveReviewResult(executionId, ReviewOutcome(
-            approved = true,
-            originalCode = pending.originalCode
-        ))
+        storage.saveReviewResult(
+            executionId, ReviewOutcome(
+                approved = true,
+                originalCode = pending.originalCode
+            )
+        )
 
         pending.deferred.complete(ReviewResult.Approved)
         closeReviewEditor(executionId)
@@ -156,19 +163,23 @@ class ReviewManager(private val project: Project) {
         }
 
         // Save review result
-        storage.saveReviewResult(executionId, ReviewOutcome(
-            approved = false,
-            originalCode = originalCode,
-            editedCode = if (codeWasModified) editedCode else null,
-            diff = diff
-        ))
+        storage.saveReviewResult(
+            executionId, ReviewOutcome(
+                approved = false,
+                originalCode = originalCode,
+                editedCode = if (codeWasModified) editedCode else null,
+                diff = diff
+            )
+        )
 
-        pending.deferred.complete(ReviewResult.Rejected(
-            originalCode = originalCode,
-            editedCode = editedCode,
-            diff = diff,
-            codeWasModified = codeWasModified
-        ))
+        pending.deferred.complete(
+            ReviewResult.Rejected(
+                originalCode = originalCode,
+                editedCode = editedCode,
+                diff = diff,
+                codeWasModified = codeWasModified
+            )
+        )
 
         closeReviewEditor(executionId)
     }
@@ -181,12 +192,14 @@ class ReviewManager(private val project: Project) {
         val pending = pendingReviews.remove(executionId) ?: return
 
         val originalCode = pending.originalCode
-        pending.deferred.complete(ReviewResult.Rejected(
-            originalCode = originalCode,
-            editedCode = originalCode,
-            diff = null,
-            codeWasModified = false
-        ))
+        pending.deferred.complete(
+            ReviewResult.Rejected(
+                originalCode = originalCode,
+                editedCode = originalCode,
+                diff = null,
+                codeWasModified = false
+            )
+        )
 
         closeReviewEditor(executionId)
     }
@@ -234,8 +247,10 @@ class ReviewManager(private val project: Project) {
             )
 
             buildUnifiedDiff(originalLines, editedLines, fragments)
+        } catch (e: ProcessCanceledException) {
+            throw e
         } catch (e: Exception) {
-            log.warn("Failed to generate diff: ${e.message}")
+            log.warn("Failed to generate diff: ${e.message}", e)
             // Fallback to simple diff
             buildSimpleDiff(originalLines, editedLines)
         }
@@ -298,6 +313,7 @@ class ReviewManager(private val project: Project) {
                     appendLine("-$origLine")
                     appendLine("+$editLine")
                 }
+
                 origLine != null -> appendLine("-$origLine")
                 editLine != null -> appendLine("+$editLine")
             }

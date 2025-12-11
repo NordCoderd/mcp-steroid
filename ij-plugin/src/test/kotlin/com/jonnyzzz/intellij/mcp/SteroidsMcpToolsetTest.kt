@@ -74,7 +74,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         assertTrue(
             "Should be in progress",
             response.status in listOf(
-                ExecutionStatus.COMPILING,
+                ExecutionStatus.SUBMITTED,
                 ExecutionStatus.RUNNING,
                 ExecutionStatus.SUCCESS
             )
@@ -116,7 +116,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         assertEquals(execResponse.execution_id, resultResponse.execution_id)
 
         // Should have completed (success, error, or still in progress - all valid)
-        val validStates = listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT, ExecutionStatus.COMPILING, ExecutionStatus.RUNNING)
+        val validStates = listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT, ExecutionStatus.SUBMITTED, ExecutionStatus.RUNNING)
         assertTrue(
             "Should be in valid state, was ${resultResponse.status}",
             resultResponse.status in validStates

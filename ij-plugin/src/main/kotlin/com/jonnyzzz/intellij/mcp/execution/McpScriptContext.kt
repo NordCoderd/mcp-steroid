@@ -29,12 +29,18 @@ import com.intellij.openapi.project.Project
  *
  * NEVER use runBlocking in production code - it blocks the thread and can cause deadlocks.
  */
-interface McpScriptContext : Disposable {
+interface McpScriptContext {
     /** The IntelliJ Project this execution is associated with */
     val project: Project
 
     /** Execution ID for this script run */
     val executionId: String
+
+    /** Allows to bind a disposable to the execution context, use coroutineScope {} for coroutine API */
+    val disposable: Disposable
+
+    /** Allows to check if the context is disposed**/
+    val isDisposed: Boolean
 
     // === Output Methods ===
 
@@ -87,18 +93,3 @@ interface McpScriptContext : Disposable {
     suspend fun waitForSmartMode()
 }
 
-/**
- * Extended context with reflection helpers.
- * These are moved to a separate interface as they may be deprecated in favor of
- * direct API usage documented in MCP tool descriptions.
- */
-interface McpScriptContextEx : McpScriptContext {
-    /** List all registered services (informational) */
-    fun listServices(): List<String>
-
-    /** List all extension points (informational) */
-    fun listExtensionPoints(): List<String>
-
-    /** Describe a class (methods, fields, etc.) */
-    fun describeClass(className: String): String
-}

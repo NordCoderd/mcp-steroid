@@ -71,7 +71,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         assertTrue(
             "Status should be valid",
             status in listOf(
-                ExecutionStatus.COMPILING,
+                ExecutionStatus.SUBMITTED,
                 ExecutionStatus.RUNNING,
                 ExecutionStatus.SUCCESS,
                 ExecutionStatus.ERROR
@@ -112,7 +112,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         // Either succeeded or failed with error - both are valid outcomes
         assertTrue(
             "Should have completed, but status was ${result.status}",
-            result.status in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT, ExecutionStatus.COMPILING, ExecutionStatus.RUNNING)
+            result.status in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT, ExecutionStatus.SUBMITTED, ExecutionStatus.RUNNING)
         )
     }
 
@@ -218,7 +218,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         val status1 = manager.getStatus(result1.executionId)
         val status2 = manager.getStatus(result2.executionId)
 
-        val validStates = listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT, ExecutionStatus.COMPILING, ExecutionStatus.RUNNING)
+        val validStates = listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT, ExecutionStatus.SUBMITTED, ExecutionStatus.RUNNING)
         assertTrue("First should be in valid state, was $status1", status1 in validStates)
         assertTrue("Second should be in valid state, was $status2", status2 in validStates)
     }

@@ -1,12 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.execution
 
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.registry.Registry
+import com.intellij.openapi.util.Disposer
 import com.jonnyzzz.intellij.mcp.review.ReviewManager
 import com.jonnyzzz.intellij.mcp.review.ReviewResult
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
@@ -20,14 +21,14 @@ import java.util.concurrent.ConcurrentHashMap
  * State of an execution.
  */
 sealed class ExecutionState {
-    data object Compiling : ExecutionState()
+    data object Submitted : ExecutionState()
     data object PendingReview : ExecutionState()
     data object Running : ExecutionState()
     data class Completed(val result: ExecutionResult) : ExecutionState()
     data object Cancelled : ExecutionState()
 
     fun toStatus(): ExecutionStatus = when (this) {
-        is Compiling -> ExecutionStatus.COMPILING
+        is Submitted -> ExecutionStatus.SUBMITTED
         is PendingReview -> ExecutionStatus.PENDING_REVIEW
         is Running -> ExecutionStatus.RUNNING
         is Completed -> result.status
@@ -42,8 +43,8 @@ sealed class ExecutionState {
 @Service(Service.Level.PROJECT)
 class ExecutionManager(
     private val project: Project,
-    private val coroutineScope: CoroutineScope
-) {
+    coroutineScope: CoroutineScope
+) : Disposable {
     private val log = Logger.getInstance(ExecutionManager::class.java)
 
     // Sequential execution scope
@@ -52,7 +53,7 @@ class ExecutionManager(
         coroutineScope.coroutineContext +
                 SupervisorJob() +
                 Dispatchers.Default.limitedParallelism(1)
-    )
+    ).also { Disposer.register(this) { it.cancel() } }
 
     private val executions = ConcurrentHashMap<String, ExecutionState>()
     private val executionJobs = ConcurrentHashMap<String, Job>()
@@ -62,6 +63,8 @@ class ExecutionManager(
 
     private val reviewManager: ReviewManager
         get() = project.service()
+
+    override fun dispose() = Unit
 
     /**
      * Submit code for execution.
@@ -74,96 +77,63 @@ class ExecutionManager(
 
         // Create execution record - this saves script.kts immediately
         storage.createExecution(executionId, code, params)
-        executions[executionId] = ExecutionState.Compiling
+        executions[executionId] = ExecutionState.Submitted
 
-        // Check review mode
-        val reviewMode = try {
-            Registry.stringValue("mcp.steroids.review.mode")
-        } catch (e: Exception) {
-            "ALWAYS"
-        }
-
-        // Start execution in background
-        val job = executionScope.launch {
+        val job = executionScope.launch(CoroutineName("mcp-steroid-$executionId")) {
             try {
+                yield()
                 // Handle review if needed
-                if (reviewMode == "ALWAYS") {
-                    executions[executionId] = ExecutionState.PendingReview
-                    when (val reviewResult = reviewManager.requestReview(executionId, code)) {
-                        is ReviewResult.Approved -> {
-                            // Continue with execution
-                        }
-                        is ReviewResult.Rejected -> {
-                            // Build rejection message with user feedback
-                            val message = buildRejectionMessage(reviewResult)
-                            storage.writeResult(executionId, ExecutionResult(
+                executions[executionId] = ExecutionState.PendingReview
+                val ignore = when (val reviewResult = reviewManager.requestReview(executionId, code)) {
+                    is ReviewResult.Approved -> {
+                        // Continue with execution
+                        executions[executionId] = ExecutionState.Running
+                    }
+
+                    is ReviewResult.Rejected -> {
+                        // Build rejection message with user feedback
+                        val message = buildRejectionMessage(reviewResult)
+                        storage.writeResult(
+                            executionId, ExecutionResult(
                                 status = ExecutionStatus.REJECTED,
                                 errorMessage = message
-                            ))
-                            executions[executionId] = ExecutionState.Completed(
-                                ExecutionResult(status = ExecutionStatus.REJECTED, errorMessage = message)
                             )
-                            return@launch
-                        }
-                        is ReviewResult.Timeout -> {
-                            storage.writeResult(executionId, ExecutionResult(
+                        )
+                        executions[executionId] = ExecutionState.Completed(
+                            ExecutionResult(status = ExecutionStatus.REJECTED, errorMessage = message)
+                        )
+                        return@launch
+                    }
+
+                    is ReviewResult.Timeout -> {
+                        storage.writeResult(
+                            executionId, ExecutionResult(
                                 status = ExecutionStatus.TIMEOUT,
                                 errorMessage = "Review timed out"
-                            ))
-                            executions[executionId] = ExecutionState.Completed(
-                                ExecutionResult(status = ExecutionStatus.TIMEOUT, errorMessage = "Review timed out")
                             )
-                            return@launch
-                        }
+                        )
+                        executions[executionId] = ExecutionState.Completed(
+                            ExecutionResult(status = ExecutionStatus.TIMEOUT, errorMessage = "Review timed out")
+                        )
+                        return@launch
                     }
                 }
 
+                yield()
+
                 // Run execution
-                executions[executionId] = ExecutionState.Running
-
-                val executor = ScriptExecutor(project, storage)
-                val timeout = try {
-                    Registry.intValue("mcp.steroids.execution.timeout")
-                } catch (e: Exception) {
-                    params.timeout
-                }
-
-                val result = executor.execute(executionId, code, timeout)
-
+                val result = project.scriptExecutor.execute(executionId, code, params.timeout)
                 storage.writeResult(executionId, result)
                 executions[executionId] = ExecutionState.Completed(result)
-
                 log.info("Execution $executionId completed with status ${result.status}")
-
-            } catch (t: Throwable) {
-                if (t is CancellationException || t is ProcessCanceledException) {
-                    log.info("Execution $executionId was cancelled")
-                    storage.writeResult(executionId, ExecutionResult(
-                        status = ExecutionStatus.CANCELLED,
-                        errorMessage = "Execution was cancelled"
-                    ))
-                    executions[executionId] = ExecutionState.Cancelled
-                    throw t
-                }
-
-                log.error("Execution $executionId failed unexpectedly", t)
-                val result = ExecutionResult(
-                    status = ExecutionStatus.ERROR,
-                    errorMessage = t.message,
-                    exceptionInfo = t.stackTraceToString()
-                )
-                storage.writeResult(executionId, result)
-                executions[executionId] = ExecutionState.Completed(result)
             } finally {
                 executionJobs.remove(executionId)
             }
         }
 
         executionJobs[executionId] = job
-
         // Return initial status
-        val status = executions[executionId]?.toStatus() ?: ExecutionStatus.COMPILING
-        return SubmitResult(executionId, status)
+        return SubmitResult(executionId, ExecutionStatus.SUBMITTED)
     }
 
     /**

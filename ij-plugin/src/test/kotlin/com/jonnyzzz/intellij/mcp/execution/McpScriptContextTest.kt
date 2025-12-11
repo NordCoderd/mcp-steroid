@@ -27,13 +27,12 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     private fun createContext(): McpScriptContextImpl {
-        val disposable = Disposer.newDisposable("test-context-$executionId")
+        val disposable = Disposer.newDisposable(testRootDisposable, "test-context-$executionId")
         Disposer.register(testRootDisposable, disposable)
         return McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = storage,
-            parentDisposable = disposable
+            disposable = disposable,
         )
     }
 
@@ -51,8 +50,6 @@ class McpScriptContextTest : BasePlatformTestCase() {
         assertEquals(OutputType.OUT, output[0].type)
         assertEquals("", output[1].msg)  // Empty line
         assertEquals("null test", output[2].msg)
-
-        context.dispose()
     }
 
     fun testPrintlnSingleValue() {
@@ -65,8 +62,6 @@ class McpScriptContextTest : BasePlatformTestCase() {
         assertEquals(2, output.size)
         assertEquals("Single value", output[0].msg)
         assertEquals("123", output[1].msg)
-
-        context.dispose()
     }
 
     fun testPrintJsonWithMap() {
@@ -82,8 +77,6 @@ class McpScriptContextTest : BasePlatformTestCase() {
         assertTrue(output[0].msg.contains("\"test\""))
         assertTrue(output[0].msg.contains("\"count\""))
         assertTrue(output[0].msg.contains("42"))
-
-        context.dispose()
     }
 
     fun testPrintJsonWithNull() {
@@ -94,8 +87,6 @@ class McpScriptContextTest : BasePlatformTestCase() {
         val output = storage.readOutput(executionId)
         assertEquals(1, output.size)
         assertEquals("null", output[0].msg)
-
-        context.dispose()
     }
 
     fun testLogMethods() {
@@ -117,8 +108,6 @@ class McpScriptContextTest : BasePlatformTestCase() {
 
         assertEquals(OutputType.LOG, output[2].type)
         assertEquals("error", output[2].level)
-
-        context.dispose()
     }
 
     fun testLogErrorWithThrowable() {
@@ -132,8 +121,6 @@ class McpScriptContextTest : BasePlatformTestCase() {
         assertTrue(output[0].msg.contains("Something failed"))
         assertTrue(output[0].msg.contains("Test error"))
         assertTrue(output[0].msg.contains("RuntimeException"))
-
-        context.dispose()
     }
 
     fun testDescribeClass() {
@@ -145,18 +132,13 @@ class McpScriptContextTest : BasePlatformTestCase() {
         assertTrue(description.contains("Public Methods:"))
         assertTrue(description.contains("length()"))
         assertTrue(description.contains("charAt("))
-
-        context.dispose()
     }
 
     fun testDescribeClassNotFound() {
         val context = createContext()
 
         val description = (context as McpScriptContextEx).describeClass("com.nonexistent.ClassName")
-
         assertTrue(description.contains("Class not found"))
-
-        context.dispose()
     }
 
     fun testProjectAccess() {
@@ -164,13 +146,12 @@ class McpScriptContextTest : BasePlatformTestCase() {
 
         assertEquals(project, context.project)
         assertEquals(executionId, context.executionId)
-
-        context.dispose()
     }
 
     fun testDisposedContextRejectsOutput() {
         val context = createContext()
-        context.dispose()
+        //hack!
+        Disposer.dispose(context.disposable)
 
         try {
             context.println("Should fail")
@@ -178,22 +159,5 @@ class McpScriptContextTest : BasePlatformTestCase() {
         } catch (e: IllegalStateException) {
             assertTrue(e.message?.contains("disposed") == true)
         }
-    }
-
-    fun testDisposableProperty() {
-        val parentDisposable = Disposer.newDisposable("test-parent")
-        Disposer.register(testRootDisposable, parentDisposable)
-
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage,
-            parentDisposable = parentDisposable
-        )
-
-        // The disposable property should return the parent
-        assertEquals(parentDisposable, context.disposable)
-
-        context.dispose()
     }
 }

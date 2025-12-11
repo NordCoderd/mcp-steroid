@@ -4,12 +4,12 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
-import com.jonnyzzz.intellij.mcp.storage.OutputMessage
 import com.jonnyzzz.intellij.mcp.storage.OutputType
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.lang.reflect.Modifier
@@ -27,10 +27,8 @@ import kotlin.coroutines.resume
 class McpScriptContextImpl(
     override val project: Project,
     override val executionId: String,
-    private val executionStorage: ExecutionStorage,
-    private val parentDisposable: Disposable
+    override val disposable: Disposable,
 ) : McpScriptContextEx {
-
     private val log = Logger.getInstance(McpScriptContextImpl::class.java)
 
     private val objectMapper = ObjectMapper().apply {
@@ -39,20 +37,11 @@ class McpScriptContextImpl(
         disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
     }
 
-    private val disposed = AtomicBoolean(false)
+    private val disposed = AtomicBoolean(false).also {
+        Disposer.register(disposable) { it.set(true) }
+    }
 
-    /**
-     * Disposable that scripts can use to register their own cleanup.
-     * Will be disposed when execution completes (success, error, or timeout).
-     */
-    val disposable: Disposable
-        get() = parentDisposable
-
-    /**
-     * Check if this context has been disposed.
-     * After disposal, output operations will be rejected.
-     */
-    val isDisposed: Boolean
+    override val isDisposed: Boolean
         get() = disposed.get()
 
     private fun checkDisposed() {
@@ -62,29 +51,17 @@ class McpScriptContextImpl(
     }
 
     private fun appendOutput(type: OutputType, message: String, level: String? = null) {
-        if (disposed.get()) {
-            log.warn("Attempt to append output after context disposed for $executionId: $message")
-            return
-        }
-        executionStorage.appendOutput(
+        project.service<ExecutionStorage>().appendOutput(
             executionId,
-            OutputMessage(
-                ts = System.currentTimeMillis(),
-                type = type,
-                msg = message,
-                level = level
-            )
+            type = type,
+            message = message,
+            level = level,
         )
     }
 
     override fun println(vararg values: Any?) {
         checkDisposed()
-        val message = if (values.isEmpty()) {
-            ""
-        } else {
-            values.joinToString(" ") { it?.toString() ?: "null" }
-        }
-        appendOutput(OutputType.OUT, message)
+        appendOutput(OutputType.OUT, values.joinToString(" ") { it?.toString() ?: "null" })
     }
 
     override fun printJson(obj: Any?) {
@@ -202,12 +179,6 @@ class McpScriptContextImpl(
             "Class not found: $className"
         } catch (e: Exception) {
             "Error describing class: ${e.message}"
-        }
-    }
-
-    override fun dispose() {
-        if (!disposed.getAndSet(true)) {
-            log.info("McpScriptContextImpl disposed for $executionId")
         }
     }
 }
