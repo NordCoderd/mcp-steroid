@@ -2,6 +2,7 @@
 package com.jonnyzzz.intellij.mcp.execution
 
 import com.intellij.openapi.components.service
+import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
@@ -25,12 +26,19 @@ class McpScriptContextTest : BasePlatformTestCase() {
         storage.createExecution(executionId, code, params)
     }
 
-    fun testPrintlnVarargs() {
-        val context = McpScriptContextImpl(
+    private fun createContext(): McpScriptContextImpl {
+        val disposable = Disposer.newDisposable("test-context-$executionId")
+        Disposer.register(testRootDisposable, disposable)
+        return McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = storage
+            executionStorage = storage,
+            parentDisposable = disposable
         )
+    }
+
+    fun testPrintlnVarargs() {
+        val context = createContext()
 
         // Test varargs println
         context.println("Hello", "World", 42)
@@ -48,11 +56,7 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     fun testPrintlnSingleValue() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage
-        )
+        val context = createContext()
 
         context.println("Single value")
         context.println(123)
@@ -66,11 +70,7 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     fun testPrintJsonWithMap() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage
-        )
+        val context = createContext()
 
         context.printJson(mapOf("name" to "test", "count" to 42))
 
@@ -87,11 +87,7 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     fun testPrintJsonWithNull() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage
-        )
+        val context = createContext()
 
         context.printJson(null)
 
@@ -103,11 +99,7 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     fun testLogMethods() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage
-        )
+        val context = createContext()
 
         context.logInfo("Info message")
         context.logWarn("Warning message")
@@ -130,11 +122,7 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     fun testLogErrorWithThrowable() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage
-        )
+        val context = createContext()
 
         val exception = RuntimeException("Test error")
         context.logError("Something failed", exception)
@@ -149,11 +137,7 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     fun testDescribeClass() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage
-        )
+        val context = createContext()
 
         val description = (context as McpScriptContextEx).describeClass("java.lang.String")
 
@@ -166,11 +150,7 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     fun testDescribeClassNotFound() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage
-        )
+        val context = createContext()
 
         val description = (context as McpScriptContextEx).describeClass("com.nonexistent.ClassName")
 
@@ -180,14 +160,39 @@ class McpScriptContextTest : BasePlatformTestCase() {
     }
 
     fun testProjectAccess() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage
-        )
+        val context = createContext()
 
         assertEquals(project, context.project)
         assertEquals(executionId, context.executionId)
+
+        context.dispose()
+    }
+
+    fun testDisposedContextRejectsOutput() {
+        val context = createContext()
+        context.dispose()
+
+        try {
+            context.println("Should fail")
+            fail("Should throw IllegalStateException")
+        } catch (e: IllegalStateException) {
+            assertTrue(e.message?.contains("disposed") == true)
+        }
+    }
+
+    fun testDisposableProperty() {
+        val parentDisposable = Disposer.newDisposable("test-parent")
+        Disposer.register(testRootDisposable, parentDisposable)
+
+        val context = McpScriptContextImpl(
+            project = project,
+            executionId = executionId,
+            executionStorage = storage,
+            parentDisposable = parentDisposable
+        )
+
+        // The disposable property should return the parent
+        assertEquals(parentDisposable, context.disposable)
 
         context.dispose()
     }

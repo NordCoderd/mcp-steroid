@@ -19,6 +19,8 @@ dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.3")
         bundledPlugin("com.intellij.mcpServer")
+        // Kotlin plugin for script engine support in tests
+        bundledPlugin("org.jetbrains.kotlin")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
 

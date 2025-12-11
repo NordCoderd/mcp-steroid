@@ -185,25 +185,70 @@ interface McpScriptContextEx : McpScriptContext {
 
 ### Disposable Hierarchy
 
-`McpScriptContext` implements `Disposable`. Use it as a parent for any resources that should be cleaned up when the script execution completes:
+`McpScriptContext` implements `Disposable`. The context also provides a `disposable` property for scripts that need to register cleanup:
 
 ```kotlin
 execute { ctx ->
-    val myResource = Disposer.newDisposable()
-    Disposer.register(ctx, myResource)
+    // Access the execution's parent Disposable
+    val execDisposable = (ctx as McpScriptContextImpl).disposable
 
-    // myResource will be disposed when execution completes
+    // Register your own cleanup
+    val myResource = Disposer.newDisposable("my-resource")
+    Disposer.register(execDisposable, myResource)
+
+    // myResource will be disposed when execution completes (success, error, or timeout)
 }
 ```
 
+The context is disposed automatically:
+- After all execute blocks complete successfully
+- If any execute block throws an exception
+- If execution times out
+- If execution is cancelled
+
 ## Code Execution Architecture
 
+### Execution Flow
+
 1. **Code Submission**: MCP tool receives code via `execute_code`
-2. **Compilation** (synchronous): Kotlin script engine compiles code
-3. **Review** (if enabled): Code opened in editor, waits for human approval
-4. **Execution**: The `execute { }` block runs with McpScriptContext inside `supervisorScope`
-5. **Output**: Written to file (append-only), polled via `get_result`
-6. **Cleanup**: McpScriptContext disposed, resources cleaned up
+2. **Script Engine Check**: Fast fail if Kotlin script engine not available
+3. **Compilation Phase**: Kotlin script engine compiles and evaluates the code
+   - Captures all `execute { }` lambdas (FIFO order)
+   - Logs the number of captured blocks
+   - Compilation errors are reported immediately (no timeout waiting)
+4. **Review** (if enabled): Code opened in editor, waits for human approval
+5. **Execution Phase**: Inside `coroutineScope { withTimeout { } }`
+   - Execute blocks run in FIFO order
+   - Any failure marks the entire job as complete
+   - Context is disposed when execution completes (success, error, or timeout)
+6. **Output**: Written to file (append-only), polled via `get_result`
+7. **Cleanup**: Disposable disposed, resources cleaned up
+
+### Fast Failure
+
+- **Script engine not available**: Returns ERROR immediately
+- **Compilation errors**: Returns ERROR immediately with details (no timeout waiting)
+- **Missing execute {} block**: Returns ERROR immediately
+- **Runtime errors**: Returns ERROR with stack trace
+- **Timeout**: Coroutine cancelled, Disposable disposed via Disposer
+
+### Multiple Execute Blocks
+
+Scripts can have multiple `execute { }` calls - they are collected and run in FIFO order:
+
+```kotlin
+execute { ctx -> ctx.println("First") }
+execute { ctx -> ctx.println("Second") }
+execute { ctx -> ctx.println("Third") }
+// Outputs: First, Second, Third (in order)
+```
+
+### Scope Disposal
+
+After script evaluation completes:
+- The execute scope is marked as disposed
+- Calling `execute { }` from within an execute block is rejected
+- This prevents patterns like: `execute { execute { } }`
 
 **Storage Structure** (append-only - files are never deleted):
 ```

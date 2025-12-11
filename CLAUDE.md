@@ -54,7 +54,7 @@ This is an IntelliJ Platform plugin using the MCP toolset architecture:
 
 ### Key Design Decisions
 
-1. **Coroutines over blocking**: All code in `execute {}` block runs as suspend functions. Never use `runBlocking` in production code. Use `supervisorScope` for script execution.
+1. **Coroutines over blocking**: All code in `execute {}` block runs as suspend functions. Never use `runBlocking` in production code. Use `coroutineScope` for script execution.
 
 2. **Read/Write Actions**: Not part of McpScriptContext. LLM-generated code should use IntelliJ's coroutine-aware APIs directly:
    ```kotlin
@@ -65,6 +65,14 @@ This is an IntelliJ Platform plugin using the MCP toolset architecture:
 3. **Append-only storage**: Files in `.idea/mcp-run/` are never deleted, only appended to.
 
 4. **Review with feedback**: When user rejects code, they can edit it first. The edited code and unified diff are returned to help LLM understand the feedback.
+
+5. **Fast failure**: Compilation errors and script engine unavailability are reported immediately (no waiting for timeout).
+
+6. **FIFO execution**: Multiple `execute {}` blocks are collected and run in order. Any failure marks the entire job complete.
+
+7. **Disposable lifecycle**: Context has a `disposable` property for resource cleanup. The coroutine completion triggers `Disposer.dispose()`.
+
+8. **Scope disposal**: After script evaluation, the scope is marked disposed to prevent nested `execute { execute { } }` patterns.
 
 ## Source Structure
 
@@ -97,6 +105,17 @@ Run specific test class:
 ```bash
 ./gradlew test --tests "*ExecutionManagerTest*"
 ```
+
+### Test Dependencies
+
+The Kotlin plugin (`org.jetbrains.kotlin`) is added as a bundled dependency to enable Kotlin script engine in tests. Without it, `IdeScriptEngineManager.getEngineByFileExtension("kts", null)` returns null.
+
+### Test Patterns
+
+- Tests should complete within 10 seconds (fast failure)
+- Use `timeoutRunBlocking(10.seconds)` or similar for coroutine tests
+- Script engine not available is a valid test outcome (ERROR status)
+- All assertions should handle both SUCCESS and ERROR cases gracefully
 
 ## Configuration
 

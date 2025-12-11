@@ -3,24 +3,35 @@ package com.jonnyzzz.intellij.mcp.execution
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.OutputMessage
 import com.jonnyzzz.intellij.mcp.storage.OutputType
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.lang.reflect.Modifier
+import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
 /**
  * Implementation of McpScriptContext.
- * Note: No coroutineScope property - suspend functions get scope implicitly.
+ *
+ * Key features:
+ * - Has a Disposable that scripts can use to register cleanup
+ * - Rejects output operations after disposed
+ * - No coroutineScope property - suspend functions get scope implicitly
  */
 class McpScriptContextImpl(
     override val project: Project,
     override val executionId: String,
-    private val executionStorage: ExecutionStorage
+    private val executionStorage: ExecutionStorage,
+    private val parentDisposable: Disposable
 ) : McpScriptContextEx {
+
+    private val log = Logger.getInstance(McpScriptContextImpl::class.java)
 
     private val objectMapper = ObjectMapper().apply {
         enable(SerializationFeature.INDENT_OUTPUT)
@@ -28,7 +39,33 @@ class McpScriptContextImpl(
         disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
     }
 
+    private val disposed = AtomicBoolean(false)
+
+    /**
+     * Disposable that scripts can use to register their own cleanup.
+     * Will be disposed when execution completes (success, error, or timeout).
+     */
+    val disposable: Disposable
+        get() = parentDisposable
+
+    /**
+     * Check if this context has been disposed.
+     * After disposal, output operations will be rejected.
+     */
+    val isDisposed: Boolean
+        get() = disposed.get()
+
+    private fun checkDisposed() {
+        if (disposed.get()) {
+            throw IllegalStateException("Context has been disposed - cannot perform output operations")
+        }
+    }
+
     private fun appendOutput(type: OutputType, message: String, level: String? = null) {
+        if (disposed.get()) {
+            log.warn("Attempt to append output after context disposed for $executionId: $message")
+            return
+        }
         executionStorage.appendOutput(
             executionId,
             OutputMessage(
@@ -41,6 +78,7 @@ class McpScriptContextImpl(
     }
 
     override fun println(vararg values: Any?) {
+        checkDisposed()
         val message = if (values.isEmpty()) {
             ""
         } else {
@@ -50,6 +88,7 @@ class McpScriptContextImpl(
     }
 
     override fun printJson(obj: Any?) {
+        checkDisposed()
         try {
             val jsonString = when (obj) {
                 null -> "null"
@@ -63,14 +102,17 @@ class McpScriptContextImpl(
     }
 
     override fun logInfo(message: String) {
+        checkDisposed()
         appendOutput(OutputType.LOG, message, "info")
     }
 
     override fun logWarn(message: String) {
+        checkDisposed()
         appendOutput(OutputType.LOG, message, "warn")
     }
 
     override fun logError(message: String, throwable: Throwable?) {
+        checkDisposed()
         val fullMessage = if (throwable != null) {
             "$message: ${throwable.message}\n${throwable.stackTraceToString()}"
         } else {
@@ -80,12 +122,19 @@ class McpScriptContextImpl(
     }
 
     override suspend fun waitForSmartMode() {
+        checkDisposed()
         if (!DumbService.isDumb(project)) return
 
         suspendCancellableCoroutine { cont ->
             fun waitForSmart() {
+                if (disposed.get()) {
+                    cont.cancel()
+                    return
+                }
                 DumbService.getInstance(project).smartInvokeLater {
-                    if (DumbService.isDumb(project)) {
+                    if (disposed.get()) {
+                        cont.cancel()
+                    } else if (DumbService.isDumb(project)) {
                         waitForSmart()
                     } else {
                         cont.resume(Unit)
@@ -99,6 +148,7 @@ class McpScriptContextImpl(
     // === McpScriptContextEx methods (reflection helpers) ===
 
     override fun listServices(): List<String> {
+        checkDisposed()
         val result = mutableListOf<String>()
         try {
             result.add("Project services: project.getService(Class)")
@@ -115,6 +165,7 @@ class McpScriptContextImpl(
     }
 
     override fun listExtensionPoints(): List<String> {
+        checkDisposed()
         val result = mutableListOf<String>()
         try {
             result.add("Use ExtensionPointName.create(\"ep.name\") to access extension points")
@@ -130,6 +181,7 @@ class McpScriptContextImpl(
     }
 
     override fun describeClass(className: String): String {
+        checkDisposed()
         return try {
             val clazz = Class.forName(className)
             buildString {
@@ -154,6 +206,8 @@ class McpScriptContextImpl(
     }
 
     override fun dispose() {
-        // No coroutineScope to cancel - context is just a data holder
+        if (!disposed.getAndSet(true)) {
+            log.info("McpScriptContextImpl disposed for $executionId")
+        }
     }
 }
