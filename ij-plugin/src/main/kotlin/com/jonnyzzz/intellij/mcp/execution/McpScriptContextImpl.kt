@@ -9,10 +9,12 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.jonnyzzz.intellij.mcp.server.ProgressReporter
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.OutputType
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.lang.reflect.Modifier
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 
@@ -22,12 +24,14 @@ import kotlin.coroutines.resume
  * Key features:
  * - Has a Disposable that scripts can use to register cleanup
  * - Rejects output operations after disposed
+ * - Supports progress reporting via MCP notifications (throttled to 1/sec)
  * - No coroutineScope property - suspend functions get scope implicitly
  */
 class McpScriptContextImpl(
     override val project: Project,
     override val executionId: String,
     override val disposable: Disposable,
+    private val progressReporter: ProgressReporter,
 ) : McpScriptContextEx {
     private val log = Logger.getInstance(McpScriptContextImpl::class.java)
 
@@ -41,8 +45,16 @@ class McpScriptContextImpl(
         Disposer.register(disposable) { it.set(true) }
     }
 
+    // Collect all output for final result
+    private val outputMessages = CopyOnWriteArrayList<String>()
+
     override val isDisposed: Boolean
         get() = disposed.get()
+
+    /**
+     * Get all output messages collected during execution.
+     */
+    fun getOutput(): List<String> = outputMessages.toList()
 
     private fun checkDisposed() {
         if (disposed.get()) {
@@ -51,12 +63,26 @@ class McpScriptContextImpl(
     }
 
     private fun appendOutput(type: OutputType, message: String, level: String? = null) {
+        // Log everything
+        when (level) {
+            "error" -> log.warn("[$executionId] $message")
+            "warn" -> log.warn("[$executionId] $message")
+            else -> log.info("[$executionId] $message")
+        }
+
+        // Store for final result
+        outputMessages.add(message)
+
+        // Also write to storage for persistence
         project.service<ExecutionStorage>().appendOutput(
             executionId,
             type = type,
             message = message,
             level = level,
         )
+
+        // Report progress with latest output
+        progressReporter.report(message)
     }
 
     override fun println(vararg values: Any?) {
@@ -76,6 +102,13 @@ class McpScriptContextImpl(
         } catch (e: Exception) {
             appendOutput(OutputType.ERR, "Failed to serialize to JSON: ${e.message}")
         }
+    }
+
+    override fun progress(message: String) {
+        checkDisposed()
+        log.info("[$executionId] progress: $message")
+        // Report progress directly without storing in output
+        progressReporter.report(message)
     }
 
     override fun logInfo(message: String) {
@@ -101,6 +134,9 @@ class McpScriptContextImpl(
     override suspend fun waitForSmartMode() {
         checkDisposed()
         if (!DumbService.isDumb(project)) return
+
+        log.info("[$executionId] Waiting for indexing to complete...")
+        progressReporter.report("Waiting for indexing to complete...")
 
         suspendCancellableCoroutine { cont ->
             fun waitForSmart() {

@@ -12,15 +12,13 @@ This IntelliJ plugin exposes IDE APIs to LLM agents via Kotlin script execution.
 
 ## MCP Server Integration
 
-This plugin registers tools with IntelliJ's built-in MCP server (`com.intellij.mcpServer`) via the `mcpToolset` extension point:
+This plugin runs its own standalone MCP server using the [Kotlin MCP SDK](https://github.com/modelcontextprotocol/kotlin-sdk) with Ktor for SSE transport:
 
-```xml
-<extensions defaultExtensionNs="com.intellij.mcpServer">
-  <mcpToolset implementation="com.jonnyzzz.intellij.mcp.SteroidsMcpToolset"/>
-</extensions>
-```
+- **Default port**: 6315 (configurable via `mcp.steroids.server.port` registry key)
+- **Transport**: Server-Sent Events (SSE) at `http://localhost:<port>/sse`
+- **Server URL file**: Written to `.idea/mcp-steroids.txt` in each open project folder
 
-No separate server or port configuration needed - uses IntelliJ's MCP infrastructure.
+The server starts automatically when IntelliJ launches and writes its URL to project folders for easy discovery by MCP clients.
 
 ## MCP Tools
 
@@ -46,23 +44,14 @@ Compiles and executes Kotlin code in the IDE's runtime context.
 - `project_name` (required): Name of an open project (from `steroid_list_projects`)
 - `code` (required): Kotlin code to execute
 - `timeout`: Execution timeout in seconds (default: 60)
-- `show_review_on_error`: If true, show code in editor even on compilation error
 
 **Execution Model**:
-- **Compilation is synchronous** - blocks until compiled
-- On success: assigns `execution_id`, starts async execution (or review if enabled)
-- On compilation error: returns error immediately (unless `show_review_on_error=true`)
-- Use `steroid_get_result` to poll for execution output
-- Requests are executed sequentially (queued)
+- **Synchronous request-response** - the tool returns when execution completes
+- **Progress notifications** - sent every 1 second during execution (via MCP progress protocol)
+- **No polling required** - output is returned directly in the response
+- Requests are executed sequentially
 
-**Response**:
-```json
-{
-    "execution_id": "abc-2024-12-10T14-30-25-a1B2c3D4e5",
-    "status": "SUBMITTED" | "RUNNING" | "SUCCESS" | "ERROR",
-    "error_message": "..."
-}
-```
+**Response**: Plain text output from the script, or error message on failure.
 
 ### Script Entry Point
 
@@ -73,11 +62,16 @@ execute { ctx ->
     // ctx is McpScriptContext - your gateway to the IDE
     ctx.println("Hello from IntelliJ!")
 
+    // Report progress (throttled to 1 message per second)
+    ctx.progress("Starting analysis...")
+
     // Wait for indexes to be ready
     ctx.waitForSmartMode()
 
     // Access the project
     val project = ctx.project
+
+    ctx.progress("Indexes ready, processing...")
 
     // For read/write actions, use IntelliJ's coroutine-aware APIs:
     import com.intellij.openapi.application.readAction
@@ -90,6 +84,8 @@ execute { ctx ->
     writeAction {
         document.setText("new content")
     }
+
+    ctx.println("Done!")
 }
 ```
 
@@ -105,52 +101,6 @@ import com.intellij.openapi.fileEditor.*
 import com.intellij.openapi.command.*
 import com.intellij.psi.*
 import kotlinx.coroutines.*
-```
-
-### `steroid_get_result`
-Gets execution output and status via polling.
-
-**Parameters**:
-- `execution_id` (required): ID returned from `steroid_execute_code`
-- `offset`: Skip first N messages (default: 0)
-
-**Status values**:
-- `SUBMITTED`: Script is being compiled/prepared
-- `RUNNING`: Script is executing
-- `PENDING_REVIEW`: Waiting for user to approve/reject
-- `SUCCESS`: Completed successfully
-- `ERROR`: Failed with error
-- `REJECTED`: User rejected the code
-- `TIMEOUT`: Execution or review timed out
-- `CANCELLED`: Execution was cancelled
-- `NOT_FOUND`: Execution ID not found
-
-**Response**:
-```json
-{
-    "execution_id": "abc-2024-12-10T14-30-25-a1B2c3D4e5",
-    "status": "SUCCESS",
-    "output": [
-        {"ts": 1733840000000, "type": "out", "msg": "Hello from IntelliJ!"},
-        {"ts": 1733840000100, "type": "log", "level": "info", "msg": "Processing..."}
-    ],
-    "error_message": null,
-    "exception_info": null
-}
-```
-
-### `steroid_cancel_execution`
-Cancels a running execution or pending review.
-
-**Parameters**:
-- `execution_id` (required): ID returned from `steroid_execute_code`
-
-**Response**:
-```json
-{
-    "cancelled": true,
-    "message": "Execution cancelled"
-}
 ```
 
 ## McpScriptContext API
@@ -174,6 +124,7 @@ interface McpScriptContext {
     // === Output Methods ===
     fun println(vararg values: Any?)  // Print space-separated values
     fun printJson(obj: Any?)          // Serialize to pretty JSON (Jackson)
+    fun progress(message: String)     // Report progress (throttled to 1/sec)
     fun logInfo(message: String)
     fun logWarn(message: String)
     fun logError(message: String, throwable: Throwable? = null)
@@ -241,21 +192,20 @@ The context is disposed automatically:
 
 ### Execution Flow
 
-1. **Code Submission**: MCP tool receives code via `execute_code`
-2. **ExecutionManager**: Orchestrates the workflow, manages state
+1. **MCP Request**: `steroid_execute_code` tool receives code
+2. **ExecutionManager**: Orchestrates the workflow within MCP request scope
 3. **Review Phase** (if enabled): Code opened in editor via `ReviewManager`, waits for human approval
 4. **Code Evaluation** (`CodeEvalManager`):
    - Script Engine Check: Fast fail if Kotlin script engine not available
    - Compilation Phase: Kotlin script engine compiles and evaluates the code
    - Captures all `execute { }` lambdas (FIFO order)
-   - Logs the number of captured blocks
    - Compilation errors are reported immediately (no timeout waiting)
 5. **Script Execution** (`ScriptExecutor`):
    - Runs inside `coroutineScope { withContext(Dispatchers.IO) { withTimeout { } } }`
    - Execute blocks run in FIFO order
-   - Any failure marks the entire job as complete
-   - Context is disposed when execution completes (success, error, or timeout)
-6. **Output**: Written to file (append-only), polled via `get_result`
+   - Progress messages sent via MCP progress notifications (throttled to 1/second)
+   - Context is disposed when execution completes
+6. **Response**: Output returned directly in MCP tool response
 7. **Cleanup**: Disposable disposed via `Disposer.dispose()`, resources cleaned up
 
 ### Fast Failure
@@ -284,7 +234,7 @@ After script evaluation completes:
 - Calling `execute { }` from within an execute block is rejected
 - This prevents patterns like: `execute { execute { } }`
 
-**Storage Structure** (append-only - files are never deleted):
+**Storage Structure** (append-only - files are never deleted, used for logging/debugging):
 ```
 .idea/mcp-run/
 ├── abc-2024-12-10T14-30-25-a1B2c3D4e5/   # execution_id as directory
@@ -294,6 +244,11 @@ After script evaluation completes:
 │   ├── result.json                        # Final status
 │   ├── review.kts                         # Code shown for review (may have user edits)
 │   └── review-result.json                 # Review outcome with user feedback
+```
+
+**Server URL file**:
+```
+.idea/mcp-steroids.txt                     # Contains MCP server SSE URL (e.g., http://localhost:6315/sse)
 ```
 
 **Execution ID Format**: `{project-hash-3chars}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-hash-10chars}`
@@ -458,7 +413,8 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 # Run specific test class
 ./gradlew test --tests "*McpServerIntegrationTest*"
 ./gradlew test --tests "*ClaudeCliIntegrationTest*"
-./gradlew test --tests "*SteroidsMcpToolsetTest*"
+./gradlew test --tests "*ScriptExecutorTest*"
+./gradlew test --tests "*ExecutionManagerTest*"
 ```
 
 ### Integration Tests
@@ -466,9 +422,10 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 The project includes integration tests that verify MCP server functionality:
 
 **Test Files:**
-- `McpServerIntegrationTest.kt` - Tests MCP server using Ktor client and MCP SDK
+- `McpServerIntegrationTest.kt` - Tests MCP server service availability
 - `ClaudeCliIntegrationTest.kt` - Tests Claude Code CLI integration (requires `claude` command)
-- `SteroidsMcpToolsetTest.kt` - Direct toolset tests
+- `ScriptExecutorTest.kt` - Tests script execution with fast failure semantics
+- `ExecutionManagerTest.kt` - Tests execution manager with progress reporting
 
 **Shell Scripts** (in `integration-test/`):
 - `test-sse-tools.sh` - Tests SSE transport directly via curl

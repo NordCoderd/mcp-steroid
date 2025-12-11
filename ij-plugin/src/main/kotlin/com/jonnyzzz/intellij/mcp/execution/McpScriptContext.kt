@@ -65,6 +65,22 @@ interface McpScriptContext {
      */
     fun printJson(obj: Any?)
 
+    /**
+     * Report progress to the MCP client.
+     * Messages are throttled to at most once per second to avoid overwhelming the connection.
+     *
+     * ```kotlin
+     * execute { ctx ->
+     *     ctx.progress("Starting analysis...")
+     *     // do work
+     *     ctx.progress("Processing file 1 of 10")
+     *     // more work
+     *     ctx.progress("Analysis complete")
+     * }
+     * ```
+     */
+    fun progress(message: String)
+
     /** Log an info message */
     fun logInfo(message: String)
 

@@ -15,15 +15,32 @@ repositories {
     }
 }
 
-val ktorVersion = "3.0.3"
+val ktorVersion = "3.1.0"
+val mcpSdkVersion = "0.8.1"
 
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.3")
-        bundledPlugin("com.intellij.mcpServer")
         // Kotlin plugin for script engine support in tests
         bundledPlugin("org.jetbrains.kotlin")
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
+    }
+
+    // MCP SDK - Kotlin implementation
+    // Exclude kotlinx dependencies to use IntelliJ's bundled versions
+    implementation("io.modelcontextprotocol:kotlin-sdk:$mcpSdkVersion") {
+        exclude(group = "org.jetbrains.kotlinx")
+    }
+
+    // Ktor server for MCP SSE transport
+    implementation("io.ktor:ktor-server-core:$ktorVersion") {
+        exclude(group = "org.jetbrains.kotlinx")
+    }
+    implementation("io.ktor:ktor-server-cio:$ktorVersion") {
+        exclude(group = "org.jetbrains.kotlinx")
+    }
+    implementation("io.ktor:ktor-server-sse:$ktorVersion") {
+        exclude(group = "org.jetbrains.kotlinx")
     }
 
     // Testing
@@ -34,7 +51,6 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers")
 
     // Ktor client for MCP SSE transport tests
-    // Exclude kotlinx-coroutines and serialization to use IntelliJ's bundled versions
     testImplementation("io.ktor:ktor-client-core:$ktorVersion") {
         exclude(group = "org.jetbrains.kotlinx")
     }

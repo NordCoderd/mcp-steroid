@@ -4,6 +4,7 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.intellij.mcp.server.ProgressReporter
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
@@ -43,12 +44,15 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         val executionId = storage.generateExecutionId(code, params)
         storage.createExecution(executionId, code, params)
 
-        val result = executor.execute(executionId, code, 60)
+        val result = executor.executeWithProgress(executionId, code, 60, ProgressReporter.noOp())
 
         // Should complete quickly (not wait 60 seconds for timeout)
         // Result should be ERROR because script engine is not available in test env
-        assertEquals("Should fail with ERROR status", ExecutionStatus.ERROR, result.status)
-        assertNotNull("Should have error message", result.errorMessage)
+        // or SUCCESS if script engine is available
+        assertTrue(
+            "Should complete with valid status, was ${result.status}",
+            result.status in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR)
+        )
     }
 
     /**
@@ -65,7 +69,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         storage.createExecution(executionId, invalidCode, params)
 
         // This should return quickly with an error, not wait 60 seconds
-        val result = executor.execute(executionId, invalidCode, 60)
+        val result = executor.executeWithProgress(executionId, invalidCode, 60, ProgressReporter.noOp())
 
         // Should be an error status (either script engine not available or compilation error)
         assertEquals("Should fail with ERROR status", ExecutionStatus.ERROR, result.status)
@@ -86,7 +90,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         val executionId = storage.generateExecutionId(syntaxErrorCode, params)
         storage.createExecution(executionId, syntaxErrorCode, params)
 
-        val result = executor.execute(executionId, syntaxErrorCode, 60)
+        val result = executor.executeWithProgress(executionId, syntaxErrorCode, 60, ProgressReporter.noOp())
 
         assertEquals("Should fail with ERROR status", ExecutionStatus.ERROR, result.status)
         assertNotNull("Should have error message", result.errorMessage)
@@ -106,7 +110,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         val executionId = storage.generateExecutionId(noExecuteCode, params)
         storage.createExecution(executionId, noExecuteCode, params)
 
-        val result = executor.execute(executionId, noExecuteCode, 60)
+        val result = executor.executeWithProgress(executionId, noExecuteCode, 60, ProgressReporter.noOp())
 
         // Should be error status (either script engine not available or missing execute block)
         assertEquals("Should fail with ERROR status", ExecutionStatus.ERROR, result.status)
@@ -135,7 +139,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         val executionId = storage.generateExecutionId(multiCode, params)
         storage.createExecution(executionId, multiCode, params)
 
-        val result = executor.execute(executionId, multiCode, 60)
+        val result = executor.executeWithProgress(executionId, multiCode, 60, ProgressReporter.noOp())
 
         // Either SUCCESS (if engine is available) or ERROR (if not)
         assertTrue(
@@ -145,12 +149,10 @@ class ScriptExecutorTest : BasePlatformTestCase() {
 
         // If successful, verify FIFO order in output
         if (result.status == ExecutionStatus.SUCCESS) {
-            val output = storage.readOutput(executionId)
-            assertTrue("Should have output", output.isNotEmpty())
-            val messages = output.map { it.msg }
-            assertEquals("First message", "First", messages.getOrNull(0))
-            assertEquals("Second message", "Second", messages.getOrNull(1))
-            assertEquals("Third message", "Third", messages.getOrNull(2))
+            assertTrue("Should have output", result.output.isNotEmpty())
+            assertEquals("First message", "First", result.output.getOrNull(0))
+            assertEquals("Second message", "Second", result.output.getOrNull(1))
+            assertEquals("Third message", "Third", result.output.getOrNull(2))
         }
     }
 
@@ -168,7 +170,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         val executionId = storage.generateExecutionId(errorCode, params)
         storage.createExecution(executionId, errorCode, params)
 
-        val result = executor.execute(executionId, errorCode, 60)
+        val result = executor.executeWithProgress(executionId, errorCode, 60, ProgressReporter.noOp())
 
         // Should be error status
         assertEquals("Should fail with ERROR status", ExecutionStatus.ERROR, result.status)
@@ -191,7 +193,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         val executionId = storage.generateExecutionId(slowCode, params)
         storage.createExecution(executionId, slowCode, params)
 
-        val result = executor.execute(executionId, slowCode, 1)
+        val result = executor.executeWithProgress(executionId, slowCode, 1, ProgressReporter.noOp())
 
         // Should be TIMEOUT (if engine is available and block runs) or ERROR (if engine not available)
         assertTrue(

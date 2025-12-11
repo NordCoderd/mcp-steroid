@@ -4,12 +4,12 @@
     <vendor>jonnyzzz.com</vendor>
 
     <description><![CDATA[
-    MCP Server extension for IntelliJ IDEA that allows LLM agents to execute Kotlin code
+    MCP Server plugin for IntelliJ IDEA that allows LLM agents to execute Kotlin code
     in the IDE's runtime environment with full access to IDE APIs.
+    Runs its own MCP server using Kotlin MCP SDK with SSE transport.
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.mcpServer</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <!-- Review panel notification -->
@@ -25,9 +25,13 @@
 
         <registryKey key="mcp.steroids.execution.timeout" defaultValue="60"
             description="Script execution timeout in seconds"/>
+
+        <registryKey key="mcp.steroids.server.port" defaultValue="6315"
+            description="MCP server port (0 for auto-assign)"/>
+
+        <!-- Start MCP server when IDE is ready -->
+        <postStartupActivity
+                implementation="com.jonnyzzz.intellij.mcp.server.SteroidsMcpServerStartupActivity"/>
     </extensions>
 
-    <extensions defaultExtensionNs="com.intellij.mcpServer">
-        <mcpToolset implementation="com.jonnyzzz.intellij.mcp.SteroidsMcpToolset"/>
-    </extensions>
 </idea-plugin>

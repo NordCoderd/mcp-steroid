@@ -39,59 +39,71 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 - **Java Toolchain**: 21
 - **IntelliJ Platform**: 2025.3+ (sinceBuild: 252.1)
 - **IntelliJ Platform Gradle Plugin**: 2.10.5
+- **MCP Server**: Kotlin MCP SDK 0.8.1 with Ktor (CIO engine)
+- **Transport**: Server-Sent Events (SSE) at `http://localhost:<port>/sse`
 - **Testing**: IntelliJ 253 pattern with `timeoutRunBlocking`
 - **Serialization**: kotlinx.serialization for JSON
 
 ## Architecture
 
-This is an IntelliJ Platform plugin using the MCP toolset architecture:
+This is an IntelliJ Platform plugin with a standalone MCP server using Kotlin MCP SDK:
 
 - **Plugin descriptor**: `src/main/resources/META-INF/plugin.xml`
-- **MCP Toolset**: `SteroidsMcpToolset.kt` - registers with `com.intellij.mcpServer`
+- **MCP Server**: `server/SteroidsMcpServer.kt` - Ktor-based MCP server with SSE transport
+- **Progress Reporting**: `server/ThrottledProgressReporter.kt` - Flow-based 1-second throttled progress
 - **Execution**: `ExecutionManager.kt` - manages script execution lifecycle
 - **Code Evaluation**: `CodeEvalManager.kt` - handles script compilation and lambda capture
 - **Script Execution**: `ScriptExecutor.kt` - runs captured execute blocks with timeout
 - **Script Context**: `McpScriptContext.kt` / `McpScriptContextImpl.kt` - runtime context for scripts
 - **Script Scope**: `McpScriptScope.kt` - bound to script engine, provides `execute { }` entry point
-- **Storage**: `ExecutionStorage.kt` - append-only file-based storage
+- **Storage**: `ExecutionStorage.kt` - append-only file-based storage (for logging/debugging)
 - **Review**: `ReviewManager.kt` - human review workflow
 
 ### Key Design Decisions
 
-1. **Coroutines over blocking**: All code in `execute {}` block runs as suspend functions. Never use `runBlocking` in production code. Use `coroutineScope` for script execution.
+1. **Standalone MCP server**: Uses Kotlin MCP SDK with Ktor for SSE transport. No dependency on IntelliJ's built-in MCP plugin. Server URL written to `.idea/mcp-steroids.txt` for discovery.
 
-2. **Read/Write Actions**: Not part of McpScriptContext. LLM-generated code should use IntelliJ's coroutine-aware APIs directly:
+2. **Synchronous request-response**: Execution happens within MCP request scope. No polling - output returned directly in response.
+
+3. **Throttled progress**: Progress messages sampled at 1-second intervals using Flow to avoid overloading MCP connections.
+
+4. **Coroutines over blocking**: All code in `execute {}` block runs as suspend functions. Never use `runBlocking` in production code. Use `coroutineScope` for script execution.
+
+5. **Read/Write Actions**: Not part of McpScriptContext. LLM-generated code should use IntelliJ's coroutine-aware APIs directly:
    ```kotlin
    import com.intellij.openapi.application.readAction
    import com.intellij.openapi.application.writeAction
    ```
 
-3. **Append-only storage**: Files in `.idea/mcp-run/` are never deleted, only appended to.
+6. **Append-only storage**: Files in `.idea/mcp-run/` are never deleted, only appended to (used for logging/debugging).
 
-4. **Review with feedback**: When user rejects code, they can edit it first. The edited code and unified diff are returned to help LLM understand the feedback.
+7. **Review with feedback**: When user rejects code, they can edit it first. The edited code and unified diff are returned to help LLM understand the feedback.
 
-5. **Fast failure**: Compilation errors and script engine unavailability are reported immediately (no waiting for timeout).
+8. **Fast failure**: Compilation errors and script engine unavailability are reported immediately (no waiting for timeout).
 
-6. **FIFO execution**: Multiple `execute {}` blocks are collected and run in order. Any failure marks the entire job complete.
+9. **FIFO execution**: Multiple `execute {}` blocks are collected and run in order. Any failure marks the entire job complete.
 
-7. **Disposable lifecycle**: Context has a `disposable` property for resource cleanup. The coroutine completion triggers `Disposer.dispose()`.
+10. **Disposable lifecycle**: Context has a `disposable` property for resource cleanup. The coroutine completion triggers `Disposer.dispose()`.
 
-8. **Scope disposal**: After script evaluation, the scope is marked disposed to prevent nested `execute { execute { } }` patterns.
+11. **Scope disposal**: After script evaluation, the scope is marked disposed to prevent nested `execute { execute { } }` patterns.
 
-9. **Two-phase execution**: First phase compiles script and captures execute blocks (`CodeEvalManager`), second phase runs them with timeout (`ScriptExecutor`).
+12. **Two-phase execution**: First phase compiles script and captures execute blocks (`CodeEvalManager`), second phase runs them with timeout (`ScriptExecutor`).
 
 ## Source Structure
 
 ```
 src/main/kotlin/com/jonnyzzz/intellij/mcp/
-├── SteroidsMcpToolset.kt          # MCP tool definitions (list_projects, execute_code, etc.)
+├── server/
+│   ├── SteroidsMcpServer.kt               # Ktor MCP server with SSE transport
+│   ├── SteroidsMcpServerStartupActivity.kt # Startup hook for server initialization
+│   └── ThrottledProgressReporter.kt       # Flow-based progress throttling (1 sec sampling)
 ├── execution/
 │   ├── ExecutionManager.kt        # Manages execution lifecycle, orchestrates review + execution
 │   ├── CodeEvalManager.kt         # Compiles scripts, captures execute {} lambdas
 │   ├── ScriptExecutor.kt          # Runs captured blocks with timeout and coroutine scope
 │   ├── McpScriptScope.kt          # Interface bound to script engine (execute {} entry point)
 │   ├── McpScriptContext.kt        # Interface for script context (project, output, utilities)
-│   ├── McpScriptContextImpl.kt    # Implementation with output methods, waitForSmartMode
+│   ├── McpScriptContextImpl.kt    # Implementation with output methods, waitForSmartMode, progress
 │   └── McpScriptContextEx.kt      # Extended interface with reflection helpers
 ├── review/
 │   ├── ReviewManager.kt           # Human review workflow, diff generation
@@ -119,16 +131,20 @@ Run specific test class:
 
 ### Test Files
 
-- **McpServerIntegrationTest.kt** - Tests MCP server using Ktor client + MCP SDK:
-  - `testMcpSseTransportReturnsSteroidToolsWithKtorClient` - Uses `HttpClient`, `SseClientTransport`, and `Client` from MCP SDK
-  - `testCallSteroidListProjectsViaMcpSseTransport` - Calls tools via SSE transport
+- **McpServerIntegrationTest.kt** - Tests MCP server service availability
 
 - **ClaudeCliIntegrationTest.kt** - Tests Claude Code CLI integration:
   - Requires `claude` command and ANTHROPIC_API_KEY
   - Creates temp directory with `.mcp.json` for isolated testing
   - Gracefully skips if prerequisites not available
 
-- **SteroidsMcpToolsetTest.kt** - Direct toolset tests (no network)
+- **ScriptExecutorTest.kt** - Tests script execution with fast failure semantics:
+  - Verifies errors return quickly (not waiting for timeout)
+  - Tests compilation errors, runtime errors, missing execute blocks
+
+- **ExecutionManagerTest.kt** - Tests execution manager with progress reporting:
+  - Tests successful execution with output collection
+  - Tests error handling and timeout scenarios
 
 ### Shell Scripts (integration-test/)
 
@@ -150,13 +166,17 @@ The Kotlin plugin (`org.jetbrains.kotlin`) is added as a bundled dependency to e
 - Use `timeoutRunBlocking(10.seconds)` or similar for coroutine tests
 - Script engine not available is a valid test outcome (ERROR status)
 - All assertions should handle both SUCCESS and ERROR cases gracefully
-- MCP SSE tests use Ktor client with `install(SSE)` and MCP SDK's `SseClientTransport`
+- Tests use `executeWithProgress()` API which returns output directly
 
 ## Configuration
 
 - `gradle.properties`: Contains `platformVersion` for IntelliJ version
 - `build.gradle.kts`: Plugin configuration using `intellijPlatform` DSL
-- Registry keys: `mcp.steroids.review.mode`, `mcp.steroids.review.timeout`, `mcp.steroids.execution.timeout`
+- Registry keys:
+  - `mcp.steroids.server.port`: MCP server port (default: 6315, use 0 for dynamic)
+  - `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
+  - `mcp.steroids.review.timeout`: Review timeout in seconds
+  - `mcp.steroids.execution.timeout`: Script execution timeout
 
 ## IntelliJ Platform Coding Principles
 

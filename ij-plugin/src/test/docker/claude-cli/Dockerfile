@@ -9,5 +9,8 @@ RUN apt-get update && \
 # Install Claude CLI
 RUN curl -fsSL https://claude.ai/install.sh | bash
 
+ENV PATH="$HOME/.local/bin:$PATH"
+ENV SHELL=/bin/bash
+
 # Default command
 CMD ["sleep", "infinity"]
