@@ -8,19 +8,19 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
+import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
-import io.modelcontextprotocol.kotlin.sdk.server.Server
-import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
-import io.modelcontextprotocol.kotlin.sdk.server.mcp
-import io.modelcontextprotocol.kotlin.sdk.types.Implementation
-import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
-import kotlinx.coroutines.*
-import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import java.net.ServerSocket
 import java.nio.file.Files
 import java.nio.file.Path
@@ -29,7 +29,7 @@ import java.util.concurrent.locks.ReentrantLock
 
 /**
  * MCP Server application service.
- * Manages the Ktor-based MCP server lifecycle using Kotlin MCP SDK.
+ * Manages the Ktor-based MCP server lifecycle with custom MCP implementation.
  */
 @Service(Service.Level.APP)
 class SteroidsMcpServer(
@@ -42,10 +42,24 @@ class SteroidsMcpServer(
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob() + Dispatchers.IO)
 
     val port: Int get() = portRef.get()
-    val mcpUrl: String get() = "http://localhost:$port$MCP_PATH"
+    val mcpUrl: String get() = "http://localhost:$port/mcp"
+
+    private val mcpServer = McpServerCore(
+        serverInfo = ServerInfo(
+            name = "intellij-mcp-steroid",
+            version = "1.0.0"
+        ),
+        capabilities = ServerCapabilities(
+            tools = ToolsCapability(listChanged = false)
+        )
+    )
 
     fun startServerIfNeeded() {
         if (port > 0) return
+
+        // Register tools
+        service<ListProjectsToolHandler>().register(mcpServer)
+        service<ExecuteCodeToolHandler>().register(mcpServer)
 
         val configuredPort = Registry.intValue("mcp.steroids.server.port", 63150)
         val actualPort = if (configuredPort == 0) findFreePort() else configuredPort
@@ -54,8 +68,14 @@ class SteroidsMcpServer(
             val server = scope.embeddedServer(CIO, host = "0.0.0.0", port = actualPort) {
                 install(SSE)
                 routing {
-                    mcp(MCP_PATH) {
-                        createMcpServer()
+                    with(McpHttpTransport) {
+                        installMcp("/mcp", mcpServer)
+                    }
+                    get("/.well-known/mcp.json") {
+                        call.respondText(
+                            contentType = ContentType.Application.Json,
+                            text = buildWellKnownMcpJson(actualPort)
+                        )
                     }
                 }
             }
@@ -109,24 +129,16 @@ class SteroidsMcpServer(
         return ServerSocket(0).use { it.localPort }
     }
 
-    private fun createMcpServer(): Server {
-        val server = Server(
-            Implementation(
-                name = "intellij-mcp-steroid",
-                version = "1.0.0"
-            ),
-            ServerOptions(
-                capabilities = ServerCapabilities(
-                    tools = ServerCapabilities.Tools(listChanged = false)
-                )
-            )
-        )
-
-        // Register tools via dedicated handlers
-        service<ListProjectsToolHandler>().register(server)
-        service<ExecuteCodeToolHandler>().register(server)
-
-        return server
+    private fun buildWellKnownMcpJson(port: Int): String {
+        return """
+            {
+                "mcpServers": {
+                    "intellij-mcp-steroid": {
+                        "url": "http://localhost:$port/mcp"
+                    }
+                }
+            }
+        """.trimIndent()
     }
 
     override fun dispose() {
@@ -136,8 +148,6 @@ class SteroidsMcpServer(
     }
 
     companion object {
-        private const val MCP_PATH = "/mcp"
-
         fun getInstance(): SteroidsMcpServer = ApplicationManager.getApplication().service()
     }
 }

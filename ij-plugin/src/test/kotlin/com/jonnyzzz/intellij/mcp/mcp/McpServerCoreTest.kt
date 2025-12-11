@@ -1,0 +1,274 @@
+/* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+package com.jonnyzzz.intellij.mcp.mcp
+
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.*
+import org.junit.Assert.*
+import org.junit.Before
+import org.junit.Test
+
+/**
+ * Unit tests for McpServerCore message handling.
+ */
+class McpServerCoreTest {
+    private lateinit var server: McpServerCore
+    private lateinit var session: McpSession
+
+    @Before
+    fun setUp() {
+        server = McpServerCore(
+            serverInfo = ServerInfo(
+                name = "test-server",
+                version = "1.0.0"
+            ),
+            capabilities = ServerCapabilities(
+                tools = ToolsCapability(listChanged = false)
+            ),
+            instructions = "Test server instructions"
+        )
+        session = server.sessionManager.createSession()
+    }
+
+    @Test
+    fun `test initialize request returns correct response`() = runBlocking {
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val responseJson = server.handleMessage(request.toString(), session)
+        assertNotNull("Should return response", responseJson)
+
+        val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
+        assertEquals(1, response.id.jsonPrimitive.int)
+        assertNull(response.error)
+        assertNotNull(response.result)
+
+        val result = McpJson.decodeFromJsonElement<InitializeResult>(response.result!!)
+        assertEquals(MCP_PROTOCOL_VERSION, result.protocolVersion)
+        assertEquals("test-server", result.serverInfo.name)
+        assertEquals("Test server instructions", result.instructions)
+    }
+
+    @Test
+    fun `test ping request returns empty object`() = runBlocking {
+        val request = """{"jsonrpc":"2.0","id":1,"method":"ping"}"""
+
+        val responseJson = server.handleMessage(request, session)
+        assertNotNull(responseJson)
+
+        val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
+        assertEquals(1, response.id.jsonPrimitive.int)
+        assertNull(response.error)
+        assertNotNull(response.result)
+        assertTrue(response.result is JsonObject)
+    }
+
+    @Test
+    fun `test tools list returns registered tools`() = runBlocking {
+        // Register a test tool
+        server.toolRegistry.registerTool(
+            name = "test_tool",
+            description = "A test tool",
+            inputSchema = buildJsonObject {
+                put("type", "object")
+            }
+        ) { _, _ ->
+            ToolCallResult(content = listOf(ContentItem.Text(text = "OK")))
+        }
+
+        val request = """{"jsonrpc":"2.0","id":1,"method":"tools/list"}"""
+
+        val responseJson = server.handleMessage(request, session)
+        assertNotNull(responseJson)
+
+        val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
+        assertNull(response.error)
+
+        val result = McpJson.decodeFromJsonElement<ToolsListResult>(response.result!!)
+        assertEquals(1, result.tools.size)
+        assertEquals("test_tool", result.tools[0].name)
+        assertEquals("A test tool", result.tools[0].description)
+    }
+
+    @Test
+    fun `test tools call executes handler`() = runBlocking {
+        var called = false
+
+        server.toolRegistry.registerTool(
+            name = "echo_tool",
+            description = "Echoes input",
+            inputSchema = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("message") { put("type", "string") }
+                }
+            }
+        ) { params, _ ->
+            called = true
+            val message = params.arguments?.get("message")?.jsonPrimitive?.content ?: "no message"
+            ToolCallResult(content = listOf(ContentItem.Text(text = "Echo: $message")))
+        }
+
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "echo_tool")
+                putJsonObject("arguments") {
+                    put("message", "Hello")
+                }
+            }
+        }
+
+        val responseJson = server.handleMessage(request.toString(), session)
+        assertNotNull(responseJson)
+
+        val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
+        assertNull(response.error)
+
+        val result = McpJson.decodeFromJsonElement<ToolCallResult>(response.result!!)
+        assertEquals(1, result.content.size)
+        assertEquals("Echo: Hello", (result.content[0] as ContentItem.Text).text)
+        assertTrue("Handler should have been called", called)
+    }
+
+    @Test
+    fun `test tools call with unknown tool returns error`() = runBlocking {
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "unknown_tool")
+            }
+        }
+
+        val responseJson = server.handleMessage(request.toString(), session)
+        assertNotNull(responseJson)
+
+        val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
+        assertNull(response.error)
+
+        val result = McpJson.decodeFromJsonElement<ToolCallResult>(response.result!!)
+        assertTrue(result.isError)
+        assertTrue((result.content[0] as ContentItem.Text).text.contains("not found"))
+    }
+
+    @Test
+    fun `test unknown method returns error`() = runBlocking {
+        val request = """{"jsonrpc":"2.0","id":1,"method":"unknown/method"}"""
+
+        val responseJson = server.handleMessage(request, session)
+        assertNotNull(responseJson)
+
+        val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
+        assertNotNull(response.error)
+        assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, response.error?.code)
+    }
+
+    @Test
+    fun `test notification returns null`() = runBlocking {
+        val notification = """{"jsonrpc":"2.0","method":"notifications/initialized"}"""
+
+        val response = server.handleMessage(notification, session)
+        assertNull("Notifications should not return a response", response)
+    }
+
+    @Test
+    fun `test malformed JSON returns parse error`() = runBlocking {
+        val malformedJson = "not valid json"
+
+        val responseJson = server.handleMessage(malformedJson, session)
+        assertNotNull(responseJson)
+
+        val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
+        assertNotNull(response.error)
+        assertEquals(JsonRpcErrorCodes.PARSE_ERROR, response.error?.code)
+    }
+
+    @Test
+    fun `test batch request returns batch response`() = runBlocking {
+        val batch = """[
+            {"jsonrpc":"2.0","id":1,"method":"ping"},
+            {"jsonrpc":"2.0","id":2,"method":"ping"}
+        ]"""
+
+        val responseJson = server.handleMessage(batch, session)
+        assertNotNull(responseJson)
+
+        val responses = McpJson.decodeFromString<JsonArray>(responseJson!!)
+        assertEquals(2, responses.size)
+    }
+
+    @Test
+    fun `test session is marked initialized after initialize`() = runBlocking {
+        assertFalse("Session should not be initialized yet", session.initialized)
+
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        server.handleMessage(request.toString(), session)
+
+        assertTrue("Session should be initialized", session.initialized)
+        assertEquals("test-client", session.clientInfo?.name)
+    }
+
+    @Test
+    fun `test session manager creates unique sessions`() {
+        val session1 = server.sessionManager.createSession()
+        val session2 = server.sessionManager.createSession()
+
+        assertNotEquals(session1.id, session2.id)
+    }
+
+    @Test
+    fun `test session manager retrieves session by id`() {
+        val session1 = server.sessionManager.createSession()
+        val retrieved = server.sessionManager.getSession(session1.id)
+
+        assertNotNull(retrieved)
+        assertEquals(session1.id, retrieved?.id)
+    }
+
+    @Test
+    fun `test session manager removes session`() {
+        val session1 = server.sessionManager.createSession()
+        server.sessionManager.removeSession(session1.id)
+
+        val retrieved = server.sessionManager.getSession(session1.id)
+        assertNull(retrieved)
+    }
+
+    @Test
+    fun `test request with string id`() = runBlocking {
+        val request = """{"jsonrpc":"2.0","id":"request-abc","method":"ping"}"""
+
+        val responseJson = server.handleMessage(request, session)
+        assertNotNull(responseJson)
+
+        val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
+        assertEquals("request-abc", response.id.jsonPrimitive.content)
+    }
+}

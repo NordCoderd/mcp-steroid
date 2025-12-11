@@ -4,11 +4,12 @@ package com.jonnyzzz.intellij.mcp.server
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.ProjectManager
-import io.modelcontextprotocol.kotlin.sdk.server.Server
-import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
-import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import com.jonnyzzz.intellij.mcp.mcp.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 /**
  * Handler for the steroid_list_projects MCP tool.
@@ -16,16 +17,21 @@ import kotlinx.serialization.json.Json
 @Service(Service.Level.APP)
 class ListProjectsToolHandler {
 
-    fun register(server: Server) {
-        server.addTool(
+    fun register(server: McpServerCore) {
+        server.toolRegistry.registerTool(
             name = "steroid_list_projects",
-            description = "List all open projects in the IDE. Returns project names that can be used with steroid_execute_code."
-        ) { _ ->
+            description = "List all open projects in the IDE. Returns project names that can be used with steroid_execute_code.",
+            inputSchema = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") { }
+                putJsonArray("required") { }
+            }
+        ) { _, _ ->
             handle()
         }
     }
 
-    private fun handle(): CallToolResult {
+    private fun handle(): ToolCallResult {
         val projects = ApplicationManager.getApplication().runReadAction<List<ProjectInfo>> {
             ProjectManager.getInstance().openProjects.map { project ->
                 ProjectInfo(
@@ -35,10 +41,11 @@ class ListProjectsToolHandler {
             }
         }
 
-        return CallToolResult(
-            content = listOf(
-                TextContent(text = Json.encodeToString(ListProjectsResponse.serializer(), ListProjectsResponse(projects)))
-            )
+        val response = ListProjectsResponse(projects)
+        val json = McpJson.encodeToString(ListProjectsResponse.serializer(), response)
+
+        return ToolCallResult(
+            content = listOf(ContentItem.Text(text = json))
         )
     }
 }

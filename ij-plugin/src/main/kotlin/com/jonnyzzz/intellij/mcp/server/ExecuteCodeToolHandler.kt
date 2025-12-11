@@ -8,10 +8,9 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
+import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
-import io.modelcontextprotocol.kotlin.sdk.server.Server
-import io.modelcontextprotocol.kotlin.sdk.types.*
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.*
 
@@ -22,12 +21,13 @@ import kotlinx.serialization.json.*
 class ExecuteCodeToolHandler {
     private val log = Logger.getInstance(ExecuteCodeToolHandler::class.java)
 
-    fun register(server: Server) {
-        server.addTool(
+    fun register(server: McpServerCore) {
+        server.toolRegistry.registerTool(
             name = "steroid_execute_code",
             description = TOOL_DESCRIPTION,
-            inputSchema = ToolSchema(
-                properties = buildJsonObject {
+            inputSchema = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
                     putJsonObject("project_name") {
                         put("type", "string")
                         put("description", "Project name (from steroid_list_projects)")
@@ -36,20 +36,27 @@ class ExecuteCodeToolHandler {
                         put("type", "string")
                         put("description", "Kotlin code to execute - must use execute { ctx -> } pattern")
                     }
+                    putJsonObject("reason") {
+                        put("type", "string")
+                        put("description", "Write human readable reason for the execution, what you want to do and to get out of that")
+                    }
                     putJsonObject("timeout") {
                         put("type", "integer")
                         put("description", "Execution timeout in seconds (default: 60)")
                     }
-                },
-                required = listOf("project_name", "code")
-            )
-        ) { request ->
-            handle(server, request)
+                }
+                putJsonArray("required") {
+                    add("project_name")
+                    add("code")
+                }
+            }
+        ) { params, session ->
+            handle(server, params, session)
         }
     }
 
-    private suspend fun handle(server: Server, request: CallToolRequest): CallToolResult {
-        val args = request.params.arguments ?: return errorResult("Missing arguments")
+    private suspend fun handle(server: McpServerCore, params: ToolCallParams, session: McpSession): ToolCallResult {
+        val args = params.arguments ?: return errorResult("Missing arguments")
 
         val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: project_name")
@@ -60,16 +67,20 @@ class ExecuteCodeToolHandler {
         val project = findProject(projectName)
             ?: return errorResult("Project not found: $projectName")
 
-        val progressToken = extractProgressToken(request)
-        val progressReporter = progressToken?.let { ThrottledProgressReporter(server, progressToken) } ?: ProgressReporter.noOp()
+        val progressToken = extractProgressToken(args)
+        val progressReporter = if (progressToken != null) {
+            McpProgressReporter(server, session, progressToken)
+        } else {
+            ProgressReporter.noOp()
+        }
 
         return coroutineScope {
-            (progressReporter as? ThrottledProgressReporter)?.run { startThrottledSender() }
+            (progressReporter as? McpProgressReporter)?.run { startThrottledSender() }
 
             try {
                 val manager = project.service<ExecutionManager>()
-                val params = ExecutionParams(timeout = timeout, showReviewOnError = false)
-                val result = manager.executeWithProgress(code, params, progressReporter)
+                val executionParams = ExecutionParams(timeout = timeout, showReviewOnError = false)
+                val result = manager.executeWithProgress(code, executionParams, progressReporter)
 
                 buildResponse(result, timeout)
             } catch (e: Throwable) {
@@ -79,10 +90,10 @@ class ExecuteCodeToolHandler {
         }
     }
 
-    private fun buildResponse(result: ExecutionResultWithOutput, timeout: Int): CallToolResult {
+    private fun buildResponse(result: ExecutionResultWithOutput, timeout: Int): ToolCallResult {
         return when (result.status) {
-            ExecutionStatus.SUCCESS -> CallToolResult(
-                content = listOf(TextContent(text = buildSuccessText(result)))
+            ExecutionStatus.SUCCESS -> ToolCallResult(
+                content = listOf(ContentItem.Text(text = buildSuccessText(result)))
             )
             ExecutionStatus.REJECTED -> errorResult(
                 "Code rejected by user: ${result.errorMessage ?: "No reason provided"}"
@@ -113,13 +124,12 @@ class ExecuteCodeToolHandler {
         }
     }
 
-    private fun extractProgressToken(request: CallToolRequest): ProgressToken? {
-        val tokenElement = request.meta?.json?.get("progressToken") ?: return null
-        return runCatching { McpJson.decodeFromJsonElement<ProgressToken>(tokenElement) }.getOrNull()
+    private fun extractProgressToken(args: JsonObject): JsonElement? {
+        return args["_meta"]?.jsonObject?.get("progressToken")
     }
 
-    private fun errorResult(message: String) = CallToolResult(
-        content = listOf(TextContent(text = message)),
+    private fun errorResult(message: String) = ToolCallResult(
+        content = listOf(ContentItem.Text(text = message)),
         isError = true
     )
 

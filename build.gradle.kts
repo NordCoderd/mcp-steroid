@@ -16,7 +16,6 @@ repositories {
 }
 
 val ktorVersion = "3.1.0"
-val mcpSdkVersion = "0.8.1"
 
 dependencies {
     intellijPlatform {
@@ -26,13 +25,7 @@ dependencies {
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
 
-    // MCP SDK - Kotlin implementation
-    // Exclude kotlinx dependencies to use IntelliJ's bundled versions
-    implementation("io.modelcontextprotocol:kotlin-sdk:$mcpSdkVersion") {
-        exclude(group = "org.jetbrains.kotlinx")
-    }
-
-    // Ktor server for MCP SSE transport
+    // Ktor server for MCP HTTP transport
     implementation("io.ktor:ktor-server-core:$ktorVersion") {
         exclude(group = "org.jetbrains.kotlinx")
     }
