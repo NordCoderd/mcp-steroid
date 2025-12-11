@@ -35,11 +35,12 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 ## Technology Stack
 
 - **Gradle**: 8.11.1 with Kotlin DSL
-- **Kotlin**: 2.1.0
+- **Kotlin**: 2.2.21
 - **Java Toolchain**: 21
-- **IntelliJ Platform**: 2025.3+ (configured in `gradle.properties`)
-- **IntelliJ Platform Gradle Plugin**: 2.1.0
+- **IntelliJ Platform**: 2025.3+ (sinceBuild: 252.1)
+- **IntelliJ Platform Gradle Plugin**: 2.10.5
 - **Testing**: IntelliJ 253 pattern with `timeoutRunBlocking`
+- **Serialization**: kotlinx.serialization for JSON
 
 ## Architecture
 
@@ -48,7 +49,10 @@ This is an IntelliJ Platform plugin using the MCP toolset architecture:
 - **Plugin descriptor**: `src/main/resources/META-INF/plugin.xml`
 - **MCP Toolset**: `SteroidsMcpToolset.kt` - registers with `com.intellij.mcpServer`
 - **Execution**: `ExecutionManager.kt` - manages script execution lifecycle
+- **Code Evaluation**: `CodeEvalManager.kt` - handles script compilation and lambda capture
+- **Script Execution**: `ScriptExecutor.kt` - runs captured execute blocks with timeout
 - **Script Context**: `McpScriptContext.kt` / `McpScriptContextImpl.kt` - runtime context for scripts
+- **Script Scope**: `McpScriptScope.kt` - bound to script engine, provides `execute { }` entry point
 - **Storage**: `ExecutionStorage.kt` - append-only file-based storage
 - **Review**: `ReviewManager.kt` - human review workflow
 
@@ -74,21 +78,26 @@ This is an IntelliJ Platform plugin using the MCP toolset architecture:
 
 8. **Scope disposal**: After script evaluation, the scope is marked disposed to prevent nested `execute { execute { } }` patterns.
 
+9. **Two-phase execution**: First phase compiles script and captures execute blocks (`CodeEvalManager`), second phase runs them with timeout (`ScriptExecutor`).
+
 ## Source Structure
 
 ```
 src/main/kotlin/com/jonnyzzz/intellij/mcp/
 ├── SteroidsMcpToolset.kt          # MCP tool definitions (list_projects, execute_code, etc.)
 ├── execution/
-│   ├── ExecutionManager.kt        # Manages execution lifecycle
-│   ├── McpScriptContext.kt        # Interface for script context
-│   ├── McpScriptContextImpl.kt    # Implementation with output methods
-│   └── ScriptExecutor.kt          # Kotlin script compilation and execution
+│   ├── ExecutionManager.kt        # Manages execution lifecycle, orchestrates review + execution
+│   ├── CodeEvalManager.kt         # Compiles scripts, captures execute {} lambdas
+│   ├── ScriptExecutor.kt          # Runs captured blocks with timeout and coroutine scope
+│   ├── McpScriptScope.kt          # Interface bound to script engine (execute {} entry point)
+│   ├── McpScriptContext.kt        # Interface for script context (project, output, utilities)
+│   ├── McpScriptContextImpl.kt    # Implementation with output methods, waitForSmartMode
+│   └── McpScriptContextEx.kt      # Extended interface with reflection helpers
 ├── review/
 │   ├── ReviewManager.kt           # Human review workflow, diff generation
 │   └── McpReviewNotificationProvider.kt  # Editor notification panel
 └── storage/
-    └── ExecutionStorage.kt        # File-based storage, data classes
+    └── ExecutionStorage.kt        # File-based storage, data classes (OutputMessage, ExecutionResult, etc.)
 ```
 
 ## Testing
@@ -104,7 +113,32 @@ fun testExample(): Unit = timeoutRunBlocking(30.seconds) {
 Run specific test class:
 ```bash
 ./gradlew test --tests "*ExecutionManagerTest*"
+./gradlew test --tests "*McpServerIntegrationTest*"
+./gradlew test --tests "*ClaudeCliIntegrationTest*"
 ```
+
+### Test Files
+
+- **McpServerIntegrationTest.kt** - Tests MCP server using Ktor client + MCP SDK:
+  - `testMcpSseTransportReturnsSteroidToolsWithKtorClient` - Uses `HttpClient`, `SseClientTransport`, and `Client` from MCP SDK
+  - `testCallSteroidListProjectsViaMcpSseTransport` - Calls tools via SSE transport
+
+- **ClaudeCliIntegrationTest.kt** - Tests Claude Code CLI integration:
+  - Requires `claude` command and ANTHROPIC_API_KEY
+  - Creates temp directory with `.mcp.json` for isolated testing
+  - Gracefully skips if prerequisites not available
+
+- **SteroidsMcpToolsetTest.kt** - Direct toolset tests (no network)
+
+### Shell Scripts (integration-test/)
+
+- **test-sse-tools.sh** - Tests SSE transport via curl:
+  ```bash
+  ./integration-test/test-sse-tools.sh [PORT]
+  ```
+
+- **run-test.sh** - Automated Claude CLI test
+- **manual-test.sh** - Interactive Claude CLI test
 
 ### Test Dependencies
 
@@ -116,9 +150,110 @@ The Kotlin plugin (`org.jetbrains.kotlin`) is added as a bundled dependency to e
 - Use `timeoutRunBlocking(10.seconds)` or similar for coroutine tests
 - Script engine not available is a valid test outcome (ERROR status)
 - All assertions should handle both SUCCESS and ERROR cases gracefully
+- MCP SSE tests use Ktor client with `install(SSE)` and MCP SDK's `SseClientTransport`
 
 ## Configuration
 
 - `gradle.properties`: Contains `platformVersion` for IntelliJ version
 - `build.gradle.kts`: Plugin configuration using `intellijPlatform` DSL
 - Registry keys: `mcp.steroids.review.mode`, `mcp.steroids.review.timeout`, `mcp.steroids.execution.timeout`
+
+## IntelliJ Platform Coding Principles
+
+When contributing to this plugin, follow these IntelliJ Platform best practices:
+
+### Threading Model
+
+1. **Never block the EDT (Event Dispatch Thread)**:
+   - UI updates must happen on EDT
+   - Long operations must run on background threads
+   - Use `Dispatchers.Main` for EDT, `Dispatchers.IO` or `Dispatchers.Default` for background
+
+2. **Read/Write Actions**:
+   - Access to PSI and VFS requires read actions
+   - Modifications require write actions
+   - Use coroutine-aware APIs: `readAction { }` and `writeAction { }` from `com.intellij.openapi.application`
+   - See [IntelliJ Threading Rules](https://plugins.jetbrains.com/docs/intellij/general-threading-rules.html)
+
+3. **Smart Mode vs Dumb Mode**:
+   - During indexing, IDE is in "dumb mode" - many APIs unavailable
+   - Use `DumbService.isDumb(project)` to check
+   - Use `DumbService.getInstance(project).smartInvokeLater { }` for operations requiring indices
+   - Our `ctx.waitForSmartMode()` handles this for scripts
+
+### Coroutine Patterns
+
+1. **Service-injected CoroutineScope**:
+   ```kotlin
+   @Service(Service.Level.PROJECT)
+   class MyService(
+       private val project: Project,
+       coroutineScope: CoroutineScope  // Injected by platform
+   )
+   ```
+
+2. **Child scopes for cleanup**:
+   ```kotlin
+   val childScope = parentScope.childScope("name", SupervisorJob())
+   ```
+
+3. **Cancelation via Disposable**:
+   ```kotlin
+   job.cancelOnDispose(disposable)
+   Disposer.register(parent, child)
+   ```
+
+4. **Sequential execution**:
+   ```kotlin
+   Dispatchers.Default.limitedParallelism(1)
+   ```
+
+### Disposable Lifecycle
+
+1. **Always register disposables with a parent**:
+   ```kotlin
+   Disposer.register(parentDisposable, childDisposable)
+   ```
+
+2. **Use Disposer.newDisposable() for named disposables**:
+   ```kotlin
+   val myDisposable = Disposer.newDisposable("my-execution-$id")
+   ```
+
+3. **Clean up in dispose()**:
+   - Cancel jobs
+   - Close resources
+   - Unregister listeners
+
+### Project Services
+
+1. **Get services via extension function**:
+   ```kotlin
+   val storage = project.service<ExecutionStorage>()
+   ```
+
+2. **Avoid storing project references statically** - leads to memory leaks
+
+3. **Use `@Service` annotation with correct level**:
+   - `Service.Level.PROJECT` for project-scoped services
+   - `Service.Level.APP` for application-scoped services
+
+### Error Handling
+
+1. **Use `ControlFlowException` for expected control flow**
+2. **Never catch `ProcessCanceledException`** - rethrow it
+3. **Log errors appropriately**:
+   ```kotlin
+   private val log = Logger.getInstance(MyClass::class.java)
+   log.info("message")
+   log.warn("message", exception)
+   log.error("message", exception)
+   ```
+
+### References
+
+- [IntelliJ Platform SDK Documentation](https://plugins.jetbrains.com/docs/intellij/)
+- [IntelliJ Community Source](https://github.com/JetBrains/intellij-community)
+- [Threading Rules](https://plugins.jetbrains.com/docs/intellij/general-threading-rules.html)
+- [Coroutines in IntelliJ](https://plugins.jetbrains.com/docs/intellij/coroutine-scopes.html)
+- [Disposer and Disposable](https://plugins.jetbrains.com/docs/intellij/disposers.html)

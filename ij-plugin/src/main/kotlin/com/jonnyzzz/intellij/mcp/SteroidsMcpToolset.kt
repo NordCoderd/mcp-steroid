@@ -22,18 +22,18 @@ import java.util.*
 @Suppress("LocalVariableName")
 class SteroidsMcpToolset : McpToolset {
 
-    @McpTool("list_projects")
-    @McpDescription("List all open projects in the IDE. Returns project names that can be used with execute_code.")
-    suspend fun list_projects(): List<ProjectInfo> {
-        return ProjectManager.getInstance().openProjects.map { project ->
+    @McpTool("steroid_list_projects")
+    @McpDescription("List all open projects in the IDE. Returns project names that can be used with steroid_execute_code.")
+    fun list_projects(): ListProjectsResponse {
+        return ListProjectsResponse(ProjectManager.getInstance().openProjects.map { project ->
             ProjectInfo(
                 name = project.name,
                 path = project.basePath ?: ""
             )
-        }
+        })
     }
 
-    @McpTool("execute_code")
+    @McpTool("steroid_execute_code")
     @McpDescription("""
         |Execute Kotlin code in the IDE's runtime context with full access to IntelliJ APIs.
         |
@@ -84,10 +84,10 @@ class SteroidsMcpToolset : McpToolset {
         |val vfsManager = VirtualFileManager.getInstance()
         |```
         |
-        |Returns an execution_id that can be used with get_result to poll for results.
+        |Returns an execution_id that can be used with steroid_get_result to poll for results.
     """)
     suspend fun execute_code(
-        @McpDescription("Project name (from list_projects)")
+        @McpDescription("Project name (from steroid_list_projects)")
         project_name: String,
         @McpDescription("Kotlin code to execute - must use execute { ctx -> } pattern with suspend functions")
         code: String,
@@ -113,7 +113,7 @@ class SteroidsMcpToolset : McpToolset {
         )
     }
 
-    @McpTool("get_result")
+    @McpTool("steroid_get_result")
     @McpDescription("""
         |Get execution result by polling. Call this repeatedly until status is SUCCESS, ERROR, REJECTED, or CANCELLED.
         |
@@ -130,7 +130,7 @@ class SteroidsMcpToolset : McpToolset {
         |Use offset to get only new output messages since last call for efficient polling.
     """)
     suspend fun get_result(
-        @McpDescription("Execution ID from execute_code")
+        @McpDescription("Execution ID from steroid_execute_code")
         execution_id: String,
         @McpDescription("Skip first N output messages (for incremental polling)")
         offset: Int = 0
@@ -162,7 +162,7 @@ class SteroidsMcpToolset : McpToolset {
         )
     }
 
-    @McpTool("cancel_execution")
+    @McpTool("steroid_cancel_execution")
     @McpDescription("Cancel a running or pending execution")
     suspend fun cancel_execution(
         @McpDescription("Execution ID to cancel")
@@ -204,6 +204,9 @@ class SteroidsMcpToolset : McpToolset {
 }
 
 // DTOs for tool responses
+
+@Serializable
+data class ListProjectsResponse(val projects: List<ProjectInfo>)
 
 @Serializable
 data class ProjectInfo(

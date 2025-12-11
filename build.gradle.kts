@@ -15,6 +15,8 @@ repositories {
     }
 }
 
+val ktorVersion = "3.0.3"
+
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.3")
@@ -24,14 +26,27 @@ dependencies {
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
 
-//    implementation("org.jetbrains.kotlinx:kotlinx-serialization-bom:1.9.0")
-//    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json")
-//    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-bom:1.10.2")
-//    implementation("org.jetbrains.kotlinx:kotlinx-coroutines")
-//    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test")
-
     // Testing
     testImplementation("junit:junit:4.13.2")
+
+    // https://mvnrepository.com/artifact/org.testcontainers/testcontainers-bom
+    testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.2"))
+    testImplementation("org.testcontainers:testcontainers")
+
+    // Ktor client for MCP SSE transport tests
+    // Exclude kotlinx-coroutines and serialization to use IntelliJ's bundled versions
+    testImplementation("io.ktor:ktor-client-core:$ktorVersion") {
+        exclude(group = "org.jetbrains.kotlinx")
+    }
+    testImplementation("io.ktor:ktor-client-cio:$ktorVersion") {
+        exclude(group = "org.jetbrains.kotlinx")
+    }
+    testImplementation("io.ktor:ktor-client-content-negotiation:$ktorVersion") {
+        exclude(group = "org.jetbrains.kotlinx")
+    }
+    testImplementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion") {
+        exclude(group = "org.jetbrains.kotlinx")
+    }
 }
 
 kotlin {
@@ -45,7 +60,7 @@ intellijPlatform {
 
         ideaVersion {
             sinceBuild = "252.1"
-            untilBuild = "*"
+            untilBuild = null
         }
     }
 }

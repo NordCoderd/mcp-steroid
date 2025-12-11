@@ -24,22 +24,26 @@ No separate server or port configuration needed - uses IntelliJ's MCP infrastruc
 
 ## MCP Tools
 
-### `list_projects`
+All tools are prefixed with `steroid_` to distinguish them from IntelliJ's built-in MCP tools.
+
+### `steroid_list_projects`
 Lists all open projects in the IDE.
 
 **Returns**:
 ```json
-[
-  {"name": "my-project", "path": "/path/to/my-project"},
-  {"name": "another-project", "path": "/path/to/another-project"}
-]
+{
+  "projects": [
+    {"name": "my-project", "path": "/path/to/my-project"},
+    {"name": "another-project", "path": "/path/to/another-project"}
+  ]
+}
 ```
 
-### `execute_code`
+### `steroid_execute_code`
 Compiles and executes Kotlin code in the IDE's runtime context.
 
 **Parameters**:
-- `project_name` (required): Name of an open project (from `list_projects`)
+- `project_name` (required): Name of an open project (from `steroid_list_projects`)
 - `code` (required): Kotlin code to execute
 - `timeout`: Execution timeout in seconds (default: 60)
 - `show_review_on_error`: If true, show code in editor even on compilation error
@@ -48,15 +52,15 @@ Compiles and executes Kotlin code in the IDE's runtime context.
 - **Compilation is synchronous** - blocks until compiled
 - On success: assigns `execution_id`, starts async execution (or review if enabled)
 - On compilation error: returns error immediately (unless `show_review_on_error=true`)
-- Use `get_result` to poll for execution output
+- Use `steroid_get_result` to poll for execution output
 - Requests are executed sequentially (queued)
 
 **Response**:
 ```json
 {
     "execution_id": "abc-2024-12-10T14-30-25-a1B2c3D4e5",
-    "status": "running" | "pending_review" | "compilation_error",
-    "errors": [...]
+    "status": "SUBMITTED" | "RUNNING" | "SUCCESS" | "ERROR",
+    "error_message": "..."
 }
 ```
 
@@ -93,6 +97,8 @@ execute { ctx ->
 ```kotlin
 import com.intellij.openapi.project.*
 import com.intellij.openapi.application.*
+import com.intellij.openapi.application.readAction   // For read actions
+import com.intellij.openapi.application.writeAction  // For write actions
 import com.intellij.openapi.vfs.*
 import com.intellij.openapi.editor.*
 import com.intellij.openapi.fileEditor.*
@@ -101,44 +107,69 @@ import com.intellij.psi.*
 import kotlinx.coroutines.*
 ```
 
-### `get_result`
+### `steroid_get_result`
 Gets execution output and status via polling.
 
 **Parameters**:
-- `execution_id` (required): ID returned from execute_code
+- `execution_id` (required): ID returned from `steroid_execute_code`
 - `offset`: Skip first N messages (default: 0)
+
+**Status values**:
+- `SUBMITTED`: Script is being compiled/prepared
+- `RUNNING`: Script is executing
+- `PENDING_REVIEW`: Waiting for user to approve/reject
+- `SUCCESS`: Completed successfully
+- `ERROR`: Failed with error
+- `REJECTED`: User rejected the code
+- `TIMEOUT`: Execution or review timed out
+- `CANCELLED`: Execution was cancelled
+- `NOT_FOUND`: Execution ID not found
 
 **Response**:
 ```json
 {
     "execution_id": "abc-2024-12-10T14-30-25-a1B2c3D4e5",
-    "status": "running" | "pending_review" | "success" | "error" | "timeout" | "cancelled" | "rejected",
+    "status": "SUCCESS",
     "output": [
         {"ts": 1733840000000, "type": "out", "msg": "Hello from IntelliJ!"},
         {"ts": 1733840000100, "type": "log", "level": "info", "msg": "Processing..."}
     ],
-    "errors": [...],
-    "exception": {...}
+    "error_message": null,
+    "exception_info": null
 }
 ```
 
-### `cancel_execution`
+### `steroid_cancel_execution`
 Cancels a running execution or pending review.
 
 **Parameters**:
-- `execution_id` (required): ID returned from execute_code
+- `execution_id` (required): ID returned from `steroid_execute_code`
+
+**Response**:
+```json
+{
+    "cancelled": true,
+    "message": "Execution cancelled"
+}
+```
 
 ## McpScriptContext API
 
 The `McpScriptContext` is provided inside the `execute { }` block:
 
 ```kotlin
-interface McpScriptContext : Disposable {
+interface McpScriptContext {
     /** The IntelliJ Project this execution is associated with */
     val project: Project
 
     /** Unique identifier for this execution */
     val executionId: String
+
+    /** Parent Disposable for resource cleanup - use coroutineScope {} for coroutine API */
+    val disposable: Disposable
+
+    /** Check if the context has been disposed */
+    val isDisposed: Boolean
 
     // === Output Methods ===
     fun println(vararg values: Any?)  // Print space-separated values
@@ -185,12 +216,12 @@ interface McpScriptContextEx : McpScriptContext {
 
 ### Disposable Hierarchy
 
-`McpScriptContext` implements `Disposable`. The context also provides a `disposable` property for scripts that need to register cleanup:
+The context provides a `disposable` property for scripts that need to register cleanup:
 
 ```kotlin
 execute { ctx ->
     // Access the execution's parent Disposable
-    val execDisposable = (ctx as McpScriptContextImpl).disposable
+    val execDisposable = ctx.disposable
 
     // Register your own cleanup
     val myResource = Disposer.newDisposable("my-resource")
@@ -211,18 +242,21 @@ The context is disposed automatically:
 ### Execution Flow
 
 1. **Code Submission**: MCP tool receives code via `execute_code`
-2. **Script Engine Check**: Fast fail if Kotlin script engine not available
-3. **Compilation Phase**: Kotlin script engine compiles and evaluates the code
+2. **ExecutionManager**: Orchestrates the workflow, manages state
+3. **Review Phase** (if enabled): Code opened in editor via `ReviewManager`, waits for human approval
+4. **Code Evaluation** (`CodeEvalManager`):
+   - Script Engine Check: Fast fail if Kotlin script engine not available
+   - Compilation Phase: Kotlin script engine compiles and evaluates the code
    - Captures all `execute { }` lambdas (FIFO order)
    - Logs the number of captured blocks
    - Compilation errors are reported immediately (no timeout waiting)
-4. **Review** (if enabled): Code opened in editor, waits for human approval
-5. **Execution Phase**: Inside `coroutineScope { withTimeout { } }`
+5. **Script Execution** (`ScriptExecutor`):
+   - Runs inside `coroutineScope { withContext(Dispatchers.IO) { withTimeout { } } }`
    - Execute blocks run in FIFO order
    - Any failure marks the entire job as complete
    - Context is disposed when execution completes (success, error, or timeout)
 6. **Output**: Written to file (append-only), polled via `get_result`
-7. **Cleanup**: Disposable disposed, resources cleaned up
+7. **Cleanup**: Disposable disposed via `Disposer.dispose()`, resources cleaned up
 
 ### Fast Failure
 
@@ -323,6 +357,125 @@ Key packages:
 - `com.intellij.psi` - Program Structure Interface
 - `com.intellij.openapi.application` - Application services, read/write actions
 - `com.intellij.openapi.editor` - Editor APIs
+
+### IntelliJ Coding Principles for Scripts
+
+When writing scripts for execution, follow these IntelliJ Platform best practices:
+
+#### Threading Model
+
+1. **Read/Write Actions are required** for PSI and VFS access:
+   ```kotlin
+   execute { ctx ->
+       // Reading PSI requires a read action
+       val psiFile = readAction {
+           PsiManager.getInstance(ctx.project).findFile(virtualFile)
+       }
+
+       // Modifying documents requires a write action
+       writeAction {
+           document.setText("new content")
+       }
+   }
+   ```
+
+2. **Smart Mode**: Many APIs require indices to be built. Use `ctx.waitForSmartMode()`:
+   ```kotlin
+   execute { ctx ->
+       ctx.waitForSmartMode()  // Wait for indexing
+
+       // Now safe to use index-dependent APIs
+       val classes = readAction {
+           JavaPsiFacade.getInstance(ctx.project)
+               .findClasses("com.example.MyClass", GlobalSearchScope.allScope(ctx.project))
+       }
+   }
+   ```
+
+#### Common Patterns
+
+1. **Getting services**:
+   ```kotlin
+   // Project services
+   val fileEditorManager = FileEditorManager.getInstance(ctx.project)
+   val psiManager = PsiManager.getInstance(ctx.project)
+
+   // Application services
+   val vfsManager = VirtualFileManager.getInstance()
+   val app = ApplicationManager.getApplication()
+   ```
+
+2. **Working with files**:
+   ```kotlin
+   execute { ctx ->
+       // Find a file
+       val vFile = LocalFileSystem.getInstance()
+           .findFileByPath("/path/to/file.kt")
+
+       // Get PSI
+       val psiFile = readAction {
+           PsiManager.getInstance(ctx.project).findFile(vFile!!)
+       }
+
+       // Modify
+       writeAction {
+           val document = FileDocumentManager.getInstance().getDocument(vFile!!)
+           document?.setText("new content")
+       }
+   }
+   ```
+
+3. **Using Disposables for cleanup**:
+   ```kotlin
+   execute { ctx ->
+       val myListener = object : FileEditorManagerListener {
+           override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
+               ctx.println("Opened: ${file.name}")
+           }
+       }
+
+       // Register with the context's disposable for automatic cleanup
+       ctx.project.messageBus.connect(ctx.disposable)
+           .subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, myListener)
+   }
+   ```
+
+#### Error Handling
+
+- Scripts run in a supervised coroutine scope
+- Exceptions are caught and reported as ERROR status
+- Use `ctx.logError()` for expected error conditions
+- Avoid catching `ProcessCanceledException` - let it propagate
+
+## Testing
+
+### Unit Tests
+
+```bash
+# Run all tests
+./gradlew test
+
+# Run specific test class
+./gradlew test --tests "*McpServerIntegrationTest*"
+./gradlew test --tests "*ClaudeCliIntegrationTest*"
+./gradlew test --tests "*SteroidsMcpToolsetTest*"
+```
+
+### Integration Tests
+
+The project includes integration tests that verify MCP server functionality:
+
+**Test Files:**
+- `McpServerIntegrationTest.kt` - Tests MCP server using Ktor client and MCP SDK
+- `ClaudeCliIntegrationTest.kt` - Tests Claude Code CLI integration (requires `claude` command)
+- `SteroidsMcpToolsetTest.kt` - Direct toolset tests
+
+**Shell Scripts** (in `integration-test/`):
+- `test-sse-tools.sh` - Tests SSE transport directly via curl
+- `run-test.sh` - Automated integration test with Claude CLI
+- `manual-test.sh` - Interactive Claude CLI test
+
+See [integration-test/README.md](integration-test/README.md) for details.
 
 ## Building and Running
 

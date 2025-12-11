@@ -37,7 +37,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
     }
 
     fun testListProjects(): Unit = timeoutRunBlocking(30.seconds) {
-        val projects = toolset.list_projects()
+        val projects = toolset.list_projects().projects
 
         // Should include at least the test project
         assertTrue("Should have at least one project", projects.isNotEmpty())

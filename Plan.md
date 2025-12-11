@@ -2,7 +2,22 @@
 
 This plan reflects decisions from [Discussions.md](Discussions.md).
 
-**Target Version**: IntelliJ 2025.3+
+**Target Version**: IntelliJ 2025.3+ (sinceBuild: 252.1)
+
+**Status**: ✅ V1 Implementation Complete
+
+---
+
+## Implementation Status
+
+| Phase | Status | Notes |
+|-------|--------|-------|
+| Phase 1: Project Setup | ✅ Complete | Plugin descriptor, package structure |
+| Phase 2: Core Execution | ✅ Complete | Two-phase execution (CodeEvalManager + ScriptExecutor) |
+| Phase 3: Storage | ✅ Complete | Append-only file storage |
+| Phase 4: MCP Toolset | ✅ Complete | All tools implemented |
+| Phase 5: Code Review | ✅ Complete | Editor notification panel, diff generation |
+| Phase 6: Testing | ✅ Complete | Unit and integration tests |
 
 ---
 
@@ -114,27 +129,27 @@ dependencies {
 </idea-plugin>
 ```
 
-### 1.3 Package Structure
+### 1.3 Package Structure (Actual Implementation)
 
 ```
 src/main/kotlin/com/jonnyzzz/intellij/mcp/
-├── SteroidsMcpToolset.kt          # MCP toolset with all tools
+├── SteroidsMcpToolset.kt          # MCP toolset with all tools + DTOs
 ├── execution/
-│   ├── ExecutionManager.kt        # Project service, queue
-│   ├── ScriptExecutor.kt          # Uses IdeScriptEngine
-│   ├── McpScriptScope.kt          # Bound to script engine
-│   ├── McpScriptContext.kt        # Full context interface
-│   ├── McpScriptContextImpl.kt    # Implementation
-│   └── OutputCapture.kt           # Writer for output
+│   ├── ExecutionManager.kt        # Project service, orchestrates workflow
+│   ├── CodeEvalManager.kt         # Script compilation, lambda capture
+│   ├── ScriptExecutor.kt          # Executes captured blocks with timeout
+│   ├── McpScriptScope.kt          # Interface bound to script engine (execute {})
+│   ├── McpScriptContext.kt        # Context interface for scripts
+│   ├── McpScriptContextEx.kt      # Extended interface with reflection helpers
+│   └── McpScriptContextImpl.kt    # Implementation with output, waitForSmartMode
 ├── storage/
-│   └── ExecutionStorage.kt        # File-based history
-├── review/
-│   ├── ReviewManager.kt           # Manages pending reviews
-│   └── McpReviewNotificationProvider.kt
-└── util/
-    ├── ProjectHash.kt             # 3-char project hash
-    └── PayloadHash.kt             # 10-char payload hash
+│   └── ExecutionStorage.kt        # File-based history + data classes
+└── review/
+    ├── ReviewManager.kt           # Human review workflow, diff generation
+    └── McpReviewNotificationProvider.kt  # Editor notification panel
 ```
+
+**Note**: Hash utilities are inline in ExecutionStorage and SteroidsMcpToolset (no separate util files).
 
 ---
 
@@ -149,16 +164,17 @@ interface McpScriptScope {
 }
 ```
 
-### 2.2 McpScriptContext Interface
+### 2.2 McpScriptContext Interface (Actual Implementation)
 
 ```kotlin
-interface McpScriptContext : Disposable {
+interface McpScriptContext {
     val project: Project
-    val coroutineScope: CoroutineScope
+    val executionId: String
+    val disposable: Disposable
+    val isDisposed: Boolean
 
     // Output
-    fun println(message: Any?)
-    fun print(message: Any?)
+    fun println(vararg values: Any?)
     fun printJson(obj: Any?)
     fun logInfo(message: String)
     fun logWarn(message: String)
@@ -166,40 +182,52 @@ interface McpScriptContext : Disposable {
 
     // IDE Utilities
     suspend fun waitForSmartMode()
-    suspend fun <T> readAction(block: () -> T): T
-    suspend fun <T> writeAction(block: () -> T): T
+}
 
-    // Reflection
+// Extended interface with reflection helpers
+interface McpScriptContextEx : McpScriptContext {
     fun listServices(): List<String>
     fun listExtensionPoints(): List<String>
     fun describeClass(className: String): String
 }
 ```
 
-### 2.3 McpScriptContextImpl
+**Note**: `readAction` and `writeAction` are NOT part of McpScriptContext. Scripts should import and use IntelliJ's coroutine-aware APIs directly:
+```kotlin
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.writeAction
+```
+
+### 2.3 McpScriptContextImpl (Actual Implementation)
 
 ```kotlin
 class McpScriptContextImpl(
     override val project: Project,
-    private val executionId: ExecutionId,
-    private val outputCapture: OutputCapture,
-    parentScope: CoroutineScope
-) : McpScriptContext {
+    override val executionId: String,
+    override val disposable: Disposable,  // Parent Disposable for cleanup
+) : McpScriptContextEx {
 
-    override val coroutineScope = parentScope.childScope(
-        "McpScriptContext-${executionId}",
-        SupervisorJob()
-    )
-
-    init {
-        coroutineScope.coroutineContext.job.cancelOnDispose(this)
+    private val disposed = AtomicBoolean(false).also {
+        Disposer.register(disposable) { it.set(true) }
     }
 
+    override val isDisposed: Boolean
+        get() = disposed.get()
+
     override suspend fun waitForSmartMode() {
+        checkDisposed()
+        if (!DumbService.isDumb(project)) return
+
         suspendCancellableCoroutine { cont ->
             fun waitForSmart() {
+                if (disposed.get()) {
+                    cont.cancel()
+                    return
+                }
                 DumbService.getInstance(project).smartInvokeLater {
-                    if (DumbService.isDumb(project)) {
+                    if (disposed.get()) {
+                        cont.cancel()
+                    } else if (DumbService.isDumb(project)) {
                         waitForSmart()
                     } else {
                         cont.resume(Unit)
@@ -210,83 +238,91 @@ class McpScriptContextImpl(
         }
     }
 
-    override suspend fun <T> readAction(block: () -> T): T =
-        com.intellij.openapi.application.readAction { block() }
-
-    override suspend fun <T> writeAction(block: () -> T): T =
-        com.intellij.openapi.application.writeAction { block() }
-
-    override fun dispose() {
-        // Scope cancelled via cancelOnDispose
-    }
+    // Output methods write to ExecutionStorage.appendOutput()
+    // Reflection helpers provide informational service/EP listings
 }
 ```
 
-### 2.4 ScriptExecutor
+### 2.4 Two-Phase Execution (Actual Implementation)
 
+The actual implementation splits execution into two components:
+
+**CodeEvalManager** - Handles compilation and lambda capture:
 ```kotlin
-class ScriptExecutor(
-    private val project: Project,
-    private val executionStorage: ExecutionStorage,
-    private val parentScope: CoroutineScope
-) {
-    suspend fun execute(executionId: ExecutionId, code: String): ExecutionResult {
-        val engineManager = IdeScriptEngineManager.getInstance()
-        val engine = engineManager.getEngineByFileExtension("kts", null)
-            ?: return ExecutionResult.Error("Kotlin script engine not available")
+@Service(Service.Level.PROJECT)
+class CodeEvalManager(private val project: Project) : Disposable {
 
-        val outputCapture = OutputCapture(executionId, executionStorage)
-        engine.setStdOut(outputCapture.stdoutWriter)
-        engine.setStdErr(outputCapture.stderrWriter)
+    fun evalCode(executionId: String, code: String): EvalResult {
+        val scope = DisposableScope(executionId)  // McpScriptScope impl
 
-        val context = McpScriptContextImpl(
-            project, executionId, outputCapture, parentScope
-        )
+        val engine = IdeScriptEngineManager.getInstance()
+            .getEngineByFileExtension("kts", null)
+            ?: return EvalResult.Failed(/* error */)
 
-        var capturedBlock: (suspend McpScriptContext.() -> Unit)? = null
+        engine.setBinding("execute", { block -> scope.execute(block) })
+        engine.eval(wrapWithImports(code))
 
-        val scope = object : McpScriptScope {
-            override fun execute(block: suspend McpScriptContext.() -> Unit) {
-                capturedBlock = block
-            }
+        Disposer.dispose(scope)  // Mark scope as disposed
+
+        if (scope.capturedBlocks.isEmpty()) {
+            return EvalResult.Failed(/* no execute block error */)
         }
 
-        engine.setBinding("execute", scope::execute)
+        return EvalResult.Success(scope.capturedBlocks.toList())
+    }
 
-        val wrappedCode = wrapWithImports(code)
+    private fun wrapWithImports(code: String): String = """
+        import com.intellij.openapi.project.*
+        import com.intellij.openapi.application.*
+        import com.intellij.openapi.application.readAction
+        import com.intellij.openapi.application.writeAction
+        import com.intellij.openapi.vfs.*
+        import com.intellij.openapi.editor.*
+        import com.intellij.openapi.fileEditor.*
+        import com.intellij.openapi.command.*
+        import com.intellij.psi.*
+        import kotlinx.coroutines.*
+
+        $code
+    """.trimIndent()
+}
+```
+
+**ScriptExecutor** - Runs captured blocks with timeout:
+```kotlin
+@Service(Service.Level.PROJECT)
+class ScriptExecutor(private val project: Project) : Disposable {
+
+    suspend fun execute(executionId: String, code: String, timeoutSeconds: Int?): ExecutionResult {
+        val evalResult = project.service<CodeEvalManager>().evalCode(executionId, code)
+        if (evalResult is EvalResult.Failed) return evalResult.errorResult
+
+        val executionDisposable = Disposer.newDisposable(this, "mcp-execution-$executionId")
+        val context = McpScriptContextImpl(project, executionId, executionDisposable)
 
         try {
-            // Compile and run script (captures the execute block)
-            engine.eval(wrappedCode)
-
-            // Now run the captured block
-            val block = capturedBlock
-                ?: return ExecutionResult.Error("Script must call execute { }")
-
-            context.use {
-                block(context)
+            return coroutineScope {
+                withContext(Dispatchers.IO) {
+                    withTimeout(timeoutSeconds.seconds) {
+                        runTheSubmittedCode(evalResult.result, executionId, context)
+                    }
+                }
             }
-
-            return ExecutionResult.Success
-        } catch (e: IdeScriptException) {
-            return ExecutionResult.CompilationError(e.message ?: "Compilation failed")
-        } catch (e: Exception) {
-            return ExecutionResult.RuntimeError(e)
+        } finally {
+            Disposer.dispose(executionDisposable)
         }
     }
 
-    private fun wrapWithImports(code: String): String {
-        val imports = """
-            import com.intellij.openapi.project.*
-            import com.intellij.openapi.application.*
-            import com.intellij.openapi.vfs.*
-            import com.intellij.openapi.editor.*
-            import com.intellij.openapi.fileEditor.*
-            import com.intellij.openapi.command.*
-            import com.intellij.psi.*
-            import kotlinx.coroutines.*
-        """.trimIndent()
-        return "$imports\n\n$code"
+    private suspend fun runTheSubmittedCode(
+        capturedBlocks: List<suspend McpScriptContext.() -> Unit>,
+        executionId: String,
+        context: McpScriptContextImpl
+    ): ExecutionResult {
+        for (block in capturedBlocks) {
+            yield()
+            block(context)
+        }
+        return ExecutionResult(status = ExecutionStatus.SUCCESS)
     }
 }
 ```
@@ -618,14 +654,16 @@ class McpIntegrationTest : HeavyPlatformTestCase() {
 | Topic | Decision |
 |-------|----------|
 | MCP Integration | McpToolset only (no REST fallback) |
-| Target Version | IntelliJ 2025.3+ |
+| Target Version | IntelliJ 2025.3+ (sinceBuild: 252.1) |
 | Entry Point | `execute { ctx -> }` via McpScriptScope |
 | Script Engine | IdeScriptEngineManager + AllPluginsLoader |
-| CoroutineScope | Service-injected, childScope pattern |
-| McpScriptContext | Implements Disposable, bound to scope |
+| Execution Architecture | Two-phase: CodeEvalManager (compile) + ScriptExecutor (run) |
+| CoroutineScope | Service-injected, Dispatchers.IO + withTimeout |
+| McpScriptContext | Has disposable property, NOT Disposable itself |
+| Read/Write Actions | NOT part of context, use IntelliJ's coroutine-aware APIs |
 | Review Mode | ALWAYS default, TRUSTED = trust all callers |
 | Execution ID | `{hash-3}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-10}` |
 | Response Model | Polling via get_result (no streaming) |
 | Language | Kotlin only (v1) |
 | Slots/Commands | Deferred to v2 |
-| Compilation | Synchronous (blocks tool call) |
+| Compilation | Synchronous in CodeEvalManager, before execution phase |
