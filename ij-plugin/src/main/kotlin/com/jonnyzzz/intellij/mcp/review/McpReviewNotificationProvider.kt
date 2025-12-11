@@ -2,7 +2,6 @@
 package com.jonnyzzz.intellij.mcp.review
 
 import com.intellij.openapi.components.service
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
@@ -15,6 +14,9 @@ import javax.swing.JComponent
 /**
  * Shows a notification panel in the editor when viewing code pending review.
  * Provides Approve and Reject buttons.
+ *
+ * The panel encourages users to edit the code to add comments or modifications
+ * before rejecting - these edits will be sent back to the LLM.
  */
 class McpReviewNotificationProvider : EditorNotificationProvider {
 
@@ -22,9 +24,9 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
         project: Project,
         file: VirtualFile
     ): Function<FileEditor, JComponent?>? {
-        // Check if this is a pending review file
+        // Check if this is a review file: .idea/mcp-run/{execution-id}/review.kts
         val path = file.path
-        if (!path.contains("mcp-run/pending/") || !path.endsWith(".kt")) {
+        if (!path.contains("mcp-run/") || !path.endsWith("/review.kts")) {
             return null
         }
 
@@ -49,36 +51,17 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
         reviewManager: ReviewManager
     ): EditorNotificationPanel {
         return EditorNotificationPanel(editor, EditorNotificationPanel.Status.Warning).apply {
-            text = "MCP Script Awaiting Review"
+            text = "MCP Script Review - Edit code to add comments, then Approve or Reject"
 
             createActionLabel("Approve & Execute") {
                 reviewManager.approve(executionId)
                 EditorNotifications.getInstance(project).updateNotifications(file)
             }
 
-            createActionLabel("Reject") {
-                // Get the current code from the editor (in case user edited it)
-                val document = FileDocumentManager.getInstance().getDocument(file)
-                val editedCode = document?.text
-
-                reviewManager.reject(
-                    executionId = executionId,
-                    reason = "Rejected by user",
-                    editedCode = editedCode
-                )
-                EditorNotifications.getInstance(project).updateNotifications(file)
-            }
-
-            createActionLabel("Reject with Comment") {
-                val document = FileDocumentManager.getInstance().getDocument(file)
-                val editedCode = document?.text
-
-                // Simple rejection - in a real implementation, you might show a dialog
-                reviewManager.reject(
-                    executionId = executionId,
-                    reason = "Rejected with modifications",
-                    editedCode = editedCode
-                )
+            createActionLabel("Reject (send edits to LLM)") {
+                // The reject action will capture any edits made to the code
+                // and return them with a diff to the LLM
+                reviewManager.reject(executionId)
                 EditorNotifications.getInstance(project).updateNotifications(file)
             }
         }

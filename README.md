@@ -62,7 +62,7 @@ Compiles and executes Kotlin code in the IDE's runtime context.
 
 ### Script Entry Point
 
-Scripts **must** call `execute { }` to interact with the IDE:
+Scripts **must** call `execute { }` to interact with the IDE. All code must be written as **suspend functions** - never use `runBlocking`:
 
 ```kotlin
 execute { ctx ->
@@ -75,13 +75,16 @@ execute { ctx ->
     // Access the project
     val project = ctx.project
 
-    // Read/write actions for PSI
-    ctx.readAction {
-        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
+    // For read/write actions, use IntelliJ's coroutine-aware APIs:
+    import com.intellij.openapi.application.readAction
+    import com.intellij.openapi.application.writeAction
+
+    val psiFile = readAction {
+        PsiManager.getInstance(project).findFile(virtualFile)
     }
 
-    ctx.writeAction {
-        psiFile.add(newElement)
+    writeAction {
+        document.setText("new content")
     }
 }
 ```
@@ -109,7 +112,7 @@ Gets execution output and status via polling.
 ```json
 {
     "execution_id": "abc-2024-12-10T14-30-25-a1B2c3D4e5",
-    "status": "running" | "pending_review" | "success" | "error" | "timeout" | "cancelled",
+    "status": "running" | "pending_review" | "success" | "error" | "timeout" | "cancelled" | "rejected",
     "output": [
         {"ts": 1733840000000, "type": "out", "msg": "Hello from IntelliJ!"},
         {"ts": 1733840000100, "type": "log", "level": "info", "msg": "Processing..."}
@@ -134,23 +137,46 @@ interface McpScriptContext : Disposable {
     /** The IntelliJ Project this execution is associated with */
     val project: Project
 
-    /** CoroutineScope bound to this context's lifecycle */
-    val coroutineScope: CoroutineScope
+    /** Unique identifier for this execution */
+    val executionId: String
 
     // === Output Methods ===
-    fun println(message: Any?)
-    fun print(message: Any?)
-    fun printJson(obj: Any?)  // Serialize to JSON
+    fun println(vararg values: Any?)  // Print space-separated values
+    fun printJson(obj: Any?)          // Serialize to pretty JSON (Jackson)
     fun logInfo(message: String)
     fun logWarn(message: String)
     fun logError(message: String, throwable: Throwable? = null)
 
     // === IDE Utilities ===
     suspend fun waitForSmartMode()  // Wait for indexing to complete
-    suspend fun <T> readAction(block: () -> T): T
-    suspend fun <T> writeAction(block: () -> T): T
+}
+```
 
-    // === Reflection Helpers ===
+**Note**: `readAction` and `writeAction` are NOT part of McpScriptContext. Use IntelliJ's coroutine-aware APIs directly:
+
+```kotlin
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.writeAction
+
+execute { ctx ->
+    // Read PSI data
+    val psiFile = readAction {
+        PsiManager.getInstance(ctx.project).findFile(virtualFile)
+    }
+
+    // Modify documents/PSI
+    writeAction {
+        document.setText("new content")
+    }
+}
+```
+
+### Extended Context (McpScriptContextEx)
+
+For reflection helpers (may be deprecated in future):
+
+```kotlin
+interface McpScriptContextEx : McpScriptContext {
     fun listServices(): List<String>
     fun listExtensionPoints(): List<String>
     fun describeClass(className: String): String
@@ -175,18 +201,20 @@ execute { ctx ->
 1. **Code Submission**: MCP tool receives code via `execute_code`
 2. **Compilation** (synchronous): Kotlin script engine compiles code
 3. **Review** (if enabled): Code opened in editor, waits for human approval
-4. **Execution**: The `execute { }` block runs with McpScriptContext
-5. **Output**: Written to file, polled via `get_result`
+4. **Execution**: The `execute { }` block runs with McpScriptContext inside `supervisorScope`
+5. **Output**: Written to file (append-only), polled via `get_result`
 6. **Cleanup**: McpScriptContext disposed, resources cleaned up
 
-**Storage Structure**:
+**Storage Structure** (append-only - files are never deleted):
 ```
 .idea/mcp-run/
 ├── abc-2024-12-10T14-30-25-a1B2c3D4e5/   # execution_id as directory
-│   ├── script.kt                          # Submitted code
+│   ├── script.kts                         # Submitted code
 │   ├── parameters.json                    # Execution parameters
-│   ├── output.jsonl                       # Output log (JSON lines)
-│   └── result.json                        # Final status
+│   ├── output.jsonl                       # Output log (JSON lines, append-only)
+│   ├── result.json                        # Final status
+│   ├── review.kts                         # Code shown for review (may have user edits)
+│   └── review-result.json                 # Review outcome with user feedback
 ```
 
 **Execution ID Format**: `{project-hash-3chars}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-hash-10chars}`
@@ -208,9 +236,18 @@ By default, all submitted code is opened in the IDE editor for human review befo
 
 **Workflow**:
 1. Code submitted → opened in editor with review panel
-2. Human reviews, can add comments/edits
+2. Human reviews, can edit code to add comments or corrections
 3. Approve: code executes, result returned
-4. Reject: rejection message returned with any edits/comments
+4. Reject: rejection message returned with edited code and unified diff
+
+**User Feedback on Rejection**:
+When code is rejected, the LLM receives:
+- The original code
+- The edited code (with user's comments/corrections)
+- A unified diff showing exactly what the user changed
+- Whether the code was modified
+
+This allows the LLM to understand user feedback and adjust its approach.
 
 All requests are logged to disk regardless of review mode.
 
@@ -225,8 +262,8 @@ execute { ctx ->
         ctx.println("${method.name}(${method.parameterTypes.joinToString()})")
     }
 
-    // Use helper to describe a class
-    ctx.println(ctx.describeClass("com.intellij.psi.PsiManager"))
+    // Use helper to describe a class (via McpScriptContextEx)
+    ctx.println((ctx as McpScriptContextEx).describeClass("com.intellij.psi.PsiManager"))
 }
 ```
 
@@ -239,7 +276,7 @@ Key packages:
 - `com.intellij.openapi.project` - Project management
 - `com.intellij.openapi.vfs` - Virtual File System
 - `com.intellij.psi` - Program Structure Interface
-- `com.intellij.openapi.application` - Application services
+- `com.intellij.openapi.application` - Application services, read/write actions
 - `com.intellij.openapi.editor` - Editor APIs
 
 ## Building and Running

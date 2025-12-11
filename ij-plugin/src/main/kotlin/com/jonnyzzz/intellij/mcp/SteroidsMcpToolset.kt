@@ -37,6 +37,8 @@ class SteroidsMcpToolset : McpToolset {
     @McpDescription("""
         |Execute Kotlin code in the IDE's runtime context with full access to IntelliJ APIs.
         |
+        |IMPORTANT: All code must be written as suspend functions. Never use runBlocking.
+        |
         |The code must use the execute { ctx -> } pattern:
         |```kotlin
         |execute { ctx ->
@@ -46,12 +48,48 @@ class SteroidsMcpToolset : McpToolset {
         |}
         |```
         |
+        |Available context methods:
+        |- ctx.println(vararg values) - Print values separated by spaces
+        |- ctx.printJson(obj) - Print object as pretty JSON
+        |- ctx.logInfo/logWarn/logError(msg) - Log messages
+        |- ctx.waitForSmartMode() - Wait for indexing to complete
+        |- ctx.project - Access the IntelliJ Project
+        |
+        |For read/write actions, use IntelliJ's coroutine-aware APIs:
+        |```kotlin
+        |import com.intellij.openapi.application.readAction
+        |import com.intellij.openapi.application.writeAction
+        |
+        |execute { ctx ->
+        |    // Read PSI/VFS:
+        |    val psiFile = readAction {
+        |        PsiManager.getInstance(ctx.project).findFile(virtualFile)
+        |    }
+        |
+        |    // Modify documents/PSI:
+        |    writeAction {
+        |        document.setText("new content")
+        |    }
+        |}
+        |```
+        |
+        |For services:
+        |```kotlin
+        |// Project services:
+        |val fileEditorManager = FileEditorManager.getInstance(ctx.project)
+        |val psiManager = PsiManager.getInstance(ctx.project)
+        |
+        |// Application services:
+        |val app = ApplicationManager.getApplication()
+        |val vfsManager = VirtualFileManager.getInstance()
+        |```
+        |
         |Returns an execution_id that can be used with get_result to poll for results.
     """)
     suspend fun execute_code(
         @McpDescription("Project name (from list_projects)")
         project_name: String,
-        @McpDescription("Kotlin code to execute - must use execute { ctx -> } pattern")
+        @McpDescription("Kotlin code to execute - must use execute { ctx -> } pattern with suspend functions")
         code: String,
         @McpDescription("Execution timeout in seconds (default: 60)")
         timeout: Int = 60,
@@ -77,9 +115,19 @@ class SteroidsMcpToolset : McpToolset {
 
     @McpTool("get_result")
     @McpDescription("""
-        |Get execution result by polling. Call this repeatedly until status is SUCCESS, ERROR, or CANCELLED.
+        |Get execution result by polling. Call this repeatedly until status is SUCCESS, ERROR, REJECTED, or CANCELLED.
         |
-        |Use offset to get only new output messages since last call.
+        |Status values:
+        |- COMPILING: Script is being compiled
+        |- PENDING_REVIEW: Waiting for user to approve/reject
+        |- RUNNING: Script is executing
+        |- SUCCESS: Completed successfully
+        |- ERROR: Failed with error
+        |- REJECTED: User rejected the code (error_message contains user's edits/comments)
+        |- TIMEOUT: Execution or review timed out
+        |- CANCELLED: Execution was cancelled
+        |
+        |Use offset to get only new output messages since last call for efficient polling.
     """)
     suspend fun get_result(
         @McpDescription("Execution ID from execute_code")

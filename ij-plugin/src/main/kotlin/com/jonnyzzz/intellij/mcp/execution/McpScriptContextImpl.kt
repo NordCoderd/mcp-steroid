@@ -1,39 +1,32 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.execution
 
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
-import com.intellij.openapi.extensions.ExtensionPointName
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.SerializationFeature
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.OutputMessage
 import com.jonnyzzz.intellij.mcp.storage.OutputType
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.json.Json
 import java.lang.reflect.Modifier
 import kotlin.coroutines.resume
 
 /**
  * Implementation of McpScriptContext.
+ * Note: No coroutineScope property - suspend functions get scope implicitly.
  */
 class McpScriptContextImpl(
     override val project: Project,
     override val executionId: String,
-    private val executionStorage: ExecutionStorage,
-    parentScope: CoroutineScope
-) : McpScriptContext {
+    private val executionStorage: ExecutionStorage
+) : McpScriptContextEx {
 
-    private val json = Json { prettyPrint = true }
-
-    override val coroutineScope: CoroutineScope = CoroutineScope(
-        parentScope.coroutineContext + SupervisorJob()
-    )
+    private val objectMapper = ObjectMapper().apply {
+        enable(SerializationFeature.INDENT_OUTPUT)
+        // Don't fail on empty beans
+        disable(SerializationFeature.FAIL_ON_EMPTY_BEANS)
+    }
 
     private fun appendOutput(type: OutputType, message: String, level: String? = null) {
         executionStorage.appendOutput(
@@ -47,12 +40,13 @@ class McpScriptContextImpl(
         )
     }
 
-    override fun println(message: Any?) {
-        appendOutput(OutputType.OUT, message?.toString() ?: "null")
-    }
-
-    override fun print(message: Any?) {
-        appendOutput(OutputType.OUT, message?.toString() ?: "null")
+    override fun println(vararg values: Any?) {
+        val message = if (values.isEmpty()) {
+            ""
+        } else {
+            values.joinToString(" ") { it?.toString() ?: "null" }
+        }
+        appendOutput(OutputType.OUT, message)
     }
 
     override fun printJson(obj: Any?) {
@@ -60,7 +54,7 @@ class McpScriptContextImpl(
             val jsonString = when (obj) {
                 null -> "null"
                 is String -> obj
-                else -> json.encodeToString(obj.toString())
+                else -> objectMapper.writeValueAsString(obj)
             }
             appendOutput(OutputType.JSON, jsonString)
         } catch (e: Exception) {
@@ -102,26 +96,18 @@ class McpScriptContextImpl(
         }
     }
 
-    override suspend fun <T> readAction(block: () -> T): T {
-        return readAction { block() }
-    }
-
-    override suspend fun <T> writeAction(block: () -> T): T {
-        return writeAction { block() }
-    }
+    // === McpScriptContextEx methods (reflection helpers) ===
 
     override fun listServices(): List<String> {
         val result = mutableListOf<String>()
         try {
-            // List project-level services
-            val projectServiceManager = project.javaClass.methods
-                .find { it.name == "getService" }
-            if (projectServiceManager != null) {
-                result.add("Project services available via project.getService(Class)")
-            }
-
-            // List application-level services
-            result.add("Application services available via ApplicationManager.getApplication().getService(Class)")
+            result.add("Project services: project.getService(Class)")
+            result.add("Application services: ApplicationManager.getApplication().getService(Class)")
+            result.add("Common services:")
+            result.add("  - ProjectRootManager: project.getService(ProjectRootManager::class.java)")
+            result.add("  - PsiManager: PsiManager.getInstance(project)")
+            result.add("  - FileEditorManager: FileEditorManager.getInstance(project)")
+            result.add("  - VirtualFileManager: VirtualFileManager.getInstance()")
         } catch (e: Exception) {
             result.add("Error listing services: ${e.message}")
         }
@@ -168,6 +154,6 @@ class McpScriptContextImpl(
     }
 
     override fun dispose() {
-        coroutineScope.cancel("McpScriptContext disposed")
+        // No coroutineScope to cancel - context is just a data holder
     }
 }

@@ -45,6 +45,7 @@ enum class ExecutionStatus {
     ERROR,
     TIMEOUT,
     CANCELLED,
+    REJECTED,
     NOT_FOUND
 }
 
@@ -57,7 +58,17 @@ data class ExecutionResult(
 
 /**
  * File-based storage for execution history.
- * Stores scripts, parameters, output, and results.
+ * APPEND-ONLY: Files are never deleted, only added.
+ *
+ * Directory structure:
+ * .idea/mcp-run/
+ *   {execution-id}/
+ *     script.kts          - Original code submitted by LLM
+ *     parameters.json     - Execution parameters
+ *     output.jsonl        - Output messages (append-only)
+ *     result.json         - Final execution result
+ *     review.kts          - Code shown for review (may have user edits)
+ *     review-result.json  - Review outcome with user feedback
  */
 @Service(Service.Level.PROJECT)
 class ExecutionStorage(private val project: Project) {
@@ -89,14 +100,55 @@ class ExecutionStorage(private val project: Project) {
     }
 
     /**
-     * Create execution directory and save initial files.
+     * Create execution directory and save initial script file.
+     * This is called immediately when execution is submitted.
      */
     fun createExecution(executionId: String, code: String, params: ExecutionParams) {
         val dir = baseDir.resolve(executionId)
         Files.createDirectories(dir)
 
-        Files.writeString(dir.resolve("script.kt"), code)
+        // Save original script as .kts file
+        Files.writeString(dir.resolve("script.kts"), code)
         Files.writeString(dir.resolve("parameters.json"), json.encodeToString(params))
+    }
+
+    /**
+     * Save code for review.
+     * Creates a review.kts file that the user can edit.
+     * Returns the path to the review file.
+     */
+    fun saveReviewCode(executionId: String, code: String): Path {
+        val dir = baseDir.resolve(executionId)
+        Files.createDirectories(dir)
+        val file = dir.resolve("review.kts")
+        Files.writeString(file, code)
+        return file
+    }
+
+    /**
+     * Read the current review code (which may have user edits).
+     */
+    fun readReviewCode(executionId: String): String? {
+        val file = baseDir.resolve(executionId).resolve("review.kts")
+        if (!Files.exists(file)) return null
+        return Files.readString(file)
+    }
+
+    /**
+     * Save review result (approved/rejected with optional user feedback).
+     */
+    fun saveReviewResult(executionId: String, result: ReviewOutcome) {
+        val file = baseDir.resolve(executionId).resolve("review-result.json")
+        Files.writeString(file, json.encodeToString(result))
+    }
+
+    /**
+     * Read review result.
+     */
+    fun readReviewResult(executionId: String): ReviewOutcome? {
+        val file = baseDir.resolve(executionId).resolve("review-result.json")
+        if (!Files.exists(file)) return null
+        return json.decodeFromString<ReviewOutcome>(Files.readString(file))
     }
 
     /**
@@ -144,10 +196,10 @@ class ExecutionStorage(private val project: Project) {
     }
 
     /**
-     * Read the script code for an execution.
+     * Read the original script code for an execution.
      */
     fun readScript(executionId: String): String? {
-        val file = baseDir.resolve(executionId).resolve("script.kt")
+        val file = baseDir.resolve(executionId).resolve("script.kts")
         if (!Files.exists(file)) return null
         return Files.readString(file)
     }
@@ -176,21 +228,22 @@ class ExecutionStorage(private val project: Project) {
     }
 
     /**
-     * Save code for pending review.
+     * Get path to review file for an execution.
      */
-    fun savePendingReview(executionId: String, code: String): Path {
-        val pendingDir = baseDir.resolve("pending")
-        Files.createDirectories(pendingDir)
-        val file = pendingDir.resolve("$executionId.kt")
-        Files.writeString(file, code)
-        return file
-    }
-
-    /**
-     * Remove pending review file.
-     */
-    fun removePendingReview(executionId: String) {
-        val file = baseDir.resolve("pending").resolve("$executionId.kt")
-        Files.deleteIfExists(file)
+    fun getReviewFilePath(executionId: String): Path {
+        return baseDir.resolve(executionId).resolve("review.kts")
     }
 }
+
+/**
+ * Review outcome stored after user approves/rejects.
+ */
+@Serializable
+data class ReviewOutcome(
+    val approved: Boolean,
+    val originalCode: String,
+    val editedCode: String? = null,
+    val userComments: String? = null,
+    val diff: String? = null,
+    val timestamp: Long = System.currentTimeMillis()
+)

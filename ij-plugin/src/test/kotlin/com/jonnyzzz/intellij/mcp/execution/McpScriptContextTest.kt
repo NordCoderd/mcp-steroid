@@ -6,11 +6,6 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.OutputType
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import org.junit.Test
 
 /**
  * Tests for McpScriptContext implementation.
@@ -18,13 +13,11 @@ import org.junit.Test
 class McpScriptContextTest : BasePlatformTestCase() {
 
     private lateinit var storage: ExecutionStorage
-    private lateinit var testScope: CoroutineScope
     private lateinit var executionId: String
 
     override fun setUp() {
         super.setUp()
         storage = project.service()
-        testScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
         val code = "test"
         val params = ExecutionParams()
@@ -32,44 +25,88 @@ class McpScriptContextTest : BasePlatformTestCase() {
         storage.createExecution(executionId, code, params)
     }
 
-    override fun tearDown() {
-        try {
-            testScope.cancel()
-        } finally {
-            super.tearDown()
-        }
-    }
-
-    @Test
-    fun testPrintln() {
+    fun testPrintlnVarargs() {
         val context = McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = storage,
-            parentScope = testScope
+            executionStorage = storage
         )
 
-        context.println("Hello World")
-        context.println(42)
-        context.println(null)
+        // Test varargs println
+        context.println("Hello", "World", 42)
+        context.println()  // Empty line
+        context.println(null, "test")
 
         val output = storage.readOutput(executionId)
         assertEquals("Should have 3 messages", 3, output.size)
-        assertEquals("Hello World", output[0].msg)
+        assertEquals("Hello World 42", output[0].msg)
         assertEquals(OutputType.OUT, output[0].type)
-        assertEquals("42", output[1].msg)
-        assertEquals("null", output[2].msg)
+        assertEquals("", output[1].msg)  // Empty line
+        assertEquals("null test", output[2].msg)
 
         context.dispose()
     }
 
-    @Test
+    fun testPrintlnSingleValue() {
+        val context = McpScriptContextImpl(
+            project = project,
+            executionId = executionId,
+            executionStorage = storage
+        )
+
+        context.println("Single value")
+        context.println(123)
+
+        val output = storage.readOutput(executionId)
+        assertEquals(2, output.size)
+        assertEquals("Single value", output[0].msg)
+        assertEquals("123", output[1].msg)
+
+        context.dispose()
+    }
+
+    fun testPrintJsonWithMap() {
+        val context = McpScriptContextImpl(
+            project = project,
+            executionId = executionId,
+            executionStorage = storage
+        )
+
+        context.printJson(mapOf("name" to "test", "count" to 42))
+
+        val output = storage.readOutput(executionId)
+        assertEquals(1, output.size)
+        assertEquals(OutputType.JSON, output[0].type)
+        // Jackson output should contain the keys
+        assertTrue(output[0].msg.contains("\"name\""))
+        assertTrue(output[0].msg.contains("\"test\""))
+        assertTrue(output[0].msg.contains("\"count\""))
+        assertTrue(output[0].msg.contains("42"))
+
+        context.dispose()
+    }
+
+    fun testPrintJsonWithNull() {
+        val context = McpScriptContextImpl(
+            project = project,
+            executionId = executionId,
+            executionStorage = storage
+        )
+
+        context.printJson(null)
+
+        val output = storage.readOutput(executionId)
+        assertEquals(1, output.size)
+        assertEquals("null", output[0].msg)
+
+        context.dispose()
+    }
+
     fun testLogMethods() {
         val context = McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = storage,
-            parentScope = testScope
+            executionStorage = storage
         )
 
         context.logInfo("Info message")
@@ -92,13 +129,11 @@ class McpScriptContextTest : BasePlatformTestCase() {
         context.dispose()
     }
 
-    @Test
     fun testLogErrorWithThrowable() {
         val context = McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = storage,
-            parentScope = testScope
+            executionStorage = storage
         )
 
         val exception = RuntimeException("Test error")
@@ -113,16 +148,14 @@ class McpScriptContextTest : BasePlatformTestCase() {
         context.dispose()
     }
 
-    @Test
     fun testDescribeClass() {
         val context = McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = storage,
-            parentScope = testScope
+            executionStorage = storage
         )
 
-        val description = context.describeClass("java.lang.String")
+        val description = (context as McpScriptContextEx).describeClass("java.lang.String")
 
         assertTrue(description.contains("Class: java.lang.String"))
         assertTrue(description.contains("Public Methods:"))
@@ -132,46 +165,25 @@ class McpScriptContextTest : BasePlatformTestCase() {
         context.dispose()
     }
 
-    @Test
     fun testDescribeClassNotFound() {
         val context = McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = storage,
-            parentScope = testScope
+            executionStorage = storage
         )
 
-        val description = context.describeClass("com.nonexistent.ClassName")
+        val description = (context as McpScriptContextEx).describeClass("com.nonexistent.ClassName")
 
         assertTrue(description.contains("Class not found"))
 
         context.dispose()
     }
 
-    @Test
-    fun testDispose() {
-        val context = McpScriptContextImpl(
-            project = project,
-            executionId = executionId,
-            executionStorage = storage,
-            parentScope = testScope
-        )
-
-        assertFalse(context.coroutineScope.coroutineContext[kotlinx.coroutines.Job]?.isCancelled ?: true)
-
-        context.dispose()
-
-        // After dispose, the coroutine scope should be cancelled
-        assertTrue(context.coroutineScope.coroutineContext[kotlinx.coroutines.Job]?.isCancelled ?: false)
-    }
-
-    @Test
     fun testProjectAccess() {
         val context = McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = storage,
-            parentScope = testScope
+            executionStorage = storage
         )
 
         assertEquals(project, context.project)

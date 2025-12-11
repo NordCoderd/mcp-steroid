@@ -72,7 +72,7 @@ class ExecutionManager(
         val executionId = storage.generateExecutionId(code, params)
         log.info("Submitting execution $executionId")
 
-        // Create execution record
+        // Create execution record - this saves script.kts immediately
         storage.createExecution(executionId, code, params)
         executions[executionId] = ExecutionState.Compiling
 
@@ -89,17 +89,20 @@ class ExecutionManager(
                 // Handle review if needed
                 if (reviewMode == "ALWAYS") {
                     executions[executionId] = ExecutionState.PendingReview
-                    val reviewResult = reviewManager.requestReview(executionId, code)
-                    when (reviewResult) {
+                    when (val reviewResult = reviewManager.requestReview(executionId, code)) {
                         is ReviewResult.Approved -> {
                             // Continue with execution
                         }
                         is ReviewResult.Rejected -> {
+                            // Build rejection message with user feedback
+                            val message = buildRejectionMessage(reviewResult)
                             storage.writeResult(executionId, ExecutionResult(
-                                status = ExecutionStatus.CANCELLED,
-                                errorMessage = "Rejected: ${reviewResult.reason}"
+                                status = ExecutionStatus.REJECTED,
+                                errorMessage = message
                             ))
-                            executions[executionId] = ExecutionState.Cancelled
+                            executions[executionId] = ExecutionState.Completed(
+                                ExecutionResult(status = ExecutionStatus.REJECTED, errorMessage = message)
+                            )
                             return@launch
                         }
                         is ReviewResult.Timeout -> {
@@ -118,7 +121,7 @@ class ExecutionManager(
                 // Run execution
                 executions[executionId] = ExecutionState.Running
 
-                val executor = ScriptExecutor(project, storage, executionScope)
+                val executor = ScriptExecutor(project, storage)
                 val timeout = try {
                     Registry.intValue("mcp.steroids.execution.timeout")
                 } catch (e: Exception) {
@@ -161,6 +164,31 @@ class ExecutionManager(
         // Return initial status
         val status = executions[executionId]?.toStatus() ?: ExecutionStatus.COMPILING
         return SubmitResult(executionId, status)
+    }
+
+    /**
+     * Build a rejection message that includes user feedback.
+     * If the user edited the code, include the diff.
+     */
+    private fun buildRejectionMessage(rejection: ReviewResult.Rejected): String = buildString {
+        appendLine("Code was rejected by user during review.")
+        appendLine()
+
+        if (rejection.codeWasModified) {
+            appendLine("The user edited the code. Their changes may contain comments or corrections.")
+            appendLine()
+            appendLine("=== USER'S EDITED VERSION ===")
+            appendLine(rejection.editedCode)
+            appendLine()
+
+            if (rejection.diff != null) {
+                appendLine("=== DIFF (changes made by user) ===")
+                appendLine(rejection.diff)
+            }
+        } else {
+            appendLine("The code was rejected without modifications.")
+            appendLine("Please review your approach and try a different solution.")
+        }
     }
 
     /**

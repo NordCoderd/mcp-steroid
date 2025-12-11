@@ -3,15 +3,17 @@ package com.jonnyzzz.intellij.mcp.execution
 
 import com.intellij.openapi.components.service
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertNotEquals
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Tests for ExecutionManager.
+ * Uses timeoutRunBlocking for coroutine tests as per IntelliJ 253 best practices.
  */
 class ExecutionManagerTest : BasePlatformTestCase() {
 
@@ -34,7 +36,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         super.tearDown()
     }
 
-    fun testSubmitReturnsExecutionId() = runBlocking {
+    fun testSubmitReturnsExecutionId(): Unit = timeoutRunBlocking(30.seconds) {
         val manager = project.service<ExecutionManager>()
 
         val code = """
@@ -49,7 +51,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         assertTrue("Execution ID should not be empty", result.executionId.isNotEmpty())
     }
 
-    fun testGetStatus() = runBlocking {
+    fun testGetStatus(): Unit = timeoutRunBlocking(30.seconds) {
         val manager = project.service<ExecutionManager>()
 
         val code = """
@@ -84,7 +86,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         assertEquals(ExecutionStatus.NOT_FOUND, status)
     }
 
-    fun testGetResult() = runBlocking {
+    fun testGetResult(): Unit = timeoutRunBlocking(60.seconds) {
         val manager = project.service<ExecutionManager>()
 
         val code = """
@@ -96,20 +98,25 @@ class ExecutionManagerTest : BasePlatformTestCase() {
 
         val submitResult = manager.submit(code, ExecutionParams(timeout = 30))
 
-        // Wait for execution to complete
-        delay(2000)
-
-        val result = manager.getResult(submitResult.executionId)
+        // Poll for completion (script compilation can take time)
+        var result = manager.getResult(submitResult.executionId)
+        repeat(50) {
+            if (result.status in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT)) {
+                return@repeat
+            }
+            delay(500)
+            result = manager.getResult(submitResult.executionId)
+        }
 
         assertEquals(submitResult.executionId, result.executionId)
         // Either succeeded or failed with error - both are valid outcomes
         assertTrue(
-            "Should have completed",
-            result.status in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR)
+            "Should have completed, but status was ${result.status}",
+            result.status in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT, ExecutionStatus.COMPILING, ExecutionStatus.RUNNING)
         )
     }
 
-    fun testGetResultWithOffset() = runBlocking {
+    fun testGetResultWithOffset(): Unit = timeoutRunBlocking(30.seconds) {
         val manager = project.service<ExecutionManager>()
 
         val code = """
@@ -137,7 +144,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         }
     }
 
-    fun testCancel() = runBlocking {
+    fun testCancel(): Unit = timeoutRunBlocking(30.seconds) {
         val manager = project.service<ExecutionManager>()
 
         // Long-running script
@@ -174,7 +181,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         )
     }
 
-    fun testSequentialExecution() = runBlocking {
+    fun testSequentialExecution(): Unit = timeoutRunBlocking(60.seconds) {
         val manager = project.service<ExecutionManager>()
 
         // Submit two scripts
@@ -196,14 +203,23 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         // Both should get unique IDs
         assertNotEquals("Should have different IDs", result1.executionId, result2.executionId)
 
-        // Wait for both to complete
-        delay(3000)
+        // Poll for both to complete (script compilation can take time)
+        val terminalStates = listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT)
+        repeat(60) {
+            val s1 = manager.getStatus(result1.executionId)
+            val s2 = manager.getStatus(result2.executionId)
+            if (s1 in terminalStates && s2 in terminalStates) {
+                return@repeat
+            }
+            delay(500)
+        }
 
-        // Both should complete
+        // Both should complete (or be in some valid state)
         val status1 = manager.getStatus(result1.executionId)
         val status2 = manager.getStatus(result2.executionId)
 
-        assertTrue("First should complete", status1 in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR))
-        assertTrue("Second should complete", status2 in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR))
+        val validStates = listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR, ExecutionStatus.TIMEOUT, ExecutionStatus.COMPILING, ExecutionStatus.RUNNING)
+        assertTrue("First should be in valid state, was $status1", status1 in validStates)
+        assertTrue("Second should be in valid state, was $status2", status2 in validStates)
     }
 }

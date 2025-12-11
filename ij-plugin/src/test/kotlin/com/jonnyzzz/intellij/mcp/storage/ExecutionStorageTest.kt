@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.storage
 
+import com.intellij.openapi.components.service
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.junit.Assert.assertNotEquals
 import java.nio.file.Files
@@ -14,7 +15,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
 
     override fun setUp() {
         super.setUp()
-        storage = ExecutionStorage(project)
+        storage = project.service()
     }
 
     fun testGenerateExecutionId() {
@@ -129,18 +130,38 @@ class ExecutionStorageTest : BasePlatformTestCase() {
         assertTrue(readResult.exceptionInfo?.contains("RuntimeException") == true)
     }
 
-    fun testPendingReview() {
+    fun testSaveReviewCode() {
         val code = "execute { ctx -> ctx.println(\"Review me\") }"
         val params = ExecutionParams()
         val executionId = storage.generateExecutionId(code, params)
+        storage.createExecution(executionId, code, params)
 
-        val reviewFile = storage.savePendingReview(executionId, code)
+        val reviewFile = storage.saveReviewCode(executionId, code)
         assertTrue("Review file should exist", Files.exists(reviewFile))
 
-        val savedCode = Files.readString(reviewFile)
+        val savedCode = storage.readReviewCode(executionId)
         assertEquals("Code should match", code, savedCode)
+    }
 
-        storage.removePendingReview(executionId)
-        assertFalse("Review file should be removed", Files.exists(reviewFile))
+    fun testSaveReviewResult() {
+        val code = "test"
+        val params = ExecutionParams()
+        val executionId = storage.generateExecutionId(code, params)
+        storage.createExecution(executionId, code, params)
+
+        val outcome = ReviewOutcome(
+            approved = false,
+            originalCode = code,
+            editedCode = "$code\n// User comment: please fix this",
+            diff = "--- original\n+++ edited\n@@ -1,1 +1,2 @@\n test\n+// User comment: please fix this"
+        )
+        storage.saveReviewResult(executionId, outcome)
+
+        val readOutcome = storage.readReviewResult(executionId)
+        assertNotNull(readOutcome)
+        assertFalse(readOutcome!!.approved)
+        assertEquals(code, readOutcome.originalCode)
+        assertNotNull(readOutcome.editedCode)
+        assertNotNull(readOutcome.diff)
     }
 }

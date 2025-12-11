@@ -2,16 +2,15 @@
 package com.jonnyzzz.intellij.mcp.execution
 
 import com.intellij.ide.script.IdeScriptEngineManager
-import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.jonnyzzz.intellij.mcp.storage.ExecutionResult
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.OutputMessage
 import com.jonnyzzz.intellij.mcp.storage.OutputType
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 import java.io.PrintWriter
 import java.io.StringWriter
@@ -19,11 +18,13 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Executes Kotlin scripts using IntelliJ's script engine.
+ *
+ * IMPORTANT: This executor runs the captured suspend block inside a supervisorScope.
+ * The script code gets coroutine context implicitly - no runBlocking needed.
  */
 class ScriptExecutor(
     private val project: Project,
-    private val executionStorage: ExecutionStorage,
-    private val parentScope: CoroutineScope
+    private val executionStorage: ExecutionStorage
 ) {
     private val log = Logger.getInstance(ScriptExecutor::class.java)
 
@@ -31,6 +32,8 @@ class ScriptExecutor(
         private val DEFAULT_IMPORTS = """
             import com.intellij.openapi.project.*
             import com.intellij.openapi.application.*
+            import com.intellij.openapi.application.readAction
+            import com.intellij.openapi.application.writeAction
             import com.intellij.openapi.vfs.*
             import com.intellij.openapi.editor.*
             import com.intellij.openapi.fileEditor.*
@@ -42,8 +45,9 @@ class ScriptExecutor(
 
     /**
      * Execute a script and return the result.
+     * This is a suspend function - it runs inside the caller's coroutine context.
      */
-    fun execute(executionId: String, code: String, timeoutSeconds: Int): ExecutionResult {
+    suspend fun execute(executionId: String, code: String, timeoutSeconds: Int): ExecutionResult {
         log.info("Executing script $executionId")
 
         val engineManager = IdeScriptEngineManager.getInstance()
@@ -61,8 +65,7 @@ class ScriptExecutor(
         val context = McpScriptContextImpl(
             project = project,
             executionId = executionId,
-            executionStorage = executionStorage,
-            parentScope = parentScope
+            executionStorage = executionStorage
         )
 
         // Capture the execute block
@@ -96,14 +99,14 @@ class ScriptExecutor(
                 )
             }
 
-            // Phase 2: Run the captured block with timeout
+            // Phase 2: Run the captured block with timeout inside supervisorScope
             log.info("Running execute block for $executionId")
             return try {
-                runBlocking {
+                // Use supervisorScope to provide coroutine context to the script
+                // Child failures won't cancel the supervisor
+                supervisorScope {
                     withTimeout(timeoutSeconds.seconds) {
-                        context.use {
-                            block(context)
-                        }
+                        block(context)
                     }
                 }
                 ExecutionResult(status = ExecutionStatus.SUCCESS)
@@ -138,17 +141,6 @@ class ScriptExecutor(
 
     private fun wrapWithImports(code: String): String {
         return "$DEFAULT_IMPORTS\n\n$code"
-    }
-
-    /**
-     * Helper to use context as a Closeable-like resource.
-     */
-    private inline fun <T : McpScriptContext, R> T.use(block: (T) -> R): R {
-        return try {
-            block(this)
-        } finally {
-            // Disposal handled in finally of execute()
-        }
     }
 }
 
