@@ -1,11 +1,33 @@
 <idea-plugin>
     <id>com.jonnyzzz.intellij.mcp-steroid</id>
-    <name>IntelliJ MCP Steroid</name>
-    <vendor>jonnyzzz</vendor>
+    <name>MCP Steroid</name>
+    <vendor>jonnyzzz.com</vendor>
 
-    <description>An MCP on Steroids for IntelliJ</description>
+    <description><![CDATA[
+    MCP Server extension for IntelliJ IDEA that allows LLM agents to execute Kotlin code
+    in the IDE's runtime environment with full access to IDE APIs.
+    ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.mcpServer</depends>
 
-    <idea-version since-build="242.0" until-build="243.*"/>
+    <extensions defaultExtensionNs="com.intellij">
+        <!-- Review panel notification -->
+        <editorNotificationProvider
+            implementation="com.jonnyzzz.intellij.mcp.review.McpReviewNotificationProvider"/>
+
+        <!-- Registry keys for configuration -->
+        <registryKey key="mcp.steroids.review.mode" defaultValue="ALWAYS"
+            description="Code review mode: ALWAYS (default), TRUSTED, NEVER"/>
+
+        <registryKey key="mcp.steroids.review.timeout" defaultValue="300"
+            description="Review timeout in seconds"/>
+
+        <registryKey key="mcp.steroids.execution.timeout" defaultValue="60"
+            description="Script execution timeout in seconds"/>
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij.mcpServer">
+        <mcpToolset implementation="com.jonnyzzz.intellij.mcp.SteroidsMcpToolset"/>
+    </extensions>
 </idea-plugin>
