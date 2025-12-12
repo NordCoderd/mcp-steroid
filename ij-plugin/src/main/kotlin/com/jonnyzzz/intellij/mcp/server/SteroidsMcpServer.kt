@@ -105,6 +105,8 @@ class SteroidsMcpServer(
             mutex.lock()
 
             log.info("MCP Steroid server started on $mcpUrl")
+            log.info("Note: If you restart IntelliJ, connected MCP clients (Claude CLI, etc.) will need to reconnect.")
+            log.info("      Client should re-run: claude mcp add --transport http intellij-steroid $mcpUrl")
         } catch (e: Exception) {
             log.error("Failed to start MCP server. ${e.message}", e)
         }
@@ -126,12 +128,52 @@ class SteroidsMcpServer(
             val ideaDir = Path.of(basePath, ".idea")
             if (Files.exists(ideaDir)) {
                 val mcpFile = ideaDir.resolve("mcp-steroids.txt")
-                Files.writeString(mcpFile, serverUrl)
+                val content = buildMcpSteroidsFileContent(serverUrl)
+                Files.writeString(mcpFile, content)
                 log.warn("MCP Steroid server URL written to: $mcpFile")
             }
         } catch (e: Exception) {
             log.error("Failed to write server URL to project folder: ${project.name}", e)
         }
+    }
+
+    private fun buildMcpSteroidsFileContent(serverUrl: String): String {
+        return """
+            |# IntelliJ MCP Steroid Server
+            |# URL: $serverUrl
+            |#
+            |# === Claude Code CLI ===
+            |# Add server:
+            |#   claude mcp add --transport http intellij-steroid $serverUrl
+            |# Verify:
+            |#   claude mcp list
+            |# Use:
+            |#   claude -p "List all open projects using steroid_list_projects"
+            |# Remove:
+            |#   claude mcp remove intellij-steroid
+            |#
+            |# === Codex CLI (TOML config) ===
+            |# Create ~/.codex/config.toml with:
+            |#   [features]
+            |#   rmcp_client = true
+            |#
+            |#   [mcp_servers.intellij-steroid]
+            |#   url = "$serverUrl"
+            |#
+            |# Or run:
+            |#   mkdir -p ~/.codex && cat > ~/.codex/config.toml << 'EOF'
+            |#   [features]
+            |#   rmcp_client = true
+            |#
+            |#   [mcp_servers.intellij-steroid]
+            |#   url = "$serverUrl"
+            |#   EOF
+            |#
+            |# Use:
+            |#   codex exec "List all open projects using steroid_list_projects"
+            |
+            |$serverUrl
+        """.trimMargin()
     }
 
     private fun findFreePort(): Int {

@@ -21,6 +21,107 @@ This plugin runs its own standalone MCP server using the [Kotlin MCP SDK](https:
 
 The server starts automatically when IntelliJ launches and writes its URL to project folders for easy discovery by MCP clients.
 
+## Connecting LLM Agents
+
+### Claude Code CLI
+
+Add the MCP server using the command line (no config files needed):
+
+```bash
+# Add the IntelliJ MCP server (default port 63150)
+claude mcp add --transport http intellij-steroid http://localhost:63150/mcp
+
+# Verify connection
+claude mcp list
+# Should show: intellij-steroid: http://localhost:63150/mcp (HTTP) - ✓ Connected
+
+# Use the tools
+claude -p "List all open projects using steroid_list_projects"
+```
+
+If you're using a **dynamic port** (registry key set to 0), check `.idea/mcp-steroids.txt` for the actual URL:
+
+```bash
+# Read the actual URL from the project
+MCP_URL=$(cat .idea/mcp-steroids.txt)
+claude mcp add --transport http intellij-steroid "$MCP_URL"
+```
+
+To remove the server:
+```bash
+claude mcp remove intellij-steroid
+```
+
+### OpenAI Codex CLI
+
+Codex CLI uses a TOML config file for HTTP-based MCP servers. Create or edit `~/.codex/config.toml`:
+
+```toml
+# Enable HTTP-based MCP client
+[features]
+rmcp_client = true
+
+# IntelliJ MCP Steroid server (default port 63150)
+[mcp_servers.intellij-steroid]
+url = "http://localhost:63150/mcp"
+```
+
+Or create it with a single command:
+
+```bash
+# Create config directory and file
+mkdir -p ~/.codex && cat > ~/.codex/config.toml << 'EOF'
+[features]
+rmcp_client = true
+
+[mcp_servers.intellij-steroid]
+url = "http://localhost:63150/mcp"
+EOF
+
+# Use the tools
+codex exec "List all open projects using steroid_list_projects"
+```
+
+For dynamic ports, read the URL from `.idea/mcp-steroids.txt`:
+```bash
+MCP_URL=$(tail -1 .idea/mcp-steroids.txt)
+mkdir -p ~/.codex && cat > ~/.codex/config.toml << EOF
+[features]
+rmcp_client = true
+
+[mcp_servers.intellij-steroid]
+url = "$MCP_URL"
+EOF
+```
+
+To remove the server, delete the `[mcp_servers.intellij-steroid]` section from the config file.
+
+### Direct HTTP (curl)
+
+You can also interact with the server directly via HTTP:
+
+```bash
+# Initialize session
+curl -X POST http://localhost:63150/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}'
+
+# List tools (use the Mcp-Session-Id from the response above)
+curl -X POST http://localhost:63150/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+
+# Call steroid_list_projects
+curl -X POST http://localhost:63150/mcp \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -H "Mcp-Session-Id: <session-id>" \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"steroid_list_projects"}}'
+```
+
 ## MCP Tools
 
 All tools are prefixed with `steroid_` to distinguish them from IntelliJ's built-in MCP tools.

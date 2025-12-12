@@ -193,7 +193,7 @@ When contributing to this plugin, follow these IntelliJ Platform best practices:
 1. **Never block the EDT (Event Dispatch Thread)**:
    - UI updates must happen on EDT
    - Long operations must run on background threads
-   - Use `Dispatchers.Main` for EDT, `Dispatchers.IO` or `Dispatchers.Default` for background
+   - Use `Dispatchers.EDT` for EDT, `Dispatchers.IO` or `Dispatchers.Default` for background
 
 2. **Read/Write Actions**:
    - Access to PSI and VFS requires read actions
