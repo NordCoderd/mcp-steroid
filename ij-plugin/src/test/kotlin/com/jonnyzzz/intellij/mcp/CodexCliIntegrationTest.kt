@@ -96,7 +96,7 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
         )
         assertTrue(
             "MCP response should contain protocol version. Output: ${curlResult.output}",
-            curlResult.output.contains(" \"protocolVersion\": \"2025-06-18\"")
+            curlResult.output.contains("\"protocolVersion\":\"2025-06-18\"")
         )
     }
 

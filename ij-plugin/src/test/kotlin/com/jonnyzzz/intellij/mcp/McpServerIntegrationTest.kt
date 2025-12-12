@@ -253,6 +253,66 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
+     * Tests with the EXACT request format Claude CLI sends (from debug logs).
+     *
+     * Log shows:
+     * {"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.67"}},"jsonrpc":"2.0","id":0}
+     *
+     * Key differences from our test:
+     * - "id" is numeric 0, not string "1"
+     * - "capabilities" has "roots":{} (empty object)
+     * - Field order: method, params, jsonrpc, id (not jsonrpc first)
+     */
+    fun testExactClaudeCliInitializeRequest(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // EXACT request from Claude CLI debug logs
+        val exactClaudeRequest = """{"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.67"}},"jsonrpc":"2.0","id":0}"""
+
+        val response = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "application/json, text/event-stream")
+            header("User-Agent", "claude-code/2.0.67")
+            setBody(exactClaudeRequest)
+        }
+
+        println("[TEST] Response status: ${response.status}")
+        println("[TEST] Response headers:")
+        response.headers.forEach { name, values ->
+            println("[TEST]   $name: ${values.joinToString(", ")}")
+        }
+        val body = response.bodyAsText()
+        println("[TEST] Response body: $body")
+
+        assertEquals(
+            "InitializeRequest should return 200 OK",
+            HttpStatusCode.OK,
+            response.status
+        )
+
+        // Check for session ID header
+        val sessionId = response.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Server should return Mcp-Session-Id header", sessionId)
+
+        // Parse and verify the response
+        val rpcResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
+        assertNull("Response should not have error: ${rpcResponse.error}", rpcResponse.error)
+        assertNotNull("Response should have result", rpcResponse.result)
+
+        // Verify response ID matches request ID (numeric 0)
+        // Note: id is JsonElement, so we check the content
+        assertTrue(
+            "Response ID should be 0, got: ${rpcResponse.id}",
+            rpcResponse.id.toString() == "0"
+        )
+
+        val initResult = McpJson.decodeFromJsonElement<InitializeResult>(rpcResponse.result!!)
+        assertEquals("2025-06-18", initResult.protocolVersion)
+        assertEquals("intellij-mcp-steroid", initResult.serverInfo.name)
+    }
+
+    /**
      * Tests that SSE-only GET requests receive 405 Method Not Allowed.
      * This is per MCP spec - if the server doesn't support SSE, it should return 405.
      */

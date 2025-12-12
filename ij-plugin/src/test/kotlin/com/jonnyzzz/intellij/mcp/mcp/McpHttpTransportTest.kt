@@ -455,13 +455,15 @@ class McpHttpTransportTest {
     }
 
     @Test
-    fun `test GET with combined Accept header returns 405 Method Not Allowed`() = runBlocking {
-        // MCP clients typically send: Accept: application/json, text/event-stream
+    fun `test GET with combined Accept header returns server info`() = runBlocking {
+        // MCP clients (like Claude CLI) send: Accept: application/json, text/event-stream
+        // When JSON is acceptable, return server info for availability checks
         val response = client.get("http://localhost:$port/mcp") {
             header(HttpHeaders.Accept, "application/json, text/event-stream")
         }
 
-        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("intellij-mcp-steroid"))
     }
 
     // ==================== Unknown Method Tests ====================

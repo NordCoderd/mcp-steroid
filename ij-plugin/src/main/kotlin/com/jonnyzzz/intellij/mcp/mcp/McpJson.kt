@@ -8,8 +8,9 @@ import kotlinx.serialization.json.Json
  */
 val McpJson = Json {
     ignoreUnknownKeys = true
-    encodeDefaults = true
+    encodeDefaults = true   // Encode defaults (required for jsonrpc version)
+    explicitNulls = false   // Don't serialize explicit nulls (cleaner JSON)
     isLenient = true
     classDiscriminator = "type"
-    prettyPrint = true
+    prettyPrint = false     // Use compact JSON for wire protocol
 }
