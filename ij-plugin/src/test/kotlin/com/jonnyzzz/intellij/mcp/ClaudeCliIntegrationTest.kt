@@ -224,6 +224,7 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         println("[TEST] .mcp.json content:\n${catResult.output}")
 
         // Run Claude in print mode to discover tools
+        // MCP tools must be explicitly allowed in print mode using mcp__<serverName>__* pattern
         val result = session.runPrompt(
             """
             You are testing an MCP server integration. You MUST use the MCP tools.
@@ -232,7 +233,8 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
             2) Call steroid_list_projects EXACTLY once and print the raw result on a single line prefixed with PROJECTS:
             Do not skip any step. If a step fails, print ERROR: <reason>.
             """.trimIndent(),
-            timeoutSeconds = 120
+            timeoutSeconds = 120,
+            allowedTools = listOf("mcp__intellij-steroid-test__*")
         )
 
         println("[TEST] Claude exit code: ${result.exitCode}")

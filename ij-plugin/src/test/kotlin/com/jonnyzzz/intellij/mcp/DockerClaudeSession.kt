@@ -48,15 +48,29 @@ class DockerClaudeSession private constructor(
 
     /**
      * Run claude in non-interactive mode with a prompt.
+     *
+     * @param prompt The prompt to send to Claude
+     * @param timeoutSeconds Maximum time to wait for the command
+     * @param allowedTools Optional list of tools to allow (e.g., "mcp__serverName__*")
      */
-    fun runPrompt(prompt: String, timeoutSeconds: Long = 120): ProcessResult {
-        val claudeArgs = listOf(
-            "claude",
-            "--debug",
-            "--mcp-debug",
-            "--verbose",
-            "-p", prompt
-        )
+    fun runPrompt(
+        prompt: String,
+        timeoutSeconds: Long = 120,
+        allowedTools: List<String>? = null
+    ): ProcessResult {
+        val claudeArgs = buildList {
+            add("claude")
+            add("--debug")
+            add("--mcp-debug")
+            add("--verbose")
+            // Allow MCP tools in print mode (required since v0.2.54)
+            if (allowedTools != null && allowedTools.isNotEmpty()) {
+                add("--allowedTools")
+                add(allowedTools.joinToString(","))
+            }
+            add("-p")
+            add(prompt)
+        }
         return runInContainer(
             claudeArgs,
             timeoutSeconds,
