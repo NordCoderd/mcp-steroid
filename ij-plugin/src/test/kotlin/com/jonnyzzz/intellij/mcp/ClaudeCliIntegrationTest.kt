@@ -5,6 +5,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertFalse
 import junit.framework.TestCase.assertTrue
 import org.junit.Assume.assumeTrue
 import kotlin.time.Duration.Companion.seconds
@@ -24,6 +25,26 @@ import kotlin.time.Duration.Companion.seconds
  * - Start a container for each test
  * - Run Claude commands inside the container
  * - Clean up the container after the test
+ *
+ * ============================================================================
+ * IMPORTANT: TEST INTEGRITY RULES - DO NOT FAKE THESE TESTS
+ * ============================================================================
+ *
+ * 1. NEVER ignore ERROR patterns in output - if Claude reports "ERROR:" or
+ *    "**ERROR:" in its response, the test MUST fail.
+ *
+ * 2. ALWAYS verify actual tool calls happened - check for specific tool output
+ *    patterns like "TOOL:" and "PROJECTS:" that indicate real execution.
+ *
+ * 3. NEVER use loose assertions like "contains steroid_" when Claude just
+ *    mentions the word in an error message - verify actual successful calls.
+ *
+ * 4. If the test fails, report the failure. Do not modify assertions to make
+ *    a failing test pass without fixing the underlying issue.
+ *
+ * 5. Compare with CodexCliIntegrationTest - both should have equivalent
+ *    assertion strictness.
+ * ============================================================================
  */
 class ClaudeCliIntegrationTest : BasePlatformTestCase() {
 
@@ -189,15 +210,52 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
+     * Helper to check for error patterns in Claude's output.
+     * Claude reports errors in various formats:
+     * - "ERROR: <message>"
+     * - "**ERROR: <message>**"
+     * - Tool not available messages
+     */
+    private fun assertNoErrorsInOutput(output: String, stderr: String, context: String) {
+        val combined = output + "\n" + stderr
+
+        // Check for explicit ERROR patterns (case-insensitive)
+        val errorPatterns = listOf(
+            Regex("(?i)\\*\\*ERROR:", RegexOption.MULTILINE),
+            Regex("(?i)^ERROR:", RegexOption.MULTILINE),
+            Regex("(?i)tool .* is not available", RegexOption.IGNORE_CASE),
+            Regex("(?i)not registered or accessible", RegexOption.IGNORE_CASE),
+            Regex("(?i)failed to connect", RegexOption.IGNORE_CASE),
+        )
+
+        for (pattern in errorPatterns) {
+            val match = pattern.find(combined)
+            assertFalse(
+                "$context: Found error pattern '${pattern.pattern}' in output. " +
+                    "Match: '${match?.value}'. Full output:\n$combined",
+                match != null
+            )
+        }
+    }
+
+    /**
      * Tests that Claude Code can discover and use our steroid_ tools.
      * Uses Docker to run Claude CLI in isolation.
      *
      * Note: This test requires ANTHROPIC_API_KEY and uses print mode (-p)
      * which runs without user interaction.
      *
-     * KNOWN LIMITATION: Claude CLI print mode (-p) may not support MCP tools.
-     * See https://github.com/anthropics/claude-code/issues/610
-     * This test exists for parity with CodexCliIntegrationTest and may fail.
+     * ============================================================================
+     * TEST INTEGRITY: This test verifies ACTUAL MCP tool calls, not just mentions.
+     * ============================================================================
+     *
+     * Success criteria (ALL must be met):
+     * 1. No ERROR patterns in Claude's output
+     * 2. Claude must list tools with "TOOL:" prefix (actual tool discovery)
+     * 3. Claude must call steroid_list_projects and show "PROJECTS:" output
+     * 4. The PROJECTS output must contain actual project data (not an error)
+     *
+     * If any of these fail, the test fails. Do not weaken these assertions.
      */
     fun testClaudeDiscoversSteroidTools(): Unit = timeoutRunBlocking(300.seconds) {
         assumeDockerAvailable()
@@ -241,21 +299,41 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         println("[TEST] Claude stdout:\n${result.output}")
         println("[TEST] Claude stderr:\n${result.stderr}")
 
-        val combined = (result.output + "\n" + result.stderr).lowercase()
+        // ============================================================================
+        // STRICT ASSERTIONS - DO NOT WEAKEN
+        // ============================================================================
 
-        // Check if MCP server connected successfully
-        val mcpConnected = combined.contains("intellij-steroid-test") || combined.contains("steroid_")
-        println("[TEST] MCP server mentioned: $mcpConnected")
-
-        assertEquals("Claude exec should succeed. Output: ${result.output}\nStderr: ${result.stderr}", 0, result.exitCode)
-
-        assertTrue(
-            "Claude should report steroid_ tools. Output: ${result.output}\nStderr: ${result.stderr}",
-            combined.contains("steroid_")
+        // 1. Command must succeed
+        assertEquals(
+            "Claude exec should succeed. Output: ${result.output}\nStderr: ${result.stderr}",
+            0,
+            result.exitCode
         )
+
+        // 2. Check for any error patterns - this catches cases where Claude says
+        //    "ERROR: Tool not available" which would be a fake pass if ignored
+        assertNoErrorsInOutput(result.output, result.stderr, "Claude prompt execution")
+
+        // 3. Claude must have actually listed tools (not just mentioned them in an error)
         assertTrue(
-            "Claude should call steroid_list_projects. Output: ${result.output}\nStderr: ${result.stderr}",
-            combined.contains("steroid_list_projects") || combined.contains("projects")
+            "Claude must list tools with 'TOOL:' prefix (actual discovery, not error message). " +
+                "Output: ${result.output}\nStderr: ${result.stderr}",
+            result.output.contains("TOOL:")
+        )
+
+        // 4. Claude must have called steroid_list_projects and shown output
+        assertTrue(
+            "Claude must show 'PROJECTS:' output from actual tool call. " +
+                "Output: ${result.output}\nStderr: ${result.stderr}",
+            result.output.contains("PROJECTS:")
+        )
+
+        // 5. The PROJECTS line should contain actual data (array or object), not an error
+        val projectsLine = result.output.lines().find { it.contains("PROJECTS:") }
+        assertTrue(
+            "PROJECTS: line must contain actual project data ([ or {), not error. " +
+                "Line: $projectsLine",
+            projectsLine != null && (projectsLine.contains("[") || projectsLine.contains("{"))
         )
     }
 

@@ -1,19 +1,9 @@
 FROM ubuntu:22.04
 
-# Install dependencies required by Claude Code CLI:
-# - curl, ca-certificates, gnupg: for downloading and package signing
-# - git: required for repository operations
-# - ripgrep: used by Claude's Search tool for fast file searching
-# - jq: JSON processor (used by Claude internally)
-# - Node.js 20+: Claude Code is a Node.js application (requires Node 18+)
+# Install dependencies including Node.js 20+ (required for Claude Code CLI)
+# Following the same pattern as Codex CLI Dockerfile for consistency
 RUN apt-get update && \
-    apt-get install -y \
-        curl \
-        ca-certificates \
-        gnupg \
-        git \
-        ripgrep \
-        jq && \
+    apt-get install -y curl ca-certificates gnupg git ripgrep jq && \
     mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
     echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" | tee /etc/apt/sources.list.d/nodesource.list && \
@@ -21,6 +11,10 @@ RUN apt-get update && \
     apt-get install -y nodejs && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install Claude Code CLI globally as root (before creating user)
+# This follows the same pattern as Codex CLI installation
+RUN npm install -g @anthropic-ai/claude-code
 
 # Create a non-root user for Claude CLI
 RUN useradd -m -s /bin/bash claude && \
@@ -31,10 +25,7 @@ RUN useradd -m -s /bin/bash claude && \
 USER claude
 WORKDIR /home/claude
 
-# Install Claude CLI as the claude user
-RUN curl -fsSL https://claude.ai/install.sh | bash
-
-ENV PATH="/home/claude/.local/bin:$PATH"
+ENV PATH="/home/claude/.local/bin:/usr/bin:$PATH"
 ENV SHELL=/bin/bash
 ENV HOME=/home/claude
 
