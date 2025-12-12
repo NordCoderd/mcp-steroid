@@ -24,3 +24,5 @@ Thumbs.db
 # Integration test temporary files
 integration-test/tmp/
 integration-test/*.tmp
+
+.gradle-local
