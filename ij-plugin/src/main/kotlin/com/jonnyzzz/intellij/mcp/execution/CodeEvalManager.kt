@@ -51,7 +51,11 @@ class CodeEvalManager(
 
     private val log = thisLogger()
 
-    private fun wrapWithImports(code: String): String = buildString {
+    /**
+     * Wrap user code with imports and execute binding.
+     * This is exposed so the review can show the final code.
+     */
+    fun wrapWithImports(code: String): String = buildString {
         appendLine(
             """
             import com.intellij.openapi.project.*

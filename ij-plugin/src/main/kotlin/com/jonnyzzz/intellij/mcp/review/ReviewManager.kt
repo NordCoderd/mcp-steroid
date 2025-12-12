@@ -4,6 +4,8 @@ package com.jonnyzzz.intellij.mcp.review
 import com.intellij.diff.comparison.ComparisonManager
 import com.intellij.diff.comparison.ComparisonPolicy
 import com.intellij.diff.fragments.LineFragment
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
@@ -13,6 +15,7 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.jonnyzzz.intellij.mcp.execution.CodeEvalManager
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.ReviewOutcome
 import kotlinx.coroutines.*
@@ -83,18 +86,23 @@ class ReviewManager(private val project: Project) {
             return ReviewResult.Approved
         }
 
-        // Save code for review in the execution directory
-        val reviewFile = storage.saveReviewCode(executionId, code)
+        // Wrap code with imports so the user sees the final code that will be executed
+        val wrappedCode = project.service<CodeEvalManager>().wrapWithImports(code)
+
+        // Save wrapped code for review in the execution directory
+        val reviewFile = storage.saveReviewCode(executionId, wrappedCode)
 
         // Open in editor on EDT
-        val edtActionResult = withContext(Dispatchers.Main) {
-            val vFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(reviewFile.toString())
-            if (vFile != null) {
-                FileEditorManager.getInstance(project).openFile(vFile, true)
-                null
-            } else {
-                log.warn("Could not open review file: $reviewFile")
-                ReviewResult.Rejected(code, "Failed to open review file", null, false)
+        val edtActionResult = withContext(Dispatchers.EDT) {
+            writeAction {
+                val vFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(reviewFile.toString())
+                if (vFile != null) {
+                    FileEditorManager.getInstance(project).openFile(vFile, true)
+                    null
+                } else {
+                    log.warn("Could not open review file: $reviewFile")
+                    ReviewResult.Rejected(code, "Failed to open review file", null, false)
+                }
             }
         }
         if (edtActionResult != null) return edtActionResult
