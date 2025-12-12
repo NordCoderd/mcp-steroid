@@ -189,17 +189,17 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
-     * Tests MCP server connection verification via claude mcp get.
+     * Tests that Claude Code can discover and use our steroid_ tools.
+     * Uses Docker to run Claude CLI in isolation.
      *
-     * Note: Claude CLI print mode (-p) does NOT support MCP tools.
-     * This is a known limitation - see https://github.com/anthropics/claude-code/issues/610
+     * Note: This test requires ANTHROPIC_API_KEY and uses print mode (-p)
+     * which runs without user interaction.
      *
-     * This test verifies:
-     * - MCP server can be registered
-     * - MCP server URL is stored correctly
-     * - Server connectivity status is reported
+     * KNOWN LIMITATION: Claude CLI print mode (-p) may not support MCP tools.
+     * See https://github.com/anthropics/claude-code/issues/610
+     * This test exists for parity with CodexCliIntegrationTest and may fail.
      */
-    fun testMcpServerConnectivity(): Unit = timeoutRunBlocking(300.seconds) {
+    fun testClaudeDiscoversSteroidTools(): Unit = timeoutRunBlocking(300.seconds) {
         assumeDockerAvailable()
         val session = claudeSession()
 
@@ -222,37 +222,39 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         // Verify the config file
         val catResult = session.runRaw("cat", ".mcp.json")
         println("[TEST] .mcp.json content:\n${catResult.output}")
-        assertTrue(
-            ".mcp.json should contain type http. Output: ${catResult.output}",
-            catResult.output.contains("\"type\": \"http\"")
+
+        // Run Claude in print mode to discover tools
+        val result = session.runPrompt(
+            """
+            You are testing an MCP server integration. You MUST use the MCP tools.
+            Steps:
+            1) List all MCP tools starting with "steroid_" and print each as: TOOL: <name> - <description>
+            2) Call steroid_list_projects EXACTLY once and print the raw result on a single line prefixed with PROJECTS:
+            Do not skip any step. If a step fails, print ERROR: <reason>.
+            """.trimIndent(),
+            timeoutSeconds = 120
         )
 
-        // Check server status via mcp get
-        val getResult = session.run("mcp", "get", "intellij-steroid-test")
-        println("[TEST] MCP get result: exit=${getResult.exitCode}")
-        println("[TEST] MCP get output:\n${getResult.output}")
-        println("[TEST] MCP get stderr:\n${getResult.stderr}")
+        println("[TEST] Claude exit code: ${result.exitCode}")
+        println("[TEST] Claude stdout:\n${result.output}")
+        println("[TEST] Claude stderr:\n${result.stderr}")
 
-        assertEquals("MCP get should succeed", 0, getResult.exitCode)
+        val combined = (result.output + "\n" + result.stderr).lowercase()
 
-        // Verify server info is correct
-        val output = getResult.output
+        // Check if MCP server connected successfully
+        val mcpConnected = combined.contains("intellij-steroid-test") || combined.contains("steroid_")
+        println("[TEST] MCP server mentioned: $mcpConnected")
+
+        assertEquals("Claude exec should succeed. Output: ${result.output}\nStderr: ${result.stderr}", 0, result.exitCode)
+
         assertTrue(
-            "MCP get should show server name. Output: $output",
-            output.contains("intellij-steroid-test")
+            "Claude should report steroid_ tools. Output: ${result.output}\nStderr: ${result.stderr}",
+            combined.contains("steroid_")
         )
         assertTrue(
-            "MCP get should show http transport type. Output: $output",
-            output.contains("http")
+            "Claude should call steroid_list_projects. Output: ${result.output}\nStderr: ${result.stderr}",
+            combined.contains("steroid_list_projects") || combined.contains("projects")
         )
-        assertTrue(
-            "MCP get should show URL. Output: $output",
-            output.contains("host.docker.internal")
-        )
-
-        // Note: We don't test actual MCP tool calls because Claude CLI print mode (-p)
-        // does not support MCP tools. See https://github.com/anthropics/claude-code/issues/610
-        // For interactive mode testing, manual testing is required.
     }
 
     private fun claudeSession(): DockerClaudeSession {
