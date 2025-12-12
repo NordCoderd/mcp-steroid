@@ -152,4 +152,171 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             }
         }
     }.toString()
+
+    /**
+     * Tests that the server responds correctly to GET requests with Claude CLI's Accept header.
+     * Claude CLI sends "Accept: application/json, text/event-stream" for health checks.
+     *
+     * This was causing "Failed to connect" in Claude CLI because the server was returning
+     * 405 Method Not Allowed when text/event-stream was in the Accept header.
+     */
+    fun testGetRequestWithClaudeCliAcceptHeader(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Claude CLI sends this Accept header format for health checks
+        val response = client.get(server.mcpUrl) {
+            header("Accept", "application/json, text/event-stream")
+            header("User-Agent", "claude-code/2.0.67")
+        }
+
+        assertEquals(
+            "GET with Claude CLI Accept header should return 200 OK",
+            HttpStatusCode.OK,
+            response.status
+        )
+        assertEquals(
+            "Response should be JSON",
+            ContentType.Application.Json.withoutParameters(),
+            response.contentType()?.withoutParameters()
+        )
+
+        val body = response.bodyAsText()
+        assertTrue(
+            "Response should contain server name",
+            body.contains("intellij-mcp-steroid")
+        )
+        assertTrue(
+            "Response should indicate server is available",
+            body.contains("available")
+        )
+    }
+
+    /**
+     * Tests that the server responds correctly to POST InitializeRequest with Claude CLI's format.
+     * This verifies the full MCP handshake that Claude CLI expects.
+     */
+    fun testPostInitializeWithClaudeCliFormat(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Claude CLI sends InitializeRequest with specific capabilities
+        val initRequest = """
+        {
+            "jsonrpc": "2.0",
+            "id": "1",
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2025-06-18",
+                "clientInfo": {
+                    "name": "claude-code",
+                    "version": "2.0.67"
+                },
+                "capabilities": {
+                    "roots": {
+                        "listChanged": true
+                    },
+                    "sampling": {}
+                }
+            }
+        }
+        """.trimIndent()
+
+        val response = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "application/json, text/event-stream")
+            header("User-Agent", "claude-code/2.0.67")
+            setBody(initRequest)
+        }
+
+        assertEquals(
+            "InitializeRequest should return 200 OK",
+            HttpStatusCode.OK,
+            response.status
+        )
+
+        // Check for session ID header
+        val sessionId = response.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Server should return Mcp-Session-Id header", sessionId)
+
+        // Parse the response
+        val body = response.bodyAsText()
+        val rpcResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
+
+        assertNull("Response should not have error", rpcResponse.error)
+        assertNotNull("Response should have result", rpcResponse.result)
+
+        val initResult = McpJson.decodeFromJsonElement<InitializeResult>(rpcResponse.result!!)
+        assertEquals("2025-06-18", initResult.protocolVersion)
+        assertEquals("intellij-mcp-steroid", initResult.serverInfo.name)
+        assertNotNull("Server should have tools capability", initResult.capabilities.tools)
+    }
+
+    /**
+     * Tests that SSE-only GET requests receive 405 Method Not Allowed.
+     * This is per MCP spec - if the server doesn't support SSE, it should return 405.
+     */
+    fun testGetRequestWithSseOnlyAcceptHeader(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Request SSE only (not JSON) - should get 405
+        val response = client.get(server.mcpUrl) {
+            header("Accept", "text/event-stream")
+        }
+
+        assertEquals(
+            "GET with SSE-only Accept header should return 405",
+            HttpStatusCode.MethodNotAllowed,
+            response.status
+        )
+    }
+
+    /**
+     * Tests that subsequent requests with session ID work correctly.
+     * This verifies the full session management flow.
+     */
+    fun testSessionManagementFlow(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Step 1: Initialize and get session ID
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+
+        assertEquals(HttpStatusCode.OK, initResponse.status)
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Session ID should be provided", sessionId)
+
+        // Step 2: Make a request with the session ID
+        val toolsResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":"2","method":"tools/list"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, toolsResponse.status)
+        val toolsRpc = McpJson.decodeFromString<JsonRpcResponse>(toolsResponse.bodyAsText())
+        assertNull("tools/list should succeed with valid session", toolsRpc.error)
+
+        // Step 3: Make a request with an invalid session ID (should create new session)
+        val invalidSessionResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, "invalid-session-id-12345")
+            setBody("""{"jsonrpc":"2.0","id":"3","method":"tools/list"}""")
+        }
+
+        // Server should either reject the invalid session or create a new one
+        // Per MCP spec, invalid sessions should return 400 Bad Request
+        assertEquals(
+            "Invalid session should be rejected",
+            HttpStatusCode.BadRequest,
+            invalidSessionResponse.status
+        )
+    }
 }

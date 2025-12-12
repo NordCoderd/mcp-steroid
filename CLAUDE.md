@@ -283,3 +283,13 @@ When contributing to this plugin, follow these IntelliJ Platform best practices:
 - [Threading Rules](https://plugins.jetbrains.com/docs/intellij/general-threading-rules.html)
 - [Coroutines in IntelliJ](https://plugins.jetbrains.com/docs/intellij/coroutine-scopes.html)
 - [Disposer and Disposable](https://plugins.jetbrains.com/docs/intellij/disposers.html)
+
+## Environment Constraints
+
+### Command Line Tools Not Available
+
+The following commands are **NOT available** on this system:
+- `timeout` - Do not use for command timeouts
+- `gtimeout` - Do not use for command timeouts
+
+For long-running commands, use Gradle's built-in timeout mechanisms or the Bash tool's `timeout` parameter instead.

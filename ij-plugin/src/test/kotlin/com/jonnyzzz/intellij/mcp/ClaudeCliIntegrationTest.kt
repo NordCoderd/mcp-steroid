@@ -337,6 +337,285 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         )
     }
 
+    /**
+     * Diagnostic test to understand Claude CLI MCP configuration.
+     * Lists MCP servers and inspects configuration files.
+     * Note: `claude doctor` requires TTY so we skip it.
+     */
+    fun testMcpServerDiagnostics(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        val dockerMcpUrl = resolveDockerUrl()
+
+        // First, register the MCP server
+        val addResult = session.run(
+            "mcp", "add",
+            "--transport", "http",
+            "--scope", "project",
+            "intellij-steroid-test",
+            dockerMcpUrl
+        )
+        println("[TEST] MCP add result: exit=${addResult.exitCode}")
+        println("[TEST] MCP add stdout: ${addResult.output}")
+        println("[TEST] MCP add stderr: ${addResult.stderr}")
+        assertEquals("MCP add should succeed", 0, addResult.exitCode)
+
+        // List MCP servers
+        val listResult = session.listMcpServers(timeoutSeconds = 30)
+        println("[TEST] MCP list exit code: ${listResult.exitCode}")
+        println("[TEST] MCP list stdout:\n${listResult.output}")
+        println("[TEST] MCP list stderr:\n${listResult.stderr}")
+
+        // Check .mcp.json content
+        val catResult = session.runRaw("cat", ".mcp.json")
+        println("[TEST] .mcp.json content:\n${catResult.output}")
+
+        // Check ~/.claude.json if it exists
+        val claudeJsonResult = session.runRaw("cat", "/home/claude/.claude.json")
+        println("[TEST] ~/.claude.json content:\n${claudeJsonResult.output}")
+
+        // Get MCP server details
+        val getResult = session.run("mcp", "get", "intellij-steroid-test")
+        println("[TEST] MCP get exit code: ${getResult.exitCode}")
+        println("[TEST] MCP get stdout:\n${getResult.output}")
+        println("[TEST] MCP get stderr:\n${getResult.stderr}")
+
+        // MCP server should be registered
+        val combinedOutput = listResult.output + listResult.stderr + getResult.output + getResult.stderr
+        assertTrue(
+            "MCP should show our server. Output: $combinedOutput",
+            combinedOutput.contains("intellij-steroid-test")
+        )
+    }
+
+    /**
+     * Test using --mcp-config flag with JSON file approach.
+     * Uses the -- separator workaround for the CLI bug.
+     */
+    fun testMcpConfigFileApproach(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        // Verify API key works
+        assertAnthropicApiKeyValid(session)
+
+        val dockerMcpUrl = resolveDockerUrl()
+
+        // Create MCP config file
+        val configResult = session.createMcpConfigFile(
+            "intellij-steroid-test",
+            dockerMcpUrl,
+            "mcp-config.json"
+        )
+        println("[TEST] Create config file result: exit=${configResult.exitCode}")
+        println("[TEST] Create config output: ${configResult.output}")
+
+        // Verify config file
+        val catResult = session.runRaw("cat", "mcp-config.json")
+        println("[TEST] mcp-config.json content:\n${catResult.output}")
+
+        // Check for any disabled servers in .claude/settings.local.json
+        val settingsResult = session.runRaw("cat", "/home/claude/.claude/settings.local.json")
+        println("[TEST] .claude/settings.local.json: ${settingsResult.output}")
+
+        // Run with --mcp-config and --strict-mcp-config
+        // Using -- separator as workaround for CLI bug in v1.0.73
+        val result = session.runPrompt(
+            """
+            List all available MCP tools and print each as: TOOL: <name>
+            Then call steroid_list_projects and print: PROJECTS: <result>
+            """.trimIndent(),
+            timeoutSeconds = 120,
+            mcpConfigFile = "mcp-config.json",
+            strictMcpConfig = true,
+            allowedTools = listOf("mcp__intellij-steroid-test__*"),
+            permissionMode = "bypassPermissions"
+        )
+
+        println("[TEST] Claude exit code: ${result.exitCode}")
+        println("[TEST] Claude stdout:\n${result.output}")
+        println("[TEST] Claude stderr:\n${result.stderr}")
+
+        // For now, just verify the command ran - we're still debugging
+        // This test helps us understand what's happening
+        assertEquals(
+            "Claude should run without crashing. Stderr: ${result.stderr}",
+            0,
+            result.exitCode
+        )
+    }
+
+    /**
+     * Test using local scope instead of project scope.
+     * Some Claude CLI versions have issues with project-scoped MCP servers.
+     */
+    fun testMcpLocalScopeApproach(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        // Verify API key works
+        assertAnthropicApiKeyValid(session)
+
+        val dockerMcpUrl = resolveDockerUrl()
+
+        // First verify MCP server is reachable from container
+        val curlCheck = session.runRaw(
+            "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+            "-X", "POST",
+            "-H", "Content-Type: application/json",
+            "-H", "Accept: application/json",
+            "-d", """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
+            dockerMcpUrl
+        )
+        println("[TEST] MCP server connectivity check: HTTP ${curlCheck.output}")
+
+        // Register with local scope instead of project scope
+        val addResult = session.run(
+            "mcp", "add",
+            "--transport", "http",
+            "--scope", "local",  // Changed from "project" to "local"
+            "intellij-steroid-test",
+            dockerMcpUrl
+        )
+        println("[TEST] MCP add (local scope) result: exit=${addResult.exitCode}")
+        println("[TEST] MCP add stdout: ${addResult.output}")
+        println("[TEST] MCP add stderr: ${addResult.stderr}")
+
+        // Check where the config was written
+        val localConfigResult = session.runRaw("cat", "/home/claude/.claude/settings.local.json")
+        println("[TEST] ~/.claude/settings.local.json:\n${localConfigResult.output}")
+
+        val mcpJsonResult = session.runRaw("cat", ".mcp.json")
+        println("[TEST] .mcp.json:\n${mcpJsonResult.output}")
+
+        // Check ~/.claude.json
+        val claudeJsonResult = session.runRaw("cat", "/home/claude/.claude.json")
+        println("[TEST] ~/.claude.json:\n${claudeJsonResult.output}")
+
+        // Verify MCP server is still reachable before mcp list
+        val curlCheck2 = session.runRaw(
+            "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+            "-X", "POST",
+            "-H", "Content-Type: application/json",
+            "-H", "Accept: application/json",
+            "-d", """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
+            dockerMcpUrl
+        )
+        println("[TEST] MCP server connectivity check before mcp list (POST): HTTP ${curlCheck2.output}")
+
+        // Try GET request (like claude mcp list might do for health check)
+        val curlGet = session.runRaw(
+            "curl", "-v", "-s",
+            "-H", "Accept: application/json, text/event-stream",
+            dockerMcpUrl
+        )
+        println("[TEST] GET request result: ${curlGet.exitCode}")
+        println("[TEST] GET response: ${curlGet.output}")
+        println("[TEST] GET stderr: ${curlGet.stderr}")
+
+        // Try POST without session ID (like Claude CLI might do for InitializeRequest)
+        val curlInit = session.runRaw(
+            "curl", "-v", "-s",
+            "-X", "POST",
+            "-H", "Content-Type: application/json",
+            "-H", "Accept: application/json, text/event-stream",
+            "-H", "User-Agent: claude-code/2.0.67",
+            "-d", """{"jsonrpc":"2.0","id":"1","method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"claude-code","version":"2.0.67"},"capabilities":{"roots":{"listChanged":true},"sampling":{}}}}""",
+            dockerMcpUrl
+        )
+        println("[TEST] InitializeRequest result: ${curlInit.exitCode}")
+        println("[TEST] InitializeRequest response: ${curlInit.output}")
+        println("[TEST] InitializeRequest stderr: ${curlInit.stderr}")
+
+        // List MCP servers to verify registration
+        val listResult = session.listMcpServers(timeoutSeconds = 60)
+        println("[TEST] MCP list exit: ${listResult.exitCode}")
+        println("[TEST] MCP list stdout:\n${listResult.output}")
+        println("[TEST] MCP list stderr:\n${listResult.stderr}")
+
+        // Run prompt
+        val result = session.runPrompt(
+            """
+            List ALL your available tools. Print each as: TOOL: <name>
+            Focus especially on any tools starting with "steroid_" or containing "mcp".
+            If you have access to steroid_list_projects, call it and print: PROJECTS: <result>
+            """.trimIndent(),
+            timeoutSeconds = 120,
+            allowedTools = listOf("mcp__intellij-steroid-test__*")
+        )
+
+        println("[TEST] Claude exit code: ${result.exitCode}")
+        println("[TEST] Claude stdout:\n${result.output}")
+        println("[TEST] Claude stderr:\n${result.stderr}")
+
+        assertEquals("Claude should run without crashing", 0, result.exitCode)
+    }
+
+    /**
+     * Test using add-json approach for MCP configuration.
+     * This bypasses the .mcp.json file approach entirely.
+     */
+    fun testMcpAddJsonApproach(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        // Verify API key works
+        assertAnthropicApiKeyValid(session)
+
+        val dockerMcpUrl = resolveDockerUrl()
+
+        // Use add-json command to add MCP server
+        // Format: claude mcp add-json <name> '<json>'
+        val mcpJson = """{"type":"http","url":"$dockerMcpUrl"}"""
+        val addJsonResult = session.run(
+            "mcp", "add-json",
+            "--scope", "project",
+            "intellij-steroid-test",
+            mcpJson
+        )
+        println("[TEST] MCP add-json result: exit=${addJsonResult.exitCode}")
+        println("[TEST] MCP add-json stdout: ${addJsonResult.output}")
+        println("[TEST] MCP add-json stderr: ${addJsonResult.stderr}")
+
+        // Verify config file was created
+        val catResult = session.runRaw("cat", ".mcp.json")
+        println("[TEST] .mcp.json content:\n${catResult.output}")
+
+        // Get MCP server info
+        val getResult = session.run("mcp", "get", "intellij-steroid-test")
+        println("[TEST] MCP get result: exit=${getResult.exitCode}")
+        println("[TEST] MCP get stdout: ${getResult.output}")
+        println("[TEST] MCP get stderr: ${getResult.stderr}")
+
+        // Run prompt with all tools enabled
+        val result = session.runPrompt(
+            """
+            You are testing MCP integration. First, list all available tools that start with "steroid_".
+            Print each tool name as: TOOL: <name>
+            Then call steroid_list_projects and print the result as: PROJECTS: <result>
+            If you encounter any issues, print: ERROR: <description>
+            """.trimIndent(),
+            timeoutSeconds = 120,
+            allowedTools = listOf("mcp__intellij-steroid-test__*"),
+            permissionMode = "bypassPermissions"
+        )
+
+        println("[TEST] Claude exit code: ${result.exitCode}")
+        println("[TEST] Claude stdout:\n${result.output}")
+        println("[TEST] Claude stderr:\n${result.stderr}")
+
+        assertEquals(
+            "Claude should run without crashing. Stderr: ${result.stderr}",
+            0,
+            result.exitCode
+        )
+
+        // Check for MCP server connection in stderr
+        val mcpConnected = result.stderr.contains("mcp") || result.stderr.contains("MCP")
+        println("[TEST] MCP mentioned in stderr: $mcpConnected")
+    }
+
     private fun claudeSession(): DockerClaudeSession {
         val session = DockerClaudeSession.create()
         Disposer.register(testRootDisposable, session)

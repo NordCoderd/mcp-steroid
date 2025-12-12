@@ -163,11 +163,14 @@ object McpHttpTransport {
     /**
      * Handle GET requests.
      *
-     * For SSE streams (Accept: text/event-stream), per MCP spec:
+     * For SSE streams (Accept: text/event-stream only), per MCP spec:
      * - Server MUST return Content-Type: text/event-stream OR HTTP 405 Method Not Allowed
      *
-     * For availability checks (Accept: wildcard or application/json):
-     * - Return server info to indicate the server is available
+     * For availability checks (Accept includes application/json or wildcard):
+     * - Return server info JSON to indicate the server is available
+     *
+     * Important: Claude CLI sends "Accept: application/json, text/event-stream"
+     * which means it accepts both - we should return JSON in this case.
      */
     private suspend fun handleGet(call: ApplicationCall) {
         val remoteHost = call.request.local.remoteHost
@@ -176,19 +179,27 @@ object McpHttpTransport {
 
         val acceptHeader = call.request.accept()
 
-        // If client explicitly requests SSE, return 405 (we don't support it)
-        if (acceptHeader != null && acceptsSse(acceptHeader) && !acceptHeader.contains("*/*")) {
-            log.info("[MCP] GET request from $remoteHost - returning 405 (SSE not supported)")
+        // If client accepts JSON (either directly or via wildcard), return server info
+        // This is the common case for health checks from Claude CLI
+        if (acceptHeader == null || acceptsJson(acceptHeader)) {
+            log.info("[MCP] GET request from $remoteHost - returning server info (accepts JSON)")
+            call.respondText(
+                """{"name":"intellij-mcp-steroid","version":"1.0.0","status":"available"}""",
+                ContentType.Application.Json
+            )
+            return
+        }
+
+        // If client explicitly requests SSE only (not JSON), return 405 (we don't support it)
+        if (acceptsSse(acceptHeader)) {
+            log.info("[MCP] GET request from $remoteHost - returning 405 (SSE-only not supported)")
             call.respond(HttpStatusCode.MethodNotAllowed, "SSE notifications not supported")
             return
         }
 
-        // For other GET requests (availability checks), return server info
-        log.info("[MCP] GET request from $remoteHost - returning server info")
-        call.respondText(
-            """{"name":"intellij-mcp-steroid","version":"1.0.0","status":"available"}""",
-            ContentType.Application.Json
-        )
+        // For other accept types, return Not Acceptable
+        log.warn("[MCP] GET request from $remoteHost - unsupported Accept header: $acceptHeader")
+        call.respond(HttpStatusCode.NotAcceptable, "Unsupported Accept header")
     }
 
     /**

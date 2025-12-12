@@ -52,22 +52,64 @@ class DockerClaudeSession private constructor(
      * @param prompt The prompt to send to Claude
      * @param timeoutSeconds Maximum time to wait for the command
      * @param allowedTools Optional list of tools to allow (e.g., "mcp__serverName__*")
+     * @param mcpConfigFile Optional path to MCP config JSON file (for --mcp-config)
+     * @param strictMcpConfig If true, use --strict-mcp-config to only use specified MCP servers
+     * @param permissionMode Optional permission mode (e.g., "bypassPermissions")
+     * @param tools Optional list of tools to enable (for --tools flag)
+     *
+     * Note: Due to a bug in Claude CLI v1.0.73 (issue #5593), when using --mcp-config,
+     * we need to use "--" separator before the prompt to prevent argument parsing issues.
+     * See: https://github.com/anthropics/claude-code/issues/5593
      */
     fun runPrompt(
         prompt: String,
         timeoutSeconds: Long = 120,
-        allowedTools: List<String>? = null
+        allowedTools: List<String>? = null,
+        mcpConfigFile: String? = null,
+        strictMcpConfig: Boolean = false,
+        permissionMode: String? = null,
+        tools: List<String>? = null
     ): ProcessResult {
         val claudeArgs = buildList {
             add("claude")
             add("--debug")
-            add("--mcp-debug")
             add("--verbose")
+            add("--mcp-debug")
+
+            // MCP config file - must come before other args due to CLI bug
+            if (mcpConfigFile != null) {
+                add("--mcp-config")
+                add(mcpConfigFile)
+            }
+
+            // Strict MCP config mode
+            if (strictMcpConfig) {
+                add("--strict-mcp-config")
+            }
+
+            // Permission mode
+            if (permissionMode != null) {
+                add("--permission-mode")
+                add(permissionMode)
+            }
+
+            // Tools to enable
+            if (tools != null && tools.isNotEmpty()) {
+                add("--tools")
+                add(tools.joinToString(","))
+            }
+
             // Allow MCP tools in print mode (required since v0.2.54)
             if (allowedTools != null && allowedTools.isNotEmpty()) {
                 add("--allowedTools")
                 add(allowedTools.joinToString(","))
             }
+
+            // Use "--" separator when --mcp-config is used (workaround for CLI bug #5593)
+            if (mcpConfigFile != null) {
+                add("--")
+            }
+
             add("-p")
             add(prompt)
         }
@@ -77,9 +119,48 @@ class DockerClaudeSession private constructor(
             enableDebugEnv = true,
             extraEnvVars = mapOf(
                 "CLAUDE_CODE_DEBUG" to "1",
+                "MCP_DEBUG" to "1",
                 "ANTHROPIC_API_KEY" to apiKey
             )
         )
+    }
+
+    /**
+     * Run claude doctor to check health
+     */
+    fun runDoctor(timeoutSeconds: Long = 30): ProcessResult {
+        return runInContainer(
+            listOf("claude", "doctor"),
+            timeoutSeconds,
+            enableDebugEnv = true,
+            extraEnvVars = mapOf(
+                "ANTHROPIC_API_KEY" to apiKey
+            )
+        )
+    }
+
+    /**
+     * List MCP servers
+     */
+    fun listMcpServers(timeoutSeconds: Long = 30): ProcessResult {
+        return run("mcp", "list", timeoutSeconds = timeoutSeconds)
+    }
+
+    /**
+     * Create an MCP config JSON file in the container
+     */
+    fun createMcpConfigFile(serverName: String, serverUrl: String, fileName: String = "mcp-config.json"): ProcessResult {
+        val mcpConfig = """
+{
+    "mcpServers": {
+        "$serverName": {
+            "type": "http",
+            "url": "$serverUrl"
+        }
+    }
+}
+""".trim()
+        return runRaw("bash", "-c", "cat > $fileName <<'EOF'\n$mcpConfig\nEOF")
     }
 
     /**
