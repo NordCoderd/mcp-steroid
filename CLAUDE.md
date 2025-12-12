@@ -40,7 +40,7 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 - **IntelliJ Platform**: 2025.3+ (sinceBuild: 252.1)
 - **IntelliJ Platform Gradle Plugin**: 2.10.5
 - **MCP Server**: Kotlin MCP SDK 0.8.1 with Ktor (CIO engine)
-- **Transport**: Server-Sent Events (SSE) at `http://localhost:<port>/sse`
+- **Transport**: HTTP at `http://localhost:<port>/mcp` with CORS support
 - **Testing**: IntelliJ 253 pattern with `timeoutRunBlocking`
 - **Serialization**: kotlinx.serialization for JSON
 
@@ -134,9 +134,15 @@ Run specific test class:
 - **McpServerIntegrationTest.kt** - Tests MCP server service availability
 
 - **ClaudeCliIntegrationTest.kt** - Tests Claude Code CLI integration:
-  - Requires `claude` command and ANTHROPIC_API_KEY
-  - Creates temp directory with `.mcp.json` for isolated testing
-  - Gracefully skips if prerequisites not available
+  - Uses Docker to run Claude CLI in isolation
+  - Requires Docker and ANTHROPIC_API_KEY
+  - Tests MCP server registration and connectivity
+  - Note: MCP tools not supported in Claude CLI print mode (-p)
+
+- **CodexCliIntegrationTest.kt** - Tests OpenAI Codex CLI integration:
+  - Uses Docker to run Codex CLI in isolation
+  - Requires Docker and OPENAI_API_KEY
+  - Tests MCP tool discovery and invocation
 
 - **ScriptExecutorTest.kt** - Tests script execution with fast failure semantics:
   - Verifies errors return quickly (not waiting for timeout)

@@ -12,10 +12,11 @@ This IntelliJ plugin exposes IDE APIs to LLM agents via Kotlin script execution.
 
 ## MCP Server Integration
 
-This plugin runs its own standalone MCP server using the [Kotlin MCP SDK](https://github.com/modelcontextprotocol/kotlin-sdk) with Ktor for SSE transport:
+This plugin runs its own standalone MCP server using the [Kotlin MCP SDK](https://github.com/modelcontextprotocol/kotlin-sdk) with Ktor for HTTP transport:
 
-- **Default port**: 6315 (configurable via `mcp.steroids.server.port` registry key)
-- **Transport**: Server-Sent Events (SSE) at `http://localhost:<port>/sse`
+- **Default port**: 63150 (configurable via `mcp.steroids.server.port` registry key, use 0 for dynamic)
+- **Transport**: HTTP at `http://localhost:<port>/mcp` with CORS support
+- **Host**: Configurable via `mcp.steroids.server.host` registry key (default: 127.0.0.1, use 0.0.0.0 for Docker)
 - **Server URL file**: Written to `.idea/mcp-steroids.txt` in each open project folder
 
 The server starts automatically when IntelliJ launches and writes its URL to project folders for easy discovery by MCP clients.
@@ -246,7 +247,7 @@ After script evaluation completes:
 
 **Server URL file**:
 ```
-.idea/mcp-steroids.txt                     # Contains MCP server SSE URL (e.g., http://localhost:6315/sse)
+.idea/mcp-steroids.txt                     # Contains MCP server URL (e.g., http://localhost:63150/mcp)
 ```
 
 **Execution ID Format**: `{project-hash-3chars}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-hash-10chars}`
@@ -421,12 +422,13 @@ The project includes integration tests that verify MCP server functionality:
 
 **Test Files:**
 - `McpServerIntegrationTest.kt` - Tests MCP server service availability
-- `ClaudeCliIntegrationTest.kt` - Tests Claude Code CLI integration (requires `claude` command)
+- `ClaudeCliIntegrationTest.kt` - Tests Claude Code CLI integration (requires Docker, ANTHROPIC_API_KEY)
+- `CodexCliIntegrationTest.kt` - Tests OpenAI Codex CLI integration (requires Docker, OPENAI_API_KEY)
 - `ScriptExecutorTest.kt` - Tests script execution with fast failure semantics
 - `ExecutionManagerTest.kt` - Tests execution manager with progress reporting
 
 **Shell Scripts** (in `integration-test/`):
-- `test-sse-tools.sh` - Tests SSE transport directly via curl
+- `test-sse-tools.sh` - Tests HTTP transport directly via curl
 - `run-test.sh` - Automated integration test with Claude CLI
 - `manual-test.sh` - Interactive Claude CLI test
 
