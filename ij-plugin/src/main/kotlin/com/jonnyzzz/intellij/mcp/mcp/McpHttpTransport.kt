@@ -115,18 +115,21 @@ object McpHttpTransport {
         }
 
         val sessionId = call.request.header(SESSION_HEADER)
-        val session = if (sessionId != null) {
-            log.debug("[MCP] Using existing session: $sessionId")
-            server.sessionManager.getSession(sessionId)
+        val (session, isNewSession) = if (sessionId != null) {
+            val existingSession = server.sessionManager.getSession(sessionId)
+            if (existingSession != null) {
+                log.debug("[MCP] Using existing session: $sessionId")
+                existingSession to false
+            } else {
+                // Session ID was provided but not found - this happens when IDE restarts
+                // Create a new session automatically to support seamless reconnection
+                log.info("[MCP] Unknown session ID: $sessionId (likely IDE was restarted)")
+                log.info("[MCP] Client (User-Agent: $userAgent) - creating new session for seamless reconnection")
+                server.sessionManager.createSession() to true
+            }
         } else {
-            log.info("[MCP] Creating new session")
-            server.sessionManager.createSession()
-        }
-
-        if (session == null) {
-            log.warn("[MCP] Invalid or expired session ID: $sessionId")
-            call.respond(HttpStatusCode.BadRequest, "Invalid session")
-            return
+            log.info("[MCP] No session ID provided, creating new session")
+            server.sessionManager.createSession() to true
         }
 
         val body = call.receiveText()
@@ -142,9 +145,9 @@ object McpHttpTransport {
 
         val response = server.handleMessage(body, session)
 
-        // Include session ID in response for new sessions
-        if (sessionId == null) {
-            log.info("[MCP] New session created: ${session.id}")
+        // Include session ID in response for new sessions (or when we created a replacement session)
+        if (isNewSession) {
+            log.info("[MCP] Returning new session ID: ${session.id}")
             call.response.header(SESSION_HEADER, session.id)
         }
 

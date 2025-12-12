@@ -363,20 +363,82 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val toolsRpc = McpJson.decodeFromString<JsonRpcResponse>(toolsResponse.bodyAsText())
         assertNull("tools/list should succeed with valid session", toolsRpc.error)
 
-        // Step 3: Make a request with an invalid session ID (should create new session)
-        val invalidSessionResponse = client.post(server.mcpUrl) {
+        // Step 3: Make a request with an unknown session ID
+        // Server should create a new session automatically (supports IDE restart scenario)
+        val unknownSessionResponse = client.post(server.mcpUrl) {
             contentType(ContentType.Application.Json)
             accept(ContentType.Application.Json)
-            header(McpHttpTransport.SESSION_HEADER, "invalid-session-id-12345")
+            header(McpHttpTransport.SESSION_HEADER, "unknown-session-id-12345")
             setBody("""{"jsonrpc":"2.0","id":"3","method":"tools/list"}""")
         }
 
-        // Server should either reject the invalid session or create a new one
-        // Per MCP spec, invalid sessions should return 400 Bad Request
+        // Server should create a new session and return it in the header
         assertEquals(
-            "Invalid session should be rejected",
-            HttpStatusCode.BadRequest,
-            invalidSessionResponse.status
+            "Request with unknown session should succeed (server creates new session)",
+            HttpStatusCode.OK,
+            unknownSessionResponse.status
         )
+
+        // Server should return a new session ID
+        val newSessionId = unknownSessionResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Server should return new session ID for unknown session", newSessionId)
+        assertFalse(
+            "New session ID should be different from the unknown one",
+            newSessionId == "unknown-session-id-12345"
+        )
+
+        // The response should be valid
+        val unknownSessionRpc = McpJson.decodeFromString<JsonRpcResponse>(unknownSessionResponse.bodyAsText())
+        assertNull("tools/list should succeed with auto-created session", unknownSessionRpc.error)
+    }
+
+    /**
+     * Tests that the server handles IDE restart gracefully.
+     * When a client sends an unknown session ID (e.g., after IDE restart),
+     * the server should create a new session instead of rejecting the request.
+     */
+    fun testServerRestartHandling(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Simulate a client that has a stale session ID from before IDE restart
+        val staleSessionId = "stale-session-from-previous-ide-instance"
+
+        // Step 1: Send a tools/call request with the stale session ID
+        val response = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, staleSessionId)
+            setBody("""{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"steroid_list_projects"}}""")
+        }
+
+        // Server should accept the request and create a new session
+        assertEquals(
+            "Request with stale session should succeed",
+            HttpStatusCode.OK,
+            response.status
+        )
+
+        // Server should return a new session ID
+        val newSessionId = response.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Server should return new session ID", newSessionId)
+        assertFalse(
+            "New session ID should be different from stale one",
+            newSessionId == staleSessionId
+        )
+
+        // Step 2: Verify the new session works for subsequent requests
+        val followUpResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, newSessionId)
+            setBody("""{"jsonrpc":"2.0","id":"2","method":"tools/list"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, followUpResponse.status)
+
+        // No new session ID should be returned (we're using a valid one now)
+        val followUpSessionId = followUpResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNull("No new session ID should be returned for valid session", followUpSessionId)
     }
 }
