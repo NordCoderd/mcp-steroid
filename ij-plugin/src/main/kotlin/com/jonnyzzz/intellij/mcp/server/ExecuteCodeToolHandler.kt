@@ -34,7 +34,7 @@ class ExecuteCodeToolHandler {
                     }
                     putJsonObject("code") {
                         put("type", "string")
-                        put("description", "Kotlin code to execute - must use execute { ctx -> } pattern")
+                        put("description", "Kotlin code to execute - must use execute { } with McpScriptContext as the receiver")
                     }
                     putJsonObject("reason") {
                         put("type", "string")
@@ -139,31 +139,31 @@ class ExecuteCodeToolHandler {
             |
             |IMPORTANT: All code must be written as suspend functions. Never use runBlocking.
             |
-            |The code must use the execute { ctx -> } pattern:
+            |The code must use the execute { } pattern (the context is the receiver):
             |```kotlin
-            |execute { ctx ->
-            |    ctx.println("Hello from IntelliJ!")
-            |    ctx.waitForSmartMode()
+            |execute {
+            |    println("Hello from IntelliJ!")
+            |    waitForSmartMode()
             |    // Use any IntelliJ API here
             |}
             |```
             |
             |Available context methods:
-            |- ctx.println(vararg values) - Print values separated by spaces
-            |- ctx.printJson(obj) - Print object as pretty JSON
-            |- ctx.progress(message) - Report progress (throttled to 1/sec)
-            |- ctx.logInfo/logWarn/logError(msg) - Log messages
-            |- ctx.waitForSmartMode() - Wait for indexing to complete
-            |- ctx.project - Access the IntelliJ Project
+            |- println(vararg values) - Print values separated by spaces
+            |- printJson(obj) - Print object as pretty JSON
+            |- progress(message) - Report progress (throttled to 1/sec)
+            |- logInfo/logWarn/logError(msg) - Log messages
+            |- waitForSmartMode() - Wait for indexing to complete
+            |- project - Access the IntelliJ Project
             |
             |For read/write actions, use IntelliJ's coroutine-aware APIs:
             |```kotlin
             |import com.intellij.openapi.application.readAction
             |import com.intellij.openapi.application.writeAction
             |
-            |execute { ctx ->
+            |execute {
             |    val psiFile = readAction {
-            |        PsiManager.getInstance(ctx.project).findFile(virtualFile)
+            |        PsiManager.getInstance(project).findFile(virtualFile)
             |    }
             |    writeAction {
             |        document.setText("new content")

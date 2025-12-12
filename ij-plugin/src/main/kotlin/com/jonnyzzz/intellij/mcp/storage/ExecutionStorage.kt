@@ -18,8 +18,8 @@ import java.util.Base64
 @Serializable
 enum class OutputType {
     COMPILER, //output from the compiler
-    OUT,   // stdout from ctx.println()
-    JSON,  // structured data from ctx.printJson()
+    OUT,   // stdout from println()
+    JSON,  // structured data from printJson()
     LOG,   // log messages (info/warn/error)
     ERR    // exceptions/errors
 }

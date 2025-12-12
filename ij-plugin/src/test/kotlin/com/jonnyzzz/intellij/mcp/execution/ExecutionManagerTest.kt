@@ -2,7 +2,6 @@
 package com.jonnyzzz.intellij.mcp.execution
 
 import com.intellij.openapi.components.service
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.server.ProgressReporter
@@ -19,28 +18,15 @@ class ExecutionManagerTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         // Disable review mode for tests
-        try {
-            Registry.get("mcp.steroids.review.mode").setValue("NEVER")
-        } catch (e: Exception) {
-            // Registry key might not exist in test environment
-        }
-    }
-
-    override fun tearDown() {
-        try {
-            Registry.get("mcp.steroids.review.mode").resetToDefault()
-        } catch (e: Exception) {
-            // Ignore
-        }
-        super.tearDown()
+        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
     }
 
     fun testExecuteWithProgressSuccess(): Unit = timeoutRunBlocking(30.seconds) {
         val manager = project.service<ExecutionManager>()
 
         val code = """
-            execute { ctx ->
-                ctx.println("Hello from test")
+            execute {
+                println("Hello from test")
             }
         """.trimIndent()
 
@@ -57,9 +43,9 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         val manager = project.service<ExecutionManager>()
 
         val code = """
-            execute { ctx ->
-                ctx.println("Line 1")
-                ctx.println("Line 2")
+            execute {
+                println("Line 1")
+                println("Line 2")
             }
         """.trimIndent()
 
@@ -75,7 +61,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         val manager = project.service<ExecutionManager>()
 
         val code = """
-            execute { ctx ->
+            execute {
                 throw RuntimeException("Test error")
             }
         """.trimIndent()
@@ -91,10 +77,10 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         val manager = project.service<ExecutionManager>()
 
         val code = """
-            execute { ctx ->
-                ctx.println("Starting")
+            execute {
+                println("Starting")
                 kotlinx.coroutines.delay(10000)
-                ctx.println("Should not reach here")
+                println("Should not reach here")
             }
         """.trimIndent()
 

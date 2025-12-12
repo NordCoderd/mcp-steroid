@@ -280,8 +280,8 @@ Using JSON lines format but with minimal quoting for LLM readability:
 ```
 
 Message types:
-- `out` - stdout from ctx.println()
-- `json` - structured data from ctx.printJson()
+- `out` - stdout from println()
+- `json` - structured data from printJson()
 - `log` - log messages (info/warn/error)
 - `err` - exceptions/errors
 
@@ -460,15 +460,15 @@ IntelliJ Community includes a full MCP server plugin (`com.intellij.mcpServer`) 
 
 New architecture:
 - Bind `McpScriptScope` to script engine (not `McpScriptContext`)
-- `McpScriptScope` has single method: `execute { ctx -> ... }`
+- `McpScriptScope` has single method: `execute { ... }` (context is the receiver)
 - Script MUST call `execute { }` to do anything useful
 - The lambda receives `McpScriptContext` with full API
 
 ```kotlin
 // What user writes:
-execute { ctx ->
-    ctx.println("Hello")
-    val project = ctx.project
+execute {
+    println("Hello")
+    val projectRef = project
     // ... actual work
 }
 
@@ -625,7 +625,7 @@ Groovy support deferred. Focus on Kotlin scripting only for v1.
 |-------|----------|
 | **MCP Integration** | McpToolset only (no REST fallback) |
 | **Target Version** | IntelliJ 2025.3+ |
-| **Entry Point** | `execute { ctx -> ... }` via McpScriptScope |
+| **Entry Point** | `execute { ... }` via McpScriptScope (McpScriptContext is receiver) |
 | **Plugins param** | REMOVED - AllPluginsLoader used internally |
 | **Review mode** | ALWAYS by default, TRUSTED = trust all callers |
 | **Registry keys** | review.mode, review.timeout, execution.timeout |

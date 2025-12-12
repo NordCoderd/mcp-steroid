@@ -50,9 +50,9 @@ No REST endpoint fallback - McpToolset only.
 
 ```kotlin
 // User writes:
-execute { ctx ->
-    ctx.waitForSmartMode()
-    ctx.println("Hello!")
+execute {
+    waitForSmartMode()
+    println("Hello!")
 }
 ```
 
@@ -601,8 +601,8 @@ class ScriptExecutorTest : BasePlatformTestCase() {
     @Test
     fun `simple script executes`() {
         val result = executor.execute(id, """
-            execute { ctx ->
-                ctx.println("Hello")
+            execute {
+                println("Hello")
             }
         """)
         assertIs<ExecutionResult.Success>(result)
@@ -655,7 +655,7 @@ class McpIntegrationTest : HeavyPlatformTestCase() {
 |-------|----------|
 | MCP Integration | McpToolset only (no REST fallback) |
 | Target Version | IntelliJ 2025.3+ (sinceBuild: 252.1) |
-| Entry Point | `execute { ctx -> }` via McpScriptScope |
+| Entry Point | `execute { }` (McpScriptContext is the receiver) |
 | Script Engine | IdeScriptEngineManager + AllPluginsLoader |
 | Execution Architecture | Two-phase: CodeEvalManager (compile) + ScriptExecutor (run) |
 | CoroutineScope | Service-injected, Dispatchers.IO + withTimeout |

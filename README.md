@@ -58,34 +58,32 @@ Compiles and executes Kotlin code in the IDE's runtime context.
 Scripts **must** call `execute { }` to interact with the IDE. All code must be written as **suspend functions** - never use `runBlocking`:
 
 ```kotlin
-execute { ctx ->
-    // ctx is McpScriptContext - your gateway to the IDE
-    ctx.println("Hello from IntelliJ!")
+execute {
+    // McpScriptContext is the receiver (`this`)
+    println("Hello from IntelliJ!")
 
     // Report progress (throttled to 1 message per second)
-    ctx.progress("Starting analysis...")
+    progress("Starting analysis...")
 
     // Wait for indexes to be ready
-    ctx.waitForSmartMode()
+    waitForSmartMode()
 
     // Access the project
-    val project = ctx.project
+    val projectRef = project
 
-    ctx.progress("Indexes ready, processing...")
+    progress("Indexes ready, processing...")
 
-    // For read/write actions, use IntelliJ's coroutine-aware APIs:
-    import com.intellij.openapi.application.readAction
-    import com.intellij.openapi.application.writeAction
+    // For read/write actions, use IntelliJ's coroutine-aware APIs (import readAction/writeAction)
 
     val psiFile = readAction {
-        PsiManager.getInstance(project).findFile(virtualFile)
+        PsiManager.getInstance(projectRef).findFile(virtualFile)
     }
 
     writeAction {
         document.setText("new content")
     }
 
-    ctx.println("Done!")
+    println("Done!")
 }
 ```
 
@@ -140,10 +138,10 @@ interface McpScriptContext {
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.writeAction
 
-execute { ctx ->
+execute {
     // Read PSI data
     val psiFile = readAction {
-        PsiManager.getInstance(ctx.project).findFile(virtualFile)
+        PsiManager.getInstance(project).findFile(virtualFile)
     }
 
     // Modify documents/PSI
@@ -170,9 +168,9 @@ interface McpScriptContextEx : McpScriptContext {
 The context provides a `disposable` property for scripts that need to register cleanup:
 
 ```kotlin
-execute { ctx ->
+execute {
     // Access the execution's parent Disposable
-    val execDisposable = ctx.disposable
+    val execDisposable = disposable
 
     // Register your own cleanup
     val myResource = Disposer.newDisposable("my-resource")
@@ -221,9 +219,9 @@ The context is disposed automatically:
 Scripts can have multiple `execute { }` calls - they are collected and run in FIFO order:
 
 ```kotlin
-execute { ctx -> ctx.println("First") }
-execute { ctx -> ctx.println("Second") }
-execute { ctx -> ctx.println("Third") }
+execute { println("First") }
+execute { println("Second") }
+execute { println("Third") }
 // Outputs: First, Second, Third (in order)
 ```
 
@@ -290,14 +288,14 @@ All requests are logged to disk regardless of review mode.
 **LLM agents should use reflection to discover available APIs at runtime:**
 
 ```kotlin
-execute { ctx ->
+execute {
     // List methods on any class
     PsiManager::class.java.methods.forEach { method ->
-        ctx.println("${method.name}(${method.parameterTypes.joinToString()})")
+        println("${method.name}(${method.parameterTypes.joinToString()})")
     }
 
     // Use helper to describe a class (via McpScriptContextEx)
-    ctx.println((ctx as McpScriptContextEx).describeClass("com.intellij.psi.PsiManager"))
+    println((this as McpScriptContextEx).describeClass("com.intellij.psi.PsiManager"))
 }
 ```
 
@@ -321,10 +319,10 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 
 1. **Read/Write Actions are required** for PSI and VFS access:
    ```kotlin
-   execute { ctx ->
+   execute {
        // Reading PSI requires a read action
        val psiFile = readAction {
-           PsiManager.getInstance(ctx.project).findFile(virtualFile)
+           PsiManager.getInstance(project).findFile(virtualFile)
        }
 
        // Modifying documents requires a write action
@@ -334,15 +332,15 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
    }
    ```
 
-2. **Smart Mode**: Many APIs require indices to be built. Use `ctx.waitForSmartMode()`:
+2. **Smart Mode**: Many APIs require indices to be built. Use `waitForSmartMode()`:
    ```kotlin
-   execute { ctx ->
-       ctx.waitForSmartMode()  // Wait for indexing
+   execute {
+       waitForSmartMode()  // Wait for indexing
 
        // Now safe to use index-dependent APIs
        val classes = readAction {
-           JavaPsiFacade.getInstance(ctx.project)
-               .findClasses("com.example.MyClass", GlobalSearchScope.allScope(ctx.project))
+           JavaPsiFacade.getInstance(project)
+               .findClasses("com.example.MyClass", GlobalSearchScope.allScope(project))
        }
    }
    ```
@@ -352,8 +350,8 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 1. **Getting services**:
    ```kotlin
    // Project services
-   val fileEditorManager = FileEditorManager.getInstance(ctx.project)
-   val psiManager = PsiManager.getInstance(ctx.project)
+   val fileEditorManager = FileEditorManager.getInstance(project)
+   val psiManager = PsiManager.getInstance(project)
 
    // Application services
    val vfsManager = VirtualFileManager.getInstance()
@@ -362,14 +360,14 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 
 2. **Working with files**:
    ```kotlin
-   execute { ctx ->
+   execute {
        // Find a file
        val vFile = LocalFileSystem.getInstance()
            .findFileByPath("/path/to/file.kt")
 
        // Get PSI
        val psiFile = readAction {
-           PsiManager.getInstance(ctx.project).findFile(vFile!!)
+           PsiManager.getInstance(project).findFile(vFile!!)
        }
 
        // Modify
@@ -382,15 +380,15 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 
 3. **Using Disposables for cleanup**:
    ```kotlin
-   execute { ctx ->
+   execute {
        val myListener = object : FileEditorManagerListener {
            override fun fileOpened(source: FileEditorManager, file: VirtualFile) {
-               ctx.println("Opened: ${file.name}")
+               println("Opened: ${file.name}")
            }
        }
 
        // Register with the context's disposable for automatic cleanup
-       ctx.project.messageBus.connect(ctx.disposable)
+       project.messageBus.connect(disposable)
            .subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, myListener)
    }
    ```
@@ -399,7 +397,7 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 
 - Scripts run in a supervised coroutine scope
 - Exceptions are caught and reported as ERROR status
-- Use `ctx.logError()` for expected error conditions
+- Use `logError()` for expected error conditions
 - Avoid catching `ProcessCanceledException` - let it propagate
 
 ## Testing

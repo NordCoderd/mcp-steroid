@@ -14,10 +14,10 @@ import com.intellij.openapi.project.Project
  * import com.intellij.openapi.application.readAction
  * import com.intellij.openapi.application.writeAction
  *
- * execute { ctx ->
+ * execute {
  *     // Read PSI/VFS data:
  *     val psiFile = readAction {
- *         PsiManager.getInstance(ctx.project).findFile(virtualFile)
+ *         PsiManager.getInstance(project).findFile(virtualFile)
  *     }
  *
  *     // Modify PSI/VFS:
@@ -49,8 +49,8 @@ interface McpScriptContext {
      * Each argument is converted to string via toString().
      *
      * ```kotlin
-     * ctx.println("Hello", "World", 42)  // prints: "Hello World 42"
-     * ctx.println()  // prints empty line
+     * println("Hello", "World", 42)  // prints: "Hello World 42"
+     * println()  // prints empty line
      * ```
      */
     fun println(vararg values: Any?)
@@ -60,7 +60,7 @@ interface McpScriptContext {
      * Uses Jackson ObjectMapper with indentation.
      *
      * ```kotlin
-     * ctx.printJson(mapOf("name" to "value", "count" to 42))
+     * printJson(mapOf("name" to "value", "count" to 42))
      * ```
      */
     fun printJson(obj: Any?)
@@ -70,12 +70,12 @@ interface McpScriptContext {
      * Messages are throttled to at most once per second to avoid overwhelming the connection.
      *
      * ```kotlin
-     * execute { ctx ->
-     *     ctx.progress("Starting analysis...")
+     * execute {
+     *     progress("Starting analysis...")
      *     // do work
-     *     ctx.progress("Processing file 1 of 10")
+     *     progress("Processing file 1 of 10")
      *     // more work
-     *     ctx.progress("Analysis complete")
+     *     progress("Analysis complete")
      * }
      * ```
      */
@@ -97,15 +97,14 @@ interface McpScriptContext {
      * Use this before accessing indices or PSI that requires smart mode.
      *
      * ```kotlin
-     * execute { ctx ->
-     *     ctx.waitForSmartMode()
+     * execute {
+     *     waitForSmartMode()
      *     // Now safe to use indices
      *     val classes = readAction {
-     *         JavaPsiFacade.getInstance(ctx.project).findClasses("com.example.MyClass", GlobalSearchScope.allScope(ctx.project))
+     *         JavaPsiFacade.getInstance(project).findClasses("com.example.MyClass", GlobalSearchScope.allScope(project))
      *     }
      * }
      * ```
      */
     suspend fun waitForSmartMode()
 }
-

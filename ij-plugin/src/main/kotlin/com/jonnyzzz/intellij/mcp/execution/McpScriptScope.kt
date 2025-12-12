@@ -6,15 +6,18 @@ package com.jonnyzzz.intellij.mcp.execution
  * Scripts must call execute { } to interact with the IDE.
  */
 interface McpScriptScope {
+    // helper function to allow execute {} block in the script
+    operator fun invoke(block: suspend McpScriptContext.() -> Unit) = execute(block)
+
     /**
      * Execute a suspend block with full MCP context.
      * This is the ONLY way for scripts to interact with the IDE.
      *
      * Example:
      * ```kotlin
-     * execute { ctx ->
-     *     ctx.println("Hello from IntelliJ!")
-     *     ctx.waitForSmartMode()
+     * execute {
+     *     println("Hello from IntelliJ!")
+     *     waitForSmartMode()
      *     // ... actual work
      * }
      * ```

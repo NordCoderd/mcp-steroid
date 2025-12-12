@@ -199,7 +199,7 @@ When contributing to this plugin, follow these IntelliJ Platform best practices:
    - During indexing, IDE is in "dumb mode" - many APIs unavailable
    - Use `DumbService.isDumb(project)` to check
    - Use `DumbService.getInstance(project).smartInvokeLater { }` for operations requiring indices
-   - Our `ctx.waitForSmartMode()` handles this for scripts
+   - Our `waitForSmartMode()` handles this for scripts
 
 ### Coroutine Patterns
 

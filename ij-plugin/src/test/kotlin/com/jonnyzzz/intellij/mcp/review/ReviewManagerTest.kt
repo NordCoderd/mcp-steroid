@@ -2,7 +2,6 @@
 package com.jonnyzzz.intellij.mcp.review
 
 import com.intellij.openapi.components.service
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
@@ -23,20 +22,7 @@ class ReviewManagerTest : BasePlatformTestCase() {
         storage = project.service()
 
         // Disable review mode for tests to avoid hanging
-        try {
-            Registry.get("mcp.steroids.review.mode").setValue("NEVER")
-        } catch (e: Exception) {
-            // Registry key might not exist
-        }
-    }
-
-    override fun tearDown() {
-        try {
-            Registry.get("mcp.steroids.review.mode").resetToDefault()
-        } catch (e: Exception) {
-            // Ignore
-        }
-        super.tearDown()
+        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
     }
 
     fun testGetExecutionIdFromPath() {
@@ -64,7 +50,7 @@ class ReviewManagerTest : BasePlatformTestCase() {
     }
 
     fun testReviewCodeStorageRoundTrip() {
-        val code = "execute { ctx -> ctx.println(\"test\") }"
+        val code = "execute { println(\"test\") }"
         val params = ExecutionParams()
         val executionId = storage.generateExecutionId(code, params)
         storage.createExecution(executionId, code, params)
@@ -80,16 +66,16 @@ class ReviewManagerTest : BasePlatformTestCase() {
 
     fun testReviewCodeWithEdits() {
         val originalCode = """
-            execute { ctx ->
-                ctx.println("Hello")
+            execute {
+                println("Hello")
             }
         """.trimIndent()
 
         val editedCode = """
-            execute { ctx ->
+            execute {
                 // FIX: Please use proper error handling
-                ctx.println("Hello")
-                ctx.logInfo("Done")
+                println("Hello")
+                logInfo("Done")
             }
         """.trimIndent()
 

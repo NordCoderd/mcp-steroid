@@ -15,8 +15,8 @@ Named storage slots for persisting data between script executions.
 - `write_slot(project_name, slot_name, value)` - Write slot value
 
 **McpScriptContext Methods**:
-- `ctx.readSlot(name): String?`
-- `ctx.writeSlot(name, value: String)`
+- `readSlot(name): String?`
+- `writeSlot(name, value: String)`
 
 **Storage**: `.idea/mcp-run/slots/<slot-name>.txt`
 

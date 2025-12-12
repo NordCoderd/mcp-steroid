@@ -19,7 +19,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testGenerateExecutionId() {
-        val code = "execute { ctx -> ctx.println(\"Hello\") }"
+        val code = "execute { println(\"Hello\") }"
         val params = ExecutionParams(timeout = 60)
 
         val id1 = storage.generateExecutionId(code, params)
@@ -41,7 +41,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testCreateExecution() {
-        val code = "execute { ctx -> ctx.println(\"Hello\") }"
+        val code = "execute { println(\"Hello\") }"
         val params = ExecutionParams(timeout = 30)
         val executionId = storage.generateExecutionId(code, params)
 
@@ -131,7 +131,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testSaveReviewCode() {
-        val code = "execute { ctx -> ctx.println(\"Review me\") }"
+        val code = "execute { println(\"Review me\") }"
         val params = ExecutionParams()
         val executionId = storage.generateExecutionId(code, params)
         storage.createExecution(executionId, code, params)

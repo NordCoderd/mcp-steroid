@@ -2,7 +2,6 @@
 package com.jonnyzzz.intellij.mcp
 
 import com.intellij.openapi.components.service
-import com.intellij.openapi.util.registry.Registry
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
@@ -20,20 +19,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         // Disable review mode for tests
-        try {
-            Registry.get("mcp.steroids.review.mode").setValue("NEVER")
-        } catch (e: Exception) {
-            // Registry key might not exist in test environment
-        }
-    }
-
-    override fun tearDown() {
-        try {
-            Registry.get("mcp.steroids.review.mode").resetToDefault()
-        } catch (e: Exception) {
-            // Ignore
-        }
-        super.tearDown()
+        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
     }
 
     fun testExecuteCodeSuccess(): Unit = timeoutRunBlocking(30.seconds) {
@@ -41,8 +27,8 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
         val result = manager.executeWithProgress(
             code = """
-                execute { ctx ->
-                    ctx.println("Hello from toolset test")
+                execute {
+                    println("Hello from toolset test")
                 }
             """.trimIndent(),
             params = ExecutionParams(timeout = 30),
@@ -64,9 +50,9 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
         val result = manager.executeWithProgress(
             code = """
-                execute { ctx ->
-                    ctx.println("Test output line 1")
-                    ctx.println("Test output line 2")
+                execute {
+                    println("Test output line 1")
+                    println("Test output line 2")
                 }
             """.trimIndent(),
             params = ExecutionParams(timeout = 30),
@@ -84,7 +70,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
         val result = manager.executeWithProgress(
             code = """
-                execute { ctx ->
+                execute {
                     throw RuntimeException("Test error")
                 }
             """.trimIndent(),
@@ -102,10 +88,10 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
         val result = manager.executeWithProgress(
             code = """
-                execute { ctx ->
-                    ctx.println("Starting")
+                execute {
+                    println("Starting")
                     kotlinx.coroutines.delay(10000) // 10 seconds
-                    ctx.println("Should not reach here")
+                    println("Should not reach here")
                 }
             """.trimIndent(),
             params = ExecutionParams(timeout = 2), // 2 second timeout

@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
@@ -12,10 +13,13 @@ import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.server.response.ApplicationSendPipeline
 import io.ktor.server.sse.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -67,6 +71,7 @@ class SteroidsMcpServer(
         try {
             // Bind to localhost only per MCP security requirements
             val server = scope.embeddedServer(CIO, host = "127.0.0.1", port = actualPort) {
+                install(requestLoggingPlugin)
                 install(SSE)
                 routing {
                     with(McpHttpTransport) {
@@ -149,6 +154,23 @@ class SteroidsMcpServer(
     }
 
     companion object {
+        private val requestLoggingPlugin = createApplicationPlugin("SteroidsMcpRequestLogger") {
+            val logger = Logger.getInstance(SteroidsMcpServer::class.java)
+            onCall { call ->
+                val startedAt = System.nanoTime()
+                val method = call.request.httpMethod.value
+                val uri = call.request.uri
+                val remoteHost = call.request.local.remoteHost
+                logger.info("[MCP-HTTP] <- $method $uri from $remoteHost")
+
+                call.response.pipeline.intercept(ApplicationSendPipeline.After) {
+                    val status = call.response.status() ?: HttpStatusCode.OK
+                    val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+                    logger.info("[MCP-HTTP] -> ${status.value} ${status.description} for $method $uri in ${elapsedMs}ms")
+                }
+            }
+        }
+
         fun getInstance(): SteroidsMcpServer = ApplicationManager.getApplication().service()
     }
 }

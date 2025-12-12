@@ -63,13 +63,13 @@ class CodeEvalManager(
             import com.intellij.openapi.command.*
             import com.intellij.psi.*
             import kotlinx.coroutines.*
-            
-            
-            $code
-        """.trimIndent()
+
+        """.trimIndent() + code
     }
 
     fun evalCode(executionId: String, code: String): EvalResult {
+        val wrappedCode = wrapWithImports(code)
+
         // Track captured execute blocks (FIFO)
         val scope = DisposableScope(executionId)
         val engineWriter = StringWriter()
@@ -94,14 +94,13 @@ class CodeEvalManager(
             log.info("Script engine obtained for $executionId: ${engine.javaClass.name}")
 
             // Set up bindings
-            engine.setBinding("execute", { block: suspend McpScriptContext.() -> Unit -> scope.execute(block) })
+            engine.setBinding("execute", scope)
 
             // Capture stdout/stderr
             engine.stdOut = engineWriter
             engine.stdErr = engineWriter
             engine.stdIn = "".reader()
 
-            val wrappedCode = wrapWithImports(code)
             try {
                 engine.eval(wrappedCode)
             } finally {
@@ -110,7 +109,7 @@ class CodeEvalManager(
             }
         } catch (e: Throwable) {
             // Compilation/evaluation failed - report immediately
-            log.warn("Script compilation/evaluation failed for $executionId: ${e.message}", e)
+            log.warn("Script compilation/evaluation failed for $executionId: ${e.message}\n\nfor code:\n$wrappedCode", e)
             val sw = StringWriter()
             e.printStackTrace(PrintWriter(sw))
 
@@ -132,7 +131,7 @@ class CodeEvalManager(
         if (capturedBlocks.isEmpty()) {
             return EvalResult.Failed(ExecutionResult(
                 status = ExecutionStatus.ERROR,
-                errorMessage = "Script must call execute { ctx -> ... } to interact with the IDE. No execute {} block found."
+                errorMessage = "Script must call execute { ... } to interact with the IDE. No execute {} block found."
             ))
         }
 

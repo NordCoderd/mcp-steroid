@@ -35,8 +35,8 @@ class ScriptExecutorTest : BasePlatformTestCase() {
      */
     fun testScriptEngineNotAvailableReturnsFast(): Unit = timeoutRunBlocking(10.seconds) {
         val code = """
-            execute { ctx ->
-                ctx.println("Hello")
+            execute {
+                println("Hello")
             }
         """.trimIndent()
 
@@ -81,7 +81,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
      */
     fun testSyntaxErrorFast(): Unit = timeoutRunBlocking(10.seconds) {
         val syntaxErrorCode = """
-            execute { ctx ->
+            execute {
                 val x = // incomplete statement
             }
         """.trimIndent()
@@ -124,14 +124,14 @@ class ScriptExecutorTest : BasePlatformTestCase() {
      */
     fun testMultipleExecuteBlocks(): Unit = timeoutRunBlocking(10.seconds) {
         val multiCode = """
-            execute { ctx ->
-                ctx.println("First")
+            execute {
+                println("First")
             }
-            execute { ctx ->
-                ctx.println("Second")
+            execute {
+                println("Second")
             }
-            execute { ctx ->
-                ctx.println("Third")
+            execute {
+                println("Third")
             }
         """.trimIndent()
 
@@ -161,7 +161,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
      */
     fun testRuntimeErrorInBlock(): Unit = timeoutRunBlocking(10.seconds) {
         val errorCode = """
-            execute { ctx ->
+            execute {
                 throw RuntimeException("Test runtime error")
             }
         """.trimIndent()
@@ -182,10 +182,10 @@ class ScriptExecutorTest : BasePlatformTestCase() {
      */
     fun testTimeoutReported(): Unit = timeoutRunBlocking(10.seconds) {
         val slowCode = """
-            execute { ctx ->
-                ctx.println("Starting")
+            execute {
+                println("Starting")
                 kotlinx.coroutines.delay(5000) // 5 seconds
-                ctx.println("Done")
+                println("Done")
             }
         """.trimIndent()
 
