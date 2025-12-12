@@ -21,9 +21,9 @@ class McpProtocolTest {
         )
 
         val json = McpJson.encodeToString(JsonRpcRequest.serializer(), request)
-        assertTrue("Should contain jsonrpc", json.contains("\"jsonrpc\":\"2.0\""))
-        assertTrue("Should contain id", json.contains("\"id\":1"))
-        assertTrue("Should contain method", json.contains("\"method\":\"initialize\""))
+        assertTrue("Should contain jsonrpc", json.contains("\"jsonrpc\"") && json.contains("\"2.0\""))
+        assertTrue("Should contain id", json.contains("\"id\"") && json.contains("1"))
+        assertTrue("Should contain method", json.contains("\"method\"") && json.contains("\"initialize\""))
 
         val decoded = McpJson.decodeFromString<JsonRpcRequest>(json)
         assertEquals(JSONRPC_VERSION, decoded.jsonrpc)

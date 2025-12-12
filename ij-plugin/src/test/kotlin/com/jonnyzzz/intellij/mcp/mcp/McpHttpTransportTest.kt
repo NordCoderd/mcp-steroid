@@ -93,6 +93,7 @@ class McpHttpTransportTest {
 
         val response = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody(request.toString())
         }
 
@@ -131,6 +132,7 @@ class McpHttpTransportTest {
 
         val firstResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody(initRequest.toString())
         }
 
@@ -142,6 +144,7 @@ class McpHttpTransportTest {
 
         val secondResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             header(McpHttpTransport.SESSION_HEADER, sessionId)
             setBody(pingRequest)
         }
@@ -168,6 +171,7 @@ class McpHttpTransportTest {
 
         val initResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody(initRequest.toString())
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
@@ -177,6 +181,7 @@ class McpHttpTransportTest {
 
         val response = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             header(McpHttpTransport.SESSION_HEADER, sessionId)
             setBody(listRequest)
         }
@@ -211,6 +216,7 @@ class McpHttpTransportTest {
 
         val initResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody(initRequest.toString())
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
@@ -230,6 +236,7 @@ class McpHttpTransportTest {
 
         val response = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             header(McpHttpTransport.SESSION_HEADER, sessionId)
             setBody(callRequest.toString())
         }
@@ -263,6 +270,7 @@ class McpHttpTransportTest {
 
         val initResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody(initRequest.toString())
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
@@ -272,6 +280,7 @@ class McpHttpTransportTest {
 
         val response = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             header(McpHttpTransport.SESSION_HEADER, sessionId)
             setBody(notification)
         }
@@ -283,6 +292,7 @@ class McpHttpTransportTest {
     fun `test POST empty body returns BadRequest`() = runBlocking {
         val response = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody("")
         }
 
@@ -295,6 +305,7 @@ class McpHttpTransportTest {
 
         val response = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             header(McpHttpTransport.SESSION_HEADER, "invalid-session-id")
             setBody(request)
         }
@@ -321,6 +332,7 @@ class McpHttpTransportTest {
 
         val initResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody(initRequest.toString())
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
@@ -336,6 +348,7 @@ class McpHttpTransportTest {
         val pingRequest = """{"jsonrpc":"2.0","id":2,"method":"ping"}"""
         val afterDeleteResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             header(McpHttpTransport.SESSION_HEADER, sessionId)
             setBody(pingRequest)
         }
@@ -369,6 +382,7 @@ class McpHttpTransportTest {
 
         val initResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             setBody(initRequest.toString())
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
@@ -381,6 +395,7 @@ class McpHttpTransportTest {
 
         val response = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
             header(McpHttpTransport.SESSION_HEADER, sessionId)
             setBody(batchRequest)
         }
@@ -390,5 +405,508 @@ class McpHttpTransportTest {
         val body = response.bodyAsText()
         val responses = McpJson.decodeFromString<JsonArray>(body)
         assertEquals(2, responses.size)
+    }
+
+    // ==================== GET Request Tests ====================
+
+    @Test
+    fun `test GET with Accept text event-stream returns 405 Method Not Allowed`() = runBlocking {
+        // Per MCP spec, client MUST include Accept: text/event-stream
+        // Server returns 405 if it doesn't support SSE
+        val response = client.get("http://localhost:$port/mcp") {
+            header(HttpHeaders.Accept, "text/event-stream")
+        }
+
+        // The response should complete immediately with 405 (SSE not supported)
+        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
+    }
+
+    @Test
+    fun `test GET without Accept header returns 405 Method Not Allowed`() = runBlocking {
+        // When no Accept header is provided, HTTP default is */* (accept anything)
+        // Ktor client adds Accept: */* by default
+        // Since */* includes text/event-stream, server returns 405 (SSE not supported)
+        val response = client.get("http://localhost:$port/mcp")
+
+        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
+    }
+
+    @Test
+    fun `test GET with wrong Accept header returns 406 Not Acceptable`() = runBlocking {
+        // Per MCP spec, client MUST include Accept: text/event-stream
+        val response = client.get("http://localhost:$port/mcp") {
+            header(HttpHeaders.Accept, "application/json")
+        }
+
+        assertEquals(HttpStatusCode.NotAcceptable, response.status)
+    }
+
+    @Test
+    fun `test GET with wildcard Accept returns 405 Method Not Allowed`() = runBlocking {
+        // Wildcard Accept (*/*) should be accepted but return 405 (SSE not supported)
+        val response = client.get("http://localhost:$port/mcp") {
+            header(HttpHeaders.Accept, "*/*")
+        }
+
+        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
+    }
+
+    @Test
+    fun `test GET with combined Accept header returns 405 Method Not Allowed`() = runBlocking {
+        // MCP clients typically send: Accept: application/json, text/event-stream
+        val response = client.get("http://localhost:$port/mcp") {
+            header(HttpHeaders.Accept, "application/json, text/event-stream")
+        }
+
+        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
+    }
+
+    // ==================== Unknown Method Tests ====================
+
+    @Test
+    fun `test POST unknown method returns METHOD_NOT_FOUND error`() = runBlocking {
+        // First initialize to get session
+        val initRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val initResponse = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(initRequest.toString())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Call unknown method
+        val unknownRequest = """{"jsonrpc":"2.0","id":2,"method":"unknown/method"}"""
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(unknownRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val body = response.bodyAsText()
+        val jsonResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
+
+        assertNotNull("Should have error", jsonResponse.error)
+        assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, jsonResponse.error?.code)
+        assertTrue(
+            "Error message should mention method",
+            jsonResponse.error?.message?.contains("not found") == true
+        )
+    }
+
+    @Test
+    fun `test POST prompts list returns METHOD_NOT_FOUND`() = runBlocking {
+        val initRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val initResponse = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(initRequest.toString())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Call prompts/list which is not implemented
+        val promptsRequest = """{"jsonrpc":"2.0","id":2,"method":"prompts/list"}"""
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(promptsRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val body = response.bodyAsText()
+        val jsonResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
+
+        assertNotNull("Should have error for unimplemented method", jsonResponse.error)
+        assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, jsonResponse.error?.code)
+    }
+
+    @Test
+    fun `test POST resources list returns METHOD_NOT_FOUND`() = runBlocking {
+        val initRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val initResponse = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(initRequest.toString())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Call resources/list which is not implemented
+        val resourcesRequest = """{"jsonrpc":"2.0","id":2,"method":"resources/list"}"""
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(resourcesRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val body = response.bodyAsText()
+        val jsonResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
+
+        assertNotNull("Should have error for unimplemented method", jsonResponse.error)
+        assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, jsonResponse.error?.code)
+    }
+
+    @Test
+    fun `test POST tools call with unknown tool returns error in result`() = runBlocking {
+        val initRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val initResponse = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(initRequest.toString())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Call unknown tool
+        val callRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 2)
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "unknown_tool_that_does_not_exist")
+            }
+        }
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(callRequest.toString())
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val body = response.bodyAsText()
+        val jsonResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
+
+        // tools/call returns result with isError=true, not a JSON-RPC error
+        assertNull("Should not have JSON-RPC error", jsonResponse.error)
+        assertNotNull("Should have result", jsonResponse.result)
+
+        val result = McpJson.decodeFromJsonElement<ToolCallResult>(jsonResponse.result!!)
+        assertTrue("Should be marked as error", result.isError)
+        assertTrue(
+            "Error content should mention tool not found",
+            (result.content[0] as ContentItem.Text).text.contains("not found")
+        )
+    }
+
+    @Test
+    fun `test POST malformed JSON returns PARSE_ERROR`() = runBlocking {
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody("{ invalid json }")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val body = response.bodyAsText()
+        val jsonResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
+
+        assertNotNull("Should have error", jsonResponse.error)
+        assertEquals(JsonRpcErrorCodes.PARSE_ERROR, jsonResponse.error?.code)
+    }
+
+    @Test
+    fun `test POST missing method returns INVALID_REQUEST`() = runBlocking {
+        val initRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val initResponse = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(initRequest.toString())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Request without method field
+        val invalidRequest = """{"jsonrpc":"2.0","id":2}"""
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(invalidRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val body = response.bodyAsText()
+        val jsonResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
+
+        assertNotNull("Should have error", jsonResponse.error)
+        assertEquals(JsonRpcErrorCodes.INVALID_REQUEST, jsonResponse.error?.code)
+    }
+
+    @Test
+    fun `test POST batch with unknown methods returns errors for each`() = runBlocking {
+        val initRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val initResponse = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(initRequest.toString())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Batch with known and unknown methods
+        val batchRequest = """[
+            {"jsonrpc":"2.0","id":1,"method":"ping"},
+            {"jsonrpc":"2.0","id":2,"method":"unknown/method1"},
+            {"jsonrpc":"2.0","id":3,"method":"tools/list"},
+            {"jsonrpc":"2.0","id":4,"method":"unknown/method2"}
+        ]"""
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(batchRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        val body = response.bodyAsText()
+        val responses = McpJson.decodeFromString<JsonArray>(body)
+        assertEquals(4, responses.size)
+
+        // Check that unknown methods return errors
+        val response1 = McpJson.decodeFromJsonElement<JsonRpcResponse>(responses[0])
+        val response2 = McpJson.decodeFromJsonElement<JsonRpcResponse>(responses[1])
+        val response3 = McpJson.decodeFromJsonElement<JsonRpcResponse>(responses[2])
+        val response4 = McpJson.decodeFromJsonElement<JsonRpcResponse>(responses[3])
+
+        assertNull("ping should succeed", response1.error)
+        assertNotNull("unknown/method1 should fail", response2.error)
+        assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, response2.error?.code)
+        assertNull("tools/list should succeed", response3.error)
+        assertNotNull("unknown/method2 should fail", response4.error)
+        assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, response4.error?.code)
+    }
+
+    // ==================== Header Validation Tests ====================
+
+    @Test
+    fun `test POST without Content-Type returns UnsupportedMediaType`() = runBlocking {
+        val request = """{"jsonrpc":"2.0","id":1,"method":"initialize"}"""
+
+        val response = client.post("http://localhost:$port/mcp") {
+            accept(ContentType.Application.Json)
+            setBody(request)
+        }
+
+        assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
+    }
+
+    @Test
+    fun `test POST with wrong Content-Type returns UnsupportedMediaType`() = runBlocking {
+        val request = """{"jsonrpc":"2.0","id":1,"method":"initialize"}"""
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Text.Plain)
+            accept(ContentType.Application.Json)
+            setBody(request)
+        }
+
+        assertEquals(HttpStatusCode.UnsupportedMediaType, response.status)
+    }
+
+    @Test
+    fun `test POST with Accept header not including json returns NotAcceptable`() = runBlocking {
+        val request = """{"jsonrpc":"2.0","id":1,"method":"initialize"}"""
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Accept, "text/html")
+            setBody(request)
+        }
+
+        assertEquals(HttpStatusCode.NotAcceptable, response.status)
+    }
+
+    @Test
+    fun `test POST with Accept wildcard succeeds`() = runBlocking {
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Accept, "*/*")
+            setBody(request.toString())
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    @Test
+    fun `test POST with Accept application wildcard succeeds`() = runBlocking {
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Accept, "application/*")
+            setBody(request.toString())
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    @Test
+    fun `test POST with combined Accept header succeeds`() = runBlocking {
+        // MCP clients typically send: Accept: application/json, text/event-stream
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            header(HttpHeaders.Accept, "application/json, text/event-stream")
+            setBody(request.toString())
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    @Test
+    fun `test POST without Accept header succeeds`() = runBlocking {
+        // Accept header is optional - if not provided, we assume the client accepts any response
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            // No Accept header
+            setBody(request.toString())
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
     }
 }

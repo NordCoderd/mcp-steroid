@@ -65,7 +65,8 @@ class SteroidsMcpServer(
         val actualPort = if (configuredPort == 0) findFreePort() else configuredPort
 
         try {
-            val server = scope.embeddedServer(CIO, host = "0.0.0.0", port = actualPort) {
+            // Bind to localhost only per MCP security requirements
+            val server = scope.embeddedServer(CIO, host = "127.0.0.1", port = actualPort) {
                 install(SSE)
                 routing {
                     with(McpHttpTransport) {
