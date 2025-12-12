@@ -8,14 +8,20 @@ import java.io.File
  * This provides complete isolation from the local system, preventing
  * MCP server registrations from affecting the local Claude config.
  *
- * The API key is read from ~/.anthropic mounted into the container.
+ * The API key is read from ~/.anthropic file.
  */
-class DockerClaudeSession(
+class DockerClaudeSession private constructor(
     containerId: String,
     workDir: File,
+    private val apiKey: String
 ) : DockerSession(containerId, workDir) {
 
     override val logPrefix = "DOCKER-CLAUDE"
+
+    init {
+        // Register API key for filtering in logs
+        processRunner.addSecretFilter(apiKey)
+    }
 
     /**
      * Run a claude command inside the Docker container.
@@ -33,11 +39,69 @@ class DockerClaudeSession(
             claudeArgs,
             timeoutSeconds,
             enableDebugEnv = true,
-            extraEnvVars = mapOf("CLAUDE_CODE_DEBUG" to "1", "ANTHROPIC_API_KEY" to File(System.getenv("HOME"), ".anthropic").readText().trim())
+            extraEnvVars = mapOf(
+                "CLAUDE_CODE_DEBUG" to "1",
+                "ANTHROPIC_API_KEY" to apiKey
+            )
         )
     }
 
+    /**
+     * Run claude in non-interactive mode with a prompt.
+     */
+    fun runPrompt(prompt: String, timeoutSeconds: Long = 120): ProcessResult {
+        val claudeArgs = listOf(
+            "claude",
+            "--debug",
+            "--mcp-debug",
+            "--verbose",
+            "-p", prompt
+        )
+        return runInContainer(
+            claudeArgs,
+            timeoutSeconds,
+            enableDebugEnv = true,
+            extraEnvVars = mapOf(
+                "CLAUDE_CODE_DEBUG" to "1",
+                "ANTHROPIC_API_KEY" to apiKey
+            )
+        )
+    }
+
+    /**
+     * Configure MCP server in .mcp.json
+     */
+    fun configureMcpServer(serverName: String, serverUrl: String): ProcessResult {
+        val mcpConfig = """
+{
+    "mcpServers": {
+        "$serverName": {
+            "url": "$serverUrl"
+        }
+    }
+}
+""".trim()
+        val script = """
+set -e
+mkdir -p ~/work
+cat > ~/work/.mcp.json <<'EOF'
+$mcpConfig
+EOF
+""".trimIndent()
+        return runRaw("bash", "-c", script)
+    }
+
     companion object {
+        private fun readAnthropicApiKey(): String {
+            System.getenv("ANTHROPIC_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
+            val keyFile = File(System.getProperty("user.home"), ".anthropic")
+            if (keyFile.exists()) {
+                val content = keyFile.readText().trim()
+                if (content.isNotBlank()) return content
+            }
+            error("ANTHROPIC_API_KEY is required for Claude CLI tests (set env or ~/.anthropic)")
+        }
+
         fun create(): DockerClaudeSession {
             val tempDir = createTempDirectory("claude-test")
             println("[DOCKER-CLAUDE] Creating new session in temp dir: $tempDir")
@@ -46,8 +110,10 @@ class DockerClaudeSession(
 
             val containerId = startContainer("claude-cli-test:latest", tempDir, "DOCKER-CLAUDE")
 
+            val apiKey = readAnthropicApiKey()
+
             println("[DOCKER-CLAUDE] Session created in container: $containerId")
-            return DockerClaudeSession(containerId, tempDir)
+            return DockerClaudeSession(containerId, tempDir, apiKey)
         }
     }
 }

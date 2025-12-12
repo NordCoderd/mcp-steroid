@@ -17,6 +17,9 @@ abstract class DockerSession(
     /** Name used for logging */
     protected abstract val logPrefix: String
 
+    /** Process runner with secret filtering. Subclasses can add secrets via addSecretFilter() */
+    protected val processRunner = ProcessRunner()
+
     /**
      * Run an arbitrary command inside the Docker container.
      */
@@ -58,7 +61,7 @@ abstract class DockerSession(
             add(shellCommand)
         }
 
-        return ProcessRunner.run(
+        return processRunner.run(
             command,
             description = "In container: ${args.joinToString(" ")}",
             workingDir = workDir,

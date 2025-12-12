@@ -16,10 +16,37 @@ data class ProcessResult(
 /**
  * Utility for running processes with consistent logging.
  * All output is logged to stdout with prefixes for easy debugging.
+ * Supports filtering secrets from log output.
  */
-object ProcessRunner {
+class ProcessRunner {
+    private val secretPatterns = mutableListOf<String>()
+
+    /**
+     * Add a secret pattern that should be filtered from log output.
+     * The secret will be replaced with [REDACTED] in all logged output.
+     */
+    fun addSecretFilter(secret: String) {
+        if (secret.isNotBlank()) {
+            secretPatterns.add(secret)
+        }
+    }
+
+    /**
+     * Filter secrets from text, replacing them with [REDACTED].
+     */
+    private fun filterSecrets(text: String): String {
+        var result = text
+        for (pattern in secretPatterns) {
+            if (pattern.isNotBlank()) {
+                result = result.replace(pattern, "[REDACTED]")
+            }
+        }
+        return result
+    }
+
     /**
      * Run a process and log all output with prefixes.
+     * Secrets are filtered from log output but preserved in returned ProcessResult.
      *
      * @param command The command to run as a list of arguments
      * @param description A short description of what this command does (for logging)
@@ -34,7 +61,10 @@ object ProcessRunner {
         timeoutSeconds: Long = 30,
         logPrefix: String = "PROCESS"
     ): ProcessResult {
-        println("[$logPrefix] $description: ${command.joinToString(" ")}")
+        // Filter secrets from command line and description for logging
+        val filteredCommand = command.map { filterSecrets(it) }
+        val filteredDescription = filterSecrets(description)
+        println("[$logPrefix] $filteredDescription: ${filteredCommand.joinToString(" ")}")
 
         val processBuilder = ProcessBuilder(command)
         processBuilder.directory(workingDir)
@@ -50,13 +80,13 @@ object ProcessRunner {
 
         val outputThread = Thread {
             process.inputStream.reader().forEachLine { line ->
-                println("[$logPrefix OUT] $line")
+                println("[$logPrefix OUT] ${filterSecrets(line)}")
                 outputBuilder.appendLine(line)
             }
         }
         val errorThread = Thread {
             process.errorStream.reader().forEachLine { line ->
-                println("[$logPrefix ERR] $line")
+                println("[$logPrefix ERR] ${filterSecrets(line)}")
                 errorBuilder.appendLine(line)
             }
         }
@@ -79,5 +109,24 @@ object ProcessRunner {
         println("[$logPrefix] Exit code: $exitCode")
 
         return ProcessResult(exitCode, outputBuilder.toString(), errorBuilder.toString())
+    }
+
+    companion object {
+        /**
+         * Default instance without any secret filtering.
+         * For backwards compatibility with existing code.
+         */
+        private val defaultInstance = ProcessRunner()
+
+        /**
+         * Run a process using the default instance (no secret filtering).
+         */
+        fun run(
+            command: List<String>,
+            description: String,
+            workingDir: File,
+            timeoutSeconds: Long = 30,
+            logPrefix: String = "PROCESS"
+        ): ProcessResult = defaultInstance.run(command, description, workingDir, timeoutSeconds, logPrefix)
     }
 }

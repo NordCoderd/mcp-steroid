@@ -10,13 +10,18 @@ import java.io.File
  *
  * The API key is read from ~/.openai mounted into the container.
  */
-class DockerCodexSession(
+class DockerCodexSession private constructor(
     containerId: String,
     workDir: File,
+    private val apiKey: String
 ) : DockerSession(containerId, workDir) {
 
     override val logPrefix = "DOCKER-CODEX"
-    private val apiKey: String = readOpenAiApiKey()
+
+    init {
+        // Register API key for filtering in logs
+        processRunner.addSecretFilter(apiKey)
+    }
 
     /**
      * Run a codex command inside the Docker container.
@@ -109,8 +114,10 @@ EOF
             )
             val containerId = startContainer("codex-cli-test:latest", tempDir, "DOCKER-CODEX")
 
+            val apiKey = readOpenAiApiKey()
+
             println("[DOCKER-CODEX] Session created in container: $containerId")
-            return DockerCodexSession(containerId, tempDir)
+            return DockerCodexSession(containerId, tempDir, apiKey)
         }
     }
 }
