@@ -127,14 +127,16 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
             ?: error("OPENAI_API_KEY not found")
 
         // Use max_completion_tokens for o-series models, max_tokens for others
+        // o-series models require higher token counts due to their reasoning capabilities
         val maxTokensParam = if (model.startsWith("o")) "max_completion_tokens" else "max_tokens"
+        val maxTokensValue = if (model.startsWith("o")) 1000 else 50
 
         // Test the chat completions endpoint which is what Codex uses
         val result = session.runRaw(
             "curl", "-s", "-w", "\n%{http_code}",
             "-H", "Authorization: Bearer $apiKey",
             "-H", "Content-Type: application/json",
-            "-d", """{"model":"$model","messages":[{"role":"user","content":"hi"}],"$maxTokensParam":50}""",
+            "-d", """{"model":"$model","messages":[{"role":"user","content":"hi"}],"$maxTokensParam":$maxTokensValue}""",
             "https://api.openai.com/v1/chat/completions"
         )
         val lines = result.output.trim().lines()

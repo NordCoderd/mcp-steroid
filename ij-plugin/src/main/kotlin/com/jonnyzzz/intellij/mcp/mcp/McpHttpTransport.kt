@@ -15,6 +15,7 @@ import io.ktor.server.routing.*
  * The transport supports:
  * - POST requests for sending messages (requests and notifications)
  * - GET requests for establishing SSE streams for server-to-client notifications
+ * - OPTIONS requests for CORS preflight
  * - Session management via Mcp-Session-Id header
  *
  * Header requirements per MCP spec:
@@ -34,8 +35,14 @@ object McpHttpTransport {
      */
     fun Route.installMcp(path: String, server: McpServerCore) {
         route(path) {
+            // OPTIONS - CORS preflight
+            options {
+                handleOptions(call)
+            }
+
             // POST - Handle incoming messages (requests and notifications)
             post {
+                addCorsHeaders(call)
                 handlePost(call, server)
             }
 
@@ -44,16 +51,38 @@ object McpHttpTransport {
             // - Client MUST include Accept header with text/event-stream
             // - Server MUST return Content-Type: text/event-stream OR HTTP 405 Method Not Allowed
             get {
+                addCorsHeaders(call)
                 handleGet(call)
             }
 
             // DELETE - Terminate session
             delete {
+                addCorsHeaders(call)
                 val remoteHost = call.request.local.remoteHost
                 log.info("[MCP] DELETE request from $remoteHost")
                 handleDelete(call, server)
             }
         }
+    }
+
+    /**
+     * Handle OPTIONS preflight requests for CORS.
+     */
+    private suspend fun handleOptions(call: ApplicationCall) {
+        val remoteHost = call.request.local.remoteHost
+        log.info("[MCP] OPTIONS request from $remoteHost - returning CORS headers")
+        addCorsHeaders(call)
+        call.respond(HttpStatusCode.NoContent)
+    }
+
+    /**
+     * Add CORS headers to allow cross-origin requests from Claude CLI and other tools.
+     */
+    private fun addCorsHeaders(call: ApplicationCall) {
+        call.response.header("Access-Control-Allow-Origin", "*")
+        call.response.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        call.response.header("Access-Control-Allow-Headers", "Content-Type, Accept, $SESSION_HEADER")
+        call.response.header("Access-Control-Expose-Headers", SESSION_HEADER)
     }
 
     private suspend fun handlePost(call: ApplicationCall, server: McpServerCore) {
@@ -132,28 +161,34 @@ object McpHttpTransport {
     }
 
     /**
-     * Handle GET requests for SSE streams.
-     * Per MCP spec:
-     * - Client MUST include Accept header with text/event-stream
+     * Handle GET requests.
+     *
+     * For SSE streams (Accept: text/event-stream), per MCP spec:
      * - Server MUST return Content-Type: text/event-stream OR HTTP 405 Method Not Allowed
+     *
+     * For availability checks (Accept: wildcard or application/json):
+     * - Return server info to indicate the server is available
      */
     private suspend fun handleGet(call: ApplicationCall) {
         val remoteHost = call.request.local.remoteHost
         val userAgent = call.request.userAgent() ?: "unknown"
         log.info("[MCP] GET request from $remoteHost (User-Agent: $userAgent)")
 
-        // Validate Accept header per MCP spec
-        // Client MUST include Accept header with text/event-stream
         val acceptHeader = call.request.accept()
-        if (acceptHeader == null || !acceptsSse(acceptHeader)) {
-            log.warn("[MCP] Rejecting GET request: Accept header '${acceptHeader ?: "missing"}' doesn't include text/event-stream")
-            call.respond(HttpStatusCode.NotAcceptable, "Accept header must include text/event-stream")
+
+        // If client explicitly requests SSE, return 405 (we don't support it)
+        if (acceptHeader != null && acceptsSse(acceptHeader) && !acceptHeader.contains("*/*")) {
+            log.info("[MCP] GET request from $remoteHost - returning 405 (SSE not supported)")
+            call.respond(HttpStatusCode.MethodNotAllowed, "SSE notifications not supported")
             return
         }
 
-        // We don't support SSE notifications, return 405 per MCP spec
-        log.info("[MCP] GET request from $remoteHost - returning 405 (SSE not supported)")
-        call.respond(HttpStatusCode.MethodNotAllowed, "SSE notifications not supported")
+        // For other GET requests (availability checks), return server info
+        log.info("[MCP] GET request from $remoteHost - returning server info")
+        call.respondText(
+            """{"name":"intellij-mcp-steroid","version":"1.0.0","status":"available"}""",
+            ContentType.Application.Json
+        )
     }
 
     /**

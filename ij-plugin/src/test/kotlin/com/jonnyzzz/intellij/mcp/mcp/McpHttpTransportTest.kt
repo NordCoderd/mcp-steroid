@@ -422,33 +422,36 @@ class McpHttpTransportTest {
     }
 
     @Test
-    fun `test GET without Accept header returns 405 Method Not Allowed`() = runBlocking {
+    fun `test GET without Accept header returns server info`() = runBlocking {
         // When no Accept header is provided, HTTP default is */* (accept anything)
         // Ktor client adds Accept: */* by default
-        // Since */* includes text/event-stream, server returns 405 (SSE not supported)
+        // Server returns server info for availability checks
         val response = client.get("http://localhost:$port/mcp")
 
-        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("intellij-mcp-steroid"))
     }
 
     @Test
-    fun `test GET with wrong Accept header returns 406 Not Acceptable`() = runBlocking {
-        // Per MCP spec, client MUST include Accept: text/event-stream
+    fun `test GET with application json Accept header returns server info`() = runBlocking {
+        // GET with Accept: application/json returns server info for availability checks
         val response = client.get("http://localhost:$port/mcp") {
             header(HttpHeaders.Accept, "application/json")
         }
 
-        assertEquals(HttpStatusCode.NotAcceptable, response.status)
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("intellij-mcp-steroid"))
     }
 
     @Test
-    fun `test GET with wildcard Accept returns 405 Method Not Allowed`() = runBlocking {
-        // Wildcard Accept (*/*) should be accepted but return 405 (SSE not supported)
+    fun `test GET with wildcard Accept returns server info`() = runBlocking {
+        // Wildcard Accept (*/*) returns server info for availability checks
         val response = client.get("http://localhost:$port/mcp") {
             header(HttpHeaders.Accept, "*/*")
         }
 
-        assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(response.bodyAsText().contains("intellij-mcp-steroid"))
     }
 
     @Test

@@ -4,6 +4,9 @@ package com.jonnyzzz.intellij.mcp
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertTrue
+import org.junit.Assume.assumeTrue
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -24,7 +27,28 @@ import kotlin.time.Duration.Companion.seconds
  */
 class ClaudeCliIntegrationTest : BasePlatformTestCase() {
 
-    fun resolveDockerUrl(): String {
+    override fun setUp() {
+        super.setUp()
+        // Bind MCP server to 0.0.0.0 so Docker containers can reach it via host.docker.internal
+        setRegistryPropertyForTest("mcp.steroids.server.host", "0.0.0.0")
+        // Use dynamic port to avoid conflicts
+        setRegistryPropertyForTest("mcp.steroids.server.port", "0")
+        // Disable review mode for tests
+        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
+    }
+
+    private fun assumeDockerAvailable() {
+        val result = ProcessRunner.run(
+            listOf("docker", "ps"),
+            description = "Check docker availability",
+            workingDir = java.io.File("."),
+            timeoutSeconds = 10,
+            logPrefix = "DOCKER-CHECK"
+        )
+        assumeTrue("Docker is not available (exit code ${result.exitCode})", result.exitCode == 0)
+    }
+
+    private fun resolveDockerUrl(): String {
         // Docker on macOS runs in a VM, so localhost inside container != host's localhost
         // Use host.docker.internal to access the host from inside Docker
         val mcpUrl = McpTestUtil.getSseUrlIfRunning()
@@ -34,7 +58,11 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         return dockerUrl
     }
 
+    /**
+     * Tests that the MCP server endpoint is reachable from Docker container via curl.
+     */
     fun testHostAvailability(): Unit = timeoutRunBlocking(180.seconds) {
+        assumeDockerAvailable()
         val session = claudeSession()
 
         val curlResult = session.runRaw(
@@ -48,16 +76,13 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
             "Accept: application/json",
             "-d",
             """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
-
             resolveDockerUrl()
         )
         println("[TEST] Curl MCP endpoint result: exit=${curlResult.exitCode}")
         println("[TEST] Curl output: ${curlResult.output}")
         println("[TEST] Curl stderr: ${curlResult.stderr}")
-        assertTrue(
-            "Curl should succeed (got exit code ${curlResult.exitCode}). stderr: ${curlResult.stderr}",
-            curlResult.exitCode == 0
-        )
+
+        assertEquals("Curl should succeed. stderr: ${curlResult.stderr}", 0, curlResult.exitCode)
         assertTrue(
             "MCP response should contain jsonrpc. Output: ${curlResult.output}",
             curlResult.output.contains("jsonrpc")
@@ -69,12 +94,26 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
+     * Tests that Claude CLI is properly installed in the Docker container.
+     */
+    fun testClaudeInstalled(): Unit = timeoutRunBlocking(180.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        val versionResult = session.run("--version")
+        println("[TEST] Claude version result: exit=${versionResult.exitCode}")
+        println("[TEST] Claude version output: ${versionResult.output}")
+        println("[TEST] Claude version stderr: ${versionResult.stderr}")
+
+        assertEquals("Claude --version should succeed", 0, versionResult.exitCode)
+    }
+
+    /**
      * Tests that MCP server can be registered and listed via Claude CLI.
      * Uses Docker to run Claude CLI in isolation.
-     * This test does NOT require ANTHROPIC_API_KEY since it only uses
-     * the `mcp` subcommands which don't need API access.
      */
     fun testMcpServerRegistration(): Unit = timeoutRunBlocking(180.seconds) {
+        assumeDockerAvailable()
         val session = claudeSession()
 
         val dockerMcpUrl = resolveDockerUrl()
@@ -90,7 +129,7 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         println("[TEST] MCP add result: exit=${addResult.exitCode}")
         assertEquals("MCP add should succeed", 0, addResult.exitCode)
 
-        // Step 3: Check .mcp.json file was created with correct content
+        // Check .mcp.json file was created with correct content
         val catResult = session.runRaw("cat", ".mcp.json")
         println("[TEST] .mcp.json content: ${catResult.output}")
         assertTrue(
@@ -101,7 +140,6 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
             ".mcp.json should contain URL. Output: ${catResult.output}",
             catResult.output.contains("host.docker.internal")
         )
-
 
         // Verify server is registered via `mcp get`
         val getResult = session.run("mcp", "get", "intellij-steroid-test")
@@ -118,31 +156,58 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
             "MCP get should show correct URL. Output: ${getResult.output}",
             getResult.output.contains("host.docker.internal")
         )
+    }
 
-        // Note: Claude CLI's "mcp get" shows "Failed to connect" status due to a known bug
-        // in Claude Code's health checker (https://github.com/anthropics/claude-code/issues/7404).
-        // The actual MCP connection works - this is just a display issue.
-        // The testHostAvailability test verifies actual connectivity via curl.
-        if (getResult.output.contains("Failed to connect")) {
-            println("[TEST] WARNING: Claude CLI reports 'Failed to connect' - this is a known display bug")
-            println("[TEST] The actual MCP connection works (verified by testHostAvailability)")
-        }
+    private fun assertAnthropicApiKeyValid(session: DockerClaudeSession) {
+        // Test API key with curl to Anthropic API
+        val apiKey = System.getenv("ANTHROPIC_API_KEY")
+            ?: java.io.File(System.getProperty("user.home"), ".anthropic").takeIf { it.exists() }?.readText()?.trim()
+            ?: error("ANTHROPIC_API_KEY not found")
+
+        // Test the messages endpoint
+        val result = session.runRaw(
+            "curl", "-s", "-w", "\n%{http_code}",
+            "-H", "x-api-key: $apiKey",
+            "-H", "anthropic-version: 2023-06-01",
+            "-H", "Content-Type: application/json",
+            "-d", """{"model":"claude-3-haiku-20240307","max_tokens":10,"messages":[{"role":"user","content":"hi"}]}""",
+            "https://api.anthropic.com/v1/messages"
+        )
+        val lines = result.output.trim().lines()
+        val httpStatus = lines.lastOrNull()?.trim() ?: "unknown"
+        val responseBody = lines.dropLast(1).joinToString("\n")
+
+        println("[TEST] Anthropic API key validation - HTTP status: $httpStatus")
+        println("[TEST] Anthropic API key validation - response: $responseBody")
+        println("[TEST] Anthropic API key validation - stderr: ${result.stderr}")
+
+        assertEquals(
+            "Anthropic API key is invalid (got HTTP $httpStatus). Response: $responseBody",
+            "200",
+            httpStatus
+        )
     }
 
     /**
-     * Tests that Claude Code can discover our steroid_ tools.
-     * Uses Docker to run Claude CLI in isolation.
+     * Tests MCP server connection verification via claude mcp get.
      *
-     * Note: This test requires ANTHROPIC_API_KEY and may fail due to:
-     * - Claude Code's health checker bug (https://github.com/anthropics/claude-code/issues/7404)
-     * - --print mode may not properly connect to MCP servers
+     * Note: Claude CLI print mode (-p) does NOT support MCP tools.
+     * This is a known limitation - see https://github.com/anthropics/claude-code/issues/610
      *
-     * This test is marked as "may fail" since it depends on Claude Code behavior.
+     * This test verifies:
+     * - MCP server can be registered
+     * - MCP server URL is stored correctly
+     * - Server connectivity status is reported
      */
-    fun testClaudeCodeDiscoversSteroidTools(): Unit = timeoutRunBlocking(180.seconds) {
+    fun testMcpServerConnectivity(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        // Verify API key works
+        assertAnthropicApiKeyValid(session)
+
         val dockerMcpUrl = resolveDockerUrl()
 
-        val session = claudeSession()
         // Register the MCP server
         val addResult = session.run(
             "mcp", "add",
@@ -152,48 +217,42 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
             dockerMcpUrl
         )
         println("[TEST] MCP add result: exit=${addResult.exitCode}")
+        assertEquals("Failed to add MCP server: ${addResult.stderr}", 0, addResult.exitCode)
 
-        if (addResult.exitCode != 0) {
-            println("[TEST] Failed to add MCP server: ${addResult.stderr}")
-            fail("Failed to add MCP server")
-            return@timeoutRunBlocking
-        }
-
-        // Run Claude to discover tools
-        val result = session.run(
-            "--print",
-            """
-                You are testing an MCP server integration.
-
-                1. List all available MCP tools that start with "steroid_"
-                2. For each tool, print its name and a one-line description
-                3. Call steroid_list_projects and print the result
-
-                Be concise. Output format:
-                TOOLS_FOUND: [number]
-                TOOL: [name] - [description]
-                PROJECTS: [result]
-                """.trimIndent()
-        )
-
-        println("[TEST] Claude response: ${result.output}")
-        println("[TEST] Claude stderr: ${result.stderr}")
-
-        // Check if Claude discovered tools
-        // Note: Due to Claude Code bug #7404, MCP tools may not be visible to Claude
-        // even though the server is working correctly. This is a known limitation.
-        if (result.output.contains("TOOLS_FOUND: 0") || !result.output.contains("steroid_")) {
-            println("[TEST] WARNING: Claude Code did not discover steroid_ tools.")
-            println("[TEST] This is likely due to Claude Code health checker bug #7404")
-            println("[TEST] The MCP server works correctly (verified by testHostAvailability)")
-            // Don't fail the test - this is a known Claude Code limitation
-            return@timeoutRunBlocking
-        }
-
+        // Verify the config file
+        val catResult = session.runRaw("cat", ".mcp.json")
+        println("[TEST] .mcp.json content:\n${catResult.output}")
         assertTrue(
-            "Claude should find steroid_ tools. Output: ${result.output}",
-            result.output.contains("steroid_") || result.output.contains("TOOLS_FOUND")
+            ".mcp.json should contain type http. Output: ${catResult.output}",
+            catResult.output.contains("\"type\": \"http\"")
         )
+
+        // Check server status via mcp get
+        val getResult = session.run("mcp", "get", "intellij-steroid-test")
+        println("[TEST] MCP get result: exit=${getResult.exitCode}")
+        println("[TEST] MCP get output:\n${getResult.output}")
+        println("[TEST] MCP get stderr:\n${getResult.stderr}")
+
+        assertEquals("MCP get should succeed", 0, getResult.exitCode)
+
+        // Verify server info is correct
+        val output = getResult.output
+        assertTrue(
+            "MCP get should show server name. Output: $output",
+            output.contains("intellij-steroid-test")
+        )
+        assertTrue(
+            "MCP get should show http transport type. Output: $output",
+            output.contains("http")
+        )
+        assertTrue(
+            "MCP get should show URL. Output: $output",
+            output.contains("host.docker.internal")
+        )
+
+        // Note: We don't test actual MCP tool calls because Claude CLI print mode (-p)
+        // does not support MCP tools. See https://github.com/anthropics/claude-code/issues/610
+        // For interactive mode testing, manual testing is required.
     }
 
     private fun claudeSession(): DockerClaudeSession {
@@ -202,4 +261,3 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         return session
     }
 }
-
