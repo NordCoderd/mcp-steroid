@@ -615,6 +615,172 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         println("[TEST] MCP mentioned in stderr: $mcpConnected")
     }
 
+    /**
+     * Tests that the exact command-line instructions from mcp-steroids.txt work correctly.
+     * This verifies the documented workflow:
+     *   claude mcp add --transport http intellij-steroid <URL>
+     *   claude mcp list
+     *   claude mcp remove intellij-steroid
+     *
+     * This test ensures the README and mcp-steroids.txt instructions are accurate.
+     */
+    fun testDocumentedCommandLineInstructions(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        val dockerMcpUrl = resolveDockerUrl()
+
+        // ============================================================================
+        // Step 1: Add server using the EXACT documented command format
+        // From README: claude mcp add --transport http intellij-steroid <URL>
+        // ============================================================================
+        println("[TEST] Step 1: Adding MCP server using documented command...")
+        val addResult = session.run(
+            "mcp", "add",
+            "--transport", "http",
+            "intellij-steroid",  // Use the exact name from documentation
+            dockerMcpUrl
+        )
+        println("[TEST] Add result: exit=${addResult.exitCode}")
+        println("[TEST] Add stdout: ${addResult.output}")
+        println("[TEST] Add stderr: ${addResult.stderr}")
+
+        assertEquals(
+            "claude mcp add should succeed. Output: ${addResult.output}\nStderr: ${addResult.stderr}",
+            0,
+            addResult.exitCode
+        )
+        assertTrue(
+            "Add command should confirm server was added. Output: ${addResult.output}",
+            addResult.output.contains("intellij-steroid") || addResult.output.contains("Added")
+        )
+
+        // ============================================================================
+        // Step 2: List servers and verify connection using documented command
+        // From README: claude mcp list
+        // Expected: intellij-steroid: <URL> (HTTP) - ✓ Connected
+        // ============================================================================
+        println("[TEST] Step 2: Listing MCP servers...")
+        val listResult = session.listMcpServers(timeoutSeconds = 30)
+        println("[TEST] List result: exit=${listResult.exitCode}")
+        println("[TEST] List stdout:\n${listResult.output}")
+        println("[TEST] List stderr:\n${listResult.stderr}")
+
+        assertEquals(
+            "claude mcp list should succeed. Stderr: ${listResult.stderr}",
+            0,
+            listResult.exitCode
+        )
+        assertTrue(
+            "Server 'intellij-steroid' should be listed. Output: ${listResult.output}",
+            listResult.output.contains("intellij-steroid")
+        )
+        assertTrue(
+            "Server should show as Connected (✓). Output: ${listResult.output}",
+            listResult.output.contains("✓") || listResult.output.contains("Connected")
+        )
+        assertFalse(
+            "Server should NOT show as Failed. Output: ${listResult.output}",
+            listResult.output.contains("✗") || listResult.output.contains("Failed")
+        )
+
+        // ============================================================================
+        // Step 3: Remove server using documented command
+        // From README: claude mcp remove intellij-steroid
+        // ============================================================================
+        println("[TEST] Step 3: Removing MCP server...")
+        val removeResult = session.run("mcp", "remove", "intellij-steroid")
+        println("[TEST] Remove result: exit=${removeResult.exitCode}")
+        println("[TEST] Remove stdout: ${removeResult.output}")
+        println("[TEST] Remove stderr: ${removeResult.stderr}")
+
+        assertEquals(
+            "claude mcp remove should succeed. Output: ${removeResult.output}\nStderr: ${removeResult.stderr}",
+            0,
+            removeResult.exitCode
+        )
+
+        // ============================================================================
+        // Step 4: Verify server is removed
+        // ============================================================================
+        println("[TEST] Step 4: Verifying server was removed...")
+        val listAfterRemove = session.listMcpServers(timeoutSeconds = 30)
+        println("[TEST] List after remove: ${listAfterRemove.output}")
+
+        assertFalse(
+            "Server 'intellij-steroid' should NOT be listed after removal. Output: ${listAfterRemove.output}",
+            listAfterRemove.output.contains("intellij-steroid")
+        )
+
+        println("[TEST] All documented command-line instructions work correctly!")
+    }
+
+    /**
+     * Tests the full workflow: add server, use tools, remove server.
+     * This is an end-to-end test of the documented user experience.
+     */
+    fun testFullDocumentedWorkflow(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        // Verify API key is valid before proceeding
+        assertAnthropicApiKeyValid(session)
+
+        val dockerMcpUrl = resolveDockerUrl()
+
+        // Step 1: Add server (documented command)
+        println("[TEST] Adding MCP server...")
+        val addResult = session.run(
+            "mcp", "add",
+            "--transport", "http",
+            "intellij-steroid",
+            dockerMcpUrl
+        )
+        assertEquals("MCP add should succeed", 0, addResult.exitCode)
+
+        // Step 2: Verify connected
+        println("[TEST] Verifying connection...")
+        val listResult = session.listMcpServers(timeoutSeconds = 30)
+        assertTrue(
+            "Server should be connected. Output: ${listResult.output}",
+            listResult.output.contains("✓") || listResult.output.contains("Connected")
+        )
+
+        // Step 3: Use the tools (documented usage)
+        // From README: claude -p "List all open projects using steroid_list_projects"
+        println("[TEST] Using steroid_list_projects tool...")
+        val promptResult = session.runPrompt(
+            "Call steroid_list_projects and output the raw JSON result prefixed with RESULT:",
+            timeoutSeconds = 120,
+            allowedTools = listOf("mcp__intellij-steroid__*"),
+            permissionMode = "bypassPermissions"
+        )
+        println("[TEST] Prompt result: exit=${promptResult.exitCode}")
+        println("[TEST] Prompt stdout:\n${promptResult.output}")
+        println("[TEST] Prompt stderr:\n${promptResult.stderr}")
+
+        assertEquals(
+            "Claude prompt should succeed. Stderr: ${promptResult.stderr}",
+            0,
+            promptResult.exitCode
+        )
+
+        // Check that we got actual project data, not an error
+        assertNoErrorsInOutput(promptResult.output, promptResult.stderr, "Tool call")
+
+        assertTrue(
+            "Output should contain RESULT with project data. Output: ${promptResult.output}",
+            promptResult.output.contains("RESULT:") || promptResult.output.contains("projects")
+        )
+
+        // Step 4: Clean up (documented command)
+        println("[TEST] Cleaning up - removing server...")
+        val removeResult = session.run("mcp", "remove", "intellij-steroid")
+        assertEquals("MCP remove should succeed", 0, removeResult.exitCode)
+
+        println("[TEST] Full documented workflow completed successfully!")
+    }
+
     private fun claudeSession(): DockerClaudeSession {
         val session = DockerClaudeSession.create()
         Disposer.register(testRootDisposable, session)

@@ -269,6 +269,93 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
         )
     }
 
+    /**
+     * Tests that the documented TOML config approach works correctly.
+     * This verifies the README and mcp-steroids.txt instructions are accurate.
+     *
+     * Codex CLI uses ~/.codex/config.toml for HTTP-based MCP servers:
+     *   [features]
+     *   rmcp_client = true
+     *
+     *   [mcp_servers.intellij-steroid]
+     *   url = "http://localhost:63150/mcp"
+     */
+    fun testDocumentedTomlConfiguration(): Unit = timeoutRunBlocking(180.seconds) {
+        assumeDockerAvailable()
+        val session = codexSession()
+
+        val dockerMcpUrl = resolveDockerUrl()
+
+        // ============================================================================
+        // Step 1: Create config using documented TOML format
+        // ============================================================================
+        println("[TEST] Step 1: Creating TOML config with documented format...")
+
+        // This mirrors the exact format from the README
+        val tomlConfig = """
+[features]
+rmcp_client = true
+
+[mcp_servers.intellij-steroid]
+url = "$dockerMcpUrl"
+""".trim()
+
+        val configScript = """
+mkdir -p ~/.codex
+cat > ~/.codex/config.toml << 'CONFIGEOF'
+$tomlConfig
+CONFIGEOF
+""".trimIndent()
+
+        val configResult = session.runRaw("bash", "-c", configScript)
+        println("[TEST] Config creation result: exit=${configResult.exitCode}")
+        println("[TEST] Config creation output: ${configResult.output}")
+        println("[TEST] Config creation stderr: ${configResult.stderr}")
+
+        assertEquals(
+            "Config creation should succeed. Stderr: ${configResult.stderr}",
+            0,
+            configResult.exitCode
+        )
+
+        // ============================================================================
+        // Step 2: Verify config file was created correctly
+        // ============================================================================
+        println("[TEST] Step 2: Verifying config file...")
+        val catResult = session.runRaw("cat", "/home/codex/.codex/config.toml")
+        println("[TEST] config.toml content:\n${catResult.output}")
+
+        assertTrue(
+            "Config should contain [features] section. Output: ${catResult.output}",
+            catResult.output.contains("[features]")
+        )
+        assertTrue(
+            "Config should enable rmcp_client. Output: ${catResult.output}",
+            catResult.output.contains("rmcp_client = true")
+        )
+        assertTrue(
+            "Config should contain [mcp_servers.intellij-steroid] section. Output: ${catResult.output}",
+            catResult.output.contains("[mcp_servers.intellij-steroid]")
+        )
+        assertTrue(
+            "Config should contain the URL. Output: ${catResult.output}",
+            catResult.output.contains(dockerMcpUrl)
+        )
+
+        // ============================================================================
+        // Step 3: Verify Codex can read the config (check help works)
+        // ============================================================================
+        println("[TEST] Step 3: Verifying Codex CLI works with config...")
+        val helpResult = session.run("--help")
+        assertEquals(
+            "Codex --help should succeed with config present. Stderr: ${helpResult.stderr}",
+            0,
+            helpResult.exitCode
+        )
+
+        println("[TEST] Documented TOML configuration works correctly!")
+    }
+
     private fun codexSession(): DockerCodexSession {
         val session = DockerCodexSession.create()
         Disposer.register(testRootDisposable, session)
