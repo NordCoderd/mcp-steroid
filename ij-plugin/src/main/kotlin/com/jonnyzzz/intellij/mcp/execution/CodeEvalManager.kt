@@ -51,8 +51,9 @@ class CodeEvalManager(
 
     private val log = thisLogger()
 
-    private fun wrapWithImports(code: String): String {
-        return """
+    private fun wrapWithImports(code: String): String = buildString {
+        appendLine(
+            """
             import com.intellij.openapi.project.*
             import com.intellij.openapi.application.*
             import com.intellij.openapi.application.readAction
@@ -63,8 +64,13 @@ class CodeEvalManager(
             import com.intellij.openapi.command.*
             import com.intellij.psi.*
             import kotlinx.coroutines.*
-
-        """.trimIndent() + code
+            """.trimIndent()
+        )
+        appendLine()
+        // Bridge the script binding to a strongly-typed function in the script scope
+        appendLine("val execute = bindings[\"execute\"] as (suspend com.jonnyzzz.intellij.mcp.execution.McpScriptContext.() -> Unit) -> Unit")
+        appendLine()
+        append(code)
     }
 
     fun evalCode(executionId: String, code: String): EvalResult {
@@ -93,8 +99,10 @@ class CodeEvalManager(
             }
             log.info("Script engine obtained for $executionId: ${engine.javaClass.name}")
 
-            // Set up bindings
-            engine.setBinding("execute", scope)
+            // Set up bindings (exposed to the script as a top-level `execute { }` function)
+            engine.setBinding("execute") { block: suspend McpScriptContext.() -> Unit ->
+                scope.execute(block)
+            }
 
             // Capture stdout/stderr
             engine.stdOut = engineWriter

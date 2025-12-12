@@ -4,6 +4,8 @@ package com.jonnyzzz.intellij.mcp
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import org.junit.Assume.assumeTrue
+import java.io.File
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -24,6 +26,32 @@ import kotlin.time.Duration.Companion.seconds
  */
 class CodexCliIntegrationTest : BasePlatformTestCase() {
 
+    override fun setUp() {
+        super.setUp()
+        // Bind MCP server to 0.0.0.0 so Docker containers can reach it via host.docker.internal
+        setRegistryPropertyForTest("mcp.steroids.server.host", "0.0.0.0")
+        // Use dynamic port to avoid conflicts
+        setRegistryPropertyForTest("mcp.steroids.server.port", "0")
+        // Disable review mode for tests
+        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
+    }
+
+    private fun assumeDockerAvailable() {
+        val result = try {
+            ProcessRunner.run(
+                listOf("docker", "ps"),
+                description = "Check docker availability",
+                workingDir = File("."),
+                timeoutSeconds = 15,
+                logPrefix = "DOCKER-CHECK"
+            )
+        } catch (e: Exception) {
+            assumeTrue("Docker is required for Codex CLI tests: ${e.message}", false)
+            return
+        }
+        assumeTrue("Docker is required for Codex CLI tests: ${result.stderr}", result.exitCode == 0)
+    }
+
     private fun resolveDockerUrl(): String {
         // Docker on macOS runs in a VM, so localhost inside container != host's localhost
         // Use host.docker.internal to access the host from inside Docker
@@ -39,6 +67,7 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
      * Uses curl to directly test HTTP connectivity.
      */
     fun testHostAvailability(): Unit = timeoutRunBlocking(180.seconds) {
+        assumeDockerAvailable()
         val session = codexSession()
 
         val curlResult = session.runRaw(
@@ -75,6 +104,7 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
      * Tests that Codex CLI is properly installed in the Docker container.
      */
     fun testCodexInstalled(): Unit = timeoutRunBlocking(180.seconds) {
+        assumeDockerAvailable()
         val session = codexSession()
 
         // Check codex version
@@ -90,11 +120,44 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
         )
     }
 
+    private fun assertOpenAiApiKeyValid(session: DockerCodexSession, model: String = "gpt-4o-mini") {
+        // Test API key with curl to OpenAI API - try chat completions endpoint
+        val apiKey = System.getenv("OPENAI_API_KEY")
+            ?: java.io.File(System.getProperty("user.home"), ".openai").takeIf { it.exists() }?.readText()?.trim()
+            ?: error("OPENAI_API_KEY not found")
+
+        // Use max_completion_tokens for o-series models, max_tokens for others
+        val maxTokensParam = if (model.startsWith("o")) "max_completion_tokens" else "max_tokens"
+
+        // Test the chat completions endpoint which is what Codex uses
+        val result = session.runRaw(
+            "curl", "-s", "-w", "\n%{http_code}",
+            "-H", "Authorization: Bearer $apiKey",
+            "-H", "Content-Type: application/json",
+            "-d", """{"model":"$model","messages":[{"role":"user","content":"hi"}],"$maxTokensParam":50}""",
+            "https://api.openai.com/v1/chat/completions"
+        )
+        val lines = result.output.trim().lines()
+        val httpStatus = lines.lastOrNull()?.trim() ?: "unknown"
+        val responseBody = lines.dropLast(1).joinToString("\n")
+
+        println("[TEST] OpenAI API key validation for model $model - HTTP status: $httpStatus")
+        println("[TEST] OpenAI API key validation - response: $responseBody")
+        println("[TEST] OpenAI API key validation - stderr: ${result.stderr}")
+
+        assertEquals(
+            "OpenAI API key is invalid for model $model (got HTTP $httpStatus). Response: $responseBody",
+            "200",
+            httpStatus
+        )
+    }
+
     /**
      * Tests that MCP server can be configured via Codex's TOML config.
      * Uses Docker to run Codex CLI in isolation.
      */
     fun testMcpServerConfiguration(): Unit = timeoutRunBlocking(180.seconds) {
+        assumeDockerAvailable()
         val session = codexSession()
         val dockerMcpUrl = resolveDockerUrl()
 
@@ -114,6 +177,7 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
             "config.toml should contain URL. Output: ${catResult.output}",
             catResult.output.contains("host.docker.internal")
         )
+        assertFalse("config.toml should not contain stray heredoc markers", catResult.output.contains("EOF"))
     }
 
     /**
@@ -121,8 +185,8 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
      * Codex uses a different syntax than Claude CLI.
      */
     fun testMcpServerAddCommand(): Unit = timeoutRunBlocking(180.seconds) {
+        assumeDockerAvailable()
         val session = codexSession()
-        val dockerMcpUrl = resolveDockerUrl()
 
         // Try to add MCP server via CLI command
         // Codex mcp add syntax: codex mcp add <name> --env VAR=VALUE -- <command>
@@ -135,9 +199,10 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
 
         // The mcp subcommand should exist
         val combinedOutput = mcpHelpResult.output + mcpHelpResult.stderr
+        assertEquals("Codex mcp --help should succeed", 0, mcpHelpResult.exitCode)
         assertTrue(
             "Codex should have mcp subcommand. Output: $combinedOutput",
-            combinedOutput.contains("mcp") || combinedOutput.contains("MCP") || mcpHelpResult.exitCode == 0
+            combinedOutput.contains("mcp") || combinedOutput.contains("MCP")
         )
     }
 
@@ -149,52 +214,56 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
      * which runs without user interaction.
      */
     fun testCodexDiscoversSteroidTools(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
         val session = codexSession()
+
+        // Verify API key works for o4-mini model before proceeding
+        assertOpenAiApiKeyValid(session, "o4-mini")
+
         val dockerMcpUrl = resolveDockerUrl()
 
         // Configure MCP server
         val configResult = session.configureMcpServer("intellij-steroid-test", dockerMcpUrl)
         println("[TEST] MCP config result: exit=${configResult.exitCode}")
 
-        if (configResult.exitCode != 0) {
-            println("[TEST] Failed to configure MCP server: ${configResult.stderr}")
-            fail("Failed to configure MCP server")
-            return@timeoutRunBlocking
-        }
+        assertEquals("Failed to configure MCP server: ${configResult.stderr}", 0, configResult.exitCode)
+
+        // Verify the config file
+        val catResult = session.runRaw("cat", "/home/codex/.codex/config.toml")
+        println("[TEST] config.toml content:\n${catResult.output}")
 
         // Run Codex exec to discover tools
         val result = session.runExec(
             """
-            You are testing an MCP server integration.
-
-            1. List all available MCP tools that start with "steroid_"
-            2. For each tool, print its name and a one-line description
-            3. Call steroid_list_projects and print the result
-
-            Be concise. Output format:
-            TOOLS_FOUND: [number]
-            TOOL: [name] - [description]
-            PROJECTS: [result]
+            You are testing an MCP server integration. You MUST use the MCP tools.
+            Steps:
+            1) List all MCP tools starting with "steroid_" and print each as: TOOL: <name> - <description>
+            2) Call steroid_list_projects EXACTLY once and print the raw result on a single line prefixed with PROJECTS:
+            Do not skip any step. If a step fails, print ERROR: <reason>.
             """.trimIndent(),
-            timeoutSeconds = 120
+            timeoutSeconds = 120,
+            model = "o4-mini"
         )
 
-        println("[TEST] Codex response: ${result.output}")
-        println("[TEST] Codex stderr: ${result.stderr}")
+        println("[TEST] Codex exit code: ${result.exitCode}")
+        println("[TEST] Codex stdout:\n${result.output}")
+        println("[TEST] Codex stderr:\n${result.stderr}")
 
-        // Check if Codex discovered tools
-        // Note: Codex may have similar issues to Claude with MCP tool discovery
-        if (result.output.contains("TOOLS_FOUND: 0") || !result.output.contains("steroid_")) {
-            println("[TEST] WARNING: Codex did not discover steroid_ tools.")
-            println("[TEST] This may be due to MCP configuration or Codex limitations")
-            println("[TEST] The MCP server works correctly (verified by testHostAvailability)")
-            // Don't fail the test - this may be a known limitation
-            return@timeoutRunBlocking
-        }
+        val combined = (result.output + "\n" + result.stderr).lowercase()
+
+        // Check if MCP server connected successfully (this is visible in stderr)
+        val mcpConnected = combined.contains("mcp:") && combined.contains("ready")
+        println("[TEST] MCP server connected: $mcpConnected")
+
+        assertEquals("Codex exec should succeed. Output: ${result.output}\nStderr: ${result.stderr}", 0, result.exitCode)
 
         assertTrue(
-            "Codex should find steroid_ tools. Output: ${result.output}",
-            result.output.contains("steroid_") || result.output.contains("TOOLS_FOUND")
+            "Codex should report steroid_ tools. Output: ${result.output}\nStderr: ${result.stderr}",
+            combined.contains("steroid_")
+        )
+        assertTrue(
+            "Codex should call steroid_list_projects. Output: ${result.output}\nStderr: ${result.stderr}",
+            combined.contains("steroid_list_projects") || combined.contains("projects")
         )
     }
 

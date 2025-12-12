@@ -16,6 +16,7 @@ class DockerCodexSession(
 ) : DockerSession(containerId, workDir) {
 
     override val logPrefix = "DOCKER-CODEX"
+    private val apiKey: String = readOpenAiApiKey()
 
     /**
      * Run a codex command inside the Docker container.
@@ -26,31 +27,78 @@ class DockerCodexSession(
             add("codex")
             addAll(args.toList())
         }
-        val extraEnvVars = mapOf("OPENAI_API_KEY" to File(System.getenv("HOME"), ".openai").readText().trim())
+        val extraEnvVars = buildMap {
+            put("OPENAI_API_KEY", apiKey)
+            put("CODEX_DEBUG", "1")
+            put("MCP_DEBUG", "1")
+        }
         return runInContainer(codexArgs, timeoutSeconds, enableDebugEnv = true, extraEnvVars = extraEnvVars)
     }
 
     /**
      * Run codex exec for non-interactive mode.
+     * @param model Optional model override (e.g., "gpt-5-codex", "o4-mini")
      */
-    fun runExec(prompt: String, timeoutSeconds: Long = 120): ProcessResult {
-        val codexArgs = listOf("codex", "exec", "--skip-git-repo-check", prompt)
-        return runInContainer(codexArgs, timeoutSeconds, enableDebugEnv = true)
+    fun runExec(prompt: String, timeoutSeconds: Long = 120, model: String? = null): ProcessResult {
+        val codexArgs = buildList {
+            add("codex")
+            add("exec")
+            add("--skip-git-repo-check")
+            if (model != null) {
+                add("--model")
+                add(model)
+            }
+            add(prompt)
+        }
+        // Set both OPENAI_API_KEY and CODEX_API_KEY for compatibility
+        val extraEnvVars = mapOf(
+            "OPENAI_API_KEY" to apiKey,
+            "CODEX_API_KEY" to apiKey,
+            "CODEX_DEBUG" to "1",
+            "MCP_DEBUG" to "1"
+        )
+        return runInContainer(codexArgs, timeoutSeconds, enableDebugEnv = true, extraEnvVars = extraEnvVars)
     }
 
     /**
      * Create the MCP config file with the given server configuration.
      * Codex uses TOML format for configuration at ~/.codex/config.toml
+     *
+     * The [features] rmcp_client = true is needed for HTTP-based MCP servers.
+     * The preferred_auth_method = "apikey" is needed for API key authentication.
      */
     fun configureMcpServer(serverName: String, serverUrl: String): ProcessResult {
         val tomlConfig = """
+# Use API key authentication (required for non-interactive mode)
+preferred_auth_method = "apikey"
+
+[features]
+rmcp_client = true
+
 [mcp_servers.$serverName]
 url = "$serverUrl"
 """.trim()
-        return runRaw("bash", "-c", "mkdir -p ~/.codex && echo '$tomlConfig' >> ~/.codex/config.toml")
+        val script = """
+set -e
+mkdir -p ~/.codex
+cat > ~/.codex/config.toml <<'EOF'
+$tomlConfig
+EOF
+""".trimIndent()
+        return runRaw("bash", "-c", script)
     }
 
     companion object {
+        private fun readOpenAiApiKey(): String {
+            System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
+            val keyFile = File(System.getProperty("user.home"), ".openai")
+            if (keyFile.exists()) {
+                val content = keyFile.readText().trim()
+                if (content.isNotBlank()) return content
+            }
+            error("OPENAI_API_KEY is required for Codex CLI tests (set env or ~/.openai)")
+        }
+
         fun create(): DockerCodexSession {
             val tempDir = createTempDirectory("codex-test")
             println("[DOCKER-CODEX] Creating new session in temp dir: $tempDir")

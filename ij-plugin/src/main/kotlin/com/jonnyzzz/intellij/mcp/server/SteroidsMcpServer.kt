@@ -68,9 +68,12 @@ class SteroidsMcpServer(
         val configuredPort = Registry.intValue("mcp.steroids.server.port", 63150)
         val actualPort = if (configuredPort == 0) findFreePort() else configuredPort
 
+        // By default, bind to localhost only per MCP security requirements.
+        // For Docker testing, set mcp.steroids.server.host to "0.0.0.0"
+        val bindHost = Registry.stringValue("mcp.steroids.server.host").takeIf { it.isNotBlank() } ?: "127.0.0.1"
+
         try {
-            // Bind to localhost only per MCP security requirements
-            val server = scope.embeddedServer(CIO, host = "127.0.0.1", port = actualPort) {
+            val server = scope.embeddedServer(CIO, host = bindHost, port = actualPort) {
                 install(requestLoggingPlugin)
                 install(SSE)
                 routing {
@@ -95,7 +98,7 @@ class SteroidsMcpServer(
                 mutex.unlock()
             }
 
-            log.info("Starting MCP Steroid server on port $actualPort")
+            log.info("Starting MCP Steroid server on $bindHost:$actualPort")
             server.start(wait = false)
 
             //wait for ktor is ready
