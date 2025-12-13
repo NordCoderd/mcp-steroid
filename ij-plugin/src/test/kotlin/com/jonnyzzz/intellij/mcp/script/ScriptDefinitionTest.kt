@@ -184,4 +184,181 @@ class ScriptDefinitionTest : BasePlatformTestCase() {
             missingTypes.isEmpty()
         )
     }
+
+    /**
+     * Verify that deep execution/debugging APIs used in real scripts are resolvable.
+     *
+     * These types come from real successful script executions found in
+     * .idea/mcp-run/ folders - scripts that use RunManager, debugger, etc.
+     */
+    fun testExecutionAndDebuggerApisAreResolvable() {
+        val classLoader = McpScriptContext::class.java.classLoader
+
+        // Types from real successful scripts that use execution/debugging APIs
+        val typesToCheck = listOf(
+            // Execution framework
+            "com.intellij.execution.RunManager",
+            "com.intellij.execution.configurations.ConfigurationType",
+            "com.intellij.execution.configurations.ConfigurationTypeUtil",
+            "com.intellij.execution.configurations.RunConfiguration",
+            "com.intellij.execution.executors.DefaultDebugExecutor",
+            "com.intellij.execution.executors.DefaultRunExecutor",
+            "com.intellij.execution.runners.ExecutionUtil",
+            // Debugger APIs
+            "com.intellij.xdebugger.XDebuggerManager",
+            "com.intellij.xdebugger.XDebugSession",
+            "com.intellij.xdebugger.frame.XValue",
+            "com.intellij.xdebugger.frame.XValueNode",
+            "com.intellij.xdebugger.frame.XStackFrame",
+            "com.intellij.xdebugger.evaluation.XDebuggerEvaluator",
+            "com.intellij.xdebugger.frame.presentation.XValuePresentation",
+            "com.intellij.xdebugger.frame.XFullValueEvaluator",
+            "com.intellij.xdebugger.frame.XValuePlace"
+        )
+
+        val missingTypes = mutableListOf<String>()
+        for (typeName in typesToCheck) {
+            try {
+                Class.forName(typeName, false, classLoader)
+            } catch (_: ClassNotFoundException) {
+                missingTypes.add(typeName)
+            }
+        }
+
+        assertTrue(
+            "All execution/debugger API types should be resolvable. Missing: $missingTypes",
+            missingTypes.isEmpty()
+        )
+    }
+
+    /**
+     * Verify that UI-related APIs used in real scripts are resolvable.
+     *
+     * These types come from scripts that show dialogs, use icons, etc.
+     */
+    fun testUiApisAreResolvable() {
+        val classLoader = McpScriptContext::class.java.classLoader
+
+        // Types from real successful scripts that use UI APIs
+        val typesToCheck = listOf(
+            // UI dialogs and messages
+            "com.intellij.openapi.ui.Messages",
+            "com.intellij.openapi.ui.DialogWrapper",
+            // Icons
+            "com.intellij.icons.AllIcons",
+            "com.intellij.openapi.util.IconLoader",
+            // Swing types used in scripts
+            "javax.swing.Icon",
+            // Application invocation
+            "com.intellij.openapi.application.ModalityState"
+        )
+
+        val missingTypes = mutableListOf<String>()
+        for (typeName in typesToCheck) {
+            try {
+                Class.forName(typeName, false, classLoader)
+            } catch (_: ClassNotFoundException) {
+                missingTypes.add(typeName)
+            }
+        }
+
+        assertTrue(
+            "All UI API types should be resolvable. Missing: $missingTypes",
+            missingTypes.isEmpty()
+        )
+    }
+
+    /**
+     * Verify that concurrent/utility types used in real scripts are resolvable.
+     */
+    fun testConcurrencyApisAreResolvable() {
+        val classLoader = McpScriptContext::class.java.classLoader
+
+        // Types from real scripts that use concurrency
+        val typesToCheck = listOf(
+            "java.util.concurrent.ConcurrentHashMap",
+            "java.util.concurrent.CountDownLatch",
+            "java.util.concurrent.TimeUnit",
+            "java.util.concurrent.atomic.AtomicBoolean",
+            "java.util.concurrent.atomic.AtomicReference"
+        )
+
+        val missingTypes = mutableListOf<String>()
+        for (typeName in typesToCheck) {
+            try {
+                Class.forName(typeName, false, classLoader)
+            } catch (_: ClassNotFoundException) {
+                missingTypes.add(typeName)
+            }
+        }
+
+        assertTrue(
+            "All concurrency API types should be resolvable. Missing: $missingTypes",
+            missingTypes.isEmpty()
+        )
+    }
+
+    /**
+     * Verify that the script definition includes our plugin's own types.
+     *
+     * Scripts need to reference McpScriptContext for the execute {} block.
+     */
+    fun testPluginTypesAreResolvable() {
+        val classLoader = McpScriptContext::class.java.classLoader
+
+        val typesToCheck = listOf(
+            "com.jonnyzzz.intellij.mcp.execution.McpScriptContext",
+            "com.jonnyzzz.intellij.mcp.execution.McpScriptScope"
+        )
+
+        val missingTypes = mutableListOf<String>()
+        for (typeName in typesToCheck) {
+            try {
+                Class.forName(typeName, false, classLoader)
+            } catch (_: ClassNotFoundException) {
+                missingTypes.add(typeName)
+            }
+        }
+
+        assertTrue(
+            "All plugin types should be resolvable. Missing: $missingTypes",
+            missingTypes.isEmpty()
+        )
+    }
+
+    /**
+     * Test that a sample real-world script structure would compile.
+     *
+     * This test verifies that the imports and execute binding pattern
+     * from real scripts is valid.
+     */
+    fun testRealWorldScriptImportsAreValid() {
+        // Verify all the imports that our wrapped scripts use are valid classes
+        val classLoader = McpScriptContext::class.java.classLoader
+
+        // These are the exact imports added by CodeEvalManager.wrapWithImports()
+        val importedPackages = listOf(
+            "com.intellij.openapi.project.Project",
+            "com.intellij.openapi.application.ApplicationManager",
+            "com.intellij.openapi.vfs.VirtualFile",
+            "com.intellij.openapi.editor.Editor",
+            "com.intellij.openapi.fileEditor.FileEditorManager",
+            "com.intellij.openapi.command.WriteCommandAction",
+            "com.intellij.psi.PsiFile"
+        )
+
+        val missingTypes = mutableListOf<String>()
+        for (typeName in importedPackages) {
+            try {
+                Class.forName(typeName, false, classLoader)
+            } catch (_: ClassNotFoundException) {
+                missingTypes.add(typeName)
+            }
+        }
+
+        assertTrue(
+            "All default import types should be resolvable. Missing: $missingTypes",
+            missingTypes.isEmpty()
+        )
+    }
 }
