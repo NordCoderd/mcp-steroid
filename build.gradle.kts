@@ -25,6 +25,10 @@ dependencies {
         testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
     }
 
+    // Kotlin scripting for script definition provider
+    compileOnly("org.jetbrains.kotlin:kotlin-scripting-common:2.2.21")
+    compileOnly("org.jetbrains.kotlin:kotlin-scripting-jvm:2.2.21")
+
     // Ktor server for MCP HTTP transport
     implementation("io.ktor:ktor-server-core:$ktorVersion") {
         exclude(group = "org.jetbrains.kotlinx")

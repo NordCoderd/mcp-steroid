@@ -1,0 +1,7 @@
+<idea-plugin>
+    <!-- Kotlin plugin extensions for script definition - only loaded when Kotlin plugin is present -->
+    <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <scriptDefinitionsProvider
+                implementation="com.jonnyzzz.intellij.mcp.script.McpSteroidScriptDefinitionsProvider"/>
+    </extensions>
+</idea-plugin>

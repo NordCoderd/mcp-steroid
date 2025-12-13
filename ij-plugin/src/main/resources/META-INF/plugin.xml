@@ -10,6 +10,7 @@
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
+    <depends optional="true" config-file="kotlin-scripting.xml">org.jetbrains.kotlin</depends>
 
     <extensions defaultExtensionNs="com.intellij">
         <!-- Review panel notification -->
