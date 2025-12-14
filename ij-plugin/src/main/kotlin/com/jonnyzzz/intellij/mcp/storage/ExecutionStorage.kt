@@ -337,6 +337,138 @@ class ExecutionStorage(
     fun getReviewFilePath(executionId: String): Path {
         return baseDir.resolve(executionId).resolve("review.kts")
     }
+
+    // ==================== Task Tracking ====================
+
+    private val tasksDir: Path
+        get() = baseDir.resolve("_tasks")
+
+    /**
+     * Create or update a task, associating an execution with it.
+     */
+    fun addExecutionToTask(taskId: String, executionId: String, projectName: String) {
+        Files.createDirectories(tasksDir)
+        val taskFile = tasksDir.resolve("$taskId.json")
+
+        val existingTask = readTask(taskId)
+        val updatedTask = if (existingTask != null) {
+            existingTask.copy(
+                executionIds = existingTask.executionIds + executionId,
+                updatedAt = System.currentTimeMillis()
+            )
+        } else {
+            TaskInfo(
+                taskId = taskId,
+                projectName = projectName,
+                executionIds = listOf(executionId)
+            )
+        }
+
+        Files.writeString(taskFile, json.encodeToString(updatedTask))
+
+        // Also store task_id in the execution directory
+        val execDir = baseDir.resolve(executionId)
+        if (Files.exists(execDir)) {
+            Files.writeString(execDir.resolve("task_id.txt"), taskId)
+        }
+    }
+
+    /**
+     * Read task info by ID.
+     */
+    fun readTask(taskId: String): TaskInfo? {
+        val taskFile = tasksDir.resolve("$taskId.json")
+        if (!Files.exists(taskFile)) return null
+        return try {
+            json.decodeFromString<TaskInfo>(Files.readString(taskFile))
+        } catch (e: Exception) {
+            log.warn("Failed to read task $taskId: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Save feedback for a task.
+     */
+    fun saveFeedback(feedback: ExecutionFeedback) {
+        // Save to task file
+        val taskFile = tasksDir.resolve("${feedback.taskId}.json")
+        val existingTask = readTask(feedback.taskId)
+        if (existingTask != null) {
+            val updatedTask = existingTask.copy(
+                feedback = feedback,
+                updatedAt = System.currentTimeMillis()
+            )
+            Files.writeString(taskFile, json.encodeToString(updatedTask))
+        } else {
+            // Create task if it doesn't exist (shouldn't happen normally)
+            Files.createDirectories(tasksDir)
+            val newTask = TaskInfo(
+                taskId = feedback.taskId,
+                projectName = "",
+                executionIds = listOf(feedback.executionId),
+                feedback = feedback
+            )
+            Files.writeString(taskFile, json.encodeToString(newTask))
+        }
+
+        // Also save feedback in the execution directory
+        val execDir = baseDir.resolve(feedback.executionId)
+        if (Files.exists(execDir)) {
+            val feedbackFile = execDir.resolve("feedback.json")
+            Files.writeString(feedbackFile, json.encodeToString(feedback))
+        }
+    }
+
+    /**
+     * Read feedback for a task.
+     */
+    fun readFeedback(taskId: String): ExecutionFeedback? {
+        return readTask(taskId)?.feedback
+    }
+
+    /**
+     * Read feedback for an execution.
+     */
+    fun readExecutionFeedback(executionId: String): ExecutionFeedback? {
+        val feedbackFile = baseDir.resolve(executionId).resolve("feedback.json")
+        if (!Files.exists(feedbackFile)) return null
+        return try {
+            json.decodeFromString<ExecutionFeedback>(Files.readString(feedbackFile))
+        } catch (e: Exception) {
+            log.warn("Failed to read feedback for execution $executionId: ${e.message}")
+            null
+        }
+    }
+
+    /**
+     * Get task ID for an execution (if associated).
+     */
+    fun getTaskIdForExecution(executionId: String): String? {
+        val taskIdFile = baseDir.resolve(executionId).resolve("task_id.txt")
+        if (!Files.exists(taskIdFile)) return null
+        return Files.readString(taskIdFile).trim()
+    }
+
+    /**
+     * List all tasks.
+     */
+    fun listTasks(): List<TaskInfo> {
+        if (!Files.exists(tasksDir)) return emptyList()
+        return Files.list(tasksDir)
+            .filter { it.toString().endsWith(".json") }
+            .map { path ->
+                try {
+                    json.decodeFromString<TaskInfo>(Files.readString(path))
+                } catch (e: Exception) {
+                    log.warn("Failed to read task file $path: ${e.message}")
+                    null
+                }
+            }
+            .filter { it != null }
+            .map { it!! }
+            .toList()
+    }
 }
 
 /**
@@ -350,4 +482,30 @@ data class ReviewOutcome(
     val userComments: String? = null,
     val diff: String? = null,
     val timestamp: Long = System.currentTimeMillis()
+)
+
+/**
+ * Agent feedback for an execution.
+ * The agent provides this after seeing the execution result.
+ */
+@Serializable
+data class ExecutionFeedback(
+    val taskId: String,
+    val executionId: String,
+    val successRating: Double,  // 0.00 to 1.00
+    val explanation: String,
+    val timestamp: Long = System.currentTimeMillis()
+)
+
+/**
+ * Task tracking info - groups related executions under a task_id.
+ */
+@Serializable
+data class TaskInfo(
+    val taskId: String,
+    val projectName: String,
+    val executionIds: List<String> = emptyList(),
+    val feedback: ExecutionFeedback? = null,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
