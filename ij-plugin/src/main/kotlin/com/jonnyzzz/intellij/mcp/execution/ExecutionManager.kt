@@ -89,7 +89,8 @@ class ExecutionManager(
                 return ExecutionResultWithOutput(
                     status = ExecutionStatus.REJECTED,
                     output = emptyList(),
-                    errorMessage = message
+                    errorMessage = message,
+                    executionId = executionId
                 )
             }
 
@@ -103,7 +104,8 @@ class ExecutionManager(
                 return ExecutionResultWithOutput(
                     status = ExecutionStatus.TIMEOUT,
                     output = emptyList(),
-                    errorMessage = "Review timed out"
+                    errorMessage = "Review timed out",
+                    executionId = executionId
                 )
             }
         }

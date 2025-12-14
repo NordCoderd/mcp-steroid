@@ -66,7 +66,8 @@ class ScriptExecutor(
             ExecutionResultWithOutput(
                 status = ExecutionStatus.ERROR,
                 output = emptyList(),
-                errorMessage = "Unexpected error: ${e.message}"
+                errorMessage = "Unexpected error: ${e.message}",
+                executionId = executionId
             )
         }
         project.service<ExecutionStorage>().writeResult(executionId, result.toExecutionResult())
@@ -84,7 +85,8 @@ class ScriptExecutor(
             return ExecutionResultWithOutput(
                 status = evalResult.errorResult.status,
                 output = emptyList(),
-                errorMessage = evalResult.errorResult.errorMessage
+                errorMessage = evalResult.errorResult.errorMessage,
+                executionId = executionId
             )
         }
 
@@ -122,7 +124,8 @@ class ScriptExecutor(
                     ExecutionResultWithOutput(
                         status = ExecutionStatus.TIMEOUT,
                         output = context.getOutput(),
-                        errorMessage = "Execution timed out after $timeoutSeconds seconds"
+                        errorMessage = "Execution timed out after $timeoutSeconds seconds",
+                        executionId = executionId
                     )
                 }
                 t is ProcessCanceledException || t is CancellationException -> {
@@ -130,7 +133,8 @@ class ScriptExecutor(
                     ExecutionResultWithOutput(
                         status = ExecutionStatus.CANCELLED,
                         output = context.getOutput(),
-                        errorMessage = "Execution was cancelled"
+                        errorMessage = "Execution was cancelled",
+                        executionId = executionId
                     )
                 }
                 else -> {
@@ -138,7 +142,8 @@ class ScriptExecutor(
                     ExecutionResultWithOutput(
                         status = ExecutionStatus.ERROR,
                         output = context.getOutput(),
-                        errorMessage = "Unexpected error: ${t.message}"
+                        errorMessage = "Unexpected error: ${t.message}",
+                        executionId = executionId
                     )
                 }
             }
@@ -163,7 +168,8 @@ class ScriptExecutor(
             }
             ExecutionResultWithOutput(
                 status = ExecutionStatus.SUCCESS,
-                output = context.getOutput()
+                output = context.getOutput(),
+                executionId = executionId
             )
         } catch (e: Throwable) {
             log.warn("Block #${index + 1} failed for $executionId: ${e.message}", e)
@@ -172,7 +178,8 @@ class ScriptExecutor(
             ExecutionResultWithOutput(
                 status = ExecutionStatus.ERROR,
                 output = context.getOutput(),
-                errorMessage = "Runtime error in block #${index + 1}: ${e.message}"
+                errorMessage = "Runtime error in block #${index + 1}: ${e.message}",
+                executionId = executionId
             )
         }
     }

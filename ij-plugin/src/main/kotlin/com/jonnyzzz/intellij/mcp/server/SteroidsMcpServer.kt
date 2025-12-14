@@ -64,6 +64,7 @@ class SteroidsMcpServer(
         // Register tools
         service<ListProjectsToolHandler>().register(mcpServer)
         service<ExecuteCodeToolHandler>().register(mcpServer)
+        service<ExecuteFeedbackToolHandler>().register(mcpServer)
 
         val configuredPort = Registry.intValue("mcp.steroids.server.port", 63150)
         val actualPort = if (configuredPort == 0) findFreePort() else configuredPort
@@ -223,5 +224,6 @@ class SteroidsMcpServer(
 data class ExecutionResultWithOutput(
     val status: ExecutionStatus,
     val output: List<String>,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val executionId: String? = null
 )
