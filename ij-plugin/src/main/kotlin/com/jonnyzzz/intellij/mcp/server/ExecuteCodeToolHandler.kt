@@ -11,6 +11,7 @@ import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
+import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.*
 
@@ -40,6 +41,10 @@ class ExecuteCodeToolHandler {
                         put("type", "string")
                         put("description", "Write human readable reason for the execution, what you want to do and to get out of that")
                     }
+                    putJsonObject("task_id") {
+                        put("type", "string")
+                        put("description", "Your task identifier to group related executions. Use the same task_id for all execute_code calls that are part of the same task, and when providing feedback via steroid_execute_feedback.")
+                    }
                     putJsonObject("timeout") {
                         put("type", "integer")
                         put("description", "Execution timeout in seconds (default: 60)")
@@ -48,6 +53,7 @@ class ExecuteCodeToolHandler {
                 putJsonArray("required") {
                     add("project_name")
                     add("code")
+                    add("task_id")
                 }
             }
         ) { params, session ->
@@ -62,6 +68,8 @@ class ExecuteCodeToolHandler {
             ?: return errorResult("Missing required parameter: project_name")
         val code = args["code"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: code")
+        val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
+            ?: return errorResult("Missing required parameter: task_id")
         val timeout = args["timeout"]?.jsonPrimitive?.intOrNull ?: 60
 
         val project = findProject(projectName)
@@ -79,10 +87,17 @@ class ExecuteCodeToolHandler {
 
             try {
                 val manager = project.service<ExecutionManager>()
+                val storage = project.service<ExecutionStorage>()
                 val executionParams = ExecutionParams(timeout = timeout, showReviewOnError = false)
                 val result = manager.executeWithProgress(code, executionParams, progressReporter)
 
-                buildResponse(result, timeout)
+                // Associate execution with task
+                val executionId = result.executionId
+                if (executionId != null) {
+                    storage.addExecutionToTask(taskId, executionId, projectName)
+                }
+
+                buildResponse(result, timeout, taskId, executionId)
             } catch (e: Throwable) {
                 log.error("Error executing code", e)
                 errorResult("Execution error: ${e.message}")
@@ -90,32 +105,75 @@ class ExecuteCodeToolHandler {
         }
     }
 
-    private fun buildResponse(result: ExecutionResultWithOutput, timeout: Int): ToolCallResult {
+    private fun buildResponse(
+        result: ExecutionResultWithOutput,
+        timeout: Int,
+        taskId: String,
+        executionId: String?
+    ): ToolCallResult {
         return when (result.status) {
             ExecutionStatus.SUCCESS -> ToolCallResult(
-                content = listOf(ContentItem.Text(text = buildSuccessText(result)))
+                content = listOf(ContentItem.Text(text = buildSuccessText(result, taskId, executionId)))
             )
-            ExecutionStatus.REJECTED -> errorResult(
-                "Code rejected by user: ${result.errorMessage ?: "No reason provided"}"
+            ExecutionStatus.REJECTED -> errorResultWithContext(
+                "Code rejected by user: ${result.errorMessage ?: "No reason provided"}",
+                taskId, executionId
             )
-            ExecutionStatus.TIMEOUT -> errorResult(
-                "Execution timed out after $timeout seconds"
+            ExecutionStatus.TIMEOUT -> errorResultWithContext(
+                "Execution timed out after $timeout seconds",
+                taskId, executionId
             )
-            ExecutionStatus.CANCELLED -> errorResult(
-                "Execution was cancelled"
+            ExecutionStatus.CANCELLED -> errorResultWithContext(
+                "Execution was cancelled",
+                taskId, executionId
             )
-            else -> errorResult(
-                result.errorMessage ?: "Execution failed with status: ${result.status}"
+            else -> errorResultWithContext(
+                result.errorMessage ?: "Execution failed with status: ${result.status}",
+                taskId, executionId
             )
         }
     }
 
-    private fun buildSuccessText(result: ExecutionResultWithOutput): String {
-        return if (result.output.isNotEmpty()) {
-            result.output.joinToString("\n")
-        } else {
-            "Execution completed successfully."
+    private fun buildSuccessText(
+        result: ExecutionResultWithOutput,
+        taskId: String,
+        executionId: String?
+    ): String = buildString {
+        appendLine("=== Execution Result ===")
+        appendLine("task_id: $taskId")
+        if (executionId != null) {
+            appendLine("execution_id: $executionId")
         }
+        appendLine("status: SUCCESS")
+        appendLine()
+        if (result.output.isNotEmpty()) {
+            appendLine("=== Output ===")
+            appendLine(result.output.joinToString("\n"))
+        } else {
+            appendLine("Execution completed successfully (no output).")
+        }
+        appendLine()
+        appendLine("IMPORTANT: Please provide feedback using steroid_execute_feedback tool with your task_id.")
+    }
+
+    private fun errorResultWithContext(message: String, taskId: String, executionId: String?): ToolCallResult {
+        val fullMessage = buildString {
+            appendLine("=== Execution Result ===")
+            appendLine("task_id: $taskId")
+            if (executionId != null) {
+                appendLine("execution_id: $executionId")
+            }
+            appendLine("status: ERROR")
+            appendLine()
+            appendLine("=== Error ===")
+            appendLine(message)
+            appendLine()
+            appendLine("IMPORTANT: Please provide feedback using steroid_execute_feedback tool with your task_id.")
+        }
+        return ToolCallResult(
+            content = listOf(ContentItem.Text(text = fullMessage)),
+            isError = true
+        )
     }
 
     private suspend fun findProject(name: String): Project? {
@@ -137,7 +195,10 @@ class ExecuteCodeToolHandler {
         private val TOOL_DESCRIPTION = """
             |Execute Kotlin code in the IDE's runtime context with full access to IntelliJ APIs.
             |
-            |IMPORTANT: All code must be written as suspend functions. Never use runBlocking.
+            |IMPORTANT:
+            |1. All code must be written as suspend functions. Never use runBlocking.
+            |2. You MUST provide a task_id to group related executions.
+            |3. After execution, you MUST call steroid_execute_feedback to rate the result.
             |
             |The code must use the execute { } pattern (the context is the receiver):
             |```kotlin
@@ -173,6 +234,11 @@ class ExecuteCodeToolHandler {
             |
             |Progress notifications are sent automatically during execution.
             |The final result is returned when execution completes.
+            |
+            |WORKFLOW:
+            |1. Call steroid_execute_code with your task_id
+            |2. Review the execution result
+            |3. Call steroid_execute_feedback with the same task_id to rate the success (0.0-1.0)
         """.trimMargin()
     }
 }
