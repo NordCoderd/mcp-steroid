@@ -53,6 +53,10 @@ class ExecuteFeedbackToolHandler {
                         put("type", "string")
                         put("description", "Explain why you gave this rating. What worked? What didn't? What will you try next?")
                     }
+                    putJsonObject("code") {
+                        put("type", "string")
+                        put("description", "Optional: The code snippet that was executed. Useful for tracking what code produced which results.")
+                    }
                 }
                 putJsonArray("required") {
                     add("project_name")
@@ -80,6 +84,7 @@ class ExecuteFeedbackToolHandler {
             ?: return errorResult("Missing required parameter: success_rating")
         val explanation = args["explanation"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: explanation")
+        val code = args["code"]?.jsonPrimitive?.contentOrNull  // Optional
 
         // Validate success_rating
         if (successRating < 0.0 || successRating > 1.0) {
@@ -107,7 +112,8 @@ class ExecuteFeedbackToolHandler {
             taskId = taskId,
             executionId = executionId,
             successRating = successRating,
-            explanation = explanation
+            explanation = explanation,
+            code = code
         )
 
         try {
@@ -152,13 +158,17 @@ class ExecuteFeedbackToolHandler {
 
     companion object {
         private val TOOL_DESCRIPTION = """
+            |╔══════════════════════════════════════════════════════════════════════════════╗
+            |║  MANDATORY: Call this after EVERY steroid_execute_code call!                 ║
+            |║  The execution workflow is incomplete without feedback.                      ║
+            |╚══════════════════════════════════════════════════════════════════════════════╝
+            |
             |Provide feedback on the result of a steroid_execute_code call.
             |
-            |IMPORTANT: You MUST call this tool after every steroid_execute_code call to rate the result.
-            |
-            |Parameters:
+            |REQUIRED PARAMETERS:
+            |- project_name: The project where execution occurred
             |- task_id: The same task_id you used in steroid_execute_code
-            |- execution_id: The execution_id returned from steroid_execute_code
+            |- execution_id: The execution_id returned in the steroid_execute_code result
             |- success_rating: Rate from 0.00 (complete failure) to 1.00 (complete success)
             |  - 0.00-0.25: Complete failure, nothing worked
             |  - 0.25-0.50: Partial failure, some errors occurred
@@ -166,7 +176,14 @@ class ExecuteFeedbackToolHandler {
             |  - 0.75-1.00: Success, achieved the intended goal
             |- explanation: Describe what worked, what didn't, and what you'll try next
             |
-            |This feedback is stored and used to track execution history and improve future attempts.
+            |OPTIONAL PARAMETERS:
+            |- code: The code snippet that was executed. Include this to help track what code
+            |  produced which results. This is useful for debugging and analysis.
+            |
+            |WHY FEEDBACK IS REQUIRED:
+            |Feedback enables tracking of execution history, success patterns, and helps
+            |identify areas for improvement. Without feedback, the execution data is incomplete
+            |and cannot be used for analysis or debugging.
         """.trimMargin()
     }
 }

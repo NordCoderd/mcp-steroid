@@ -494,6 +494,7 @@ data class ExecutionFeedback(
     val executionId: String,
     val successRating: Double,  // 0.00 to 1.00
     val explanation: String,
+    val code: String? = null,  // Optional: the code snippet that was executed
     val timestamp: Long = System.currentTimeMillis()
 )
 
