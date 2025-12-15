@@ -1,3 +1,6 @@
+import com.jetbrains.plugin.structure.base.utils.contentBuilder.buildDirectory
+import com.jetbrains.plugin.structure.base.utils.contentBuilder.buildZipFile
+
 plugins {
     id("org.jetbrains.intellij.platform") version "2.10.5"
     kotlin("jvm") version "2.2.21"
@@ -87,3 +90,22 @@ tasks {
         duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
 }
+
+
+val deployPluginLocallyTo253 by tasks.registering(Sync::class) {
+    dependsOn(tasks.buildPlugin)
+    group = "intellij platform"
+
+    val targetName = "" + rootProject.name
+    val targetDir = "${System.getenv("HOME")}/intellij-253/config/plugins/$targetName"
+
+    into(targetDir)
+    from(
+        tasks.buildPlugin
+            .map { it.archiveFile }
+            .map { zipTree(it) }
+    ) {
+        include(targetName)
+    }
+}
+

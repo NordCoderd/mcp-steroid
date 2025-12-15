@@ -4,6 +4,7 @@ package com.jonnyzzz.intellij.mcp.review
 import com.intellij.diff.comparison.ComparisonManager
 import com.intellij.diff.comparison.ComparisonPolicy
 import com.intellij.diff.fragments.LineFragment
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.Service
@@ -15,6 +16,7 @@ import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.wm.WindowManager
 import com.jonnyzzz.intellij.mcp.execution.CodeEvalManager
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.ReviewOutcome
@@ -92,12 +94,14 @@ class ReviewManager(private val project: Project) {
         // Save wrapped code for review in the execution directory
         val reviewFile = storage.saveReviewCode(executionId, wrappedCode)
 
-        // Open in editor on EDT
+        // Open in editor on EDT and bring IDE to foreground
         val edtActionResult = withContext(Dispatchers.EDT) {
             writeAction {
                 val vFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(reviewFile.toString())
                 if (vFile != null) {
                     FileEditorManager.getInstance(project).openFile(vFile, true)
+                    // Bring IDE to foreground (only in UI mode, not in headless/test mode)
+                    bringIdeToForeground()
                     null
                 } else {
                     log.warn("Could not open review file: $reviewFile")
@@ -236,6 +240,29 @@ class ReviewManager(private val project: Project) {
         val vFile = LocalFileSystem.getInstance().findFileByPath(reviewFile.toString())
         if (vFile != null) {
             FileEditorManager.getInstance(project).closeFile(vFile)
+        }
+    }
+
+    /**
+     * Bring the IDE window to the foreground.
+     * Only works in UI mode, safely ignored in headless/test mode.
+     */
+    private fun bringIdeToForeground() {
+        if (ApplicationManager.getApplication().isHeadlessEnvironment) {
+            return
+        }
+        try {
+            val frame = WindowManager.getInstance().getFrame(project)
+            if (frame != null) {
+                // Request focus and bring to front
+                if (frame.state == java.awt.Frame.ICONIFIED) {
+                    frame.state = java.awt.Frame.NORMAL
+                }
+                frame.toFront()
+                frame.requestFocus()
+            }
+        } catch (e: Exception) {
+            log.debug("Could not bring IDE to foreground: ${e.message}")
         }
     }
 
