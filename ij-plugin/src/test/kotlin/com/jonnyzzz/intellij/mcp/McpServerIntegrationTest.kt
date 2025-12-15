@@ -444,6 +444,55 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
+     * Tests that successful execution returns clean output without error-like formatting.
+     * The response should start with "=== Execution Result ===" and contain the output,
+     * not aggressive banners that look like errors.
+     */
+    fun testSuccessfulExecutionReturnsCleanOutput(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Execute code
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(buildExecuteCodeRequest(project.name))
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = (execResult.content.singleOrNull() as? ContentItem.Text)?.text.orEmpty()
+
+        // Verify the output format is clean (not error-like)
+        assertTrue(
+            "Output should start with execution result header",
+            execOutput.contains("=== Execution Result ===")
+        )
+        assertTrue(
+            "Output should indicate SUCCESS status",
+            execOutput.contains("status: SUCCESS")
+        )
+        assertFalse(
+            "Output should NOT contain aggressive ACTION REQUIRED banner",
+            execOutput.contains("ACTION REQUIRED")
+        )
+        assertFalse(
+            "Output should NOT contain box drawing characters at start",
+            execOutput.startsWith("╔")
+        )
+    }
+
+    /**
      * Tests that when the configured port is busy, the server starts on the next available port.
      * This reproduces the issue where opening multiple IDE instances or projects causes
      * "Address already in use" errors.

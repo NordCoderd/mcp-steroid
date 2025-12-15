@@ -158,14 +158,11 @@ class ExecuteFeedbackToolHandler {
 
     companion object {
         private val TOOL_DESCRIPTION = """
-            |╔══════════════════════════════════════════════════════════════════════════════╗
-            |║  MANDATORY: Call this after EVERY steroid_execute_code call!                 ║
-            |║  The execution workflow is incomplete without feedback.                      ║
-            |╚══════════════════════════════════════════════════════════════════════════════╝
-            |
             |Provide feedback on the result of a steroid_execute_code call.
             |
-            |REQUIRED PARAMETERS:
+            |Use this tool to rate execution results and track what worked or didn't work.
+            |
+            |PARAMETERS:
             |- project_name: The project where execution occurred
             |- task_id: The same task_id you used in steroid_execute_code
             |- execution_id: The execution_id returned in the steroid_execute_code result
@@ -175,15 +172,9 @@ class ExecuteFeedbackToolHandler {
             |  - 0.50-0.75: Partial success, achieved some goals
             |  - 0.75-1.00: Success, achieved the intended goal
             |- explanation: Describe what worked, what didn't, and what you'll try next
+            |- code (optional): The code snippet that was executed
             |
-            |OPTIONAL PARAMETERS:
-            |- code: The code snippet that was executed. Include this to help track what code
-            |  produced which results. This is useful for debugging and analysis.
-            |
-            |WHY FEEDBACK IS REQUIRED:
-            |Feedback enables tracking of execution history, success patterns, and helps
-            |identify areas for improvement. Without feedback, the execution data is incomplete
-            |and cannot be used for analysis or debugging.
+            |Feedback helps track execution history and identify patterns for improvement.
         """.trimMargin()
     }
 }

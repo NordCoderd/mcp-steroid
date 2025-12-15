@@ -139,16 +139,12 @@ class ExecuteCodeToolHandler {
         taskId: String,
         executionId: String?
     ): String = buildString {
-        appendLine("╔══════════════════════════════════════════════════════════════════════════════╗")
-        appendLine("║  ACTION REQUIRED: Call steroid_execute_feedback NOW with the values below!  ║")
-        appendLine("╚══════════════════════════════════════════════════════════════════════════════╝")
-        appendLine()
         appendLine("=== Execution Result ===")
+        appendLine("status: SUCCESS")
         appendLine("task_id: $taskId")
         if (executionId != null) {
             appendLine("execution_id: $executionId")
         }
-        appendLine("status: SUCCESS")
         appendLine()
         if (result.output.isNotEmpty()) {
             appendLine("=== Output ===")
@@ -157,44 +153,24 @@ class ExecuteCodeToolHandler {
             appendLine("Execution completed successfully (no output).")
         }
         appendLine()
-        appendLine("═══════════════════════════════════════════════════════════════════════════════")
-        appendLine("NEXT STEP: You MUST call steroid_execute_feedback with:")
-        appendLine("  - project_name: (same as this execution)")
-        appendLine("  - task_id: $taskId")
-        if (executionId != null) {
-            appendLine("  - execution_id: $executionId")
-        }
-        appendLine("  - success_rating: 0.0 to 1.0")
-        appendLine("  - explanation: what worked/didn't work")
-        appendLine("═══════════════════════════════════════════════════════════════════════════════")
+        appendLine("---")
+        appendLine("Tip: Consider calling steroid_execute_feedback to rate this execution.")
     }
 
     private fun errorResultWithContext(message: String, taskId: String, executionId: String?): ToolCallResult {
         val fullMessage = buildString {
-            appendLine("╔══════════════════════════════════════════════════════════════════════════════╗")
-            appendLine("║  ACTION REQUIRED: Call steroid_execute_feedback NOW with the values below!  ║")
-            appendLine("╚══════════════════════════════════════════════════════════════════════════════╝")
-            appendLine()
             appendLine("=== Execution Result ===")
+            appendLine("status: ERROR")
             appendLine("task_id: $taskId")
             if (executionId != null) {
                 appendLine("execution_id: $executionId")
             }
-            appendLine("status: ERROR")
             appendLine()
             appendLine("=== Error ===")
             appendLine(message)
             appendLine()
-            appendLine("═══════════════════════════════════════════════════════════════════════════════")
-            appendLine("NEXT STEP: You MUST call steroid_execute_feedback with:")
-            appendLine("  - project_name: (same as this execution)")
-            appendLine("  - task_id: $taskId")
-            if (executionId != null) {
-                appendLine("  - execution_id: $executionId")
-            }
-            appendLine("  - success_rating: 0.0 to 1.0 (rate based on error severity)")
-            appendLine("  - explanation: describe the error and your next steps")
-            appendLine("═══════════════════════════════════════════════════════════════════════════════")
+            appendLine("---")
+            appendLine("Tip: Consider calling steroid_execute_feedback to rate this execution.")
         }
         return ToolCallResult(
             content = listOf(ContentItem.Text(text = fullMessage)),
@@ -221,25 +197,9 @@ class ExecuteCodeToolHandler {
         private val TOOL_DESCRIPTION = """
             |Execute Kotlin code in the IDE's runtime context with full access to IntelliJ APIs.
             |
-            |╔══════════════════════════════════════════════════════════════════════════════╗
-            |║  MANDATORY: You MUST call steroid_execute_feedback after EVERY execution!   ║
-            |║  The execution workflow is incomplete without feedback.                      ║
-            |╚══════════════════════════════════════════════════════════════════════════════╝
-            |
-            |REQUIRED WORKFLOW (you must follow this exactly):
-            |  Step 1: Call steroid_execute_code with a task_id
-            |  Step 2: Review the execution result (contains execution_id)
-            |  Step 3: IMMEDIATELY call steroid_execute_feedback with:
-            |          - Same task_id
-            |          - The execution_id from the result
-            |          - Your success_rating (0.0-1.0)
-            |          - Your explanation
-            |
-            |IMPORTANT RULES:
+            |IMPORTANT:
             |1. All code must be written as suspend functions. Never use runBlocking.
-            |2. You MUST provide a task_id to group related executions.
-            |3. You MUST call steroid_execute_feedback after EVERY steroid_execute_code call.
-            |   Skipping feedback breaks the execution tracking system.
+            |2. Provide a task_id to group related executions.
             |
             |The code must use the execute { } pattern:
             |```kotlin
@@ -272,6 +232,8 @@ class ExecuteCodeToolHandler {
             |    }
             |}
             |```
+            |
+            |Tip: After execution, consider calling steroid_execute_feedback to rate the result.
         """.trimMargin()
     }
 }
