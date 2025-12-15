@@ -21,10 +21,12 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.response.ApplicationSendPipeline
 import io.ktor.server.sse.*
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import java.net.BindException
 import java.net.ServerSocket
 import java.nio.file.Files
 import java.nio.file.Path
@@ -44,6 +46,7 @@ class SteroidsMcpServer(
     private val serverRef = AtomicReference<EmbeddedServer<*, *>?>(null)
     private val portRef = AtomicReference<Int>(0)
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob() + Dispatchers.IO)
+    private val startupLock = ReentrantLock()
 
     val port: Int get() = portRef.get()
     val mcpUrl: String get() = "http://localhost:$port/mcp"
@@ -59,22 +62,82 @@ class SteroidsMcpServer(
     )
 
     fun startServerIfNeeded() {
+        // Fast check without lock
         if (port > 0) return
 
-        // Register tools
-        service<ListProjectsToolHandler>().register(mcpServer)
-        service<ExecuteCodeToolHandler>().register(mcpServer)
-        service<ExecuteFeedbackToolHandler>().register(mcpServer)
+        // Synchronize startup to handle concurrent calls from multiple projects
+        startupLock.lock()
+        try {
+            // Double-check after acquiring lock
+            if (port > 0) return
 
-        val configuredPort = Registry.intValue("mcp.steroids.server.port", 63150)
-        val actualPort = if (configuredPort == 0) findFreePort() else configuredPort
+            // Register tools
+            service<ListProjectsToolHandler>().register(mcpServer)
+            service<ExecuteCodeToolHandler>().register(mcpServer)
+            service<ExecuteFeedbackToolHandler>().register(mcpServer)
 
-        // By default, bind to localhost only per MCP security requirements.
-        // For Docker testing, set mcp.steroids.server.host to "0.0.0.0"
-        val bindHost = Registry.stringValue("mcp.steroids.server.host").takeIf { it.isNotBlank() } ?: "127.0.0.1"
+            val configuredPort = Registry.intValue("mcp.steroids.server.port", 63150)
+
+            // By default, bind to localhost only per MCP security requirements.
+            // For Docker testing, set mcp.steroids.server.host to "0.0.0.0"
+            val bindHost = Registry.stringValue("mcp.steroids.server.host").takeIf { it.isNotBlank() } ?: "127.0.0.1"
+
+            // Try to start on configured port, fall back to next ports if busy
+            val actualPort = startServerOnAvailablePort(bindHost, configuredPort)
+            if (actualPort > 0) {
+                log.info("MCP Steroid server started on $mcpUrl")
+                log.info("Note: If you restart IntelliJ, connected MCP clients (Claude CLI, etc.) will need to reconnect.")
+                log.info("      Client should re-run: claude mcp add --transport http intellij-steroid $mcpUrl")
+            }
+        } finally {
+            startupLock.unlock()
+        }
+    }
+
+    /**
+     * Tries to start the server on the given port. If the port is busy,
+     * tries subsequent ports up to MAX_PORT_RETRIES times.
+     * If configuredPort is 0, finds a free port automatically.
+     *
+     * @return the actual port the server started on, or 0 if failed
+     */
+    private fun startServerOnAvailablePort(bindHost: String, configuredPort: Int): Int {
+        if (configuredPort == 0) {
+            // Dynamic port allocation requested
+            val freePort = findFreePort()
+            return tryStartServer(bindHost, freePort)
+        }
+
+        // Try configured port and subsequent ports
+        for (attempt in 0 until MAX_PORT_RETRIES) {
+            val portToTry = configuredPort + attempt
+            val result = tryStartServer(bindHost, portToTry)
+            if (result > 0) {
+                if (attempt > 0) {
+                    log.info("Port $configuredPort was busy, started on port $portToTry instead")
+                }
+                return result
+            }
+        }
+
+        log.error("Failed to start MCP server: all ports from $configuredPort to ${configuredPort + MAX_PORT_RETRIES - 1} are busy")
+        return 0
+    }
+
+    /**
+     * Attempts to start the server on the specified port.
+     *
+     * @return the port if successful, 0 if the port is busy, throws on other errors
+     */
+    private fun tryStartServer(bindHost: String, portToTry: Int): Int {
+        // Pre-check if port is available to avoid async BindException from Ktor CIO
+        if (!isPortAvailable(bindHost, portToTry)) {
+            log.info("Port $portToTry is busy, will try next port")
+            return 0
+        }
 
         try {
-            val server = scope.embeddedServer(CIO, host = bindHost, port = actualPort) {
+            val server = scope.embeddedServer(CIO, host = bindHost, port = portToTry) {
                 install(requestLoggingPlugin)
                 install(SSE)
                 routing {
@@ -84,33 +147,72 @@ class SteroidsMcpServer(
                     get("/.well-known/mcp.json") {
                         call.respondText(
                             contentType = ContentType.Application.Json,
-                            text = buildWellKnownMcpJson(actualPort)
+                            text = buildWellKnownMcpJson(portToTry)
                         )
                     }
                 }
             }
 
-            serverRef.set(server)
-            portRef.set(actualPort)
-
-            val mutex = ReentrantLock()
-            mutex.lock()
+            val startupMutex = ReentrantLock()
+            startupMutex.lock()
             server.application.monitor.subscribe(ApplicationStarted) {
-                mutex.unlock()
+                startupMutex.unlock()
             }
 
-            log.info("Starting MCP Steroid server on $bindHost:$actualPort")
+            log.info("Starting MCP Steroid server on $bindHost:$portToTry")
             server.start(wait = false)
 
-            //wait for ktor is ready
-            mutex.lock()
+            // Wait for Ktor to be ready
+            startupMutex.lock()
 
-            log.info("MCP Steroid server started on $mcpUrl")
-            log.info("Note: If you restart IntelliJ, connected MCP clients (Claude CLI, etc.) will need to reconnect.")
-            log.info("      Client should re-run: claude mcp add --transport http intellij-steroid $mcpUrl")
+            // Server started successfully
+            serverRef.set(server)
+            portRef.set(portToTry)
+            return portToTry
+        } catch (e: CancellationException) {
+            // Control-flow exception - rethrow, do not log
+            throw e
         } catch (e: Exception) {
-            log.error("Failed to start MCP server. ${e.message}", e)
+            // Check if the root cause is BindException (port busy)
+            if (isPortBusyException(e)) {
+                log.info("Port $portToTry is busy, will try next port")
+                return 0
+            }
+            // Other exception - log and rethrow
+            log.error("Failed to start MCP server on port $portToTry: ${e.message}", e)
+            throw e
         }
+    }
+
+    /**
+     * Checks if a port is available for binding.
+     */
+    private fun isPortAvailable(host: String, port: Int): Boolean {
+        return try {
+            val address = if (host == "0.0.0.0") null else java.net.InetAddress.getByName(host)
+            ServerSocket(port, 1, address).use { true }
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Checks if the exception indicates the port is already in use.
+     */
+    private fun isPortBusyException(e: Throwable): Boolean {
+        var current: Throwable? = e
+        while (current != null) {
+            if (current is BindException) {
+                return true
+            }
+            // Also check for common messages
+            val msg = current.message?.lowercase() ?: ""
+            if (msg.contains("address already in use") || msg.contains("address in use")) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
     }
 
     /**
@@ -200,6 +302,8 @@ class SteroidsMcpServer(
     }
 
     companion object {
+        private const val MAX_PORT_RETRIES = 10
+
         private val requestLoggingPlugin = createApplicationPlugin("SteroidsMcpRequestLogger") {
             val logger = Logger.getInstance(SteroidsMcpServer::class.java)
             onCall { call ->
