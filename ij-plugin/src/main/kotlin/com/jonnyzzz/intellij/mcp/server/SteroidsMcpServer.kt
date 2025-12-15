@@ -329,5 +329,6 @@ data class ExecutionResultWithOutput(
     val status: ExecutionStatus,
     val output: List<String>,
     val errorMessage: String? = null,
-    val executionId: String? = null
+    val executionId: String? = null,
+    val exceptionStacktrace: String? = null
 )

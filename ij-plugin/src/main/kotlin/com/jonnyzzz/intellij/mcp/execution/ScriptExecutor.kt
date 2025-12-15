@@ -118,6 +118,10 @@ class ScriptExecutor(
                 }
             }
         } catch (t: Throwable) {
+            val sw = StringWriter()
+            t.printStackTrace(PrintWriter(sw))
+            val stacktrace = sw.toString()
+
             return when {
                 t is TimeoutCancellationException -> {
                     log.info("Execution timed out for $executionId after ${timeoutSeconds}s")
@@ -125,7 +129,8 @@ class ScriptExecutor(
                         status = ExecutionStatus.TIMEOUT,
                         output = context.getOutput(),
                         errorMessage = "Execution timed out after $timeoutSeconds seconds",
-                        executionId = executionId
+                        executionId = executionId,
+                        exceptionStacktrace = stacktrace
                     )
                 }
                 t is ProcessCanceledException || t is CancellationException -> {
@@ -139,11 +144,20 @@ class ScriptExecutor(
                 }
                 else -> {
                     log.error("Unexpected error during execution $executionId", t)
+                    val includeStacktrace = Registry.`is`("mcp.steroids.exception.include.stacktrace", true)
+                    val errorMessage = buildString {
+                        append("Unexpected error: ${t.message}")
+                        if (includeStacktrace) {
+                            append("\n\n--- Stacktrace ---\n")
+                            append(stacktrace)
+                        }
+                    }
                     ExecutionResultWithOutput(
                         status = ExecutionStatus.ERROR,
                         output = context.getOutput(),
-                        errorMessage = "Unexpected error: ${t.message}",
-                        executionId = executionId
+                        errorMessage = errorMessage,
+                        executionId = executionId,
+                        exceptionStacktrace = stacktrace
                     )
                 }
             }
@@ -175,11 +189,24 @@ class ScriptExecutor(
             log.warn("Block #${index + 1} failed for $executionId: ${e.message}", e)
             val sw = StringWriter()
             e.printStackTrace(PrintWriter(sw))
+            val stacktrace = sw.toString()
+
+            // Build error message with stacktrace if enabled
+            val includeStacktrace = Registry.`is`("mcp.steroids.exception.include.stacktrace", true)
+            val errorMessage = buildString {
+                append("Runtime error in block #${index + 1}: ${e.message}")
+                if (includeStacktrace) {
+                    append("\n\n--- Stacktrace ---\n")
+                    append(stacktrace)
+                }
+            }
+
             ExecutionResultWithOutput(
                 status = ExecutionStatus.ERROR,
                 output = context.getOutput(),
-                errorMessage = "Runtime error in block #${index + 1}: ${e.message}",
-                executionId = executionId
+                errorMessage = errorMessage,
+                executionId = executionId,
+                exceptionStacktrace = stacktrace
             )
         }
     }
@@ -187,6 +214,6 @@ class ScriptExecutor(
     private fun ExecutionResultWithOutput.toExecutionResult() = ExecutionResult(
         status = status,
         errorMessage = errorMessage,
-        exceptionInfo = null
+        exceptionInfo = exceptionStacktrace
     )
 }
