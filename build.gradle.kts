@@ -1,3 +1,4 @@
+
 plugins {
     id("org.jetbrains.intellij.platform") version "2.10.5"
     kotlin("jvm") version "2.2.21"
@@ -92,17 +93,22 @@ tasks {
 val deployPluginLocallyTo253 by tasks.registering(Sync::class) {
     dependsOn(tasks.buildPlugin)
     group = "intellij platform"
+    outputs.upToDateWhen { false }
 
     val targetName = "" + rootProject.name
     val targetDir = "${System.getenv("HOME")}/intellij-253/config/plugins/$targetName"
 
-    into(targetDir)
+    this.destinationDir = file(targetDir)
     from(
         tasks.buildPlugin
             .map { it.archiveFile }
             .map { zipTree(it) }
     ) {
-        include(targetName)
+        includeEmptyDirs = false
+        eachFile {
+            println(this)
+            this.path = this.path.substringAfter("/")
+        }
     }
 }
 
