@@ -149,6 +149,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                     """.trimIndent()
                 )
                 put("reason", "Verify MCP agent can execute code inside IntelliJ")
+                put("task_id", "integration-test-task-1")
             }
         }
     }.toString()
