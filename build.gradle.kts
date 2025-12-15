@@ -1,6 +1,3 @@
-import com.jetbrains.plugin.structure.base.utils.contentBuilder.buildDirectory
-import com.jetbrains.plugin.structure.base.utils.contentBuilder.buildZipFile
-
 plugins {
     id("org.jetbrains.intellij.platform") version "2.10.5"
     kotlin("jvm") version "2.2.21"
