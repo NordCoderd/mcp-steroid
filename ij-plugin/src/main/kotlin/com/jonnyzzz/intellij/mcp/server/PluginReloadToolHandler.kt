@@ -38,7 +38,7 @@ Use this to check plugin status before attempting reload operations.""",
                 putJsonObject("properties") { }
                 putJsonArray("required") { }
             }
-        ) { _, _ ->
+        ) { _ ->
             handlePluginInfo()
         }
 
@@ -62,7 +62,7 @@ Returns the scheduling result and path to the log file for monitoring.""",
                 putJsonObject("properties") { }
                 putJsonArray("required") { }
             }
-        ) { _, _ ->
+        ) { _ ->
             handlePluginReload()
         }
     }

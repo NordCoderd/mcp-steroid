@@ -4,7 +4,7 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.server.ProgressReporter
+import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
 import kotlin.time.Duration.Companion.seconds
@@ -30,7 +30,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
             }
         """.trimIndent()
 
-        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), ProgressReporter.noOp())
+        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), NoOpProgressReporter)
 
         // Should complete with a valid status
         assertTrue(
@@ -49,7 +49,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
             }
         """.trimIndent()
 
-        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), ProgressReporter.noOp())
+        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), NoOpProgressReporter)
 
         // If execution succeeded, verify output
         if (result.status == ExecutionStatus.SUCCESS) {
@@ -66,7 +66,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
             }
         """.trimIndent()
 
-        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), ProgressReporter.noOp())
+        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), NoOpProgressReporter)
 
         // Should be ERROR status
         assertEquals(ExecutionStatus.ERROR, result.status)
@@ -84,7 +84,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
             }
         """.trimIndent()
 
-        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 2), ProgressReporter.noOp())
+        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 2), NoOpProgressReporter)
 
         // Should be TIMEOUT or ERROR (if script engine not available)
         assertTrue(

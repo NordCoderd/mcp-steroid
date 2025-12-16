@@ -5,7 +5,7 @@ import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
-import com.jonnyzzz.intellij.mcp.server.ProgressReporter
+import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
 import kotlin.time.Duration.Companion.seconds
@@ -32,7 +32,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
                 }
             """.trimIndent(),
             params = ExecutionParams(timeout = 30),
-            progressReporter = ProgressReporter.noOp()
+            progressReporter = NoOpProgressReporter
         )
 
         // Should complete with a valid status
@@ -56,7 +56,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
                 }
             """.trimIndent(),
             params = ExecutionParams(timeout = 30),
-            progressReporter = ProgressReporter.noOp()
+            progressReporter = NoOpProgressReporter
         )
 
         // If execution succeeded, verify output
@@ -75,7 +75,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
                 }
             """.trimIndent(),
             params = ExecutionParams(timeout = 30),
-            progressReporter = ProgressReporter.noOp()
+            progressReporter = NoOpProgressReporter
         )
 
         // Should be ERROR status
@@ -95,7 +95,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
                 }
             """.trimIndent(),
             params = ExecutionParams(timeout = 2), // 2 second timeout
-            progressReporter = ProgressReporter.noOp()
+            progressReporter = NoOpProgressReporter
         )
 
         // Should be TIMEOUT or ERROR (if script engine not available)
@@ -113,7 +113,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
                 this is not valid kotlin code at all
             """.trimIndent(),
             params = ExecutionParams(timeout = 30),
-            progressReporter = ProgressReporter.noOp()
+            progressReporter = NoOpProgressReporter
         )
 
         // Should be ERROR status

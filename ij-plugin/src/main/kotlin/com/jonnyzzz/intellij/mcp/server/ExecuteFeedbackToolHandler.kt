@@ -66,8 +66,8 @@ class ExecuteFeedbackToolHandler {
                     add("explanation")
                 }
             }
-        ) { params, _ ->
-            handle(params)
+        ) { context ->
+            handle(context.params)
         }
     }
 
@@ -87,7 +87,7 @@ class ExecuteFeedbackToolHandler {
         val code = args["code"]?.jsonPrimitive?.contentOrNull  // Optional
 
         // Validate success_rating
-        if (successRating < 0.0 || successRating > 1.0) {
+        if (successRating !in 0.0..1.0) {
             return errorResult("success_rating must be between 0.00 and 1.00")
         }
 

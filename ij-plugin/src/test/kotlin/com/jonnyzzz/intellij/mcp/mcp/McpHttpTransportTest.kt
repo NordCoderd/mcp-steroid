@@ -6,6 +6,7 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.application.*
+import io.ktor.server.cio.CIO
 import io.ktor.server.engine.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
@@ -51,12 +52,12 @@ class McpHttpTransportTest {
                     putJsonObject("message") { put("type", "string") }
                 }
             }
-        ) { params, _ ->
-            val message = params.arguments?.get("message")?.jsonPrimitive?.content ?: ""
+        ) { context ->
+            val message = context.params.arguments?.get("message")?.jsonPrimitive?.content ?: ""
             ToolCallResult(content = listOf(ContentItem.Text(text = "Echo: $message")))
         }
 
-        server = embeddedServer(io.ktor.server.cio.CIO, port = port) {
+        server = embeddedServer(CIO, port = port) {
             install(SSE)
             routing {
                 with(McpHttpTransport) {
@@ -436,7 +437,7 @@ class McpHttpTransportTest {
 
     @Test
     fun `test GET without Accept header returns server info`() = runBlocking {
-        // When no Accept header is provided, HTTP default is */* (accept anything)
+        // When no Accept header is provided, HTTP default is */*, accept anything
         // Ktor client adds Accept: */* by default
         // Server returns server info for availability checks
         val response = client.get("http://localhost:$port/mcp")

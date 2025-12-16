@@ -26,7 +26,7 @@ class ListProjectsToolHandler {
                 putJsonObject("properties") { }
                 putJsonArray("required") { }
             }
-        ) { _, _ ->
+        ) { _ ->
             handle()
         }
     }

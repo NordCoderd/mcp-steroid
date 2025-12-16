@@ -4,7 +4,7 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.intellij.openapi.components.service
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.server.ProgressReporter
+import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.OutputType
@@ -34,7 +34,7 @@ class McpScriptContextTest : BasePlatformTestCase() {
             project = project,
             executionId = executionId,
             disposable = disposable,
-            progressReporter = ProgressReporter.noOp(),
+            progressReporter = NoOpProgressReporter,
         )
     }
 

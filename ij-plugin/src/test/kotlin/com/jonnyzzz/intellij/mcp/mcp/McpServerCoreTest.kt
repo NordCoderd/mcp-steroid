@@ -82,7 +82,7 @@ class McpServerCoreTest {
             inputSchema = buildJsonObject {
                 put("type", "object")
             }
-        ) { _, _ ->
+        ) { _ ->
             ToolCallResult(content = listOf(ContentItem.Text(text = "OK")))
         }
 
@@ -113,9 +113,9 @@ class McpServerCoreTest {
                     putJsonObject("message") { put("type", "string") }
                 }
             }
-        ) { params, _ ->
+        ) { context ->
             called = true
-            val message = params.arguments?.get("message")?.jsonPrimitive?.content ?: "no message"
+            val message = context.params.arguments?.get("message")?.jsonPrimitive?.content ?: "no message"
             ToolCallResult(content = listOf(ContentItem.Text(text = "Echo: $message")))
         }
 

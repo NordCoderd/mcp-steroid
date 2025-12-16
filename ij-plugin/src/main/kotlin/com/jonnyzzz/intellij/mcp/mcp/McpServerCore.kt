@@ -53,7 +53,7 @@ class McpServerCore(
         // Check if this is a notification (no id)
         if (id == null) {
             if (method != null) {
-                handleNotification(method, json["params"]?.jsonObject, session)
+                handleNotification(method)
             }
             return null
         }
@@ -74,13 +74,13 @@ class McpServerCore(
         return when (method) {
             McpMethods.INITIALIZE -> handleInitialize(id, params, session)
             McpMethods.PING -> handlePing(id)
-            McpMethods.TOOLS_LIST -> handleToolsList(id, session)
+            McpMethods.TOOLS_LIST -> handleToolsList(id)
             McpMethods.TOOLS_CALL -> handleToolsCall(id, params, session)
             else -> encodeError(id, JsonRpcErrorCodes.METHOD_NOT_FOUND, "Method not found: $method")
         }
     }
 
-    private fun handleNotification(method: String, params: JsonObject?, session: McpSession) {
+    private fun handleNotification(method: String) {
         when (method) {
             McpMethods.INITIALIZED -> {
                 // Client confirmed initialization - nothing special needed
@@ -114,7 +114,7 @@ class McpServerCore(
         return encodeResult(id, JsonObject(emptyMap()))
     }
 
-    private fun handleToolsList(id: JsonElement, session: McpSession): String {
+    private fun handleToolsList(id: JsonElement): String {
         val tools = toolRegistry.listTools()
         val result = ToolsListResult(tools = tools)
         return encodeResult(id, McpJson.encodeToJsonElement(result))
@@ -146,23 +146,6 @@ class McpServerCore(
             error = JsonRpcError(code = code, message = message)
         )
         return McpJson.encodeToString(JsonRpcResponse.serializer(), response)
-    }
-
-    /**
-     * Send a progress notification to a session.
-     */
-    fun sendProgress(session: McpSession, progressToken: JsonElement, progress: Double, total: Double?, message: String?) {
-        val params = ProgressParams(
-            progressToken = progressToken,
-            progress = progress,
-            total = total,
-            message = message
-        )
-        val notification = JsonRpcNotification(
-            method = McpMethods.PROGRESS,
-            params = McpJson.encodeToJsonElement(params).jsonObject
-        )
-        session.sendNotification(notification)
     }
 
     /**

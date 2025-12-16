@@ -8,8 +8,10 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
-import com.jonnyzzz.intellij.mcp.execution.codeButcher
-import com.jonnyzzz.intellij.mcp.mcp.*
+import com.jonnyzzz.intellij.mcp.mcp.ContentItem
+import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
+import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
+import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
@@ -26,7 +28,7 @@ class ExecuteCodeToolHandler {
     fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_execute_code",
-            description = TOOL_DESCRIPTION,
+            description = toolDescription,
             inputSchema = buildJsonObject {
                 put("type", "object")
                 putJsonObject("properties") {
@@ -38,13 +40,13 @@ class ExecuteCodeToolHandler {
                         put("type", "string")
                         put("description", "Kotlin code to execute - must use execute { } with McpScriptContext as the receiver")
                     }
-                    putJsonObject("reason") {
-                        put("type", "string")
-                        put("description", "Write human readable reason for the execution, what you want to do and to get out of that")
-                    }
                     putJsonObject("task_id") {
                         put("type", "string")
                         put("description", "Your task identifier to group related executions. Use the same task_id for all execute_code calls that are part of the same task, and when providing feedback via steroid_execute_feedback.")
+                    }
+                    putJsonObject("reason") {
+                        put("type", "string")
+                        put("description", "Write human readable reason for the execution, what you want to do and to get out of that")
                     }
                     putJsonObject("timeout") {
                         put("type", "integer")
@@ -56,13 +58,13 @@ class ExecuteCodeToolHandler {
                     add("code")
                     add("task_id")
                 }
-            }
-        ) { params, session ->
-            handle(server, params, session)
-        }
+            },
+            ::handle
+        )
     }
 
-    private suspend fun handle(server: McpServerCore, params: ToolCallParams, session: McpSession): ToolCallResult {
+    private suspend fun handle(context: ToolCallContext): ToolCallResult {
+        val params = context.params
         val args = params.arguments ?: return errorResult("Missing arguments")
 
         val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
@@ -76,21 +78,13 @@ class ExecuteCodeToolHandler {
         val project = findProject(projectName)
             ?: return errorResult("Project not found: $projectName")
 
-        val progressToken = extractProgressToken(args)
-        val progressReporter = if (progressToken != null) {
-            McpProgressReporter(server, session, progressToken)
-        } else {
-            ProgressReporter.noOp()
-        }
-
         return coroutineScope {
-            (progressReporter as? McpProgressReporter)?.run { startThrottledSender() }
-
             try {
                 val manager = project.service<ExecutionManager>()
+
                 val storage = project.service<ExecutionStorage>()
                 val executionParams = ExecutionParams(timeout = timeout, showReviewOnError = false)
-                val result = manager.executeWithProgress(code, executionParams, progressReporter)
+                val result = manager.executeWithProgress(code, executionParams, context.progress)
 
                 // Associate execution with task
                 val executionId = result.executionId
@@ -185,23 +179,25 @@ class ExecuteCodeToolHandler {
         }
     }
 
-    private fun extractProgressToken(args: JsonObject): JsonElement? {
-        return args["_meta"]?.jsonObject?.get("progressToken")
-    }
-
     private fun errorResult(message: String) = ToolCallResult(
         content = listOf(ContentItem.Text(text = message)),
         isError = true
     )
 
-    private val TOOL_DESCRIPTION get() = """
-            Execute Kotlin code in the IDE's runtime context with full access to IntelliJ APIs.
-            
-            When you are working with the code, you can always use the MCP with steroid_* methods
-            to ask IntelliJ API to show you everything you need about the code or your changes --
-            use code completion, highlighting, coroutines highlighting, error highlighting,
-            run compilation and tests execution or even reflection. Run refactorings where possible.
-            Everything is for your. Mind what projects are open in IntelliJ's, use that! 
+    private val toolDescription get() = """
+             Execute Kotlin code in the IntelliJ-based IDE's runtime context with full access to IntelliJ APIs.
+ 
+             You are working with the stateful API, everything you do here changes the state of the IDE,
+             which is running exclusively for you. Use the IntelliJ-based IDE to help you looking
+             at the project, where you are working. Prioritize using the IDE and this MCP where possible.
+             
+             You can do everything IntelliJ API allows you to do including, but not limited to
+             - code search
+             - code completion
+             - code introspection, including methods, API, coroutines, reelection
+             - errors and warnings highlighting
+             - tests execution
+             - automated code refactorings, such as rename or find usages
               
             IMPORTANT:
             1. All code must be written as suspend functions. Never use runBlocking.
@@ -223,6 +219,7 @@ class ExecuteCodeToolHandler {
             - logInfo/logWarn/logError(msg) - Log messages
             - waitForSmartMode() - Wait for indexing to complete
             - project - Access the IntelliJ Project
+            - use Java/Kotlin reflection to find more!
             
             For read/write actions, use IntelliJ's coroutine-aware APIs:
             ```kotlin
@@ -239,10 +236,7 @@ class ExecuteCodeToolHandler {
             }
             ```
             
-            The execution context is the following, your code can see all plugin classes:
-            
-            ${codeButcher.wrapWithImports("TODO(\"YourCodeGoesHere!\")")}            
-           
-            Tip: After execution, consider calling steroid_execute_feedback to rate the result.
+            Tip: After execution is success and you solved or give up solving the task
+                 call the steroid_execute_feedback tool to log your feedback, so we can improve.
         """.trimIndent()
 }

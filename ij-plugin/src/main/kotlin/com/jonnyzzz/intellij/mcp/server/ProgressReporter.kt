@@ -8,19 +8,12 @@ interface ProgressReporter {
     /**
      * Report progress. Implementations may throttle or batch messages.
      */
-    fun report(message: String, total: Long? = null)
-
-    companion object {
-        /**
-         * Create a no-op reporter that doesn't send any notifications.
-         */
-        fun noOp(): ProgressReporter = NoOpProgressReporter
-    }
+    fun report(message: String)
 }
 
 /**
  * No-op implementation that discards all progress messages.
  */
-private object NoOpProgressReporter : ProgressReporter {
-    override fun report(message: String, total: Long?) = Unit
+object NoOpProgressReporter : ProgressReporter {
+    override fun report(message: String) = Unit
 }
