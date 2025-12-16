@@ -197,6 +197,12 @@ class ExecuteCodeToolHandler {
         private val TOOL_DESCRIPTION = """
             |Execute Kotlin code in the IDE's runtime context with full access to IntelliJ APIs.
             |
+            |When you are working with the code, you can always use the MCP with steroid_* methods
+            |to ask IntelliJ API to show you everything you need about the code or your changes --
+            |use code completion, highlighting, coroutines highlighting, error highlighting,
+            |run compilation and tests execution or even reflection. Run refactorings where possible.
+            |Everything is for your. Mind what projets are open in IntelliJ's, use that! 
+            |  
             |IMPORTANT:
             |1. All code must be written as suspend functions. Never use runBlocking.
             |2. Provide a task_id to group related executions.
@@ -209,6 +215,7 @@ class ExecuteCodeToolHandler {
             |    // Use any IntelliJ API here
             |}
             |```
+            |
             |
             |Available context methods:
             |- println(vararg values) - Print values separated by spaces
