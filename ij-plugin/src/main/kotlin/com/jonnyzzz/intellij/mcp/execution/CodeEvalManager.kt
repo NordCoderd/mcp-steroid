@@ -51,34 +51,8 @@ class CodeEvalManager(
 
     private val log = thisLogger()
 
-    /**
-     * Wrap user code with imports and execute binding.
-     * This is exposed so the review can show the final code.
-     */
-    fun wrapWithImports(code: String): String = buildString {
-        appendLine(
-            """
-            import com.intellij.openapi.project.*
-            import com.intellij.openapi.application.*
-            import com.intellij.openapi.application.readAction
-            import com.intellij.openapi.application.writeAction
-            import com.intellij.openapi.vfs.*
-            import com.intellij.openapi.editor.*
-            import com.intellij.openapi.fileEditor.*
-            import com.intellij.openapi.command.*
-            import com.intellij.psi.*
-            import kotlinx.coroutines.*
-            """.trimIndent()
-        )
-        appendLine()
-        // Bridge the script binding to a strongly-typed function in the script scope
-        appendLine("val execute = bindings[\"execute\"] as (suspend com.jonnyzzz.intellij.mcp.execution.McpScriptContext.() -> Unit) -> Unit")
-        appendLine()
-        append(code)
-    }
-
     fun evalCode(executionId: String, code: String): EvalResult {
-        val wrappedCode = wrapWithImports(code)
+        val wrappedCode = codeButcher.wrapWithImports(code)
 
         // Track captured execute blocks (FIFO)
         val scope = DisposableScope(executionId)

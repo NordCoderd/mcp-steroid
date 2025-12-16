@@ -8,6 +8,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
+import com.jonnyzzz.intellij.mcp.execution.codeButcher
 import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
@@ -193,54 +194,55 @@ class ExecuteCodeToolHandler {
         isError = true
     )
 
-    companion object {
-        private val TOOL_DESCRIPTION = """
-            |Execute Kotlin code in the IDE's runtime context with full access to IntelliJ APIs.
-            |
-            |When you are working with the code, you can always use the MCP with steroid_* methods
-            |to ask IntelliJ API to show you everything you need about the code or your changes --
-            |use code completion, highlighting, coroutines highlighting, error highlighting,
-            |run compilation and tests execution or even reflection. Run refactorings where possible.
-            |Everything is for your. Mind what projets are open in IntelliJ's, use that! 
-            |  
-            |IMPORTANT:
-            |1. All code must be written as suspend functions. Never use runBlocking.
-            |2. Provide a task_id to group related executions.
-            |
-            |The code must use the execute { } pattern:
-            |```kotlin
-            |execute {
-            |    println("Hello from IntelliJ!")
-            |    waitForSmartMode()
-            |    // Use any IntelliJ API here
-            |}
-            |```
-            |
-            |
-            |Available context methods:
-            |- println(vararg values) - Print values separated by spaces
-            |- printJson(obj) - Print object as pretty JSON
-            |- progress(message) - Report progress (throttled to 1/sec)
-            |- logInfo/logWarn/logError(msg) - Log messages
-            |- waitForSmartMode() - Wait for indexing to complete
-            |- project - Access the IntelliJ Project
-            |
-            |For read/write actions, use IntelliJ's coroutine-aware APIs:
-            |```kotlin
-            |import com.intellij.openapi.application.readAction
-            |import com.intellij.openapi.application.writeAction
-            |
-            |execute {
-            |    val psiFile = readAction {
-            |        PsiManager.getInstance(project).findFile(virtualFile)
-            |    }
-            |    writeAction {
-            |        document.setText("new content")
-            |    }
-            |}
-            |```
-            |
-            |Tip: After execution, consider calling steroid_execute_feedback to rate the result.
-        """.trimMargin()
-    }
+    private val TOOL_DESCRIPTION get() = """
+            Execute Kotlin code in the IDE's runtime context with full access to IntelliJ APIs.
+            
+            When you are working with the code, you can always use the MCP with steroid_* methods
+            to ask IntelliJ API to show you everything you need about the code or your changes --
+            use code completion, highlighting, coroutines highlighting, error highlighting,
+            run compilation and tests execution or even reflection. Run refactorings where possible.
+            Everything is for your. Mind what projects are open in IntelliJ's, use that! 
+              
+            IMPORTANT:
+            1. All code must be written as suspend functions. Never use runBlocking.
+            2. Provide a task_id to group related executions.
+            
+            The code must use the execute { } pattern:
+            ```kotlin
+            execute {
+                println("Hello from IntelliJ!")
+                waitForSmartMode()
+                // Use any IntelliJ API here
+            }
+            ```
+            
+            Available context methods:
+            - println(vararg values) - Print values separated by spaces
+            - printJson(obj) - Print object as pretty JSON
+            - progress(message) - Report progress (throttled to 1/sec)
+            - logInfo/logWarn/logError(msg) - Log messages
+            - waitForSmartMode() - Wait for indexing to complete
+            - project - Access the IntelliJ Project
+            
+            For read/write actions, use IntelliJ's coroutine-aware APIs:
+            ```kotlin
+            import com.intellij.openapi.application.readAction
+            import com.intellij.openapi.application.writeAction
+            
+            execute {
+                val psiFile = readAction {
+                    PsiManager.getInstance(project).findFile(virtualFile)
+                }
+                writeAction {
+                    document.setText("new content")
+                }
+            }
+            ```
+            
+            The execution context is the following, your code can see all plugin classes:
+            
+            ${codeButcher.wrapWithImports("TODO(\"YourCodeGoesHere!\")")}            
+           
+            Tip: After execution, consider calling steroid_execute_feedback to rate the result.
+        """.trimIndent()
 }

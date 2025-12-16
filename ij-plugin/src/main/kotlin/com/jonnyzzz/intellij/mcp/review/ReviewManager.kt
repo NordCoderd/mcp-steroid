@@ -18,6 +18,7 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.wm.WindowManager
 import com.jonnyzzz.intellij.mcp.execution.CodeEvalManager
+import com.jonnyzzz.intellij.mcp.execution.codeButcher
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.ReviewOutcome
 import kotlinx.coroutines.*
@@ -89,7 +90,8 @@ class ReviewManager(private val project: Project) {
         }
 
         // Wrap code with imports so the user sees the final code that will be executed
-        val wrappedCode = project.service<CodeEvalManager>().wrapWithImports(code)
+        project.service<CodeEvalManager>()
+        val wrappedCode = codeButcher.wrapWithImports(code)
 
         // Save wrapped code for review in the execution directory
         val reviewFile = storage.saveReviewCode(executionId, wrappedCode)
