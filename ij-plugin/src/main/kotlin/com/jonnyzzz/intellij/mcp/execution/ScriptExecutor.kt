@@ -5,18 +5,11 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.registry.Registry
-import com.jonnyzzz.intellij.mcp.server.ExecutionResultWithOutput
-import com.jonnyzzz.intellij.mcp.server.ProgressReporter
-import com.jonnyzzz.intellij.mcp.storage.ExecutionResult
-import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
-import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
+import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
+import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import kotlinx.coroutines.*
-import java.io.PrintWriter
-import java.io.StringWriter
 import kotlin.time.Duration.Companion.seconds
 
 inline val Project.scriptExecutor: ScriptExecutor get() = service()
@@ -40,10 +33,6 @@ class ScriptExecutor(
     private val log = Logger.getInstance(ScriptExecutor::class.java)
     override fun dispose() = Unit
 
-    private fun defaultTimeout(timeout: Int?): Int {
-        return timeout ?: Registry.intValue("mcp.steroids.execution.timeout", 30)
-    }
-
     /**
      * Execute a script with progress reporting and return the result with output.
      * This is a suspend function - it runs inside the caller's coroutine context.
@@ -52,43 +41,13 @@ class ScriptExecutor(
      * returns immediately with an error - no waiting.
      */
     suspend fun executeWithProgress(
-        executionId: String,
-        code: String,
-        timeoutSeconds: Int? = null,
-        progressReporter: ProgressReporter,
-    ): ExecutionResultWithOutput {
-        val result = try {
-            executeImpl(executionId, code, defaultTimeout(timeoutSeconds), progressReporter)
-        } catch (e: Throwable) {
-            log.error("Unexpected error during execution $executionId", e)
-            val sw = StringWriter()
-            e.printStackTrace(PrintWriter(sw))
-            ExecutionResultWithOutput(
-                status = ExecutionStatus.ERROR,
-                output = emptyList(),
-                errorMessage = "Unexpected error: ${e.message}",
-                executionId = executionId
-            )
-        }
-        project.service<ExecutionStorage>().writeResult(executionId, result.toExecutionResult())
-        return result
-    }
-
-    private suspend fun executeImpl(
-        executionId: String,
-        code: String,
-        timeoutSeconds: Int,
-        progressReporter: ProgressReporter,
-    ): ExecutionResultWithOutput {
-        val evalResult = project.service<CodeEvalManager>().evalCode(executionId, code)
-        if (evalResult is EvalResult.Failed) {
-            return ExecutionResultWithOutput(
-                status = evalResult.errorResult.status,
-                output = emptyList(),
-                errorMessage = evalResult.errorResult.errorMessage,
-                executionId = executionId
-            )
-        }
+        executionId: ExecutionId,
+        exec: ExecCodeParams,
+        resultBuilder: ExecutionResultBuilder,
+    ) {
+        val evalResult = project
+            .codeEvalManager
+            .evalCode(executionId, exec.code, resultBuilder) ?: return
 
         log.info("Starting execution $executionId")
 
@@ -98,133 +57,56 @@ class ScriptExecutor(
         // Create context for this execution with progress support
         val context = McpScriptContextImpl(
             project = project,
+            params = exec.rawParams,
             executionId = executionId,
             disposable = executionDisposable,
-            progressReporter = progressReporter,
+            resultBuilder = resultBuilder,
         )
 
         try {
-            evalResult as EvalResult.Success
             val capturedBlocks = evalResult.result
 
             // Run captured blocks in FIFO order with timeout
-            log.info("Running ${capturedBlocks.size} execute block(s) for $executionId with timeout ${timeoutSeconds}s")
+            log.info("Running ${capturedBlocks.size} execute block(s) for $executionId with timeout ${exec.timeout}s")
 
             return coroutineScope {
                 withContext(Dispatchers.IO) {
-                    withTimeout(timeoutSeconds.seconds) {
-                        val job = launch {
-                            service<ExceptionCaptureService>().exceptions.collect { ex ->
-                                context.println(buildString {
-                                    appendLine("=== IDE Exception Captured ===")
-                                    appendLine("Time: ${ex.timestamp}")
-                                    ex.pluginId?.let { appendLine("Plugin: $it") }
-                                    appendLine("Message: ${ex.message}")
-                                    appendLine("Stacktrace:")
-                                    append(ex.stacktrace)
-                                    appendLine("=== END ===")
-                                })
+                    val job = launch {
+                        service<ExceptionCaptureService>().exceptions.collect { ex ->
+                            context.println(buildString {
+                                appendLine("=== IDE Exception Captured ===")
+                                appendLine("Time: ${ex.timestamp}")
+                                ex.pluginId?.let { appendLine("Plugin: $it") }
+                                appendLine("Message: ${ex.message}")
+                                appendLine("Stacktrace:")
+                                append(ex.stacktrace)
+                                appendLine("=== END ===")
+                            })
+                        }
+                    }
+
+                    try {
+                        withTimeout(exec.timeout.seconds) {
+                            var index = 0
+                            for (block in capturedBlocks) {
+                                yield()
+                                log.info("Executing block #${index + 1}/${capturedBlocks.size} for $executionId")
+                                context.progress("Executing block ${index + 1} of ${capturedBlocks.size}...")
+                                block(context)
+                                index++
                             }
                         }
-
-                        try {
-                            runTheSubmittedCode(capturedBlocks, executionId, context)
-                        } finally {
-                            job.cancel()
-                        }
+                    } finally {
+                        job.cancel()
                     }
                 }
             }
         } catch (t: Throwable) {
-            val sw = StringWriter()
-            t.printStackTrace(PrintWriter(sw))
-            val stacktrace = sw.toString()
-
-            return when {
-                t is TimeoutCancellationException -> {
-                    log.info("Execution timed out for $executionId after ${timeoutSeconds}s")
-                    ExecutionResultWithOutput(
-                        status = ExecutionStatus.TIMEOUT,
-                        output = context.getOutput(),
-                        errorMessage = "Execution timed out after $timeoutSeconds seconds",
-                        executionId = executionId,
-                        exceptionStacktrace = stacktrace
-                    )
-                }
-                t is ProcessCanceledException || t is CancellationException -> {
-                    log.info("Execution cancelled for $executionId")
-                    ExecutionResultWithOutput(
-                        status = ExecutionStatus.CANCELLED,
-                        output = context.getOutput(),
-                        errorMessage = "Execution was cancelled",
-                        executionId = executionId
-                    )
-                }
-                else -> {
-                    log.error("Unexpected error during execution $executionId", t)
-                    val errorMessage = buildString {
-                        append("Unexpected error: ${t.message}")
-                        append("\n\n--- Stacktrace ---\n")
-                        append(stacktrace)
-                    }
-                    ExecutionResultWithOutput(
-                        status = ExecutionStatus.ERROR,
-                        output = context.getOutput(),
-                        errorMessage = errorMessage,
-                        executionId = executionId,
-                        exceptionStacktrace = stacktrace
-                    )
-                }
-            }
+            log.warn("Unexpected error during execution $executionId: ${t.message}", t)
+            resultBuilder.logException("Unexpected error during execution: ${t.message}", t)
+            resultBuilder.reportFailed("Unexpected error during execution: ${t.message}")
         } finally {
             Disposer.dispose(executionDisposable)
         }
     }
-
-    private suspend fun runTheSubmittedCode(
-        capturedBlocks: List<suspend McpScriptContext.() -> Unit>,
-        executionId: String,
-        context: McpScriptContextImpl
-    ): ExecutionResultWithOutput {
-        var index = 0
-        return try {
-            for (block in capturedBlocks) {
-                yield()
-                log.info("Executing block #${index + 1}/${capturedBlocks.size} for $executionId")
-                context.progress("Executing block ${index + 1} of ${capturedBlocks.size}...")
-                block(context)
-                index++
-            }
-            ExecutionResultWithOutput(
-                status = ExecutionStatus.SUCCESS,
-                output = context.getOutput(),
-                executionId = executionId
-            )
-        } catch (e: Throwable) {
-            log.warn("Block #${index + 1} failed for $executionId: ${e.message}", e)
-            val sw = StringWriter()
-            e.printStackTrace(PrintWriter(sw))
-            val stacktrace = sw.toString()
-
-            val errorMessage = buildString {
-                append("Runtime error in block #${index + 1}: ${e.message}")
-                append("\n\n--- Stacktrace ---\n")
-                append(stacktrace)
-            }
-
-            ExecutionResultWithOutput(
-                status = ExecutionStatus.ERROR,
-                output = context.getOutput(),
-                errorMessage = errorMessage,
-                executionId = executionId,
-                exceptionStacktrace = stacktrace
-            )
-        }
-    }
-
-    private fun ExecutionResultWithOutput.toExecutionResult() = ExecutionResult(
-        status = status,
-        errorMessage = errorMessage,
-        exceptionInfo = exceptionStacktrace
-    )
 }

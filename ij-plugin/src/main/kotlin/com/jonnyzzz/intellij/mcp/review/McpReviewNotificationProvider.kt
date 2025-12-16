@@ -8,6 +8,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.EditorNotificationProvider
 import com.intellij.ui.EditorNotifications
+import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import java.util.function.Function
 import javax.swing.JComponent
 
@@ -19,49 +20,32 @@ import javax.swing.JComponent
  * before rejecting - these edits will be sent back to the LLM.
  */
 class McpReviewNotificationProvider : EditorNotificationProvider {
-
     override fun collectNotificationData(
         project: Project,
         file: VirtualFile
     ): Function<FileEditor, JComponent?>? {
-        // Check if this is a review file: .idea/mcp-run/{execution-id}/review.kts
-        val path = file.path
-        if (!path.contains("mcp-run/") || !path.endsWith("/review.kts")) {
-            return null
-        }
-
         val reviewManager = project.service<ReviewManager>()
-        val executionId = reviewManager.getExecutionIdFromPath(path) ?: return null
-
-        // Only show if there's actually a pending review
-        if (!reviewManager.hasPendingReview(executionId)) {
-            return null
-        }
+        if (!reviewManager.isReviewPending(file)) return null
 
         return Function { editor ->
-            createPanel(project, file, editor, executionId, reviewManager)
+            createPanel(project, file, editor)
         }
     }
 
     private fun createPanel(
         project: Project,
         file: VirtualFile,
-        editor: FileEditor,
-        executionId: String,
-        reviewManager: ReviewManager
-    ): EditorNotificationPanel {
+        editor: FileEditor): EditorNotificationPanel {
         return EditorNotificationPanel(editor, EditorNotificationPanel.Status.Warning).apply {
-            text = "MCP Script Review - Edit code to add comments, then Approve or Reject"
+            text = "Review - Edit code to add comments, then Approve or Reject"
 
             createActionLabel("Approve & Execute") {
-                reviewManager.approve(executionId)
+                project.service<ReviewManager>().approve(file)
                 EditorNotifications.getInstance(project).updateNotifications(file)
             }
 
             createActionLabel("Reject (send edits to LLM)") {
-                // The reject action will capture any edits made to the code
-                // and return them with a diff to the LLM
-                reviewManager.reject(executionId)
+                project.service<ReviewManager>().reject(file)
                 EditorNotifications.getInstance(project).updateNotifications(file)
             }
         }

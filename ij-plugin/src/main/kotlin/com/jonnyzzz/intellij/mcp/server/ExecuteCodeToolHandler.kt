@@ -5,18 +5,29 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectManager
+import com.intellij.openapi.project.ProjectManager.getInstance
+import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
-import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
-import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
-import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
+import com.jonnyzzz.intellij.mcp.mcp.builder
+import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
+
+data class ExecCodeParams(
+    val taskId: String,
+    val code: String,
+    val reason: String,
+    val timeout: Int,
+
+    val rawParams: JsonObject,
+)
 
 /**
  * Handler for the steroid_execute_code MCP tool.
@@ -24,165 +35,6 @@ import kotlinx.serialization.json.*
 @Service(Service.Level.APP)
 class ExecuteCodeToolHandler {
     private val log = Logger.getInstance(ExecuteCodeToolHandler::class.java)
-
-    fun register(server: McpServerCore) {
-        server.toolRegistry.registerTool(
-            name = "steroid_execute_code",
-            description = toolDescription,
-            inputSchema = buildJsonObject {
-                put("type", "object")
-                putJsonObject("properties") {
-                    putJsonObject("project_name") {
-                        put("type", "string")
-                        put("description", "Project name (from steroid_list_projects)")
-                    }
-                    putJsonObject("code") {
-                        put("type", "string")
-                        put("description", "Kotlin code to execute - must use execute { } with McpScriptContext as the receiver")
-                    }
-                    putJsonObject("task_id") {
-                        put("type", "string")
-                        put("description", "Your task identifier to group related executions. Use the same task_id for all execute_code calls that are part of the same task, and when providing feedback via steroid_execute_feedback.")
-                    }
-                    putJsonObject("reason") {
-                        put("type", "string")
-                        put("description", "Write human readable reason for the execution, what you want to do and to get out of that")
-                    }
-                    putJsonObject("timeout") {
-                        put("type", "integer")
-                        put("description", "Execution timeout in seconds (default: 60)")
-                    }
-                }
-                putJsonArray("required") {
-                    add("project_name")
-                    add("code")
-                    add("task_id")
-                }
-            },
-            ::handle
-        )
-    }
-
-    private suspend fun handle(context: ToolCallContext): ToolCallResult {
-        val params = context.params
-        val args = params.arguments ?: return errorResult("Missing arguments")
-
-        val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
-            ?: return errorResult("Missing required parameter: project_name")
-        val code = args["code"]?.jsonPrimitive?.contentOrNull
-            ?: return errorResult("Missing required parameter: code")
-        val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
-            ?: return errorResult("Missing required parameter: task_id")
-        val timeout = args["timeout"]?.jsonPrimitive?.intOrNull ?: 60
-
-        val project = findProject(projectName)
-            ?: return errorResult("Project not found: $projectName")
-
-        return coroutineScope {
-            try {
-                val manager = project.service<ExecutionManager>()
-
-                val storage = project.service<ExecutionStorage>()
-                val executionParams = ExecutionParams(timeout = timeout, showReviewOnError = false)
-                val result = manager.executeWithProgress(code, executionParams, context.progress)
-
-                // Associate execution with task
-                val executionId = result.executionId
-                if (executionId != null) {
-                    storage.addExecutionToTask(taskId, executionId, projectName)
-                }
-
-                buildResponse(result, timeout, taskId, executionId)
-            } catch (e: Throwable) {
-                log.error("Error executing code", e)
-                errorResult("Execution error: ${e.message}")
-            }
-        }
-    }
-
-    private fun buildResponse(
-        result: ExecutionResultWithOutput,
-        timeout: Int,
-        taskId: String,
-        executionId: String?
-    ): ToolCallResult {
-        return when (result.status) {
-            ExecutionStatus.SUCCESS -> ToolCallResult(
-                content = listOf(ContentItem.Text(text = buildSuccessText(result, taskId, executionId)))
-            )
-            ExecutionStatus.REJECTED -> errorResultWithContext(
-                "Code rejected by user: ${result.errorMessage ?: "No reason provided"}",
-                taskId, executionId
-            )
-            ExecutionStatus.TIMEOUT -> errorResultWithContext(
-                "Execution timed out after $timeout seconds",
-                taskId, executionId
-            )
-            ExecutionStatus.CANCELLED -> errorResultWithContext(
-                "Execution was cancelled",
-                taskId, executionId
-            )
-            else -> errorResultWithContext(
-                result.errorMessage ?: "Execution failed with status: ${result.status}",
-                taskId, executionId
-            )
-        }
-    }
-
-    private fun buildSuccessText(
-        result: ExecutionResultWithOutput,
-        taskId: String,
-        executionId: String?
-    ): String = buildString {
-        appendLine("=== Execution Result ===")
-        appendLine("status: SUCCESS")
-        appendLine("task_id: $taskId")
-        if (executionId != null) {
-            appendLine("execution_id: $executionId")
-        }
-        appendLine()
-        if (result.output.isNotEmpty()) {
-            appendLine("=== Output ===")
-            appendLine(result.output.joinToString("\n"))
-        } else {
-            appendLine("Execution completed successfully (no output).")
-        }
-        appendLine()
-        appendLine("---")
-        appendLine("Tip: Consider calling steroid_execute_feedback to rate this execution.")
-    }
-
-    private fun errorResultWithContext(message: String, taskId: String, executionId: String?): ToolCallResult {
-        val fullMessage = buildString {
-            appendLine("=== Execution Result ===")
-            appendLine("status: ERROR")
-            appendLine("task_id: $taskId")
-            if (executionId != null) {
-                appendLine("execution_id: $executionId")
-            }
-            appendLine()
-            appendLine("=== Error ===")
-            appendLine(message)
-            appendLine()
-            appendLine("---")
-            appendLine("Tip: Consider calling steroid_execute_feedback to rate this execution.")
-        }
-        return ToolCallResult(
-            content = listOf(ContentItem.Text(text = fullMessage)),
-            isError = true
-        )
-    }
-
-    private suspend fun findProject(name: String): Project? {
-        return readAction {
-             ProjectManager.getInstance().openProjects.find { it.name == name }
-        }
-    }
-
-    private fun errorResult(message: String) = ToolCallResult(
-        content = listOf(ContentItem.Text(text = message)),
-        isError = true
-    )
 
     private val toolDescription get() = """
              Execute Kotlin code in the IntelliJ-based IDE's runtime context with full access to IntelliJ APIs.
@@ -239,4 +91,79 @@ class ExecuteCodeToolHandler {
             Tip: After execution is success and you solved or give up solving the task
                  call the steroid_execute_feedback tool to log your feedback, so we can improve.
         """.trimIndent()
+
+    fun register(server: McpServerCore) {
+        server.toolRegistry.registerTool(
+            name = "steroid_execute_code",
+            description = toolDescription,
+            inputSchema = buildJsonObject {
+                put("type", "object")
+                putJsonObject("properties") {
+                    putJsonObject("project_name") {
+                        put("type", "string")
+                        put("description", "Project name (from steroid_list_projects)")
+                    }
+                    putJsonObject("code") {
+                        put("type", "string")
+                        put("description", "Kotlin code to execute - must use execute { } with McpScriptContext as the receiver")
+                    }
+                    putJsonObject("task_id") {
+                        put("type", "string")
+                        put("description", "Your task identifier to group related executions. Use the same task_id for all execute_code calls that are part of the same task, and when providing feedback via steroid_execute_feedback.")
+                    }
+                    putJsonObject("reason") {
+                        put("type", "string")
+                        put("description", "Write human readable reason for the execution, what you want to do and to get out of that")
+                    }
+                    putJsonObject("timeout") {
+                        put("type", "integer")
+                        put("description", "Execution timeout in seconds (default: 60)")
+                    }
+                }
+                putJsonArray("required") {
+                    add("project_name")
+                    add("code")
+                    add("reason")
+                    add("task_id")
+                }
+            },
+            ::handle
+        )
+    }
+
+    private suspend fun handle(context: ToolCallContext): ToolCallResult {
+        val params = context.params
+        val args = params.arguments ?: return errorResult("Missing arguments")
+
+        val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
+            ?: return errorResult("Missing required parameter: project_name")
+        val code = args["code"]?.jsonPrimitive?.contentOrNull
+            ?: return errorResult("Missing required parameter: code")
+        val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
+            ?: return errorResult("Missing required parameter: task_id")
+        val reason = args["reason"]?.jsonPrimitive?.contentOrNull
+        val timeout = args["timeout"]?.jsonPrimitive?.intOrNull ?: Registry.intValue("mcp.steroids.execution.timeout", 60)
+
+        val project = readAction {
+            getInstance().openProjects.find { it.name == projectName }
+        }
+            ?: return errorResult("Project not found: $projectName")
+
+        val execCodeParams = ExecCodeParams(
+            taskId = taskId,
+            code = code,
+            reason = reason ?: "No reason provided",
+            timeout = timeout,
+            rawParams = params.arguments
+        )
+
+        return project
+            .service<ExecutionManager>()
+            .executeWithProgress(execCodeParams)
+    }
+
+    private fun errorResult(message: String) = ToolCallResult(
+        content = listOf(ContentItem.Text(text = "ERROR: $message")),
+        isError = true
+    )
 }

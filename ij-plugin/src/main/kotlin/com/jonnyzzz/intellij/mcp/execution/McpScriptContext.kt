@@ -3,6 +3,7 @@ package com.jonnyzzz.intellij.mcp.execution
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
+import kotlinx.serialization.json.JsonElement
 
 /**
  * Context provided to scripts inside the execute { } block.
@@ -33,8 +34,8 @@ interface McpScriptContext {
     /** The IntelliJ Project this execution is associated with */
     val project: Project
 
-    /** Execution ID for this script run */
-    val executionId: String
+    /** Original tool exection parameters */
+    val params: JsonElement
 
     /** Allows to bind a disposable to the execution context, use coroutineScope {} for coroutine API */
     val disposable: Disposable
@@ -66,6 +67,12 @@ interface McpScriptContext {
     fun printJson(obj: Any?)
 
     /**
+     * Report an error to the MCP client.
+     * Does not make the execution as failed
+     */
+    fun printException(message: String, throwable: Throwable)
+
+    /**
      * Report progress to the MCP client.
      * Messages are throttled to at most once per second to avoid overwhelming the connection.
      *
@@ -80,15 +87,6 @@ interface McpScriptContext {
      * ```
      */
     fun progress(message: String)
-
-    /** Log an info message */
-    fun logInfo(message: String)
-
-    /** Log a warning message */
-    fun logWarn(message: String)
-
-    /** Log an error message */
-    fun logError(message: String, throwable: Throwable? = null)
 
     // === IDE Utilities ===
 

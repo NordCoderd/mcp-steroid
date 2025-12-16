@@ -4,11 +4,13 @@ package com.jonnyzzz.intellij.mcp.storage
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.Service
-import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -18,54 +20,20 @@ import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.io.path.deleteIfExists
+import kotlin.io.path.isRegularFile
+import kotlin.io.path.writeText
 
 @Serializable
-enum class OutputType {
-    COMPILER, //output from the compiler
-    OUT,   // stdout from println()
-    JSON,  // structured data from printJson()
-    LOG,   // log messages (info/warn/error)
-    ERR    // exceptions/errors
-}
+data class ExecutionId(val executionId: String)
 
 @Serializable
-data class OutputMessage(
-    val ts: Long,
-    val type: OutputType,
-    val msg: String,
-    val level: String? = null  // For LOG type: info, warn, error
-)
+data class TextMessage(val text: String)
 
-@Serializable
-data class ExecutionParams(
-    val timeout: Int? = 120,
-    val showReviewOnError: Boolean = false
-)
-
-@Serializable
-enum class ExecutionStatus {
-    SUBMITTED,
-    PENDING_REVIEW,
-    RUNNING,
-    SUCCESS,
-    ERROR,
-    TIMEOUT,
-    CANCELLED,
-    REJECTED,
-    NOT_FOUND
-}
-
-@Serializable
-data class ExecutionResult(
-    val status: ExecutionStatus,
-    val errorMessage: String? = null,
-    val exceptionInfo: String? = null
-)
+inline val Project.executionStorage : ExecutionStorage get() = service()
 
 /**
  * File-based storage for execution history.
@@ -86,9 +54,14 @@ class ExecutionStorage(
     private val project: Project,
     private val coroutineScope: CoroutineScope,
 ) {
-    private val log = Logger.getInstance(ExecutionStorage::class.java)
+    private val log = thisLogger()
 
-    private val json = Json {
+    val json = Json {
+        prettyPrint = true
+        ignoreUnknownKeys = true
+    }
+
+    val oneLineJson = Json {
         prettyPrint = false
         ignoreUnknownKeys = true
     }
@@ -98,38 +71,82 @@ class ExecutionStorage(
     private val baseDir: Path
         get() = Path.of(project.basePath ?: throw IllegalStateException("Project has no base path"), ".idea", "mcp-run")
 
-    /**
-     * Generate execution ID in format: {project-hash-3}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-hash-10}
-     */
-    fun generateExecutionId(code: String, params: ExecutionParams): String {
-        val projectHash = computeHash(project.name).take(3)
-        val timestamp = LocalDateTime.now()
-            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH-mm-ss"))
-        val payloadHash = computeHash(code + json.encodeToString(params)).take(10)
 
-        return "$projectHash-$timestamp-$payloadHash"
+    private val ExecutionId.dir: Path
+        get() {
+            val dir = baseDir.resolve(executionId)
+            Files.createDirectories(dir)
+            return dir
+        }
+
+    suspend fun appendExecutionEvent(executionId: ExecutionId, text: String) {
+        appendExecutionEvent(executionId, TextMessage(text))
     }
 
-    private fun computeHash(input: String): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashBytes = digest.digest(input.toByteArray(Charsets.UTF_8))
-        return Base64.getUrlEncoder().withoutPadding().encodeToString(hashBytes)
+    suspend inline fun <reified T> appendExecutionEvent(executionId: ExecutionId, message: T) {
+        appendExecutionEventJson(executionId, oneLineJson.encodeToString(message))
     }
 
-    /**
-     * Create execution directory and save initial script file.
-     * This is called immediately when execution is submitted.
-     */
-    fun createExecution(executionId: String, code: String, params: ExecutionParams) {
-        val dir = baseDir.resolve(executionId)
-        Files.createDirectories(dir)
+    suspend fun writeCodeErrorEvent(executionId: ExecutionId, text: String) {
+        writeCodeExecutionData(executionId, "error.txt", text)
+    }
 
-        // Save original script as .kts file
-        Files.writeString(dir.resolve("script.kts"), code)
-        Files.writeString(dir.resolve("parameters.json"), json.encodeToString(params))
+    suspend fun appendExecutionEventJson(executionId: ExecutionId, json: String) {
+        withContext(Dispatchers.IO) {
+            val file = executionId.dir.resolve("output.jsonl")
+            require(json.lines().size == 1)
+            require(json.startsWith("{") && json.endsWith("}"))
 
-        // Mark the mcp-run folder as excluded to disable error highlighting
-        ensureBaseDirExcluded()
+            Files.writeString(
+                file,
+                json + "\n",
+                StandardOpenOption.CREATE,
+                StandardOpenOption.APPEND
+            )
+        }
+    }
+
+    suspend inline fun <reified T> writeCodeExecutionData(executionId: ExecutionId, name: String, data: T) {
+        writeCodeExecutionData(executionId, name, json.encodeToString(data))
+    }
+
+    suspend fun writeCodeExecutionData(executionId: ExecutionId, name: String, data: String): Path {
+        val path = executionId.dir.resolve(name)
+        withContext(Dispatchers.IO) {
+            ensureBaseDirExcluded()
+            path.writeText(data)
+        }
+        return path
+    }
+
+    fun findExecutionId(executionId: String) : ExecutionId? {
+        if (executionId.contains("/") || executionId.contains("..")) return null
+
+        val path = baseDir.resolve(executionId).resolve("params.json")
+        if (!path.isRegularFile()) return null
+
+        return ExecutionId(executionId)
+    }
+
+
+    private fun newExecutionId(taskId: String): ExecutionId {
+        val pattern = DateTimeFormatter.ofPattern("yyyyMMddTHHmmss")
+        val timestamp = LocalDateTime.now().format(pattern)
+        val invalidPath = Regex("[^a-zA-Z0-9_-]+", RegexOption.IGNORE_CASE)
+        val id = timestamp + "-" + invalidPath.replace(taskId, "_")
+        return ExecutionId(id)
+    }
+
+    suspend fun writeNewExecution(exec: ExecCodeParams) : ExecutionId {
+        val storage = project.executionStorage
+
+        val executionId = storage.newExecutionId(exec.taskId)
+        storage.writeCodeExecutionData(executionId, "params.json", exec.rawParams)
+        storage.writeCodeExecutionData(executionId, "reason.txt", exec.reason)
+        storage.writeCodeExecutionData(executionId, "script.kts", exec.code)
+        storage.writeCodeExecutionData(executionId, "execution-id.txt", executionId.executionId)
+
+        return executionId
     }
 
     /**
@@ -194,8 +211,9 @@ class ExecutionStorage(
                         modifiableModel.commit()
                     } catch (e: Exception) {
                         log.warn("Failed to exclude mcp-run folder: ${e.message}", e)
-                        modifiableModel.dispose()
                         baseDirExcluded.set(false)
+                    } finally {
+                        modifiableModel.dispose()
                     }
                 }
                 return
@@ -204,309 +222,15 @@ class ExecutionStorage(
         log.debug("mcp-run folder is not under any content root, no exclusion needed")
     }
 
-    /**
-     * Save code for review.
-     * Creates a review.kts file that the user can edit.
-     * Returns the path to the review file.
-     */
-    fun saveReviewCode(executionId: String, code: String): Path {
-        val dir = baseDir.resolve(executionId)
-        Files.createDirectories(dir)
-        val file = dir.resolve("review.kts")
-        Files.writeString(file, code)
-        return file
+    suspend fun writeCodeReviewFile(executionId: ExecutionId, execCodeParams: ExecCodeParams): Path {
+        return writeCodeExecutionData(executionId, "review.kts", execCodeParams.code)
     }
 
-    /**
-     * Read the current review code (which may have user edits).
-     */
-    fun readReviewCode(executionId: String): String? {
-        val file = baseDir.resolve(executionId).resolve("review.kts")
-        if (!Files.exists(file)) return null
-        return Files.readString(file)
-    }
-
-    /**
-     * Save review result (approved/rejected with optional user feedback).
-     */
-    fun saveReviewResult(executionId: String, result: ReviewOutcome) {
-        val file = baseDir.resolve(executionId).resolve("review-result.json")
-        Files.writeString(file, json.encodeToString(result))
-    }
-
-    /**
-     * Read review result.
-     */
-    fun readReviewResult(executionId: String): ReviewOutcome? {
-        val file = baseDir.resolve(executionId).resolve("review-result.json")
-        if (!Files.exists(file)) return null
-        return json.decodeFromString<ReviewOutcome>(Files.readString(file))
-    }
-
-    /**
-     * Append an output message to the execution log.
-     */
-    fun appendOutput(executionId: String, message: OutputMessage) {
-        val file = baseDir.resolve(executionId).resolve("output.jsonl")
-        val line = json.encodeToString(message) + "\n"
-        Files.writeString(
-            file,
-            line,
-            StandardOpenOption.CREATE,
-            StandardOpenOption.APPEND
-        )
-    }
-
-    fun appendOutput(executionId: String, type: OutputType, message: String, level: String? = null) {
-        appendOutput(
-            executionId,
-            OutputMessage(
-                ts = System.currentTimeMillis(),
-                type = type,
-                msg = message,
-                level = level
-            )
-        )
-    }
-
-    /**
-     * Read output messages, optionally skipping first N.
-     */
-    fun readOutput(executionId: String, offset: Int = 0): List<OutputMessage> {
-        val file = baseDir.resolve(executionId).resolve("output.jsonl")
-        if (!Files.exists(file)) return emptyList()
-
-        return Files.readAllLines(file)
-            .drop(offset)
-            .filter { it.isNotBlank() }
-            .map { json.decodeFromString<OutputMessage>(it) }
-    }
-
-    /**
-     * Write final execution result.
-     */
-    fun writeResult(executionId: String, result: ExecutionResult) {
-        val file = baseDir.resolve(executionId).resolve("result.json")
-        Files.writeString(file, json.encodeToString(result))
-    }
-
-    /**
-     * Read execution result if available.
-     */
-    fun readResult(executionId: String): ExecutionResult? {
-        val file = baseDir.resolve(executionId).resolve("result.json")
-        if (!Files.exists(file)) return null
-        return json.decodeFromString<ExecutionResult>(Files.readString(file))
-    }
-
-    /**
-     * Read the original script code for an execution.
-     */
-    fun readScript(executionId: String): String? {
-        val file = baseDir.resolve(executionId).resolve("script.kts")
-        if (!Files.exists(file)) return null
-        return Files.readString(file)
-    }
-
-    /**
-     * Read execution parameters.
-     */
-    fun readParams(executionId: String): ExecutionParams? {
-        val file = baseDir.resolve(executionId).resolve("parameters.json")
-        if (!Files.exists(file)) return null
-        return json.decodeFromString<ExecutionParams>(Files.readString(file))
-    }
-
-    /**
-     * Check if execution exists.
-     */
-    fun exists(executionId: String): Boolean {
-        return Files.exists(baseDir.resolve(executionId))
-    }
-
-    /**
-     * Get execution directory path.
-     */
-    fun getExecutionDir(executionId: String): Path {
-        return baseDir.resolve(executionId)
-    }
-
-    /**
-     * Get path to review file for an execution.
-     */
-    fun getReviewFilePath(executionId: String): Path {
-        return baseDir.resolve(executionId).resolve("review.kts")
-    }
-
-    // ==================== Task Tracking ====================
-
-    private val tasksDir: Path
-        get() = baseDir.resolve("_tasks")
-
-    /**
-     * Create or update a task, associating an execution with it.
-     */
-    fun addExecutionToTask(taskId: String, executionId: String, projectName: String) {
-        Files.createDirectories(tasksDir)
-        val taskFile = tasksDir.resolve("$taskId.json")
-
-        val existingTask = readTask(taskId)
-        val updatedTask = if (existingTask != null) {
-            existingTask.copy(
-                executionIds = existingTask.executionIds + executionId,
-                updatedAt = System.currentTimeMillis()
-            )
-        } else {
-            TaskInfo(
-                taskId = taskId,
-                projectName = projectName,
-                executionIds = listOf(executionId)
-            )
-        }
-
-        Files.writeString(taskFile, json.encodeToString(updatedTask))
-
-        // Also store task_id in the execution directory
-        val execDir = baseDir.resolve(executionId)
-        if (Files.exists(execDir)) {
-            Files.writeString(execDir.resolve("task_id.txt"), taskId)
-        }
-    }
-
-    /**
-     * Read task info by ID.
-     */
-    fun readTask(taskId: String): TaskInfo? {
-        val taskFile = tasksDir.resolve("$taskId.json")
-        if (!Files.exists(taskFile)) return null
-        return try {
-            json.decodeFromString<TaskInfo>(Files.readString(taskFile))
-        } catch (e: Exception) {
-            log.warn("Failed to read task $taskId: ${e.message}")
-            null
-        }
-    }
-
-    /**
-     * Save feedback for a task.
-     */
-    fun saveFeedback(feedback: ExecutionFeedback) {
-        // Save to task file
-        val taskFile = tasksDir.resolve("${feedback.taskId}.json")
-        val existingTask = readTask(feedback.taskId)
-        if (existingTask != null) {
-            val updatedTask = existingTask.copy(
-                feedback = feedback,
-                updatedAt = System.currentTimeMillis()
-            )
-            Files.writeString(taskFile, json.encodeToString(updatedTask))
-        } else {
-            // Create task if it doesn't exist (shouldn't happen normally)
-            Files.createDirectories(tasksDir)
-            val newTask = TaskInfo(
-                taskId = feedback.taskId,
-                projectName = "",
-                executionIds = listOf(feedback.executionId),
-                feedback = feedback
-            )
-            Files.writeString(taskFile, json.encodeToString(newTask))
-        }
-
-        // Also save feedback in the execution directory
-        val execDir = baseDir.resolve(feedback.executionId)
-        if (Files.exists(execDir)) {
-            val feedbackFile = execDir.resolve("feedback.json")
-            Files.writeString(feedbackFile, json.encodeToString(feedback))
-        }
-    }
-
-    /**
-     * Read feedback for a task.
-     */
-    fun readFeedback(taskId: String): ExecutionFeedback? {
-        return readTask(taskId)?.feedback
-    }
-
-    /**
-     * Read feedback for an execution.
-     */
-    fun readExecutionFeedback(executionId: String): ExecutionFeedback? {
-        val feedbackFile = baseDir.resolve(executionId).resolve("feedback.json")
-        if (!Files.exists(feedbackFile)) return null
-        return try {
-            json.decodeFromString<ExecutionFeedback>(Files.readString(feedbackFile))
-        } catch (e: Exception) {
-            log.warn("Failed to read feedback for execution $executionId: ${e.message}")
-            null
-        }
-    }
-
-    /**
-     * Get task ID for an execution (if associated).
-     */
-    fun getTaskIdForExecution(executionId: String): String? {
-        val taskIdFile = baseDir.resolve(executionId).resolve("task_id.txt")
-        if (!Files.exists(taskIdFile)) return null
-        return Files.readString(taskIdFile).trim()
-    }
-
-    /**
-     * List all tasks.
-     */
-    fun listTasks(): List<TaskInfo> {
-        if (!Files.exists(tasksDir)) return emptyList()
-        return Files.list(tasksDir)
-            .filter { it.toString().endsWith(".json") }
-            .map { path ->
-                try {
-                    json.decodeFromString<TaskInfo>(Files.readString(path))
-                } catch (e: Exception) {
-                    log.warn("Failed to read task file $path: ${e.message}")
-                    null
-                }
+    suspend fun removeCodeReviewFile(executionId: ExecutionId) {
+        withContext(Dispatchers.IO) {
+            runCatching {
+                executionId.dir.resolve("review.kts").deleteIfExists()
             }
-            .filter { it != null }
-            .map { it!! }
-            .toList()
+        }
     }
 }
-
-/**
- * Review outcome stored after user approves/rejects.
- */
-@Serializable
-data class ReviewOutcome(
-    val approved: Boolean,
-    val originalCode: String,
-    val editedCode: String? = null,
-    val userComments: String? = null,
-    val diff: String? = null,
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-/**
- * Agent feedback for an execution.
- * The agent provides this after seeing the execution result.
- */
-@Serializable
-data class ExecutionFeedback(
-    val taskId: String,
-    val executionId: String,
-    val successRating: Double,  // 0.00 to 1.00
-    val explanation: String,
-    val code: String? = null,  // Optional: the code snippet that was executed
-    val timestamp: Long = System.currentTimeMillis()
-)
-
-/**
- * Task tracking info - groups related executions under a task_id.
- */
-@Serializable
-data class TaskInfo(
-    val taskId: String,
-    val projectName: String,
-    val executionIds: List<String> = emptyList(),
-    val feedback: ExecutionFeedback? = null,
-    val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
-)

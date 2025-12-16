@@ -4,11 +4,12 @@ package com.jonnyzzz.intellij.mcp.server
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectManager
-import com.jonnyzzz.intellij.mcp.mcp.*
-import com.jonnyzzz.intellij.mcp.storage.ExecutionFeedback
+import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.project.ProjectManager.getInstance
+import com.jonnyzzz.intellij.mcp.mcp.ContentItem
+import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
+import com.jonnyzzz.intellij.mcp.mcp.ToolCallParams
+import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import kotlinx.serialization.json.*
 
@@ -22,12 +23,32 @@ import kotlinx.serialization.json.*
  */
 @Service(Service.Level.APP)
 class ExecuteFeedbackToolHandler {
-    private val log = Logger.getInstance(ExecuteFeedbackToolHandler::class.java)
+    private val log = thisLogger()
+
+    private val toolDescription get() = """
+            Provide feedback on the result of a steroid_execute_code call.
+            
+            Use this tool to rate execution results and track what worked or didn't work.
+            
+            PARAMETERS:
+            - project_name: The project where execution occurred
+            - task_id: The same task_id you used in steroid_execute_code
+            - execution_id: The execution_id returned in the steroid_execute_code result
+            - success_rating: Rate from 0.00 (complete failure) to 1.00 (complete success)
+              - 0.00-0.25: Complete failure, nothing worked
+              - 0.25-0.50: Partial failure, some errors occurred
+              - 0.50-0.75: Partial success, achieved some goals
+              - 0.75-1.00: Success, achieved the intended goal
+            - explanation: Describe what worked, what didn't, and what you'll try next
+            - code (optional): The code snippet that was executed
+            
+            Feedback helps track execution history and identify patterns for improvement.
+        """.trimIndent()
 
     fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_execute_feedback",
-            description = TOOL_DESCRIPTION,
+            description = toolDescription,
             inputSchema = buildJsonObject {
                 put("type", "object")
                 putJsonObject("properties") {
@@ -78,7 +99,7 @@ class ExecuteFeedbackToolHandler {
             ?: return errorResult("Missing required parameter: project_name")
         val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: task_id")
-        val executionId = args["execution_id"]?.jsonPrimitive?.contentOrNull
+        val executionIdText = args["execution_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: execution_id")
         val successRating = args["success_rating"]?.jsonPrimitive?.doubleOrNull
             ?: return errorResult("Missing required parameter: success_rating")
@@ -91,90 +112,27 @@ class ExecuteFeedbackToolHandler {
             return errorResult("success_rating must be between 0.00 and 1.00")
         }
 
-        val project = findProject(projectName)
-            ?: return errorResult("Project not found: $projectName")
+        log.info("Feedback is submitted: " + params.arguments)
 
-        val storage = project.service<ExecutionStorage>()
+        val project = readAction {
+            getInstance().openProjects.find { it.name == projectName }
+        } ?: return errorResult("Project not found: $projectName")
 
-        // Verify the execution exists
-        if (!storage.exists(executionId)) {
-            return errorResult("Execution not found: $executionId")
-        }
+        runCatching {
+            val storage = project.service<ExecutionStorage>()
+            val executionId = storage.findExecutionId(executionIdText)
+                ?: return errorResult("Execution not found: $executionIdText")
 
-        // Verify the task_id matches (if already associated)
-        val existingTaskId = storage.getTaskIdForExecution(executionId)
-        if (existingTaskId != null && existingTaskId != taskId) {
-            return errorResult("Execution $executionId is associated with task $existingTaskId, not $taskId")
-        }
-
-        // Create and save feedback
-        val feedback = ExecutionFeedback(
-            taskId = taskId,
-            executionId = executionId,
-            successRating = successRating,
-            explanation = explanation,
-            code = code
-        )
-
-        try {
-            storage.saveFeedback(feedback)
-            log.info("Saved feedback for task=$taskId, execution=$executionId, rating=$successRating")
-        } catch (e: Exception) {
-            log.error("Failed to save feedback", e)
-            return errorResult("Failed to save feedback: ${e.message}")
+            storage.writeCodeExecutionData(executionId, "feedback.json", args)
         }
 
         return ToolCallResult(
-            content = listOf(ContentItem.Text(text = buildSuccessMessage(feedback)))
+            content = listOf(ContentItem.Text(text = "ACK!"))
         )
-    }
-
-    private fun buildSuccessMessage(feedback: ExecutionFeedback): String = buildString {
-        appendLine("=== Feedback Recorded ===")
-        appendLine("task_id: ${feedback.taskId}")
-        appendLine("execution_id: ${feedback.executionId}")
-        appendLine("success_rating: ${String.format("%.2f", feedback.successRating)}")
-        appendLine()
-        appendLine("Thank you for providing feedback. This helps improve future executions.")
-        if (feedback.successRating < 0.5) {
-            appendLine()
-            appendLine("Since the success rating is low, consider:")
-            appendLine("- Reviewing the error message from the execution")
-            appendLine("- Trying a different approach")
-            appendLine("- Breaking the task into smaller steps")
-        }
-    }
-
-    private suspend fun findProject(name: String): Project? {
-        return readAction {
-            ProjectManager.getInstance().openProjects.find { it.name == name }
-        }
     }
 
     private fun errorResult(message: String) = ToolCallResult(
         content = listOf(ContentItem.Text(text = message)),
         isError = true
     )
-
-    companion object {
-        private val TOOL_DESCRIPTION = """
-            |Provide feedback on the result of a steroid_execute_code call.
-            |
-            |Use this tool to rate execution results and track what worked or didn't work.
-            |
-            |PARAMETERS:
-            |- project_name: The project where execution occurred
-            |- task_id: The same task_id you used in steroid_execute_code
-            |- execution_id: The execution_id returned in the steroid_execute_code result
-            |- success_rating: Rate from 0.00 (complete failure) to 1.00 (complete success)
-            |  - 0.00-0.25: Complete failure, nothing worked
-            |  - 0.25-0.50: Partial failure, some errors occurred
-            |  - 0.50-0.75: Partial success, achieved some goals
-            |  - 0.75-1.00: Success, achieved the intended goal
-            |- explanation: Describe what worked, what didn't, and what you'll try next
-            |- code (optional): The code snippet that was executed
-            |
-            |Feedback helps track execution history and identify patterns for improvement.
-        """.trimMargin()
-    }
 }

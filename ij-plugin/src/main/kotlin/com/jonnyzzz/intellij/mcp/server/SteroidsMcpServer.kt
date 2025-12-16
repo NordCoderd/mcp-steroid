@@ -10,22 +10,15 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.intellij.mcp.mcp.*
-import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
 import io.ktor.http.*
 import io.ktor.server.application.*
-import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.server.response.ApplicationSendPipeline
 import io.ktor.server.sse.*
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.*
 import java.net.BindException
 import java.net.ServerSocket
 import java.nio.file.Files
@@ -325,11 +318,3 @@ class SteroidsMcpServer(
         fun getInstance(): SteroidsMcpServer = ApplicationManager.getApplication().service()
     }
 }
-
-data class ExecutionResultWithOutput(
-    val status: ExecutionStatus,
-    val output: List<String>,
-    val errorMessage: String? = null,
-    val executionId: String? = null,
-    val exceptionStacktrace: String? = null
-)

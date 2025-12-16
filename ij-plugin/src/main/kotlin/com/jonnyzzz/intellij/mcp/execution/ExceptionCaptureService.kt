@@ -48,7 +48,6 @@ data class CapturedIdeException(
 @Suppress("UnstableApiUsage")
 @Service(Service.Level.APP)
 class ExceptionCaptureService : Disposable {
-    private val log = Logger.getInstance(ExceptionCaptureService::class.java)
     private val initialized = AtomicBoolean(false)
 
     /**

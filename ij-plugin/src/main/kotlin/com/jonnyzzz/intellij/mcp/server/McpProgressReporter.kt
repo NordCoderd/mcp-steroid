@@ -4,7 +4,7 @@ package com.jonnyzzz.intellij.mcp.server
 /**
  * Interface for reporting progress during script execution.
  */
-interface ProgressReporter {
+interface McpProgressReporter {
     /**
      * Report progress. Implementations may throttle or batch messages.
      */
@@ -14,6 +14,6 @@ interface ProgressReporter {
 /**
  * No-op implementation that discards all progress messages.
  */
-object NoOpProgressReporter : ProgressReporter {
+object NoOpProgressReporter : McpProgressReporter {
     override fun report(message: String) = Unit
 }
