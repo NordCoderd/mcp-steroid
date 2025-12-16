@@ -84,8 +84,7 @@ class ExceptionCaptureService : Disposable {
 
     private fun ensureInitialized() {
         if (initialized.compareAndSet(false, true)) {
-            registerListener()
-            log.info("ExceptionCaptureService initialized and listening for IDE exceptions")
+            runCatching { registerListener() }
         }
     }
 
@@ -93,7 +92,6 @@ class ExceptionCaptureService : Disposable {
         MessagePool.getInstance().addListener(listener)
         Disposer.register(this) {
             MessagePool.getInstance().removeListener(listener)
-            log.info("ExceptionCaptureService listener removed")
         }
     }
 
