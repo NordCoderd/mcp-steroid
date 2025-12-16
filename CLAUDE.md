@@ -89,6 +89,8 @@ This is an IntelliJ Platform plugin with a standalone MCP server using Kotlin MC
 
 12. **Two-phase execution**: First phase compiles script and captures execute blocks (`CodeEvalManager`), second phase runs them with timeout (`ScriptExecutor`).
 
+13. **Script definitions for IDE highlighting**: Uses `ScriptDefinitionsSource` extension point (K1/K2 compatible) to provide proper code highlighting for `.kts` files in the IDE.
+
 ## Source Structure
 
 ```
@@ -105,6 +107,10 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 │   ├── McpScriptContext.kt        # Interface for script context (project, output, utilities)
 │   ├── McpScriptContextImpl.kt    # Implementation with output methods, waitForSmartMode, progress
 │   └── McpScriptContextEx.kt      # Extended interface with reflection helpers
+├── script/
+│   ├── McpSteroidScriptDefinition.kt          # @KotlinScript annotation for .kts files
+│   ├── McpSteroidScriptDefinitionsSource.kt   # ScriptDefinitionsSource for K1/K2 modes
+│   └── McpSteroidScriptDefinitionsProvider.kt # ScriptDefinitionsProvider bridge API
 ├── review/
 │   ├── ReviewManager.kt           # Human review workflow, diff generation
 │   └── McpReviewNotificationProvider.kt  # Editor notification panel
@@ -293,3 +299,128 @@ The following commands are **NOT available** on this system:
 - `gtimeout` - Do not use for command timeouts
 
 For long-running commands, use Gradle's built-in timeout mechanisms or the Bash tool's `timeout` parameter instead.
+
+## Kotlin Script Definitions (IDE Highlighting)
+
+The plugin provides script definitions to enable proper code highlighting for `.kts` files in the IDE. This ensures IntelliJ APIs are recognized without error highlighting.
+
+### Architecture
+
+The Kotlin plugin supports two extension points for script definitions:
+
+1. **`org.jetbrains.kotlin.scriptDefinitionsSource`** - Primary extension point for both K1 and K2 modes
+2. **`org.jetbrains.kotlin.scriptDefinitionsProvider`** - Bridge API (loaded by `BridgeScriptDefinitionsContributor`)
+
+**Important**: In K2 mode (IntelliJ 2025.3+), `scriptDefinitionsProvider` extensions registered via optional dependency configs may not load properly. Always implement `ScriptDefinitionsSource` directly for K2 compatibility.
+
+### Implementation Files
+
+- **`McpSteroidScriptDefinitionsSource.kt`** - Primary implementation of `ScriptDefinitionsSource`:
+  - Provides `ScriptDefinition` with default imports, classpath, and `execute` binding
+  - Works in both K1 and K2 modes
+  - Registered via `kotlin-scripting.xml`
+
+- **`McpSteroidScriptDefinition.kt`** - `@KotlinScript` annotated class:
+  - Defines `McpSteroidScriptCompilationConfiguration` with imports and dependencies
+  - Uses `dependenciesFromClassContext(McpScriptContext::class, wholeClasspath = true)` for full IntelliJ classpath
+
+- **`McpSteroidScriptDefinitionsProvider.kt`** - Bridge API implementation:
+  - Returns `McpSteroidScript` class name and plugin classpath
+  - Kept for K1 mode compatibility
+
+### Extension Registration
+
+`src/main/resources/META-INF/kotlin-scripting.xml`:
+```xml
+<extensions defaultExtensionNs="org.jetbrains.kotlin">
+    <scriptDefinitionsSource
+            id="McpSteroidScriptDefinitionsSource"
+            implementation="com.jonnyzzz.intellij.mcp.script.McpSteroidScriptDefinitionsSource"/>
+    <scriptDefinitionsProvider
+            implementation="com.jonnyzzz.intellij.mcp.script.McpSteroidScriptDefinitionsProvider"/>
+</extensions>
+```
+
+### Default Imports Provided
+
+Scripts automatically have access to:
+- `com.intellij.openapi.project.*`
+- `com.intellij.openapi.application.*` (including `readAction`, `writeAction`)
+- `com.intellij.openapi.vfs.*`
+- `com.intellij.openapi.editor.*`
+- `com.intellij.openapi.fileEditor.*`
+- `com.intellij.openapi.command.*`
+- `com.intellij.psi.*`
+- `kotlinx.coroutines.*`
+
+### Troubleshooting Script Highlighting
+
+If `.kts` files show errors:
+1. Ensure Kotlin plugin is installed and enabled
+2. Restart IDE after plugin installation/update
+3. Check `Help > Diagnostic Tools > Activity Log` for script definition loading errors
+4. Verify plugin is loaded: `Settings > Plugins > Installed > MCP Steroid`
+
+## Plugin Deployment
+
+### Deploy to Local IntelliJ Instance
+
+```bash
+# Build and deploy to IntelliJ 253
+./gradlew deployPluginLocallyTo253
+
+# This deploys to: ~/intellij-253/config/plugins/intellij-mcp-steroid/
+```
+
+### Reload Plugin in Running IDE
+
+After deploying, the plugin needs to be reloaded. Use MCP to trigger a plugin reload:
+
+```kotlin
+execute {
+    // Unload and reload the plugin
+    val pluginId = com.intellij.openapi.extensions.PluginId.getId("com.jonnyzzz.intellij.mcp-steroid")
+    val pluginManager = com.intellij.ide.plugins.PluginManager.getInstance()
+
+    // Dynamic plugin reload (if supported)
+    com.intellij.ide.plugins.DynamicPlugins.unloadPlugin(
+        com.intellij.ide.plugins.PluginManagerCore.getPlugin(pluginId)!!
+    )
+
+    // Or restart IDE
+    com.intellij.openapi.application.ApplicationManager.getApplication().restart()
+}
+```
+
+**Note**: Full IDE restart may be required for script definition changes to take effect.
+
+## Committing Changes
+
+When work is complete, commit changes with descriptive messages:
+
+```bash
+# Check status
+git status
+git diff
+
+# Stage and commit
+git add -A
+git commit -m "$(cat <<'EOF'
+Brief description of changes
+
+- Detailed point 1
+- Detailed point 2
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+)"
+```
+
+### Commit Guidelines
+
+1. **Atomic commits**: Each commit should represent a single logical change
+2. **Descriptive messages**: Explain what and why, not just how
+3. **Test before commit**: Run `./gradlew test` to verify changes
+4. **Build verification**: Run `./gradlew build` to ensure the plugin builds

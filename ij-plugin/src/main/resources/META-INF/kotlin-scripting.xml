@@ -1,6 +1,12 @@
 <idea-plugin>
     <!-- Kotlin plugin extensions for script definition - only loaded when Kotlin plugin is present -->
     <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <!-- ScriptDefinitionsSource - primary extension point for K1 and K2 modes -->
+        <scriptDefinitionsSource
+                id="McpSteroidScriptDefinitionsSource"
+                implementation="com.jonnyzzz.intellij.mcp.script.McpSteroidScriptDefinitionsSource"/>
+
+        <!-- ScriptDefinitionsProvider - bridge API (loaded by BridgeScriptDefinitionsContributor) -->
         <scriptDefinitionsProvider
                 implementation="com.jonnyzzz.intellij.mcp.script.McpSteroidScriptDefinitionsProvider"/>
     </extensions>

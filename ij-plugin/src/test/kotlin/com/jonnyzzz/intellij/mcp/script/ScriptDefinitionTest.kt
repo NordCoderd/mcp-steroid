@@ -361,4 +361,115 @@ class ScriptDefinitionTest : BasePlatformTestCase() {
             missingTypes.isEmpty()
         )
     }
+
+    // ========== Tests for McpSteroidScriptDefinitionsSource ==========
+
+    /**
+     * Verify that ScriptDefinitionsSource provides definitions.
+     */
+    fun testScriptDefinitionsSourceProvidesDefinitions() {
+        val source = McpSteroidScriptDefinitionsSource(project)
+
+        val definitions = source.definitions.toList()
+        assertTrue(
+            "ScriptDefinitionsSource should provide at least one definition",
+            definitions.isNotEmpty()
+        )
+    }
+
+    /**
+     * Verify that ScriptDefinitionsSource definition has correct file extension.
+     */
+    fun testScriptDefinitionsSourceFileExtension() {
+        val source = McpSteroidScriptDefinitionsSource(project)
+
+        val definition = source.definitions.first()
+        val fileExtension = definition.compilationConfiguration[ScriptCompilationConfiguration.fileExtension]
+
+        assertEquals(
+            "Script definition should have .kts file extension",
+            "kts",
+            fileExtension
+        )
+    }
+
+    /**
+     * Verify that ScriptDefinitionsSource definition has default imports.
+     */
+    fun testScriptDefinitionsSourceHasDefaultImports() {
+        val source = McpSteroidScriptDefinitionsSource(project)
+
+        val definition = source.definitions.first()
+        val imports = definition.compilationConfiguration[ScriptCompilationConfiguration.defaultImports]
+
+        assertNotNull("Script definition should have default imports", imports)
+        assertTrue(
+            "Should have Project import",
+            imports!!.any { it.toString().contains("com.intellij.openapi.project") }
+        )
+        assertTrue(
+            "Should have coroutines import",
+            imports.any { it.toString().contains("kotlinx.coroutines") }
+        )
+    }
+
+    /**
+     * Verify that ScriptDefinitionsSource definition has execute binding.
+     */
+    fun testScriptDefinitionsSourceHasExecuteBinding() {
+        val source = McpSteroidScriptDefinitionsSource(project)
+
+        val definition = source.definitions.first()
+        val providedProps = definition.compilationConfiguration[ScriptCompilationConfiguration.providedProperties]
+
+        assertNotNull("Script definition should have provided properties", providedProps)
+        assertTrue(
+            "Script definition should provide 'execute' binding",
+            providedProps!!.containsKey("execute")
+        )
+    }
+
+    /**
+     * Verify that ScriptDefinitionsSource definition accepts scripts everywhere.
+     */
+    fun testScriptDefinitionsSourceAcceptsScriptsEverywhere() {
+        val source = McpSteroidScriptDefinitionsSource(project)
+
+        val definition = source.definitions.first()
+        val acceptedLocations = definition.compilationConfiguration[ScriptCompilationConfiguration.ide.acceptedLocations]
+
+        assertNotNull("Script definition should specify accepted locations", acceptedLocations)
+        assertTrue(
+            "Script definition should accept scripts everywhere",
+            acceptedLocations!!.contains(ScriptAcceptedLocation.Everywhere)
+        )
+    }
+
+    /**
+     * Verify that ScriptDefinitionsSource definition has JVM dependencies.
+     */
+    fun testScriptDefinitionsSourceHasJvmDependencies() {
+        val source = McpSteroidScriptDefinitionsSource(project)
+
+        val definition = source.definitions.first()
+        val deps = definition.compilationConfiguration[ScriptCompilationConfiguration.dependencies]
+
+        assertNotNull("Script definition should have dependencies", deps)
+
+        val jvmDeps = deps!!.filterIsInstance<JvmDependency>()
+        assertTrue(
+            "Script definition should have JVM dependencies",
+            jvmDeps.isNotEmpty()
+        )
+
+        // Should include IntelliJ platform classes
+        val classpathEntries = jvmDeps.flatMap { it.classpath }.map { it.absolutePath }
+        val hasIntelliJClasses = classpathEntries.any { path ->
+            path.contains("intellij") || path.contains("classes") || path.contains("mcp")
+        }
+        assertTrue(
+            "Classpath should include IntelliJ platform classes",
+            hasIntelliJClasses
+        )
+    }
 }
