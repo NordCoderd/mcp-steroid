@@ -1,7 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.mcp
 
-import com.jonnyzzz.intellij.mcp.server.ProgressReporter
+import com.jonnyzzz.intellij.mcp.server.McpProgressReporter
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -47,7 +47,7 @@ class McpToolRegistry {
                 isError = true
             )
 
-        val progress = object : ProgressReporter {
+        val progress = object : McpProgressReporter {
             val counter = AtomicInteger(0)
             val progressToken = params.arguments?.get("_meta")?.jsonObject?.get("progressToken")
 
@@ -75,7 +75,10 @@ class McpToolRegistry {
             definition.handler(toolCallContext)
         } catch (e: Exception) {
             ToolCallResult(
-                content = listOf(ContentItem.Text(text = "Tool execution error: ${e.message}")),
+                content = listOf(
+                    ContentItem.Text(text = "Tool execution error: ${e.message}"),
+                    ContentItem.Text(text = "Stacktrace: " + e.stackTraceToString()),
+                ),
                 isError = true
             )
         }
@@ -85,7 +88,7 @@ class McpToolRegistry {
 data class ToolCallContext(
     val params: ToolCallParams,
     val session: McpSession,
-    val progress: ProgressReporter,
+    val mcpProgressReporter: McpProgressReporter,
 )
 
 /**
