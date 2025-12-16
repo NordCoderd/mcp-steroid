@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.jonnyzzz.intellij"
-version = "1.0.0-SNAPSHOT"
+version = "0.83.5-SNAPSHOT-2025-12-16-11-58"
 
 repositories {
     mavenCentral()
