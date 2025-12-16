@@ -113,7 +113,25 @@ class ScriptExecutor(
             return coroutineScope {
                 withContext(Dispatchers.IO) {
                     withTimeout(timeoutSeconds.seconds) {
-                        runTheSubmittedCode(capturedBlocks, executionId, context)
+                        val job = launch {
+                            service<ExceptionCaptureService>().exceptions.collect { ex ->
+                                context.println(buildString {
+                                    appendLine("=== IDE Exception Captured ===")
+                                    appendLine("Time: ${ex.timestamp}")
+                                    ex.pluginId?.let { appendLine("Plugin: $it") }
+                                    appendLine("Message: ${ex.message}")
+                                    appendLine("Stacktrace:")
+                                    append(ex.stacktrace)
+                                    appendLine("=== END ===")
+                                })
+                            }
+                        }
+
+                        try {
+                            runTheSubmittedCode(capturedBlocks, executionId, context)
+                        } finally {
+                            job.cancel()
+                        }
                     }
                 }
             }
@@ -144,13 +162,10 @@ class ScriptExecutor(
                 }
                 else -> {
                     log.error("Unexpected error during execution $executionId", t)
-                    val includeStacktrace = Registry.`is`("mcp.steroids.exception.include.stacktrace", true)
                     val errorMessage = buildString {
                         append("Unexpected error: ${t.message}")
-                        if (includeStacktrace) {
-                            append("\n\n--- Stacktrace ---\n")
-                            append(stacktrace)
-                        }
+                        append("\n\n--- Stacktrace ---\n")
+                        append(stacktrace)
                     }
                     ExecutionResultWithOutput(
                         status = ExecutionStatus.ERROR,
@@ -191,14 +206,10 @@ class ScriptExecutor(
             e.printStackTrace(PrintWriter(sw))
             val stacktrace = sw.toString()
 
-            // Build error message with stacktrace if enabled
-            val includeStacktrace = Registry.`is`("mcp.steroids.exception.include.stacktrace", true)
             val errorMessage = buildString {
                 append("Runtime error in block #${index + 1}: ${e.message}")
-                if (includeStacktrace) {
-                    append("\n\n--- Stacktrace ---\n")
-                    append(stacktrace)
-                }
+                append("\n\n--- Stacktrace ---\n")
+                append(stacktrace)
             }
 
             ExecutionResultWithOutput(
