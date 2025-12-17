@@ -79,9 +79,10 @@ class CodeEvalManager(
 
         } catch (e: Throwable) {
             // Compilation/evaluation failed - report immediately
-            val message = "Script compilation/evaluation failed for $executionId: ${e.message}\n\nfor code:\n$wrappedCode"
+            val message = "Script compilation/evaluation failed for $executionId: ${e.message}\n\n"
             log.warn(message, e)
             resultBuilder.logException(message, e)
+            resultBuilder.reportFailed(message)
             return null
         } finally {
             // Mark scope as disposed - no more executed {} calls allowed

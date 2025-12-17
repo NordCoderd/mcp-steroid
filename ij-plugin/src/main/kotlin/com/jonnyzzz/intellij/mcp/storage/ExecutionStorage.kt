@@ -130,10 +130,10 @@ class ExecutionStorage(
 
 
     private fun newExecutionId(taskId: String): ExecutionId {
-        val pattern = DateTimeFormatter.ofPattern("yyyyMMddTHHmmss")
+        val pattern = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
         val timestamp = LocalDateTime.now().format(pattern)
         val invalidPath = Regex("[^a-zA-Z0-9_-]+", RegexOption.IGNORE_CASE)
-        val id = timestamp + "-" + invalidPath.replace(taskId, "_")
+        val id = "eid_" + timestamp + "-" + invalidPath.replace(taskId, "_")
         return ExecutionId(id)
     }
 

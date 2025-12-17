@@ -145,15 +145,30 @@ Compiles and executes Kotlin code in the IDE's runtime context.
 **Parameters**:
 - `project_name` (required): Name of an open project (from `steroid_list_projects`)
 - `code` (required): Kotlin code to execute
+- `task_id` (required): Your task identifier to group related executions
+- `reason` (required): Human readable reason for the execution
 - `timeout`: Execution timeout in seconds (default: 60)
 
 **Execution Model**:
 - **Synchronous request-response** - the tool returns when execution completes
-- **Progress notifications** - sent every 1 second during execution (via MCP progress protocol)
+- **Progress notifications** - sent during execution (via MCP progress protocol)
 - **No polling required** - output is returned directly in the response
-- Requests are executed sequentially
+- Returns `execution_id` for use with `steroid_execute_feedback`
 
 **Response**: Plain text output from the script, or error message on failure.
+
+### `steroid_execute_feedback`
+Provide feedback on the result of a script execution.
+
+**Parameters**:
+- `project_name` (required): Project where execution occurred
+- `task_id` (required): Same task_id used in `steroid_execute_code`
+- `execution_id` (required): The execution_id returned from execution
+- `success_rating` (required): Rate from 0.00 (failure) to 1.00 (success)
+- `explanation` (required): What worked, what didn't, what you'll try next
+- `code` (optional): The code snippet that was executed
+
+This feedback helps track execution history and identify patterns for improvement.
 
 ### Script Entry Point
 
@@ -205,34 +220,19 @@ import kotlinx.coroutines.*
 
 ## McpScriptContext API
 
-The `McpScriptContext` is provided inside the `execute { }` block:
+The `McpScriptContext` is provided inside the `execute { }` block.
 
-```kotlin
-interface McpScriptContext {
-    /** The IntelliJ Project this execution is associated with */
-    val project: Project
+**See**: [`src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/McpScriptContext.kt`](src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/McpScriptContext.kt)
 
-    /** Unique identifier for this execution */
-    val executionId: String
-
-    /** Parent Disposable for resource cleanup - use coroutineScope {} for coroutine API */
-    val disposable: Disposable
-
-    /** Check if the context has been disposed */
-    val isDisposed: Boolean
-
-    // === Output Methods ===
-    fun println(vararg values: Any?)  // Print space-separated values
-    fun printJson(obj: Any?)          // Serialize to pretty JSON (Jackson)
-    fun progress(message: String)     // Report progress (throttled to 1/sec)
-    fun logInfo(message: String)
-    fun logWarn(message: String)
-    fun logError(message: String, throwable: Throwable? = null)
-
-    // === IDE Utilities ===
-    suspend fun waitForSmartMode()  // Wait for indexing to complete
-}
-```
+Key methods:
+- `project` - Access the IntelliJ Project
+- `params` - Original tool execution parameters (JSON)
+- `disposable` - Parent Disposable for resource cleanup
+- `println(vararg values)` - Print space-separated values
+- `printJson(obj)` - Serialize to pretty JSON (Jackson)
+- `printException(msg, throwable)` - Report an error without failing execution
+- `progress(message)` - Report progress (throttled to 1/sec)
+- `waitForSmartMode()` - Wait for indexing to complete
 
 **Note**: `readAction` and `writeAction` are NOT part of McpScriptContext. Use IntelliJ's coroutine-aware APIs directly:
 
@@ -250,18 +250,6 @@ execute {
     writeAction {
         document.setText("new content")
     }
-}
-```
-
-### Extended Context (McpScriptContextEx)
-
-For reflection helpers (may be deprecated in future):
-
-```kotlin
-interface McpScriptContextEx : McpScriptContext {
-    fun listServices(): List<String>
-    fun listExtensionPoints(): List<String>
-    fun describeClass(className: String): String
 }
 ```
 
@@ -337,13 +325,15 @@ After script evaluation completes:
 **Storage Structure** (append-only - files are never deleted, used for logging/debugging):
 ```
 .idea/mcp-run/
-├── abc-2024-12-10T14-30-25-a1B2c3D4e5/   # execution_id as directory
+├── 20241210T143025-my_task/              # execution_id as directory
 │   ├── script.kts                         # Submitted code
-│   ├── parameters.json                    # Execution parameters
+│   ├── params.json                        # Execution parameters
+│   ├── reason.txt                         # Human readable reason
+│   ├── execution-id.txt                   # Execution ID
 │   ├── output.jsonl                       # Output log (JSON lines, append-only)
-│   ├── result.json                        # Final status
+│   ├── error.txt                          # Error message (if failed)
 │   ├── review.kts                         # Code shown for review (may have user edits)
-│   └── review-result.json                 # Review outcome with user feedback
+│   └── kotlinc.txt                        # Compiler output (if any)
 ```
 
 **Server URL file**:
@@ -351,10 +341,9 @@ After script evaluation completes:
 .idea/mcp-steroids.txt                     # Contains MCP server URL (e.g., http://localhost:63150/mcp)
 ```
 
-**Execution ID Format**: `{project-hash-3chars}-{YYYY-MM-DD}T{HH-MM-SS}-{payload-hash-10chars}`
-- Project hash: first 3 chars of base64url-encoded hash of project name
+**Execution ID Format**: `{YYYYMMDD}T{HHMMSS}-{task-id}`
 - Timestamp: ISO-like format without timezone
-- Payload hash: first 10 chars of base64url-encoded hash of (code + parameters)
+- Task ID: sanitized version of the task_id parameter
 
 ## Code Review Mode
 
@@ -396,8 +385,9 @@ execute {
         println("${method.name}(${method.parameterTypes.joinToString()})")
     }
 
-    // Use helper to describe a class (via McpScriptContextEx)
-    println((this as McpScriptContextEx).describeClass("com.intellij.psi.PsiManager"))
+    // Explore class hierarchy
+    println(PsiManager::class.java.superclass)
+    println(PsiManager::class.java.interfaces.toList())
 }
 ```
 
@@ -498,8 +488,8 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 #### Error Handling
 
 - Scripts run in a supervised coroutine scope
-- Exceptions are caught and reported as ERROR status
-- Use `logError()` for expected error conditions
+- Exceptions are caught and reported in the response
+- Use `printException(msg, throwable)` to report errors without failing execution
 - Avoid catching `ProcessCanceledException` - let it propagate
 
 ## Testing
@@ -522,11 +512,18 @@ When writing scripts for execution, follow these IntelliJ Platform best practice
 The project includes integration tests that verify MCP server functionality:
 
 **Test Files:**
-- `McpServerIntegrationTest.kt` - Tests MCP server service availability
+- `McpServerIntegrationTest.kt` - Tests MCP server HTTP handshake, session management, and tool invocation
+  - Includes system property test verifying MCP server runs in IDE JVM
 - `ClaudeCliIntegrationTest.kt` - Tests Claude Code CLI integration (requires Docker, ANTHROPIC_API_KEY)
+  - Tests MCP server registration, tool discovery, and documented workflow
+  - Includes system property test verifying end-to-end MCP execution
 - `CodexCliIntegrationTest.kt` - Tests OpenAI Codex CLI integration (requires Docker, OPENAI_API_KEY)
+  - Tests TOML configuration and tool invocation
+  - Includes system property test verifying end-to-end MCP execution
+  - Note: `codex mcp add` only supports stdio servers; HTTP uses TOML config
 - `ScriptExecutorTest.kt` - Tests script execution with fast failure semantics
 - `ExecutionManagerTest.kt` - Tests execution manager with progress reporting
+- `SteroidsMcpToolsetTest.kt` - Tests MCP tool execution flow
 
 **Shell Scripts** (in `integration-test/`):
 - `test-sse-tools.sh` - Tests HTTP transport directly via curl

@@ -96,18 +96,26 @@ This is an IntelliJ Platform plugin with a standalone MCP server using Kotlin MC
 ```
 src/main/kotlin/com/jonnyzzz/intellij/mcp/
 ├── server/
-│   ├── SteroidsMcpServer.kt               # Ktor MCP server with SSE transport
+│   ├── SteroidsMcpServer.kt               # Ktor MCP server with HTTP transport
 │   ├── SteroidsMcpServerStartupActivity.kt # Startup hook for server initialization
-│   ├── PluginReloadToolHandler.kt         # MCP tools for plugin info and reload
-│   └── ThrottledProgressReporter.kt       # Flow-based progress throttling (1 sec sampling)
+│   ├── ExecuteCodeToolHandler.kt          # steroid_execute_code tool
+│   ├── ExecuteFeedbackToolHandler.kt      # steroid_execute_feedback tool
+│   ├── ListProjectsToolHandler.kt         # steroid_list_projects tool
+│   ├── PluginReloadToolHandler.kt         # Plugin reload tools
+│   └── McpProgressReporter.kt             # Progress reporting interface
+├── mcp/
+│   ├── McpServerCore.kt                   # Core MCP server logic
+│   ├── McpToolRegistry.kt                 # Tool registration and dispatch
+│   ├── McpBuilders.kt                     # ToolCallResult builder pattern
+│   └── McpProtocol.kt                     # MCP protocol types
 ├── execution/
-│   ├── ExecutionManager.kt        # Manages execution lifecycle, orchestrates review + execution
+│   ├── ExecutionManager.kt        # Orchestrates execution, returns ToolCallResult
 │   ├── CodeEvalManager.kt         # Compiles scripts, captures execute {} lambdas
-│   ├── ScriptExecutor.kt          # Runs captured blocks with timeout and coroutine scope
+│   ├── ScriptExecutor.kt          # Runs captured blocks with timeout
 │   ├── McpScriptScope.kt          # Interface bound to script engine (execute {} entry point)
 │   ├── McpScriptContext.kt        # Interface for script context (project, output, utilities)
-│   ├── McpScriptContextImpl.kt    # Implementation with output methods, waitForSmartMode, progress
-│   └── McpScriptContextEx.kt      # Extended interface with reflection helpers
+│   ├── McpScriptContextImpl.kt    # Implementation with output methods, waitForSmartMode
+│   └── Diff.kt                    # Unified diff generation for review feedback
 ├── script/
 │   ├── McpSteroidScriptDefinition.kt          # @KotlinScript annotation for .kts files
 │   ├── McpSteroidScriptDefinitionsSource.kt   # ScriptDefinitionsSource for K1/K2 modes
@@ -119,7 +127,7 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 │   ├── ReviewManager.kt           # Human review workflow, diff generation
 │   └── McpReviewNotificationProvider.kt  # Editor notification panel
 └── storage/
-    └── ExecutionStorage.kt        # File-based storage, data classes (OutputMessage, ExecutionResult, etc.)
+    └── ExecutionStorage.kt        # Append-only file storage (no status tracking)
 ```
 
 ## Testing
@@ -141,26 +149,41 @@ Run specific test class:
 
 ### Test Files
 
-- **McpServerIntegrationTest.kt** - Tests MCP server service availability
+- **McpServerIntegrationTest.kt** - Tests MCP server HTTP handshake and tool flows:
+  - Tests MCP protocol initialization and session management
+  - Tests tool listing and invocation via HTTP
+  - Tests system property reading via `steroid_execute_code`
+  - Tests Claude CLI and Codex CLI Accept header compatibility
+  - Tests graceful handling of unknown/stale session IDs
 
 - **ClaudeCliIntegrationTest.kt** - Tests Claude Code CLI integration:
   - Uses Docker to run Claude CLI in isolation
   - Requires Docker and ANTHROPIC_API_KEY
-  - Tests MCP server registration and connectivity
-  - Note: MCP tools not supported in Claude CLI print mode (-p)
+  - Tests MCP server registration (`mcp add`, `mcp list`, `mcp remove`)
+  - Tests tool discovery and invocation
+  - Tests system property reading via MCP execute_code
+  - Tests documented command-line workflow
 
 - **CodexCliIntegrationTest.kt** - Tests OpenAI Codex CLI integration:
   - Uses Docker to run Codex CLI in isolation
   - Requires Docker and OPENAI_API_KEY
-  - Tests MCP tool discovery and invocation
+  - Tests MCP server TOML configuration
+  - Tests tool discovery and invocation
+  - Tests system property reading via MCP execute_code
+  - Note: `codex mcp add` only supports stdio servers; HTTP uses TOML config
 
 - **ScriptExecutorTest.kt** - Tests script execution with fast failure semantics:
   - Verifies errors return quickly (not waiting for timeout)
   - Tests compilation errors, runtime errors, missing execute blocks
+  - Tests multiple execute blocks (FIFO order)
 
 - **ExecutionManagerTest.kt** - Tests execution manager with progress reporting:
   - Tests successful execution with output collection
   - Tests error handling and timeout scenarios
+
+- **SteroidsMcpToolsetTest.kt** - Tests the MCP tool execution flow:
+  - Tests code execution via `ExecutionManager.executeWithProgress`
+  - Tests output collection and error handling
 
 - **DynamicPluginsTest.kt** - Tests DynamicPlugins API integration:
   - Tests plugin discovery via PluginManagerCore
@@ -186,9 +209,58 @@ The Kotlin plugin (`org.jetbrains.kotlin`) is added as a bundled dependency to e
 
 - Tests should complete within 10 seconds (fast failure)
 - Use `timeoutRunBlocking(10.seconds)` or similar for coroutine tests
-- Script engine not available is a valid test outcome (ERROR status)
-- All assertions should handle both SUCCESS and ERROR cases gracefully
-- Tests use `executeWithProgress()` API which returns output directly
+- Script engine not available is a valid test outcome (check `ToolCallResult.isError`)
+- All assertions should handle both success and error cases gracefully
+- Tests use `ExecutionManager.executeWithProgress(ExecCodeParams)` which returns `ToolCallResult`
+
+### Test Helper Pattern
+
+For tests, create `ExecCodeParams` using a helper:
+
+```kotlin
+private fun testExecParams(code: String, timeout: Int = 30) = ExecCodeParams(
+    taskId = "test-task",
+    code = code,
+    reason = "test",
+    timeout = timeout,
+    rawParams = buildJsonObject { }
+)
+
+// Usage
+val result = manager.executeWithProgress(testExecParams(code))
+assertTrue(!result.isError)
+```
+
+## Key Types
+
+### ExecCodeParams
+Parameters for `steroid_execute_code` tool:
+- `taskId` - Groups related executions
+- `code` - Kotlin code to execute
+- `reason` - Human readable reason
+- `timeout` - Execution timeout in seconds
+- `rawParams` - Original JSON parameters
+
+### ToolCallResult
+MCP-native result type:
+- `content` - List of `ContentItem` (text, images, etc.)
+- `isError` - Whether execution failed
+- Use `ToolCallResult.builder()` to construct
+
+### ExecutionResultBuilder
+Interface for collecting output during execution:
+- `logMessage(message)` - Add text to output
+- `logProgress(message)` - Report progress
+- `logException(message, throwable)` - Report error with stack trace
+- `reportFailed(message)` - Mark execution as failed
+
+### McpScriptContext
+Context provided inside `execute { }` blocks:
+- `project` - IntelliJ Project
+- `params` - Original tool parameters (JsonElement)
+- `disposable` - Parent Disposable for cleanup
+- `println(vararg)`, `printJson(obj)`, `printException(msg, t)`, `progress(msg)`
+- `suspend fun waitForSmartMode()`
 
 ## Configuration
 
@@ -470,3 +542,65 @@ EOF
 2. **Descriptive messages**: Explain what and why, not just how
 3. **Test before commit**: Run `./gradlew test` to verify changes
 4. **Build verification**: Run `./gradlew build` to ensure the plugin builds
+
+## Adding New MCP Tools
+
+To add a new MCP tool:
+
+1. **Create a handler class** in `server/` package:
+   ```kotlin
+   @Service(Service.Level.APP)
+   class MyToolHandler {
+       fun register(server: McpServerCore) {
+           server.toolRegistry.registerTool(
+               name = "steroid_my_tool",
+               description = "Description for LLM",
+               inputSchema = buildJsonObject { /* JSON schema */ },
+               ::handle
+           )
+       }
+
+       private suspend fun handle(context: ToolCallContext): ToolCallResult {
+           // Access parameters via context.params.arguments
+           // Return ToolCallResult.builder().addTextContent("...").build()
+       }
+   }
+   ```
+
+2. **Register in SteroidsMcpServer.kt**:
+   ```kotlin
+   service<MyToolHandler>().register(server)
+   ```
+
+3. **Use NoOpProgressReporter** for tests that don't need MCP progress:
+   ```kotlin
+   val result = manager.executeWithProgress(params, NoOpProgressReporter)
+   ```
+
+## Writing Tests
+
+For execution tests:
+
+```kotlin
+class MyTest : BasePlatformTestCase() {
+    override fun setUp() {
+        super.setUp()
+        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
+    }
+
+    fun testSomething(): Unit = timeoutRunBlocking(30.seconds) {
+        val manager = project.service<ExecutionManager>()
+        val result = manager.executeWithProgress(
+            ExecCodeParams(
+                taskId = "test",
+                code = "execute { println(\"hello\") }",
+                reason = "test",
+                timeout = 30,
+                rawParams = buildJsonObject { }
+            ),
+            NoOpProgressReporter
+        )
+        // Check result.isError and result.content
+    }
+}
+```

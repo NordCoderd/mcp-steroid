@@ -4,9 +4,11 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.intellij.mcp.mcp.ContentItem
+import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
+import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
-import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
-import com.jonnyzzz.intellij.mcp.storage.ExecutionStatus
+import kotlinx.serialization.json.buildJsonObject
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -21,6 +23,18 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
     }
 
+    private fun testExecParams(code: String, timeout: Int = 30) = ExecCodeParams(
+        taskId = "test-task",
+        code = code,
+        reason = "test",
+        timeout = timeout,
+        rawParams = buildJsonObject { }
+    )
+
+    private fun getTextContent(result: ToolCallResult): String {
+        return result.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+    }
+
     fun testExecuteWithProgressSuccess(): Unit = timeoutRunBlocking(30.seconds) {
         val manager = project.service<ExecutionManager>()
 
@@ -30,13 +44,10 @@ class ExecutionManagerTest : BasePlatformTestCase() {
             }
         """.trimIndent()
 
-        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), NoOpProgressReporter)
+        val result = manager.executeWithProgress(testExecParams(code), NoOpProgressReporter)
 
-        // Should complete with a valid status
-        assertTrue(
-            "Should complete with valid status, was ${result.status}",
-            result.status in listOf(ExecutionStatus.SUCCESS, ExecutionStatus.ERROR)
-        )
+        // Should have content (either success output or error message)
+        assertTrue("Should have content", result.content.isNotEmpty())
     }
 
     fun testExecuteWithProgressOutput(): Unit = timeoutRunBlocking(60.seconds) {
@@ -49,11 +60,12 @@ class ExecutionManagerTest : BasePlatformTestCase() {
             }
         """.trimIndent()
 
-        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), NoOpProgressReporter)
+        val result = manager.executeWithProgress(testExecParams(code), NoOpProgressReporter)
 
         // If execution succeeded, verify output
-        if (result.status == ExecutionStatus.SUCCESS) {
-            assertTrue("Should have output", result.output.isNotEmpty())
+        if (!result.isError) {
+            val text = getTextContent(result)
+            assertTrue("Should have output", text.isNotEmpty())
         }
     }
 
@@ -66,11 +78,12 @@ class ExecutionManagerTest : BasePlatformTestCase() {
             }
         """.trimIndent()
 
-        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 30), NoOpProgressReporter)
+        val result = manager.executeWithProgress(testExecParams(code), NoOpProgressReporter)
 
-        // Should be ERROR status
-        assertEquals(ExecutionStatus.ERROR, result.status)
-        assertNotNull("Should have error message", result.errorMessage)
+        // Should be error
+        assertTrue("Should be error", result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should have error content", text.isNotEmpty())
     }
 
     fun testExecuteWithProgressTimeout(): Unit = timeoutRunBlocking(15.seconds) {
@@ -84,12 +97,9 @@ class ExecutionManagerTest : BasePlatformTestCase() {
             }
         """.trimIndent()
 
-        val result = manager.executeWithProgress(code, ExecutionParams(timeout = 2), NoOpProgressReporter)
+        val result = manager.executeWithProgress(testExecParams(code, timeout = 2), NoOpProgressReporter)
 
-        // Should be TIMEOUT or ERROR (if script engine not available)
-        assertTrue(
-            "Should complete with TIMEOUT or ERROR, was ${result.status}",
-            result.status in listOf(ExecutionStatus.TIMEOUT, ExecutionStatus.ERROR)
-        )
+        // Should be error due to timeout (or error if script engine not available)
+        assertTrue("Should be error", result.isError)
     }
 }

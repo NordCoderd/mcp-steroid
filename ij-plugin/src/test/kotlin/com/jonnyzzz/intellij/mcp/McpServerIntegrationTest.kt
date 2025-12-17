@@ -15,6 +15,7 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -109,7 +110,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
         assertNull("steroid_execute_code should return result payload", execRpc.error)
         val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
-        val execOutput = (execResult.content.singleOrNull() as? ContentItem.Text)?.text.orEmpty()
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
         assertTrue("steroid_execute_code should return content for the agent", execOutput.isNotBlank())
         assertFalse("Execution should succeed, got error payload: $execOutput", execResult.isError)
         assertTrue(
@@ -445,7 +446,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
 
     /**
      * Tests that successful execution returns clean output without error-like formatting.
-     * The response should start with "=== Execution Result ===" and contain the output,
+     * The response should contain LOG: entries with the output,
      * not aggressive banners that look like errors.
      */
     fun testSuccessfulExecutionReturnsCleanOutput(): Unit = timeoutRunBlocking(30.seconds) {
@@ -471,17 +472,18 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertEquals(HttpStatusCode.OK, execResponse.status)
         val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
         val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
-        val execOutput = (execResult.content.singleOrNull() as? ContentItem.Text)?.text.orEmpty()
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        // Verify execution is not marked as error
+        assertFalse("Execution should succeed, got: $execOutput", execResult.isError)
+
+        // Verify output contains our marker text
+        assertTrue(
+            "Output should contain marker text, got: $execOutput",
+            execOutput.contains("Integration test execution from MCP")
+        )
 
         // Verify the output format is clean (not error-like)
-        assertTrue(
-            "Output should start with execution result header",
-            execOutput.contains("=== Execution Result ===")
-        )
-        assertTrue(
-            "Output should indicate SUCCESS status",
-            execOutput.contains("status: SUCCESS")
-        )
         assertFalse(
             "Output should NOT contain aggressive ACTION REQUIRED banner",
             execOutput.contains("ACTION REQUIRED")
@@ -489,6 +491,10 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertFalse(
             "Output should NOT contain box drawing characters at start",
             execOutput.startsWith("╔")
+        )
+        assertFalse(
+            "Output should NOT contain FAILED prefix (unless actually failed)",
+            execOutput.contains("FAILED:")
         )
     }
 
@@ -513,5 +519,73 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             header("Accept", "application/json, text/event-stream")
         }
         assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    /**
+     * Tests that a system property set in the test JVM can be read via MCP execute_code.
+     * This verifies the MCP server runs in the same JVM and can access system properties.
+     */
+    fun testSystemPropertyCanBeReadViaMcp(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Set a system property with a random value
+        val propertyKey = "mcp.test.random.value"
+        val randomValue = "test-${UUID.randomUUID()}"
+        System.setProperty(propertyKey, randomValue)
+
+        try {
+            // Initialize session
+            val initResponse = client.post(server.mcpUrl) {
+                contentType(ContentType.Application.Json)
+                accept(ContentType.Application.Json)
+                setBody(buildInitializeRequest())
+            }
+            val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+            // Execute code that reads the system property
+            val execRequest = buildJsonObject {
+                put("jsonrpc", "2.0")
+                put("id", "exec-sysprop")
+                put("method", "tools/call")
+                putJsonObject("params") {
+                    put("name", "steroid_execute_code")
+                    putJsonObject("arguments") {
+                        put("project_name", project.name)
+                        put("code", """
+                            execute {
+                                val value = System.getProperty("$propertyKey")
+                                println("SYSPROP_VALUE: ${'$'}value")
+                            }
+                        """.trimIndent())
+                        put("reason", "Test reading system property via MCP")
+                        put("task_id", "sysprop-test")
+                    }
+                }
+            }.toString()
+
+            val execResponse = client.post(server.mcpUrl) {
+                contentType(ContentType.Application.Json)
+                accept(ContentType.Application.Json)
+                header(McpHttpTransport.SESSION_HEADER, sessionId)
+                setBody(execRequest)
+            }
+
+            assertEquals(HttpStatusCode.OK, execResponse.status)
+            val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+            assertNull("Execute should not return error", execRpc.error)
+
+            val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+            val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+            assertFalse("Execution should succeed, got: $execOutput", execResult.isError)
+            assertTrue(
+                "Output should contain the system property value '$randomValue', got: $execOutput",
+                execOutput.contains("SYSPROP_VALUE: $randomValue")
+            )
+        } finally {
+            // Clean up the system property
+            System.clearProperty(propertyKey)
+        }
     }
 }

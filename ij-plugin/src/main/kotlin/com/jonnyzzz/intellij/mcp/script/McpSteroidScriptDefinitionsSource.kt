@@ -1,7 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.script
 
-import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.jonnyzzz.intellij.mcp.execution.McpScriptContext
 import org.jetbrains.kotlin.scripting.definitions.ScriptDefinition
@@ -18,7 +18,7 @@ import kotlin.script.experimental.jvm.jvm
  * for script definitions in both K1 and K2 modes of the Kotlin plugin.
  */
 class McpSteroidScriptDefinitionsSource(private val project: Project) : ScriptDefinitionsSource {
-    private val log = Logger.getInstance(McpSteroidScriptDefinitionsSource::class.java)
+    private val log = thisLogger()
 
     override val definitions: Sequence<ScriptDefinition>
         get() {
@@ -57,7 +57,7 @@ class McpSteroidScriptDefinitionsSource(private val project: Project) : ScriptDe
 
             // Provide implicit receivers/bindings type information
             providedProperties(
-                "execute" to KotlinType("(suspend com.jonnyzzz.intellij.mcp.execution.McpScriptContext.() -> Unit) -> Unit")
+                "execute" to KotlinType("(suspend ${McpScriptContext::class.java.name}.() -> Unit) -> Unit")
             )
 
             // Display name for this script type

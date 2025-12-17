@@ -1,9 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.script
 
-import com.intellij.openapi.diagnostic.Logger
-import kotlin.script.experimental.intellij.ScriptDefinitionsProvider
+import com.intellij.openapi.diagnostic.thisLogger
 import java.io.File
+import kotlin.script.experimental.intellij.ScriptDefinitionsProvider
 
 /**
  * Provides script definitions for MCP Steroid .kts files.
@@ -14,7 +14,7 @@ import java.io.File
  * Registered via plugin.xml as org.jetbrains.kotlin.scriptDefinitionsProvider
  */
 class McpSteroidScriptDefinitionsProvider : ScriptDefinitionsProvider {
-    private val log = Logger.getInstance(McpSteroidScriptDefinitionsProvider::class.java)
+    private val log = thisLogger()
 
     override val id: String = "McpSteroidScriptDefinitionsProvider"
 

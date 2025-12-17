@@ -1,158 +1,146 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.execution
 
-import com.intellij.openapi.components.service
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
-import com.jonnyzzz.intellij.mcp.storage.ExecutionParams
-import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
-import com.jonnyzzz.intellij.mcp.storage.OutputType
+import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Tests for McpScriptContext implementation.
+ *
+ * Note: Uses a TestResultBuilder to capture output instead of storage,
+ * since the new API uses ExecutionResultBuilder interface.
  */
 class McpScriptContextTest : BasePlatformTestCase() {
 
-    private lateinit var storage: ExecutionStorage
-    private lateinit var executionId: String
+    private lateinit var executionId: ExecutionId
 
     override fun setUp() {
         super.setUp()
-        storage = project.service()
-
-        val code = "test"
-        val params = ExecutionParams()
-        executionId = storage.generateExecutionId(code, params)
-        storage.createExecution(executionId, code, params)
+        executionId = ExecutionId("test-execution-id")
     }
 
-    private fun createContext(): McpScriptContextImpl {
+    /**
+     * Simple test implementation of ExecutionResultBuilder that collects messages.
+     */
+    private class TestResultBuilder : ExecutionResultBuilder {
+        val messages = mutableListOf<String>()
+        val progressMessages = mutableListOf<String>()
+        val exceptions = mutableListOf<Pair<String, Throwable>>()
+        var failed = false
+        var failureMessage: String? = null
+
+        override fun logMessage(message: String) {
+            messages += message
+        }
+
+        override fun logProgress(message: String) {
+            progressMessages += message
+        }
+
+        override fun logException(message: String, throwable: Throwable) {
+            exceptions += message to throwable
+        }
+
+        override fun reportFailed(message: String) {
+            failed = true
+            failureMessage = message
+        }
+    }
+
+    private fun createContext(resultBuilder: TestResultBuilder = TestResultBuilder()): Pair<McpScriptContextImpl, TestResultBuilder> {
         val disposable = Disposer.newDisposable(testRootDisposable, "test-context-$executionId")
         Disposer.register(testRootDisposable, disposable)
-        return McpScriptContextImpl(
+        val context = McpScriptContextImpl(
             project = project,
+            params = buildJsonObject { },
             executionId = executionId,
             disposable = disposable,
-            progressReporter = NoOpProgressReporter,
+            resultBuilder = resultBuilder,
         )
+        return context to resultBuilder
     }
 
     fun testPrintlnVarargs() {
-        val context = createContext()
+        val (context, builder) = createContext()
 
         // Test varargs println
         context.println("Hello", "World", 42)
         context.println()  // Empty line
         context.println(null, "test")
 
-        val output = storage.readOutput(executionId)
-        assertEquals("Should have 3 messages", 3, output.size)
-        assertEquals("Hello World 42", output[0].msg)
-        assertEquals(OutputType.OUT, output[0].type)
-        assertEquals("", output[1].msg)  // Empty line
-        assertEquals("null test", output[2].msg)
+        assertEquals("Should have 3 messages", 3, builder.messages.size)
+        assertEquals("Hello World 42", builder.messages[0])
+        assertEquals("", builder.messages[1])  // Empty line
+        assertEquals("null test", builder.messages[2])
     }
 
     fun testPrintlnSingleValue() {
-        val context = createContext()
+        val (context, builder) = createContext()
 
         context.println("Single value")
         context.println(123)
 
-        val output = storage.readOutput(executionId)
-        assertEquals(2, output.size)
-        assertEquals("Single value", output[0].msg)
-        assertEquals("123", output[1].msg)
+        assertEquals(2, builder.messages.size)
+        assertEquals("Single value", builder.messages[0])
+        assertEquals("123", builder.messages[1])
     }
 
     fun testPrintJsonWithMap() {
-        val context = createContext()
+        val (context, builder) = createContext()
 
         context.printJson(mapOf("name" to "test", "count" to 42))
 
-        val output = storage.readOutput(executionId)
-        assertEquals(1, output.size)
-        assertEquals(OutputType.JSON, output[0].type)
+        assertEquals(1, builder.messages.size)
         // Jackson output should contain the keys
-        assertTrue(output[0].msg.contains("\"name\""))
-        assertTrue(output[0].msg.contains("\"test\""))
-        assertTrue(output[0].msg.contains("\"count\""))
-        assertTrue(output[0].msg.contains("42"))
+        assertTrue(builder.messages[0].contains("\"name\""))
+        assertTrue(builder.messages[0].contains("\"test\""))
+        assertTrue(builder.messages[0].contains("\"count\""))
+        assertTrue(builder.messages[0].contains("42"))
     }
 
     fun testPrintJsonWithNull() {
-        val context = createContext()
+        val (context, builder) = createContext()
 
         context.printJson(null)
 
-        val output = storage.readOutput(executionId)
-        assertEquals(1, output.size)
-        assertEquals("null", output[0].msg)
+        assertEquals(1, builder.messages.size)
+        assertEquals("null", builder.messages[0])
     }
 
-    fun testLogMethods() {
-        val context = createContext()
-
-        context.logInfo("Info message")
-        context.logWarn("Warning message")
-        context.logError("Error message")
-
-        val output = storage.readOutput(executionId)
-        assertEquals("Should have 3 log messages", 3, output.size)
-
-        assertEquals(OutputType.LOG, output[0].type)
-        assertEquals("info", output[0].level)
-        assertEquals("Info message", output[0].msg)
-
-        assertEquals(OutputType.LOG, output[1].type)
-        assertEquals("warn", output[1].level)
-
-        assertEquals(OutputType.LOG, output[2].type)
-        assertEquals("error", output[2].level)
-    }
-
-    fun testLogErrorWithThrowable() {
-        val context = createContext()
+    fun testPrintException() {
+        val (context, builder) = createContext()
 
         val exception = RuntimeException("Test error")
-        context.logError("Something failed", exception)
+        context.printException("Something failed", exception)
 
-        val output = storage.readOutput(executionId)
-        assertEquals(1, output.size)
-        assertTrue(output[0].msg.contains("Something failed"))
-        assertTrue(output[0].msg.contains("Test error"))
-        assertTrue(output[0].msg.contains("RuntimeException"))
+        assertEquals(1, builder.exceptions.size)
+        assertEquals("Something failed", builder.exceptions[0].first)
+        assertEquals(exception, builder.exceptions[0].second)
     }
 
-    fun testDescribeClass() {
-        val context = createContext()
+    fun testProgressReporting() {
+        val (context, builder) = createContext()
 
-        val description = (context as McpScriptContextEx).describeClass("java.lang.String")
+        context.progress("Starting work...")
+        context.progress("Processing...")
 
-        assertTrue(description.contains("Class: java.lang.String"))
-        assertTrue(description.contains("Public Methods:"))
-        assertTrue(description.contains("length()"))
-        assertTrue(description.contains("charAt("))
-    }
-
-    fun testDescribeClassNotFound() {
-        val context = createContext()
-
-        val description = (context as McpScriptContextEx).describeClass("com.nonexistent.ClassName")
-        assertTrue(description.contains("Class not found"))
+        assertEquals(2, builder.progressMessages.size)
+        assertEquals("Starting work...", builder.progressMessages[0])
+        assertEquals("Processing...", builder.progressMessages[1])
     }
 
     fun testProjectAccess() {
-        val context = createContext()
+        val (context, _) = createContext()
 
         assertEquals(project, context.project)
-        assertEquals(executionId, context.executionId)
+        assertNotNull(context.params)
     }
 
     fun testDisposedContextRejectsOutput() {
-        val context = createContext()
-        //hack!
+        val (context, _) = createContext()
+        // Dispose the context
         Disposer.dispose(context.disposable)
 
         try {
@@ -161,5 +149,15 @@ class McpScriptContextTest : BasePlatformTestCase() {
         } catch (e: IllegalStateException) {
             assertTrue(e.message?.contains("disposed") == true)
         }
+    }
+
+    fun testIsDisposedFlag() {
+        val (context, _) = createContext()
+
+        assertFalse("Should not be disposed initially", context.isDisposed)
+
+        Disposer.dispose(context.disposable)
+
+        assertTrue("Should be disposed after dispose()", context.isDisposed)
     }
 }

@@ -2,12 +2,19 @@
 package com.jonnyzzz.intellij.mcp.storage
 
 import com.intellij.openapi.components.service
+import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Assert.assertNotEquals
-import java.nio.file.Files
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Tests for ExecutionStorage.
+ *
+ * Note: The storage API has been simplified to append-only logging.
+ * Tests cover the current API: writeNewExecution, appendExecutionEvent,
+ * writeCodeExecutionData, and findExecutionId.
  */
 class ExecutionStorageTest : BasePlatformTestCase() {
 
@@ -18,150 +25,98 @@ class ExecutionStorageTest : BasePlatformTestCase() {
         storage = project.service()
     }
 
-    fun testGenerateExecutionId() {
+    private fun testExecParams(code: String, taskId: String = "test-task") = ExecCodeParams(
+        taskId = taskId,
+        code = code,
+        reason = "test",
+        timeout = 60,
+        rawParams = buildJsonObject { }
+    )
+
+    fun testWriteNewExecution(): Unit = timeoutRunBlocking(10.seconds) {
         val code = "execute { println(\"Hello\") }"
-        val params = ExecutionParams(timeout = 60)
+        val params = testExecParams(code)
 
-        val id1 = storage.generateExecutionId(code, params)
+        val executionId = storage.writeNewExecution(params)
 
-        // ID should have the format: {3-char-hash}-{timestamp}-{10-char-hash}
-        // Example: abc-2024-12-10T14-30-25-a1B2c3D4e5
-        val parts = id1.split("-")
-        assertTrue("ID should have multiple parts separated by dash", parts.size >= 5)
-
-        // First part should be 3-char project hash
-        assertEquals("First part should be 3 chars", 3, parts[0].length)
-
-        // Last part should be 10-char payload hash
-        assertEquals("Last part should be 10 chars", 10, parts.last().length)
-
-        // Different code should produce different payload hash
-        val id3 = storage.generateExecutionId("different code", params)
-        assertNotEquals("Different code should have different hash", id1.takeLast(10), id3.takeLast(10))
+        // ID should have the format: eid_{timestamp}-{task-id}
+        assertTrue("ID should start with eid_", executionId.executionId.startsWith("eid_"))
+        assertTrue("ID should contain task ID", executionId.executionId.contains("test"))
     }
 
-    fun testCreateExecution() {
+    fun testDifferentTaskIdsProduceDifferentExecutionIds(): Unit = timeoutRunBlocking(10.seconds) {
         val code = "execute { println(\"Hello\") }"
-        val params = ExecutionParams(timeout = 30)
-        val executionId = storage.generateExecutionId(code, params)
 
-        storage.createExecution(executionId, code, params)
+        val id1 = storage.writeNewExecution(testExecParams(code, taskId = "task-1"))
+        val id2 = storage.writeNewExecution(testExecParams(code, taskId = "task-2"))
 
-        assertTrue("Execution should exist", storage.exists(executionId))
-
-        val savedCode = storage.readScript(executionId)
-        assertEquals("Script should be saved", code, savedCode)
-
-        val savedParams = storage.readParams(executionId)
-        assertNotNull("Params should be saved", savedParams)
-        assertEquals("Timeout should match", 30, savedParams!!.timeout)
+        assertNotEquals("Different task IDs should produce different execution IDs",
+            id1.executionId, id2.executionId)
     }
 
-    fun testAppendAndReadOutput() {
+    fun testFindExecutionId(): Unit = timeoutRunBlocking(10.seconds) {
+        val code = "execute { println(\"Hello\") }"
+        val executionId = storage.writeNewExecution(testExecParams(code))
+
+        // Should find the execution
+        val found = storage.findExecutionId(executionId.executionId)
+        assertNotNull("Should find execution", found)
+        assertEquals("Execution ID should match", executionId.executionId, found?.executionId)
+
+        // Should not find non-existent execution
+        val notFound = storage.findExecutionId("non-existent-id")
+        assertNull("Should not find non-existent execution", notFound)
+    }
+
+    fun testFindExecutionIdRejectsInvalidPaths(): Unit = timeoutRunBlocking(10.seconds) {
+        // Should reject paths with ".." or "/"
+        assertNull(storage.findExecutionId("../etc/passwd"))
+        assertNull(storage.findExecutionId("foo/bar"))
+        assertNull(storage.findExecutionId(".."))
+    }
+
+    fun testAppendExecutionEvent(): Unit = timeoutRunBlocking(10.seconds) {
         val code = "test"
-        val params = ExecutionParams()
-        val executionId = storage.generateExecutionId(code, params)
-        storage.createExecution(executionId, code, params)
+        val executionId = storage.writeNewExecution(testExecParams(code))
 
-        // Append multiple messages
-        storage.appendOutput(executionId, OutputMessage(
-            ts = 1000L,
-            type = OutputType.OUT,
-            msg = "Hello"
-        ))
-        storage.appendOutput(executionId, OutputMessage(
-            ts = 2000L,
-            type = OutputType.LOG,
-            msg = "Info message",
-            level = "info"
-        ))
-        storage.appendOutput(executionId, OutputMessage(
-            ts = 3000L,
-            type = OutputType.ERR,
-            msg = "Error!"
-        ))
-
-        // Read all output
-        val allOutput = storage.readOutput(executionId)
-        assertEquals("Should have 3 messages", 3, allOutput.size)
-        assertEquals("First message", "Hello", allOutput[0].msg)
-        assertEquals("Second message type", OutputType.LOG, allOutput[1].type)
-        assertEquals("Third message", "Error!", allOutput[2].msg)
-
-        // Read with offset
-        val offsetOutput = storage.readOutput(executionId, offset = 1)
-        assertEquals("Should have 2 messages after offset", 2, offsetOutput.size)
-        assertEquals("First after offset", "Info message", offsetOutput[0].msg)
+        // Should not throw
+        storage.appendExecutionEvent(executionId, "Hello from test")
+        storage.appendExecutionEvent(executionId, "Second message")
     }
 
-    fun testWriteAndReadResult() {
+    fun testWriteCodeExecutionData(): Unit = timeoutRunBlocking(10.seconds) {
         val code = "test"
-        val params = ExecutionParams()
-        val executionId = storage.generateExecutionId(code, params)
-        storage.createExecution(executionId, code, params)
+        val executionId = storage.writeNewExecution(testExecParams(code))
 
-        val result = ExecutionResult(
-            status = ExecutionStatus.SUCCESS
-        )
-        storage.writeResult(executionId, result)
+        // Write custom data file
+        val path = storage.writeCodeExecutionData(executionId, "custom.txt", "Custom content")
+        assertTrue("File should exist", java.nio.file.Files.exists(path))
 
-        val readResult = storage.readResult(executionId)
-        assertNotNull("Result should be readable", readResult)
-        assertEquals("Status should match", ExecutionStatus.SUCCESS, readResult!!.status)
+        val content = java.nio.file.Files.readString(path)
+        assertEquals("Content should match", "Custom content", content)
     }
 
-    fun testResultWithError() {
-        val code = "test"
-        val params = ExecutionParams()
-        val executionId = storage.generateExecutionId(code, params)
-        storage.createExecution(executionId, code, params)
-
-        val result = ExecutionResult(
-            status = ExecutionStatus.ERROR,
-            errorMessage = "Something went wrong",
-            exceptionInfo = "java.lang.RuntimeException: test\n\tat ..."
-        )
-        storage.writeResult(executionId, result)
-
-        val readResult = storage.readResult(executionId)
-        assertNotNull(readResult)
-        assertEquals(ExecutionStatus.ERROR, readResult!!.status)
-        assertEquals("Something went wrong", readResult.errorMessage)
-        assertTrue(readResult.exceptionInfo?.contains("RuntimeException") == true)
-    }
-
-    fun testSaveReviewCode() {
+    fun testWriteCodeReviewFile(): Unit = timeoutRunBlocking(10.seconds) {
         val code = "execute { println(\"Review me\") }"
-        val params = ExecutionParams()
-        val executionId = storage.generateExecutionId(code, params)
-        storage.createExecution(executionId, code, params)
+        val params = testExecParams(code)
+        val executionId = storage.writeNewExecution(params)
 
-        val reviewFile = storage.saveReviewCode(executionId, code)
-        assertTrue("Review file should exist", Files.exists(reviewFile))
+        val reviewPath = storage.writeCodeReviewFile(executionId, params)
+        assertTrue("Review file should exist", java.nio.file.Files.exists(reviewPath))
 
-        val savedCode = storage.readReviewCode(executionId)
+        val savedCode = java.nio.file.Files.readString(reviewPath)
         assertEquals("Code should match", code, savedCode)
     }
 
-    fun testSaveReviewResult() {
-        val code = "test"
-        val params = ExecutionParams()
-        val executionId = storage.generateExecutionId(code, params)
-        storage.createExecution(executionId, code, params)
+    fun testRemoveCodeReviewFile(): Unit = timeoutRunBlocking(10.seconds) {
+        val code = "execute { println(\"Review me\") }"
+        val params = testExecParams(code)
+        val executionId = storage.writeNewExecution(params)
 
-        val outcome = ReviewOutcome(
-            approved = false,
-            originalCode = code,
-            editedCode = "$code\n// User comment: please fix this",
-            diff = "--- original\n+++ edited\n@@ -1,1 +1,2 @@\n test\n+// User comment: please fix this"
-        )
-        storage.saveReviewResult(executionId, outcome)
+        val reviewPath = storage.writeCodeReviewFile(executionId, params)
+        assertTrue("Review file should exist", java.nio.file.Files.exists(reviewPath))
 
-        val readOutcome = storage.readReviewResult(executionId)
-        assertNotNull(readOutcome)
-        assertFalse(readOutcome!!.approved)
-        assertEquals(code, readOutcome.originalCode)
-        assertNotNull(readOutcome.editedCode)
-        assertNotNull(readOutcome.diff)
+        storage.removeCodeReviewFile(executionId)
+        assertFalse("Review file should be removed", java.nio.file.Files.exists(reviewPath))
     }
 }

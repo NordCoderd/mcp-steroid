@@ -5,6 +5,7 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.junit.Assume.assumeTrue
+import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -779,6 +780,94 @@ class ClaudeCliIntegrationTest : BasePlatformTestCase() {
         assertEquals("MCP remove should succeed", 0, removeResult.exitCode)
 
         println("[TEST] Full documented workflow completed successfully!")
+    }
+
+    /**
+     * Tests that Claude can read a system property set in the IDE JVM via MCP execute_code.
+     * This verifies the MCP server runs in the same JVM and can access system properties.
+     *
+     * The test:
+     * 1. Sets a system property with a random UUID value
+     * 2. Asks Claude to read it via steroid_execute_code
+     * 3. Verifies Claude's output contains the correct value
+     */
+    fun testSystemPropertyCanBeReadViaClaude(): Unit = timeoutRunBlocking(300.seconds) {
+        assumeDockerAvailable()
+        val session = claudeSession()
+
+        // Verify API key works
+        assertAnthropicApiKeyValid(session)
+
+        val dockerMcpUrl = resolveDockerUrl()
+
+        // Set a system property with a random value
+        val propertyKey = "mcp.test.claude.random.value"
+        val randomValue = "claude-${UUID.randomUUID()}"
+        System.setProperty(propertyKey, randomValue)
+
+        try {
+            // Register the MCP server
+            val addResult = session.run(
+                "mcp", "add",
+                "--transport", "http",
+                "--scope", "project",
+                "intellij-steroid-test",
+                dockerMcpUrl
+            )
+            println("[TEST] MCP add result: exit=${addResult.exitCode}")
+            assertEquals("Failed to add MCP server: ${addResult.stderr}", 0, addResult.exitCode)
+
+            // Verify connection
+            val listResult = session.listMcpServers(timeoutSeconds = 30)
+            println("[TEST] MCP list: ${listResult.output}")
+
+            // Ask Claude to read the system property using execute_code
+            val result = session.runPrompt(
+                """
+                You are testing MCP integration. You MUST use steroid_execute_code to run Kotlin code.
+                Execute the following code and print the result:
+
+                Call steroid_execute_code with this code:
+                ```
+                execute {
+                    val value = System.getProperty("$propertyKey")
+                    println("SYSPROP_VALUE: " + value)
+                }
+                ```
+
+                After execution, extract the SYSPROP_VALUE line from the output and print it as:
+                FINAL_VALUE: <the value you found>
+
+                If you encounter any errors, print: ERROR: <description>
+                """.trimIndent(),
+                timeoutSeconds = 120,
+                allowedTools = listOf("mcp__intellij-steroid-test__*"),
+                permissionMode = "bypassPermissions"
+            )
+
+            println("[TEST] Claude exit code: ${result.exitCode}")
+            println("[TEST] Claude stdout:\n${result.output}")
+            println("[TEST] Claude stderr:\n${result.stderr}")
+
+            // Verify no errors
+            assertEquals(
+                "Claude should succeed. Stderr: ${result.stderr}",
+                0,
+                result.exitCode
+            )
+            assertNoErrorsInOutput(result.output, result.stderr, "System property read")
+
+            // Verify the output contains our random value
+            assertTrue(
+                "Output should contain the system property value '$randomValue'. Output:\n${result.output}",
+                result.output.contains(randomValue)
+            )
+
+            println("[TEST] Successfully read system property via Claude!")
+        } finally {
+            // Clean up
+            System.clearProperty(propertyKey)
+        }
     }
 
     private fun claudeSession(): DockerClaudeSession {

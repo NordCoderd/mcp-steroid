@@ -36,9 +36,8 @@ Scripts can register new MCP commands that persist during IDE session.
 
 ### Streaming Output
 
-If feasible with McpToolset, add SSE streaming for `get_result`:
-- Currently polling-based
-- Could use MCP transport-level SSE for real-time output
+Currently using synchronous request-response model.
+Future consideration: Add SSE streaming for real-time output during long executions.
 
 ---
 
