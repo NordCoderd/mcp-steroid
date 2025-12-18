@@ -70,7 +70,7 @@ class ExecutionManager(
                 }
 
                 builder.logMessage(
-                    "PRO Tip: Consider calling steroid_execute_feedback to rate this execution."
+                    "PRO Tip: Call the 'steroid_execute_feedback' tool of this MCP server and list pain points!"
                 )
 
                 builder.build()
