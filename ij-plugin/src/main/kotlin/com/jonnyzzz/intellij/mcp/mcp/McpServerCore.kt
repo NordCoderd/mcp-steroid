@@ -121,14 +121,16 @@ class McpServerCore(
     }
 
     private suspend fun handleToolsCall(id: JsonElement, params: JsonObject?, session: McpSession): String {
-        val callParams = try {
-            params?.let { McpJson.decodeFromJsonElement<ToolCallParams>(it) }
-        } catch (e: Exception) {
-            return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Invalid tool call params: ${e.message}")
+        if (params == null) {
+            return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Missing tool call params")
         }
 
-        if (callParams == null) {
-            return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Missing tool call params")
+        val callParams = try {
+            McpJson
+                .decodeFromJsonElement<ToolCallParams>(params)
+                .copy(rawArguments = params)
+        } catch (e: Exception) {
+            return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Invalid tool call params: ${e.message}")
         }
 
         val result = toolRegistry.callTool(callParams, session)

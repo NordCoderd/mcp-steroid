@@ -3,6 +3,7 @@ package com.jonnyzzz.intellij.mcp.mcp
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 
 /**
@@ -150,6 +151,9 @@ data class ToolsListResult(
 data class ToolCallParams(
     val name: String,
     val arguments: JsonObject? = null,
+
+    @Transient
+    val rawArguments: JsonObject? = null,
 )
 
 @Serializable

@@ -1,7 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.mcp
 
+import com.intellij.openapi.diagnostic.thisLogger
 import com.jonnyzzz.intellij.mcp.server.McpProgressReporter
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
@@ -11,6 +13,12 @@ import java.util.concurrent.atomic.AtomicInteger
  * Registry for MCP tools.
  */
 class McpToolRegistry {
+    private val log = thisLogger()
+
+    private val jsonToLogMessages = Json {
+        prettyPrint = true
+    }
+
     private val tools = mutableMapOf<String, McpToolDefinition>()
 
     /**
@@ -47,9 +55,12 @@ class McpToolRegistry {
                 isError = true
             )
 
+        val textParams = jsonToLogMessages.encodeToString(params.rawArguments)
+        log.info("callTool with parameters: $textParams")
+
+        val progressToken = params.rawArguments?.get("_meta")?.jsonObject?.get("progressToken")
         val progress = object : McpProgressReporter {
             val counter = AtomicInteger(0)
-            val progressToken = params.arguments?.get("_meta")?.jsonObject?.get("progressToken")
 
             override fun report(message: String) {
                 if (progressToken == null) return
