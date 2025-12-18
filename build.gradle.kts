@@ -1,3 +1,5 @@
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 plugins {
     id("org.jetbrains.intellij.platform") version "2.10.5"
@@ -6,7 +8,7 @@ plugins {
 }
 
 group = "com.jonnyzzz.intellij"
-version = "0.83.5-SNAPSHOT-2025-12-16-11-58"
+version = "0.84.0-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}"
 
 repositories {
     mavenCentral()
