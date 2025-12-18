@@ -21,10 +21,10 @@
         <registryKey key="mcp.steroids.review.mode" defaultValue="ALWAYS"
             description="Code review mode: ALWAYS (default), TRUSTED, NEVER"/>
 
-        <registryKey key="mcp.steroids.review.timeout" defaultValue="300"
+        <registryKey key="mcp.steroids.review.timeout" defaultValue="600"
             description="Review timeout in seconds"/>
 
-        <registryKey key="mcp.steroids.execution.timeout" defaultValue="60"
+        <registryKey key="mcp.steroids.execution.timeout" defaultValue="600"
             description="Script execution timeout in seconds"/>
 
         <registryKey key="mcp.steroids.server.port" defaultValue="6315"
