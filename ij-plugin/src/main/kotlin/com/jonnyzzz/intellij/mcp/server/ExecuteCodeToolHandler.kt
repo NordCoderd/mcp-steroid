@@ -113,7 +113,7 @@ class ExecuteCodeToolHandler {
                     }
                     putJsonObject("reason") {
                         put("type", "string")
-                        put("description", "Write human readable reason for the execution, what you want to do and to get out of that")
+                        put("description", "Write human readable reason and END GOAL for the execution, what you want to do and to get out of that")
                     }
                     putJsonObject("timeout") {
                         put("type", "integer")
