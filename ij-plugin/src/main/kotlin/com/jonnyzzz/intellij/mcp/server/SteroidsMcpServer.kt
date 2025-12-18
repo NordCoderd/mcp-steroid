@@ -236,40 +236,32 @@ class SteroidsMcpServer(
 
     private fun buildMcpSteroidsFileContent(serverUrl: String): String {
         return """
-            |# IntelliJ MCP Steroid Server
-            |# URL: $serverUrl
-            |#
-            |# === Claude Code CLI ===
-            |# Add server:
-            |#   claude mcp add --transport http intellij-steroid $serverUrl
-            |# Verify:
-            |#   claude mcp list
-            |# Use:
-            |#   claude -p "List all open projects using steroid_list_projects"
-            |# Remove:
-            |#   claude mcp remove intellij-steroid
-            |#
-            |# === Codex CLI (TOML config) ===
-            |# Create ~/.codex/config.toml with:
-            |#   [features]
-            |#   rmcp_client = true
-            |#
-            |#   [mcp_servers.intellij-steroid]
-            |#   url = "$serverUrl"
-            |#
-            |# Or run:
-            |#   mkdir -p ~/.codex && cat > ~/.codex/config.toml << 'EOF'
-            |#   [features]
-            |#   rmcp_client = true
-            |#
-            |#   [mcp_servers.intellij-steroid]
-            |#   url = "$serverUrl"
-            |#   EOF
-            |#
-            |# Use:
-            |#   codex exec "List all open projects using steroid_list_projects"
-            |
-            |$serverUrl
+             IntelliJ MCP Steroid Server
+             URL: $serverUrl
+            
+             === Claude Code CLI ===
+             
+             Add server:
+               claude mcp add --transport http intellij-steroid $serverUrl
+               claude mcp list
+               
+             Recommended:
+               claude mcp add playwright npx @playwright/mcp@latest
+               
+             Test:
+               claude -p "List all open projects using steroid_list_projects"
+            
+             === Codex CLI (TOML config) ===
+               codex mcp add intellij --url http://localhost:6315/mcp
+               codex mcp list
+             
+             Recommended:
+               codex mcp add playwright npx "@playwright/mcp@latest" 
+              
+             Test:
+               codex exec "List all open projects using steroid_list_projects"
+               
+             $serverUrl
         """.trimMargin()
     }
 
