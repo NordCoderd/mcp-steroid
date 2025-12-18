@@ -31,8 +31,8 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
         super.setUp()
         // Bind MCP server to 0.0.0.0 so Docker containers can reach it via host.docker.internal
         setRegistryPropertyForTest("mcp.steroids.server.host", "0.0.0.0")
-        // Use dynamic port to avoid conflicts
-        setRegistryPropertyForTest("mcp.steroids.server.port", "0")
+        // Use fixed port for tests
+        setRegistryPropertyForTest("mcp.steroids.server.port", "17820")
         // Disable review mode for tests
         setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
     }

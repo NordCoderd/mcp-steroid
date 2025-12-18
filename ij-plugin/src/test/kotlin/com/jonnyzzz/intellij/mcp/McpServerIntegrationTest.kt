@@ -29,7 +29,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
-        setRegistryPropertyForTest("mcp.steroids.server.port", "0")
+        setRegistryPropertyForTest("mcp.steroids.server.port", "17820")
         client = HttpClient(CIO) {
             expectSuccess = false
         }
