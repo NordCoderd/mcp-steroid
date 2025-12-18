@@ -197,78 +197,43 @@ class CodexCliIntegrationTest : BasePlatformTestCase() {
         val dockerMcpUrl = resolveDockerUrl()
 
         // First check if mcp subcommand exists
-        val mcpHelpResult = session.run("mcp", "--help")
+        val mcpHelpResult = session.run("mcp", "add", "intellij-steroid-test", "--url", dockerMcpUrl)
         println("[TEST] MCP help result: exit=${mcpHelpResult.exitCode}")
         println("[TEST] MCP help output: ${mcpHelpResult.output}")
         println("[TEST] MCP help stderr: ${mcpHelpResult.stderr}")
 
-        val combinedHelpOutput = mcpHelpResult.output + mcpHelpResult.stderr
+        // Run Codex exec to discover tools
+        val result = session.runExec(
+            """
+            You are testing an MCP server integration. You MUST use the MCP tools.
+            Steps:
+            1) List all MCP tools starting with "steroid_" and print each as: TOOL: <name> - <description>
+            2) Call steroid_list_projects EXACTLY once and print the raw result on a single line prefixed with PROJECTS:
+            Do not skip any step. If a step fails, print ERROR: <reason>.
+            """.trimIndent(),
+            timeoutSeconds = 120,
+            model = "o4-mini"
+        )
 
-        // Skip test if mcp subcommand doesn't exist
-        if (mcpHelpResult.exitCode != 0) {
-            println("[TEST] PASS: Codex mcp subcommand not available - test not applicable")
-            return@timeoutRunBlocking
-        }
+        println("[TEST] Codex exit code: ${result.exitCode}")
+        println("[TEST] Codex stdout:\n${result.output}")
+        println("[TEST] Codex stderr:\n${result.stderr}")
 
-        // Check mcp add help to see exact syntax
-        val mcpAddHelpResult = session.run("mcp", "add", "--help")
-        println("[TEST] MCP add help result: exit=${mcpAddHelpResult.exitCode}")
-        println("[TEST] MCP add help output: ${mcpAddHelpResult.output}")
-        println("[TEST] MCP add help stderr: ${mcpAddHelpResult.stderr}")
+        val combined = (result.output + "\n" + result.stderr).lowercase()
 
-        val combinedAddHelpOutput = mcpAddHelpResult.output + mcpAddHelpResult.stderr
+        // Check if MCP server connected successfully (this is visible in stderr)
+        val mcpConnected = combined.contains("mcp:") && combined.contains("ready")
+        println("[TEST] MCP server connected: $mcpConnected")
 
-        // Skip if mcp add subcommand doesn't exist
-        if (mcpAddHelpResult.exitCode != 0) {
-            println("[TEST] PASS: Codex mcp add subcommand not available - test not applicable")
-            return@timeoutRunBlocking
-        }
+        assertEquals("Codex exec should succeed. Output: ${result.output}\nStderr: ${result.stderr}", 0, result.exitCode)
 
-        // Check if HTTP server support exists in mcp add
-        val supportsHttpServers = combinedAddHelpOutput.contains("--transport") ||
-                combinedAddHelpOutput.contains("--url") ||
-                combinedAddHelpOutput.contains("sse")
-
-        if (!supportsHttpServers) {
-            // Codex CLI only supports stdio-based servers via 'mcp add' (syntax: mcp add name -- command)
-            // HTTP servers must be configured via TOML config (tested in testDocumentedTomlConfiguration)
-            println("[TEST] PASS: Codex mcp add doesn't support HTTP servers - HTTP config is via TOML (see testDocumentedTomlConfiguration)")
-            return@timeoutRunBlocking
-        }
-
-        // Add MCP server via CLI command
-        // The syntax depends on Codex version - try with --transport http --url for HTTP servers
-        val addResult = if (combinedAddHelpOutput.contains("--transport") || combinedAddHelpOutput.contains("--url")) {
-            // New syntax with transport/url flags
-            session.run("mcp", "add", "intellij-steroid-cli", "--transport", "http", "--url", dockerMcpUrl)
-        } else {
-            // Try SSE transport syntax
-            session.run("mcp", "add", "intellij-steroid-cli", "--sse", dockerMcpUrl)
-        }
-
-        println("[TEST] MCP add result: exit=${addResult.exitCode}")
-        println("[TEST] MCP add output: ${addResult.output}")
-        println("[TEST] MCP add stderr: ${addResult.stderr}")
-
-        // Skip if the add command itself failed (HTTP not supported by this version)
-        if (addResult.exitCode != 0) {
-            println("[TEST] PASS: Codex mcp add failed for HTTP server - HTTP config is via TOML")
-            return@timeoutRunBlocking
-        }
-
-        // Verify the server was added by listing MCP servers
-        val listResult = session.run("mcp", "list")
-        println("[TEST] MCP list result: exit=${listResult.exitCode}")
-        println("[TEST] MCP list output: ${listResult.output}")
-        println("[TEST] MCP list stderr: ${listResult.stderr}")
-
-        val combinedListOutput = listResult.output + listResult.stderr
-
-        // The server should appear in the list
         assertTrue(
-            "MCP server should be added via 'codex mcp add'. " +
-                    "List output: $combinedListOutput",
-            combinedListOutput.contains("intellij-steroid-cli")
+            "Codex should report steroid_ tools. Output: ${result.output}\nStderr: ${result.stderr}",
+            combined.contains("steroid_")
+        )
+        assertTrue(
+            "Codex should call steroid_list_projects. Output: ${result.output}\nStderr: ${result.stderr}",
+            combined.contains("steroid_list_projects") || combined.contains("projects")
         )
     }
 
