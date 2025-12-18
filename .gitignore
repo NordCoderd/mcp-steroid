@@ -11,6 +11,8 @@ build/
 out/
 .intellijPlatform/
 
+.vscode
+
 # Kotlin
 *.kotlin_module
 
@@ -27,3 +29,6 @@ integration-test/*.tmp
 
 .gradle-local
 .kotlin
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
