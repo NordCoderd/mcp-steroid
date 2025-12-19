@@ -68,7 +68,6 @@ class SteroidsMcpServer(
             service<ListProjectsToolHandler>().register(mcpServer)
             service<ExecuteCodeToolHandler>().register(mcpServer)
             service<ExecuteFeedbackToolHandler>().register(mcpServer)
-            service<PluginReloadToolHandler>().register(mcpServer)
 
             val configuredPort = Registry.intValue("mcp.steroids.server.port", 63150)
 

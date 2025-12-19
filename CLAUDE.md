@@ -467,64 +467,6 @@ If `.kts` files show errors:
 # This deploys to: ~/intellij-253/config/plugins/intellij-mcp-steroid/
 ```
 
-### Reload Plugin in Running IDE
-
-After deploying, the plugin needs to be reloaded. There are two MCP tools for this:
-
-#### 1. Check Plugin Status
-
-Use `steroid_plugin_info` to check if the plugin can be reloaded without restart:
-
-```json
-{"method": "tools/call", "params": {"name": "steroid_plugin_info"}}
-```
-
-Returns:
-- Plugin ID, version, and installation path
-- Whether dynamic reload is supported
-- Path to IDE log file for monitoring
-
-#### 2. Trigger Plugin Reload
-
-Use `steroid_plugin_reload` to schedule a plugin reload:
-
-```json
-{"method": "tools/call", "params": {"name": "steroid_plugin_reload"}}
-```
-
-**Important Notes**:
-- Only works if the plugin supports dynamic reload (check with `steroid_plugin_info` first)
-- The reload is scheduled to run after the current execution completes
-- After reload, the MCP connection will be lost and needs to be re-established
-- Check the IDE log file for reload status
-
-### Dynamic Plugin Reload Implementation
-
-The plugin includes a reload mechanism based on IntelliJ's `DynamicPlugins` API:
-
-**Key Files**:
-- `reload/PluginReloadHelper.kt` - Utilities for checking plugin state and reload capability
-- `reload/PluginReloader.kt` - Schedules and performs plugin reload
-- `server/PluginReloadToolHandler.kt` - MCP tools for plugin info and reload
-
-**How it works**:
-1. `PluginReloadHelper.checkCanReloadWithoutRestart()` checks if the plugin can be reloaded
-2. `PluginReloader.scheduleReload()` schedules the reload via `invokeLater`
-3. The reload unloads the plugin, then reloads it from disk
-
-**DynamicPlugins API Methods**:
-- `DynamicPlugins.checkCanUnloadWithoutRestart(descriptor)` - Returns null if OK, or reason string
-- `DynamicPlugins.unloadPlugin(descriptor, options)` - Unloads a plugin
-- `DynamicPlugins.loadPlugin(descriptor)` - Loads a plugin
-- `PluginManagerCore.getPlugin(pluginId)` - Gets plugin descriptor
-- `PluginManagerCore.getPluginSet().isPluginEnabled(pluginId)` - Check if enabled
-
-**IDE Log Path**:
-- `PathManager.getLogPath()` returns the log directory
-- Main log file: `{logPath}/idea.log`
-
-**Note**: Full IDE restart may be required for script definition changes to take effect.
-
 ## Committing Changes
 
 When work is complete, commit changes with descriptive messages:
