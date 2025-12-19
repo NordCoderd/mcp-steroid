@@ -46,7 +46,7 @@ class ExecuteCodeToolHandler {
              You can do everything IntelliJ API allows you to do including, but not limited to
              - code search
              - code completion
-             - code introspection, including methods, API, coroutines, reelection
+             - code introspection, including methods, API, coroutines, reflection
              - errors and warnings highlighting
              - tests execution
              - automated code refactorings, such as rename or find usages
