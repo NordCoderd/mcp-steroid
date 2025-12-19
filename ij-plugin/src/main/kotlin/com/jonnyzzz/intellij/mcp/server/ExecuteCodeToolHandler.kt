@@ -38,11 +38,11 @@ class ExecuteCodeToolHandler {
 
     private val toolDescription get() = """
              Execute Kotlin code in the IntelliJ-based IDE's runtime context with full access to IntelliJ APIs.
- 
+
              You are working with the stateful API, everything you do here changes the state of the IDE,
              which is running exclusively for you. Use the IntelliJ-based IDE to help you looking
              at the project, where you are working. Prioritize using the IDE and this MCP where possible.
-             
+
              You can do everything IntelliJ API allows you to do including, but not limited to
              - code search
              - code completion
@@ -50,46 +50,39 @@ class ExecuteCodeToolHandler {
              - errors and warnings highlighting
              - tests execution
              - automated code refactorings, such as rename or find usages
-              
-            IMPORTANT:
-            1. All code must be written as suspend functions. Never use runBlocking.
-            2. Provide a task_id to group related executions.
-            
-            The code must use the execute { } pattern:
+
+            CRITICAL RULES:
+            1. The execute { } block is a SUSPEND function - prefer Kotlin coroutine APIs over blocking Java APIs
+            2. IMPORTS MUST be OUTSIDE execute { } - place imports at the top of the script
+            3. Never use runBlocking - you're already in a coroutine context
+            4. Use readAction { } for PSI/VFS reads, writeAction { } for modifications
+            5. Call waitForSmartMode() before accessing indices or PSI
+
+            Script structure:
             ```kotlin
-            execute {
-                println("Hello from IntelliJ!")
-                waitForSmartMode()
-                // Use any IntelliJ API here
-            }
-            ```
-            
-            Available context methods:
-            - println(vararg values) - Print values separated by spaces
-            - printJson(obj) - Print object as pretty JSON
-            - progress(message) - Report progress (throttled to 1/sec)
-            - logInfo/logWarn/logError(msg) - Log messages
-            - waitForSmartMode() - Wait for indexing to complete
-            - project - Access the IntelliJ Project
-            - use Java/Kotlin reflection to find more!
-            
-            For read/write actions, use IntelliJ's coroutine-aware APIs:
-            ```kotlin
+            // Imports go HERE, outside execute block
             import com.intellij.openapi.application.readAction
-            import com.intellij.openapi.application.writeAction
-            
+            import com.intellij.psi.PsiManager
+
             execute {
+                // This is a suspend function - use coroutine APIs!
+                waitForSmartMode()
                 val psiFile = readAction {
                     PsiManager.getInstance(project).findFile(virtualFile)
                 }
-                writeAction {
-                    document.setText("new content")
-                }
+                println(psiFile?.name)
             }
             ```
-            
-            Tip: After execution is success and you solved or give up solving the task
-                 call the steroid_execute_feedback tool to log your feedback, so we can improve.
+
+            Available in execute { } scope:
+            - project: Project - the IntelliJ Project instance
+            - println(vararg values) - output separated by spaces
+            - printJson(obj) - pretty-print as JSON
+            - progress(message) - report progress (throttled to 1/sec)
+            - waitForSmartMode() - suspend until indexing completes
+            - disposable - for resource cleanup
+
+            Tip: After execution, call steroid_execute_feedback to log your feedback.
         """.trimIndent()
 
     fun register(server: McpServerCore) {

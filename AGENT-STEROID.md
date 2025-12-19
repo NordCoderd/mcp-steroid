@@ -35,49 +35,92 @@ Provide feedback on execution results. Use after `steroid_execute_code` to rate 
 ### `steroid_plugin_info` / `steroid_plugin_reload`
 Check plugin status and trigger hot reload after deploying plugin updates.
 
-## The `execute { }` Block
+## Critical Rules
 
-All code runs inside a suspend function with access to `McpScriptContext`:
+### 1. The `execute { }` Block is a SUSPEND Function
 
+The code inside `execute { }` runs in a **coroutine context**. This means:
+- **Prefer Kotlin coroutine APIs** over blocking Java APIs
+- You can call any `suspend` function directly
+- **NEVER use `runBlocking`** - it will cause deadlocks
+
+### 2. IMPORTS MUST Be OUTSIDE `execute { }`
+
+**WRONG:**
 ```kotlin
 execute {
-    // Available in scope:
-    // - project: Project       - The IntelliJ Project
-    // - params: JsonElement    - Original tool parameters
-    // - disposable: Disposable - For resource cleanup
-
-    // Output methods:
-    println("Values", "separated", "by spaces")  // Output to MCP client
-    printJson(someObject)                         // Pretty-print as JSON
-    progress("Working on step 1...")              // Progress reporting (throttled)
-
-    // IDE utilities:
-    waitForSmartMode()  // Wait for indexing before PSI operations
+    import com.intellij.psi.PsiManager  // ERROR: imports don't work here!
+    // ...
 }
 ```
 
-## Read/Write Actions - CRITICAL
-
-IntelliJ requires proper threading for PSI/VFS access:
-
+**CORRECT:**
 ```kotlin
+import com.intellij.psi.PsiManager
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
 
 execute {
-    // READING PSI/VFS - wrap in readAction
     val psiFile = readAction {
         PsiManager.getInstance(project).findFile(virtualFile)
     }
-
-    // MODIFYING PSI/VFS - wrap in writeAction
-    writeAction {
-        document.setText("new content")
-    }
 }
 ```
 
-**NEVER use `runBlocking`** - it causes deadlocks. Everything is already in a coroutine context.
+### 3. Read/Write Actions for PSI/VFS
+
+IntelliJ requires proper threading:
+- **`readAction { }`** - for reading PSI, VFS, indices
+- **`writeAction { }`** - for modifying PSI, VFS, documents
+
+Both are suspend functions that work naturally in the execute block.
+
+## Script Structure Template
+
+```kotlin
+// 1. IMPORTS - Always at the top, outside execute
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.writeAction
+import com.intellij.psi.PsiManager
+
+// 2. EXECUTE BLOCK - Your suspend function
+execute {
+    // 3. Wait for indexing if needed
+    waitForSmartMode()
+
+    // 4. Use IntelliJ APIs with proper read/write actions
+    val result = readAction {
+        // PSI/VFS reads here
+    }
+
+    // 5. Output results
+    println(result)
+}
+```
+
+## Context Available in `execute { }`
+
+```kotlin
+execute {
+    // Available properties:
+    project      // The IntelliJ Project instance
+    params       // Original tool parameters (JsonElement)
+    disposable   // For resource cleanup
+    isDisposed   // Check if context is disposed
+
+    // Output methods:
+    println("Values", "separated", "by spaces")
+    // Pretty-print as JSON
+    printJson(object {
+       val foo = 42
+       val bar = "cool"
+    })
+    printJson(anyOtherObject)
+    progress("Working on step 1...")  // Throttled to 1/sec
+
+    // IDE utilities (suspend functions):
+    waitForSmartMode()  // Wait for indexing before PSI operations
+}
+```
 
 ## Common Patterns
 
@@ -144,11 +187,11 @@ execute {
 ### 5. Open Another Project
 
 ```kotlin
-execute {
-    import com.intellij.ide.impl.OpenProjectTask
-    import com.intellij.openapi.project.ex.ProjectManagerEx
-    import java.nio.file.Path
+import com.intellij.ide.impl.OpenProjectTask
+import com.intellij.openapi.project.ex.ProjectManagerEx
+import java.nio.file.Path
 
+execute {
     val projectPath = Path.of("/path/to/project")
     val projectManager = ProjectManagerEx.getInstanceEx()
     val result = projectManager.openProjectAsync(projectPath, OpenProjectTask { })
@@ -167,8 +210,11 @@ execute {
 ### 7. Inspect JAR Contents
 
 ```kotlin
+import java.util.jar.JarFile
+import java.io.File
+
 execute {
-    val jarFile = java.util.jar.JarFile(java.io.File("/path/to/plugin.jar"))
+    val jarFile = JarFile(File("/path/to/plugin.jar"))
     jarFile.entries().toList()
         .filter { it.name.endsWith(".class") }
         .forEach { println(it.name) }
@@ -198,10 +244,11 @@ execute {
 ### Find Usages via PSI
 
 ```kotlin
-execute {
-    import com.intellij.psi.search.GlobalSearchScope
-    import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.openapi.application.readAction
 
+execute {
     waitForSmartMode()
 
     readAction {
@@ -217,10 +264,10 @@ execute {
 ### Navigate Project Structure
 
 ```kotlin
-execute {
-    import com.intellij.openapi.roots.ProjectRootManager
-    import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.vfs.VfsUtil
 
+execute {
     val contentRoots = ProjectRootManager.getInstance(project).contentRoots
     contentRoots.forEach { root ->
         println("Content root: ${root.path}")
@@ -237,10 +284,10 @@ execute {
 ### Run Inspections Programmatically
 
 ```kotlin
-execute {
-    import com.intellij.codeInspection.InspectionManager
-    import com.intellij.codeInspection.ProblemsHolder
+import com.intellij.codeInspection.InspectionManager
+import com.intellij.openapi.application.readAction
 
+execute {
     waitForSmartMode()
 
     readAction {
@@ -253,11 +300,9 @@ execute {
 ### Execute Actions
 
 ```kotlin
-execute {
-    import com.intellij.openapi.actionSystem.ActionManager
-    import com.intellij.openapi.actionSystem.AnActionEvent
-    import com.intellij.openapi.actionSystem.DataContext
+import com.intellij.openapi.actionSystem.ActionManager
 
+execute {
     val action = ActionManager.getInstance().getAction("GotoFile")
     if (action != null) {
         println("Found action: ${action.templatePresentation.text}")
@@ -288,17 +333,17 @@ execute {
 
 3. **Use `writeAction { }` for any PSI/VFS modification** - always
 
-4. **Keep executions focused** - one task per `execute { }` block
+4. **Keep imports outside `execute { }`** - imports inside won't work
 
-5. **Use meaningful `task_id`** - groups related executions for tracking
+5. **Leverage suspend context** - prefer Kotlin coroutine APIs (`delay`, `async`, `withContext`)
 
-6. **Report progress for long operations** - `progress("Step 1 of 5...")`
+6. **Use meaningful `task_id`** - groups related executions for tracking
 
-7. **Print results** - the output is your only way to see what happened
+7. **Report progress for long operations** - `progress("Step 1 of 5...")`
 
-8. **Use reflection cautiously** - APIs may change between IDE versions
+8. **Print results** - the output is your only way to see what happened
 
-9. **Check nulls explicitly** - many IntelliJ APIs return nullable
+9. **Use reflection cautiously** - APIs may change between IDE versions
 
 10. **Prefer IntelliJ APIs over file operations** - the IDE has already indexed everything
 
@@ -332,6 +377,8 @@ The MCP Steroid server gives you **direct access to IntelliJ's runtime**. This i
 - You can execute actions
 - You can inspect plugins
 - You can access PSI (the parsed code model)
+
+**The execute block is a suspend function.** Use this to your advantage - call suspend APIs directly, use coroutine primitives, and never block.
 
 **Don't settle for file-level operations when you have IDE-level access.**
 
