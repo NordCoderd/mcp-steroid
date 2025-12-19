@@ -21,6 +21,7 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 ## Key Documentation
 
 - [README.md](README.md) - Full API documentation and architecture
+- [AGENT-STEROID.md](AGENT-STEROID.md) - **IntelliJ API usage guide for LLM agents** - read this to become a power user
 - [Plan.md](Plan.md) - Implementation plan and phases
 - [Suggestions.md](Suggestions.md) - Open questions and design decisions
 - [Discussions.md](Discussions.md) - Design discussions and decisions from Q&A sessions
