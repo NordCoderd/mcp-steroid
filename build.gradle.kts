@@ -72,7 +72,7 @@ kotlin {
 }
 
 intellijPlatform {
-    buildSearchableOptions = true
+    buildSearchableOptions = false
     pluginConfiguration {
         name = "IntelliJ MCP Steroid"
         version = project.version.toString()
@@ -87,10 +87,6 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
-    }
-
-    processTestResources {
-        duplicatesStrategy = DuplicatesStrategy.INCLUDE
     }
 }
 
