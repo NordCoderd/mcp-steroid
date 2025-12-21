@@ -13,6 +13,18 @@ metadata:
 
 Execute Kotlin code directly in IntelliJ IDEA's runtime with full access to the IntelliJ Platform API.
 
+## Important Notes for AI Agents
+
+**Learning Curve**: Writing working code for IntelliJ APIs may require several attempts. This is normal! The API is vast and powerful. Keep trying - each attempt teaches you more about the available APIs. Use `printException()` to see stack traces when errors occur.
+
+**Persistence Pays Off**: If your first attempt fails, analyze the error, adjust your approach, and try again. The power you gain from direct IDE access is worth the effort.
+
+**Comparison to LSP**: This MCP server provides functionality similar to LSP (Language Server Protocol) tools, but uses IntelliJ's native APIs instead. IntelliJ APIs are often more powerful and feature-rich than standard LSP, offering:
+- Deeper code understanding via PSI (Program Structure Interface)
+- Access to IDE-specific features (inspections, refactorings, intentions)
+- Full project model with module dependencies
+- Platform-specific indices for fast code search
+
 ## Quickstart Flow
 
 ```
@@ -88,23 +100,26 @@ execute {
 **CORRECT:**
 ```kotlin
 import com.intellij.psi.PsiManager
-import com.intellij.openapi.application.readAction
 
 execute {
+    // Use built-in readAction helper - no import needed!
     val file = readAction { PsiManager.getInstance(project).findFile(vf) }
 }
 ```
 
 ### 3. Read/Write Actions for PSI/VFS
 
+**Built-in helpers (no imports needed):**
 ```kotlin
-import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
-
 execute {
-    // Reading PSI/VFS/indices
-    val data = readAction {
+    // Reading PSI/VFS/indices - use built-in readAction
+    val psiFile = readAction {
         PsiManager.getInstance(project).findFile(virtualFile)
+    }
+
+    // Or use smartReadAction to auto-wait for indexing
+    val classes = smartReadAction {
+        JavaPsiFacade.getInstance(project).findClass("MyClass", projectScope())
     }
 
     // Modifying PSI/VFS/documents
@@ -114,25 +129,46 @@ execute {
 }
 ```
 
+**With explicit imports (same functionality):**
+```kotlin
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.writeAction
+
+execute {
+    val data = readAction { /* ... */ }
+    writeAction { /* ... */ }
+}
+```
+
 ## Script Template
 
+**Minimal template (uses built-in helpers):**
 ```kotlin
-// 1. IMPORTS - Always outside execute block
-import com.intellij.openapi.application.readAction
-import com.intellij.psi.PsiManager
-
-// 2. EXECUTE BLOCK
 execute {
-    // 3. Wait for indexing if needed
+    // Wait for indexing if needed
     waitForSmartMode()
 
-    // 4. Use IntelliJ APIs
+    // Use IntelliJ APIs with built-in helpers
     val result = readAction {
         // PSI/VFS operations here
     }
 
-    // 5. Output results
+    // Output results
     println(result)
+}
+```
+
+**With imports (for specialized APIs):**
+```kotlin
+// IMPORTS - Always outside execute block
+import com.intellij.psi.JavaPsiFacade
+
+execute {
+    // Use smartReadAction - combines wait + read
+    val psiClass = smartReadAction {
+        JavaPsiFacade.getInstance(project).findClass("MyClass", allScope())
+    }
+    println(psiClass?.qualifiedName)
 }
 ```
 
@@ -140,20 +176,35 @@ execute {
 
 ```kotlin
 execute {
-    // Properties
+    // === Properties ===
     project      // IntelliJ Project instance
     params       // Tool parameters (JsonElement)
     disposable   // For resource cleanup
     isDisposed   // Check if disposed
 
-    // Output methods
-    println("Hello", 42, "world")      // Space-separated output
-    printJson(object { val x = 1 })    // Pretty JSON
-    printException("Failed", exception) // Error with stack trace (recommended for errors)
-    progress("Step 1 of 3...")         // Progress (throttled 1/sec)
+    // === Output Methods ===
+    println("Hello", 42, "world")       // Space-separated output
+    printJson(object { val x = 1 })     // Pretty JSON
+    printException("Failed", exception) // Error with stack trace (recommended!)
+    progress("Step 1 of 3...")          // Progress (throttled 1/sec)
 
-    // IDE utilities
-    waitForSmartMode()  // Wait for indexing
+    // === Read/Write Actions (NO IMPORTS NEEDED!) ===
+    val data = readAction { /* PSI/VFS reads */ }      // Suspend read action
+    writeAction { /* PSI/VFS writes */ }               // Suspend write action
+    val smart = smartReadAction { /* reads in smart mode */ }  // Auto-waits for indexing
+
+    // === Search Scopes (NO IMPORTS NEEDED!) ===
+    val scope1 = projectScope()  // Project files only
+    val scope2 = allScope()      // Project + libraries
+
+    // === File Access Helpers ===
+    val vf = findFile("/absolute/path.kt")           // Find VirtualFile
+    val psi = findPsiFile("/absolute/path.kt")       // Find PsiFile (suspend)
+    val vf2 = findProjectFile("src/main/App.kt")     // Relative to project
+    val psi2 = findProjectPsiFile("src/main/App.kt") // Relative to project (suspend)
+
+    // === IDE Utilities ===
+    waitForSmartMode()  // Wait for indexing to complete
 }
 ```
 
@@ -242,22 +293,18 @@ execute {
 This example finds a Kotlin class, gets its methods, and prints their signatures:
 
 ```kotlin
-import com.intellij.openapi.application.readAction
-import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
 execute {
-    waitForSmartMode()
-
-    readAction {
-        // Find all classes named "MyService" in the project
-        val scope = GlobalSearchScope.projectScope(project)
-        val classes = KotlinClassShortNameIndex.get("MyService", project, scope)
+    // smartReadAction = waitForSmartMode() + readAction { } in one call
+    smartReadAction {
+        // Use built-in projectScope() helper
+        val classes = KotlinClassShortNameIndex.get("MyService", project, projectScope())
 
         if (classes.isEmpty()) {
             println("No class named 'MyService' found")
-            return@readAction
+            return@smartReadAction
         }
 
         classes.forEach { ktClass ->
@@ -279,27 +326,23 @@ execute {
 ## Find Usages (Complete Example)
 
 ```kotlin
-import com.intellij.openapi.application.readAction
-import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
 execute {
-    waitForSmartMode()
-
-    readAction {
-        // First find the class
-        val scope = GlobalSearchScope.projectScope(project)
-        val classes = KotlinClassShortNameIndex.get("MyService", project, scope)
+    // smartReadAction = waitForSmartMode() + readAction
+    smartReadAction {
+        // Use built-in projectScope() helper
+        val classes = KotlinClassShortNameIndex.get("MyService", project, projectScope())
         val targetClass = classes.firstOrNull()
 
         if (targetClass == null) {
             println("Class not found")
-            return@readAction
+            return@smartReadAction
         }
 
         // Find all usages using findAll() (returns a Collection)
-        val usages = ReferencesSearch.search(targetClass, scope).findAll()
+        val usages = ReferencesSearch.search(targetClass, projectScope()).findAll()
 
         println("Found ${usages.size} usages of ${targetClass.name}:")
         usages.forEach { ref ->
@@ -448,20 +491,13 @@ execute {
 ### Search Files by Name
 
 ```kotlin
-import com.intellij.openapi.application.readAction
 import com.intellij.psi.search.FilenameIndex
-import com.intellij.psi.search.GlobalSearchScope
 
 execute {
-    waitForSmartMode()
-
-    readAction {
-        // Find files by exact name
-        val files = FilenameIndex.getFilesByName(
-            project,
-            "build.gradle.kts",
-            GlobalSearchScope.projectScope(project)
-        )
+    // smartReadAction = waitForSmartMode() + readAction
+    smartReadAction {
+        // Find files by exact name using built-in projectScope()
+        val files = FilenameIndex.getFilesByName(project, "build.gradle.kts", projectScope())
 
         files.forEach { file ->
             println("Found: ${file.virtualFile.path}")
@@ -473,20 +509,13 @@ execute {
 ### Search Files by Extension
 
 ```kotlin
-import com.intellij.openapi.application.readAction
 import com.intellij.psi.search.FileTypeIndex
-import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.kotlin.idea.KotlinFileType
 
 execute {
-    waitForSmartMode()
-
-    readAction {
-        // Find all Kotlin files
-        val kotlinFiles = FileTypeIndex.getFiles(
-            KotlinFileType.INSTANCE,
-            GlobalSearchScope.projectScope(project)
-        )
+    smartReadAction {
+        // Find all Kotlin files using built-in projectScope()
+        val kotlinFiles = FileTypeIndex.getFiles(KotlinFileType.INSTANCE, projectScope())
 
         println("Found ${kotlinFiles.size} Kotlin files")
         kotlinFiles.take(20).forEach { vf ->
@@ -1317,15 +1346,15 @@ execute {
 
 ## Best Practices
 
-1. **Call `waitForSmartMode()` before PSI operations** - indexing must complete first
-2. **Use `readAction { }` for all PSI/VFS reads** - even simple property access
-3. **Use `writeAction { }` for all PSI/VFS modifications** - always
+1. **Use `smartReadAction { }` for PSI operations** - combines wait + read in one call
+2. **Use built-in helpers** - `readAction`, `writeAction`, `projectScope()`, `allScope()` need no imports
+3. **Use file helpers** - `findPsiFile()`, `findProjectFile()` simplify file access
 4. **Keep imports outside `execute { }`** - imports inside won't compile
 5. **Prefer Kotlin coroutine APIs** - you're in a suspend context
 6. **Use meaningful `task_id`** - groups related executions
 7. **Report progress** - `progress("Step 1 of 5...")`
-8. **Use `printException` for errors** - better than printStackTrace
-9. **Use reflection for discovery** - explore unknown APIs
+8. **Use `printException` for errors** - includes stack trace in output
+9. **Keep trying** - IntelliJ API has a learning curve, persistence pays off
 10. **Prefer IntelliJ APIs over file operations** - IDE has indexed everything
 
 ## Troubleshooting
@@ -1360,6 +1389,14 @@ The MCP Steroid server gives you **direct access to IntelliJ's runtime**:
 - Inspect plugins
 - Access PSI (parsed code)
 
-**The execute block is a suspend function.** Use coroutine APIs directly.
+**Key points:**
+- The execute block is a suspend function - use coroutine APIs directly
+- Built-in helpers (`readAction`, `writeAction`, `projectScope()`, etc.) require no imports
+- Use `smartReadAction { }` for most PSI operations
+- Use `findPsiFile()` and `findProjectFile()` for easy file access
+
+**This is like LSP, but more powerful.** IntelliJ APIs offer deeper code understanding and more features than standard LSP.
 
 **Don't settle for file-level operations when you have IDE-level access.**
+
+**Keep trying!** The API is vast - errors on first attempts are normal. Each attempt teaches you more.

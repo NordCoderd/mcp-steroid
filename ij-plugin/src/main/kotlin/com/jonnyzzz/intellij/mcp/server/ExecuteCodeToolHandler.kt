@@ -44,6 +44,12 @@ class ExecuteCodeToolHandler {
              which is running exclusively for you. Use the IntelliJ-based IDE to help you looking
              at the project, where you are working. Prioritize using the IDE and this MCP where possible.
 
+             LEARNING NOTE: Writing working code may require several attempts - this is normal! The IntelliJ API
+             is vast and powerful. Keep trying - each attempt teaches you more. Use printException() for errors.
+
+             This is similar to LSP tools but uses IntelliJ's native APIs, offering deeper code understanding
+             and more features (refactorings, inspections, full project model).
+
              You can do everything IntelliJ API allows you to do including, but not limited to
              - code search
              - code completion
@@ -62,12 +68,12 @@ class ExecuteCodeToolHandler {
             Script structure:
             ```kotlin
             // Imports go HERE, outside execute block
-            import com.intellij.openapi.application.readAction
             import com.intellij.psi.PsiManager
 
             execute {
                 // This is a suspend function - use coroutine APIs!
                 waitForSmartMode()
+                // Use built-in readAction helper - no import needed!
                 val psiFile = readAction {
                     PsiManager.getInstance(project).findFile(virtualFile)
                 }
@@ -79,10 +85,22 @@ class ExecuteCodeToolHandler {
             - project: Project - the IntelliJ Project instance
             - println(vararg values) - output separated by spaces
             - printJson(obj) - pretty-print as JSON
+            - printException(msg, throwable) - error with stack trace (recommended!)
             - progress(message) - report progress (throttled to 1/sec)
             - waitForSmartMode() - suspend until indexing completes
             - disposable - for resource cleanup
-            
+
+            Built-in helpers (NO IMPORTS NEEDED):
+            - readAction { } - execute under read lock
+            - writeAction { } - execute under write lock
+            - smartReadAction { } - waitForSmartMode() + readAction in one call
+            - projectScope() - GlobalSearchScope for project files
+            - allScope() - GlobalSearchScope for project + libraries
+            - findFile(path) - find VirtualFile by absolute path
+            - findPsiFile(path) - find PsiFile by absolute path
+            - findProjectFile(relativePath) - find file relative to project
+            - findProjectPsiFile(relativePath) - find PsiFile relative to project
+
             IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
 
             Tip: After execution, call steroid_execute_feedback to log your feedback.
