@@ -13,6 +13,14 @@ better than a test that does not check the problems. Make sure you fix tests.
 
 Check you changes to see if there are no new warnings added to the code.
 
+## IntelliJ and Coroutines
+
+Main APIs for synchronous return from blocking code:
+
+1. runBlockingCancellable - The recommended approach for BGT (background thread). Blocks the current thread, executes coroutine, returns result synchronously. Cancellation-aware.
+2. runWithModalProgressBlocking - For EDT usage. Shows modal progress, pumps event queue while waiting, returns synchronously.
+3. RunSuspend - Low-level utility using Object.wait()/notifyAll() for custom bridging scenarios.
+
 
 ## Project Overview
 
