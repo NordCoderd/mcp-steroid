@@ -69,8 +69,8 @@ class SkillReference {
             errorMessage.contains("runBlocking") ->
                 "TIP: Never use runBlocking - execute {} is already a suspend function."
 
-            errorMessage.contains("Service is dying") ->
-                "TIP: Kotlin script engine needs restart. Restart IntelliJ to recover."
+            // Note: "Service is dying" errors are now handled automatically with retry logic
+            // in CodeEvalManager.kt. If this error reaches here, it means all retries failed.
 
             else -> criticalRules
         }
