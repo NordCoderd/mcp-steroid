@@ -22,16 +22,10 @@ class SkillReference {
         get() = SteroidsMcpServer.getInstance()
 
     /**
-     * The current MCP server port.
-     */
-    val port: Int
-        get() = mcpServer.port
-
-    /**
-     * Returns the SKILL.md URL for the current server.
+     * Returns the SKILL.md URL from the MCP server.
      */
     val skillUrl: String
-        get() = "http://localhost:$port/skill.md"
+        get() = mcpServer.skillUrl
 
     /**
      * Brief reminder of critical rules - included in error responses.
