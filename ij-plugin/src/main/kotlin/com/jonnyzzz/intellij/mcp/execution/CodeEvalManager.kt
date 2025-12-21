@@ -13,6 +13,7 @@ import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import java.io.StringWriter
 import java.util.concurrent.atomic.AtomicBoolean
+import javax.script.ScriptException
 
 data class EvalResult(val result: List<suspend McpScriptContext.() -> Unit>)
 
@@ -80,8 +81,13 @@ class CodeEvalManager(
         } catch (e: Throwable) {
             // Compilation/evaluation failed - report immediately
             val message = "Script compilation/evaluation failed for $executionId: ${e.message}\n\n"
-            log.warn(message, e)
-            resultBuilder.logException(message, e)
+            if (e !is ScriptException) {
+                //we do not need exception from the compiler, it will only eat tokens for nothing
+                log.warn(message, e)
+                resultBuilder.logException(message, e)
+            } else {
+                log.warn(message)
+            }
             resultBuilder.reportFailed(message)
             return null
         } finally {
