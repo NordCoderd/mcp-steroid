@@ -12,6 +12,7 @@ import com.jonnyzzz.intellij.mcp.review.ReviewManager
 import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import com.jonnyzzz.intellij.mcp.server.McpProgressReporter
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
+import com.jonnyzzz.intellij.mcp.server.SkillReference
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import kotlinx.coroutines.*
@@ -73,6 +74,10 @@ class ExecutionManager(
                     "PRO Tip: Call the 'steroid_execute_feedback' tool of this MCP server and list pain points!"
                 )
 
+                // Add SKILL.md URL to help agents find documentation
+                val skillRef = SkillReference.getInstance()
+                builder.logMessage(skillRef.successFooter)
+
                 builder.build()
             }
         }
@@ -105,6 +110,11 @@ class ExecutionManager(
             val text = "EXCEPTION: $message: ${throwable.message}\n${throwable.stackTraceToString()}"
             responseBuilder.addTextContent(text)
             mcpProgress.report(text)
+
+            // Add error-specific hint with SKILL.md URL
+            val hint = SkillReference.getInstance().errorHint(throwable.message ?: message)
+            responseBuilder.addTextContent("HINT: $hint")
+
             innerScope.launch {
                 project.executionStorage.appendExecutionEvent(executionId, text)
             }

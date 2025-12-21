@@ -356,7 +356,12 @@ When contributing to this plugin, follow these IntelliJ Platform best practices:
 
 1. **Get services via extension function**:
    ```kotlin
+   // Project-level service
    val storage = project.service<ExecutionStorage>()
+
+   // Application-level service (no project needed)
+   val skillRef = service<SkillReference>()
+   val mcpServer = service<SteroidsMcpServer>()
    ```
 
 2. **Avoid storing project references statically** - leads to memory leaks
@@ -364,6 +369,40 @@ When contributing to this plugin, follow these IntelliJ Platform best practices:
 3. **Use `@Service` annotation with correct level**:
    - `Service.Level.PROJECT` for project-scoped services
    - `Service.Level.APP` for application-scoped services
+
+4. **Application services can reference other app services**:
+   ```kotlin
+   @Service(Service.Level.APP)
+   class SkillReference {
+       // Lazy access to another app service
+       private val mcpServer: SteroidsMcpServer
+           get() = SteroidsMcpServer.getInstance()
+
+       val skillUrl: String
+           get() = "http://localhost:${mcpServer.port}/skill.md"
+
+       companion object {
+           fun getInstance(): SkillReference = service()
+       }
+   }
+   ```
+
+5. **Pattern: Service with companion getInstance()**:
+   ```kotlin
+   @Service(Service.Level.APP)
+   class MyService {
+       // ... service implementation
+
+       companion object {
+           fun getInstance(): MyService = service()
+       }
+   }
+
+   // Usage
+   val svc = MyService.getInstance()
+   // or
+   val svc = service<MyService>()
+   ```
 
 ### Error Handling
 
