@@ -30,13 +30,13 @@ class SkillReference {
     /**
      * Brief reminder of critical rules - included in error responses.
      */
-    val criticalRules = """
-        |CRITICAL RULES:
-        |1. Imports MUST be OUTSIDE execute {} block
-        |2. Call waitForSmartMode() before PSI operations
-        |3. Use readAction {} for PSI/VFS reads
-        |4. Never use runBlocking - you're in a coroutine
-    """.trimMargin()
+    val criticalRules = buildString {
+        appendLine("CRITICAL RULES:")
+        appendLine("1. Imports MUST be OUTSIDE execute {} block")
+        appendLine("2. Call waitForSmartMode() before PSI operations")
+        appendLine("3. Use readAction {} for PSI/VFS reads")
+        append("4. Never use runBlocking - you're in a coroutine")
+    }
 
     /**
      * Returns a tip message with the SKILL.md URL.
