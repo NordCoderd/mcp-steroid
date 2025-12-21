@@ -21,6 +21,105 @@ This plugin runs its own standalone MCP server using the [Kotlin MCP SDK](https:
 
 The server starts automatically when IntelliJ launches and writes its URL to project folders for easy discovery by MCP clients.
 
+## Agent Skills Support
+
+This plugin implements the [Agent Skills](https://agentskills.io) protocol, making its capabilities discoverable by AI agents. The skill documentation is served at the server root and `/skill.md` endpoints.
+
+### Skill Discovery Endpoints
+
+- `http://localhost:63150/` - Returns SKILL.md content
+- `http://localhost:63150/skill.md` - Returns SKILL.md content
+- `http://localhost:63150/SKILL.md` - Returns SKILL.md content
+
+### Setting Up Agent Skills in Any Project
+
+To make the IntelliJ MCP Steroid skill available in your project:
+
+**Option 1: Symlink to SKILL.md (Recommended)**
+
+```bash
+# From your project root, create a symlink to the skill
+# This requires the MCP Steroid plugin repository to be cloned locally
+
+ln -s /path/to/intellij-mcp-steroids/SKILL.md SKILL.md
+```
+
+**Option 2: Download SKILL.md from the running server**
+
+```bash
+# Download the skill documentation from the running MCP server
+curl -s http://localhost:63150/skill.md > SKILL.md
+
+# Or with dynamic port, read from mcp-steroids.txt
+MCP_URL=$(grep -o 'http://[^/]*' .idea/mcp-steroids.txt | head -1)
+curl -s "${MCP_URL}/skill.md" > SKILL.md
+```
+
+**Option 3: Setup script for any project**
+
+Create a setup script `setup-intellij-skill.sh`:
+
+```bash
+#!/bin/bash
+# setup-intellij-skill.sh - Add IntelliJ MCP Steroid skill to current project
+
+set -e
+
+# Default port
+PORT=${1:-63150}
+SERVER_URL="http://localhost:${PORT}"
+
+# Check if server is running
+if ! curl -s "${SERVER_URL}/skill.md" > /dev/null 2>&1; then
+    echo "Error: MCP Steroid server not running at ${SERVER_URL}"
+    echo "Make sure IntelliJ IDEA is running with the MCP Steroid plugin installed."
+    exit 1
+fi
+
+# Download skill
+curl -s "${SERVER_URL}/skill.md" > SKILL.md
+echo "Downloaded SKILL.md from ${SERVER_URL}"
+
+# Optionally add to .gitignore if not already there
+if [ -f .gitignore ] && ! grep -q "^SKILL.md$" .gitignore; then
+    echo "SKILL.md" >> .gitignore
+    echo "Added SKILL.md to .gitignore"
+fi
+
+echo "Done! IntelliJ MCP Steroid skill is now available in this project."
+```
+
+Usage:
+```bash
+chmod +x setup-intellij-skill.sh
+./setup-intellij-skill.sh        # Use default port 63150
+./setup-intellij-skill.sh 6315   # Use custom port
+```
+
+### Verifying Skill Setup
+
+```bash
+# Check skill is accessible
+cat SKILL.md | head -20
+
+# Verify server is running and responding
+curl -s http://localhost:63150/ | head -20
+```
+
+### Using the Skill with AI Agents
+
+Once the skill is set up, AI agents can:
+
+1. **Read the SKILL.md** to understand available capabilities
+2. **Connect to the MCP server** using the documented endpoints
+3. **Execute IntelliJ API calls** via `steroid_execute_code`
+
+The skill documentation includes:
+- Quickstart flow for getting started
+- Complete API reference for all MCP tools
+- Code examples for common operations (PSI, VFS, refactoring)
+- Best practices and troubleshooting guide
+
 ## Connecting LLM Agents
 
 ### Claude Code CLI
@@ -556,6 +655,7 @@ See [integration-test/README.md](integration-test/README.md) for details.
 
 ## Documentation
 
+- [SKILL.md](SKILL.md) - Agent Skills documentation (for AI agents)
 - [CLAUDE.md](CLAUDE.md) - Guidance for Claude Code
 - [Plan.md](Plan.md) - Implementation plan
 - [Suggestions.md](Suggestions.md) - Design suggestions
