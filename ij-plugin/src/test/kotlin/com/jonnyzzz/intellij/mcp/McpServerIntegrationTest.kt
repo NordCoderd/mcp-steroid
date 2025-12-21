@@ -522,6 +522,468 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
+     * Tests that compilation errors are properly reported in the API response.
+     * This test demonstrates what the agent sees when code fails to compile.
+     */
+    fun testCompilationErrorReturnsErrorResponse(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Execute code with syntax error - missing closing brace
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-compile-error")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", """
+                        execute {
+                            val x = 42
+                            // Missing closing brace - syntax error!
+                            println("This won't compile"
+                        }
+                    """.trimIndent())
+                    put("reason", "Test compilation error handling")
+                    put("task_id", "compile-error-test")
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+
+        // The JSON-RPC layer should succeed (no protocol error)
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+        assertNotNull("Should have result", execRpc.result)
+
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        // Print the actual response for visibility
+        println("=== COMPILATION ERROR RESPONSE ===")
+        println("isError: ${execResult.isError}")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        // Execution should be marked as error
+        assertTrue("Execution should be marked as error for compilation failure", execResult.isError)
+
+        // Output should contain compilation error information
+        assertTrue(
+            "Output should mention compilation/script error, got: $execOutput",
+            execOutput.contains("error", ignoreCase = true) ||
+                    execOutput.contains("compile", ignoreCase = true) ||
+                    execOutput.contains("script", ignoreCase = true)
+        )
+    }
+
+    /**
+     * Tests that type errors in code are properly reported.
+     * This is a common error agents make - using wrong types.
+     */
+    fun testTypeErrorReturnsErrorResponse(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Execute code with type error - assigning String to Int
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-type-error")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", """
+                        execute {
+                            val number: Int = "this is not a number"
+                            println(number)
+                        }
+                    """.trimIndent())
+                    put("reason", "Test type error handling")
+                    put("task_id", "type-error-test")
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        // Print the actual response for visibility
+        println("=== TYPE ERROR RESPONSE ===")
+        println("isError: ${execResult.isError}")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        // Execution should be marked as error
+        assertTrue("Execution should be marked as error for type mismatch", execResult.isError)
+
+        // Output should mention type-related error
+        assertTrue(
+            "Output should mention type error, got: $execOutput",
+            execOutput.contains("type", ignoreCase = true) ||
+                    execOutput.contains("mismatch", ignoreCase = true) ||
+                    execOutput.contains("String", ignoreCase = true) ||
+                    execOutput.contains("Int", ignoreCase = true)
+        )
+    }
+
+    /**
+     * Tests that progress reporting works correctly over the MCP protocol.
+     * When code calls progress(), the messages should be included in the response.
+     *
+     * Per MCP 2025-06-18 spec:
+     * - Client can pass _meta.progressToken in tool call arguments
+     * - Server sends notifications/progress with that token
+     * - Progress messages are also accumulated in the final response
+     */
+    fun testProgressReportingInResponse(): Unit = timeoutRunBlocking(60.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Execute code that reports progress multiple times
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-progress")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", """
+                        execute {
+                            progress("Step 1: Initializing...")
+                            progress("Step 2: Processing data...")
+                            progress("Step 3: Completing task...")
+                            println("DONE: All steps completed")
+                        }
+                    """.trimIndent())
+                    put("reason", "Test progress reporting")
+                    put("task_id", "progress-test")
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        // Print the actual response for visibility
+        println("=== PROGRESS REPORTING RESPONSE ===")
+        println("isError: ${execResult.isError}")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        // Execution should succeed
+        assertFalse("Execution should succeed", execResult.isError)
+
+        // Output should contain our completion message
+        assertTrue(
+            "Output should contain completion message, got: $execOutput",
+            execOutput.contains("DONE: All steps completed")
+        )
+
+        // Output should contain progress messages (they may be throttled, so check for at least one)
+        assertTrue(
+            "Output should contain at least one progress indicator, got: $execOutput",
+            execOutput.contains("Step") || execOutput.contains("PROGRESS:")
+        )
+    }
+
+    /**
+     * Tests that progress reporting works with _meta.progressToken in the request.
+     * The MCP 2025-06-18 spec allows clients to provide a progressToken to receive
+     * notifications/progress messages during execution.
+     */
+    fun testProgressReportingWithProgressToken(): Unit = timeoutRunBlocking(60.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Create a unique progress token
+        val progressToken = "progress-token-${UUID.randomUUID()}"
+
+        // Execute code with _meta.progressToken in arguments
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-progress-token")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", """
+                        execute {
+                            progress("Starting with progress token...")
+                            progress("Middle step...")
+                            progress("Final step...")
+                            println("COMPLETED: Task with progress token")
+                        }
+                    """.trimIndent())
+                    put("reason", "Test progress with token")
+                    put("task_id", "progress-token-test")
+                    // Include _meta.progressToken per MCP spec
+                    putJsonObject("_meta") {
+                        put("progressToken", progressToken)
+                    }
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        // Print the actual response for visibility
+        println("=== PROGRESS WITH TOKEN RESPONSE ===")
+        println("isError: ${execResult.isError}")
+        println("Progress Token: $progressToken")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        // Execution should succeed
+        assertFalse("Execution should succeed", execResult.isError)
+
+        // Output should contain our completion message
+        assertTrue(
+            "Output should contain completion message, got: $execOutput",
+            execOutput.contains("COMPLETED: Task with progress token")
+        )
+    }
+
+    /**
+     * Tests that long-running operations with multiple progress updates work correctly.
+     * This simulates a real-world scenario where code reports progress over time.
+     */
+    fun testLongRunningProgressReporting(): Unit = timeoutRunBlocking(90.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Execute code that simulates a longer operation with multiple progress updates
+        // Note: Using Thread.sleep for simulation since delay() may not be in classpath
+        val code = """
+            execute {
+                val items = listOf("Alpha", "Beta", "Gamma", "Delta", "Epsilon")
+            
+                for (i in items.indices) {
+                    val item = items[i]
+                    progress("Processing item " + (i + 1) + "/" + items.size + ": " + item)
+                    Thread.sleep(100)
+                }
+            
+                println("FINISHED: Processed " + items.size + " items")
+            }
+        """.trim()
+
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-long-progress")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", code)
+                    put("reason", "Test long-running progress")
+                    put("task_id", "long-progress-test")
+                    put("timeout", 60) // Give it enough time
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        // Print the actual response for visibility
+        println("=== LONG-RUNNING PROGRESS RESPONSE ===")
+        println("isError: ${execResult.isError}")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        // Execution should succeed
+        assertFalse("Execution should succeed", execResult.isError)
+
+        // Output should contain our completion message
+        assertTrue(
+            "Output should contain completion message, got: $execOutput",
+            execOutput.contains("FINISHED: Processed 5 items")
+        )
+
+        // Should contain at least some progress messages
+        // Note: progress is throttled to 1 message per second, so not all may appear
+        assertTrue(
+            "Output should contain progress messages, got: $execOutput",
+            execOutput.contains("Processing item") || execOutput.contains("PROGRESS:")
+        )
+    }
+
+    /**
+     * Tests that unresolved reference errors are properly reported.
+     * This happens when the agent uses an API that doesn't exist.
+     */
+    fun testUnresolvedReferenceReturnsErrorResponse(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // Execute code with unresolved reference
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-unresolved")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", """
+                        execute {
+                            // This class doesn't exist
+                            val x = NonExistentClass.doSomething()
+                            println(x)
+                        }
+                    """.trimIndent())
+                    put("reason", "Test unresolved reference handling")
+                    put("task_id", "unresolved-ref-test")
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        // Print the actual response for visibility
+        println("=== UNRESOLVED REFERENCE RESPONSE ===")
+        println("isError: ${execResult.isError}")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        // Execution should be marked as error
+        assertTrue("Execution should be marked as error for unresolved reference", execResult.isError)
+
+        // Output should mention unresolved reference
+        assertTrue(
+            "Output should mention unresolved reference, got: $execOutput",
+            execOutput.contains("unresolved", ignoreCase = true) ||
+                    execOutput.contains("NonExistentClass", ignoreCase = true) ||
+                    execOutput.contains("reference", ignoreCase = true)
+        )
+    }
+
+    /**
      * Tests that a system property set in the test JVM can be read via MCP execute_code.
      * This verifies the MCP server runs in the same JVM and can access system properties.
      */
