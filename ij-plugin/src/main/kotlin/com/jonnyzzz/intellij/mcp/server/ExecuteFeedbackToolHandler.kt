@@ -24,6 +24,9 @@ import kotlinx.serialization.json.*
 @Service(Service.Level.APP)
 class ExecuteFeedbackToolHandler {
     private val log = thisLogger()
+    private val json = Json {
+        prettyPrint = true
+    }
 
     private val toolDescription get() = """
             Provide feedback on the result of a steroid_execute_code call.
@@ -97,22 +100,21 @@ class ExecuteFeedbackToolHandler {
 
         val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: project_name")
-        val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
+        args["task_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: task_id")
         val executionIdText = args["execution_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: execution_id")
         val successRating = args["success_rating"]?.jsonPrimitive?.doubleOrNull
             ?: return errorResult("Missing required parameter: success_rating")
-        val explanation = args["explanation"]?.jsonPrimitive?.contentOrNull
+        args["explanation"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: explanation")
-        val code = args["code"]?.jsonPrimitive?.contentOrNull  // Optional
 
         // Validate success_rating
         if (successRating !in 0.0..1.0) {
             return errorResult("success_rating must be between 0.00 and 1.00")
         }
 
-        log.info("Feedback is submitted: " + params.arguments)
+        log.info("Feedback is submitted: " + json.encodeToString(params.rawArguments))
 
         val project = readAction {
             getInstance().openProjects.find { it.name == projectName }
