@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
+import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
@@ -81,6 +82,8 @@ class ExecuteCodeToolHandler {
             - progress(message) - report progress (throttled to 1/sec)
             - waitForSmartMode() - suspend until indexing completes
             - disposable - for resource cleanup
+            
+            IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
 
             Tip: After execution, call steroid_execute_feedback to log your feedback.
         """.trimIndent()
