@@ -272,13 +272,20 @@ class SteroidsMcpServer(
              === Codex CLI (TOML config) ===
                codex mcp add intellij --url http://localhost:6315/mcp
                codex mcp list
-             
+
              Recommended:
-               codex mcp add playwright npx "@playwright/mcp@latest" 
-              
+               codex mcp add playwright npx "@playwright/mcp@latest"
+
              Test:
                codex exec "List all open projects using steroid_list_projects"
-               
+
+             === Gemini CLI ===
+               gemini mcp add intellij-steroid $serverUrl --transport http --scope user
+               gemini mcp list
+
+             Test:
+               gemini "List all open projects using steroid_list_projects"
+
              $serverUrl
         """.trimMargin()
     }

@@ -195,6 +195,33 @@ EOF
 
 To remove the server, delete the `[mcp_servers.intellij-steroid]` section from the config file.
 
+### Gemini CLI
+
+Add the MCP server using the command line:
+
+```bash
+# Add the IntelliJ MCP server (default port 63150)
+gemini mcp add intellij-steroid http://localhost:63150/mcp --transport http --scope user
+
+# Verify connection
+gemini mcp list
+# Should show: ✓ intellij-steroid: http://localhost:63150/mcp (http) - Connected
+
+# Use the tools
+gemini "List all open projects using steroid_list_projects"
+```
+
+For dynamic ports, read the URL from `.idea/mcp-steroids.txt`:
+```bash
+MCP_URL=$(tail -1 .idea/mcp-steroids.txt)
+gemini mcp add intellij-steroid "$MCP_URL" --transport http --scope user
+```
+
+To remove the server:
+```bash
+gemini mcp remove intellij-steroid
+```
+
 ### Direct HTTP (curl)
 
 You can also interact with the server directly via HTTP:
