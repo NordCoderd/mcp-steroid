@@ -143,6 +143,25 @@ class SteroidsMcpServer(
                             text = buildWellKnownMcpJson(portToTry)
                         )
                     }
+                    // Agent Skills endpoints - serve SKILL.md at root and /skill.md
+                    get("/") {
+                        call.respondText(
+                            contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
+                            text = loadSkillMd()
+                        )
+                    }
+                    get("/skill.md") {
+                        call.respondText(
+                            contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
+                            text = loadSkillMd()
+                        )
+                    }
+                    get("/SKILL.md") {
+                        call.respondText(
+                            contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
+                            text = loadSkillMd()
+                        )
+                    }
                 }
             }
 
@@ -262,6 +281,13 @@ class SteroidsMcpServer(
                
              $serverUrl
         """.trimMargin()
+    }
+
+    private fun loadSkillMd(): String {
+        return javaClass.getResourceAsStream("/skill/SKILL.md")
+            ?.bufferedReader()
+            ?.readText()
+            ?: "# IntelliJ MCP Steroid\n\nSKILL.md not found in resources"
     }
 
     private fun findFreePort(): Int {

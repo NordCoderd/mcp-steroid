@@ -1,3 +1,4 @@
+import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import java.net.HttpURLConnection
 import java.net.URI
 import java.time.LocalDateTime
@@ -27,7 +28,7 @@ dependencies {
         intellijIdeaUltimate("2025.3")
         // Kotlin plugin for script engine support in tests
         bundledPlugin("org.jetbrains.kotlin")
-        testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)
+        testFramework(TestFrameworkType.Platform)
     }
 
     // Kotlin scripting for script definition provider
