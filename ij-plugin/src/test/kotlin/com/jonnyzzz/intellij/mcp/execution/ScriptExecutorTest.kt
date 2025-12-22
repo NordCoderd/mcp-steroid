@@ -51,10 +51,6 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         )
     }
 
-    private fun TestResultBuilder.hasAnyOutput(): Boolean {
-        return isFailed || messages.isNotEmpty() || exceptions.isNotEmpty() || progressMessages.isNotEmpty()
-    }
-
     /**
      * Test that compilation errors are reported fast - not waiting for timeout.
      * Uses invalid Kotlin syntax that should fail immediately.
