@@ -73,23 +73,23 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
     }
 
     /**
-     * Tests that Claude can read a system property set in the IDE JVM via MCP execute_code.
+     * Tests that AI can read a system property set in the IDE JVM via MCP execute_code.
      * This verifies the MCP server runs in the same JVM and can access system properties.
      *
      * The test:
      * 1. Sets a system property with a random UUID value
-     * 2. Asks Claude to read it via steroid_execute_code
-     * 3. Verifies Claude's output contains the correct value
+     * 2. Asks AI to read it via steroid_execute_code
+     * 3. Verifies AI's output contains the correct value
      */
-    fun testSystemPropertyCanBeReadViaClaude(): Unit = timeoutRunBlocking(300.seconds) {
+    fun testSystemPropertyCanBeRead(): Unit = timeoutRunBlocking(300.seconds) {
         val session = newAiSession()
 
         // Set a system property with a random value
-        val propertyKey = "mcp.test.claude.random.value"
-        val randomValue = "claude-${UUID.randomUUID()}"
+        val propertyKey = "mcp.test.ai.random.value"
+        val randomValue = "ai-${UUID.randomUUID()}"
         System.setProperty(propertyKey, randomValue)
 
-        // Ask Claude to read the system property using execute_code
+        // Ask AI to read the system property using execute_code
         session.runPrompt(
             """
                 You are testing MCP integration. You MUST use steroid_execute_code to run Kotlin code.
@@ -109,12 +109,12 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
                 If you encounter any errors, print: ERROR: <description>
                 """,
         )
-            .assertExitCode(0, "Claude prompt")
-            .assertNoErrorsInOutput(message = "Claude prompt")
-            .assertOutputContains(randomValue, "Output should contain the system property value '$randomValue'")
+            .assertExitCode(0, "prompt")
+            .assertNoErrorsInOutput(message = "prompt")
             .assertOutputContains(
+                randomValue,
                 "FINAL_VALUE: $randomValue",
-                "Final output should contain the system property value '$randomValue'"
+                message = "Output should contain the system property value '$randomValue'"
             )
     }
 }
