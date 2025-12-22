@@ -87,13 +87,13 @@ class ScriptExecutor(
 
                     try {
                         withTimeout(exec.timeout.seconds) {
-                            var index = 0
-                            for (block in capturedBlocks) {
+                            for ((index, block) in capturedBlocks.withIndex()) {
                                 yield()
-                                log.info("Executing block #${index + 1}/${capturedBlocks.size} for $executionId")
-                                context.progress("Executing block ${index + 1} of ${capturedBlocks.size}...")
+                                if (capturedBlocks.size >1) {
+                                    log.info("Executing block #${index + 1}/${capturedBlocks.size} for $executionId")
+                                    context.progress("Executing block ${index + 1} of ${capturedBlocks.size}...")
+                                }
                                 block(context)
-                                index++
                             }
                         }
                     } finally {
