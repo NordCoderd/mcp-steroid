@@ -70,7 +70,7 @@ class SteroidsMcpServer(
             service<ExecuteCodeToolHandler>().register(mcpServer)
             service<ExecuteFeedbackToolHandler>().register(mcpServer)
 
-            val configuredPort = Registry.intValue("mcp.steroids.server.port", 63150)
+            val configuredPort = Registry.intValue("mcp.steroids.server.port")
 
             // By default, bind to localhost only per MCP security requirements.
             // For Docker testing, set mcp.steroids.server.host to "0.0.0.0"
