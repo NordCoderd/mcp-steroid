@@ -90,7 +90,7 @@ class ProcessRunner(
         // Filter secrets from command line and description for logging
         val filteredCommand = command.map { filterSecrets(it) }
         val filteredDescription = filterSecrets(description)
-        println("[$logPrefix] $filteredDescription: ${filteredCommand.joinToString(" ")}")
+        println("[$logPrefix] $filteredDescription")
 
         val processBuilder = ProcessBuilder(command)
         processBuilder.directory(workingDir)
