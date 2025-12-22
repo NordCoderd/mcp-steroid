@@ -10,6 +10,7 @@ import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.jonnyzzz.intellij.mcp.mcp.ToolCallParams
 import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import org.jetbrains.kotlin.idea.gradleTooling.get
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
@@ -128,6 +130,11 @@ class ExecutionStorage(
         return ExecutionId(executionId)
     }
 
+    suspend fun writeExecutionFeedback(taskId: String, element: ToolCallParams) : ExecutionId {
+        val executionId = newExecutionId("feedback-$taskId")
+        writeCodeExecutionData(executionId, "feedback.json", element)
+        return executionId
+    }
 
     private fun newExecutionId(taskId: String): ExecutionId {
         val pattern = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")

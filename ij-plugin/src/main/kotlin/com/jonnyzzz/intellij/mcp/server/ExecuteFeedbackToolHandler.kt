@@ -6,6 +6,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.ProjectManager.getInstance
+import com.jonnyzzz.intellij.mcp.execution.CodeButcher
+import com.jonnyzzz.intellij.mcp.execution.codeButcher
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallParams
@@ -85,7 +87,6 @@ class ExecuteFeedbackToolHandler {
                 putJsonArray("required") {
                     add("project_name")
                     add("task_id")
-                    add("execution_id")
                     add("success_rating")
                     add("explanation")
                 }
@@ -100,14 +101,14 @@ class ExecuteFeedbackToolHandler {
 
         val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: project_name")
-        args["task_id"]?.jsonPrimitive?.contentOrNull
+        val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: task_id")
-        val executionIdText = args["execution_id"]?.jsonPrimitive?.contentOrNull
+        args["execution_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: execution_id")
         val successRating = args["success_rating"]?.jsonPrimitive?.doubleOrNull
             ?: return errorResult("Missing required parameter: success_rating")
-        args["explanation"]?.jsonPrimitive?.contentOrNull
-            ?: return errorResult("Missing required parameter: explanation")
+        val explanation = args["explanation"]?.jsonPrimitive?.contentOrNull
+        val code = args["code"]?.jsonPrimitive?.contentOrNull
 
         // Validate success_rating
         if (successRating !in 0.0..1.0) {
@@ -121,11 +122,15 @@ class ExecuteFeedbackToolHandler {
         } ?: return errorResult("Project not found: $projectName")
 
         runCatching {
-            val storage = project.service<ExecutionStorage>()
-            val executionId = storage.findExecutionId(executionIdText)
-                ?: return errorResult("Execution not found: $executionIdText")
+            val executionStorage = project.service<ExecutionStorage>()
+            val executionId = executionStorage.writeExecutionFeedback(taskId = taskId, params)
+            if (code != null) {
+                executionStorage.writeCodeExecutionData(executionId, "script.kts", codeButcher.wrapWithImports(code))
+            }
 
-            storage.writeCodeExecutionData(executionId, "feedback.json", args)
+            if (explanation != null) {
+                executionStorage.writeCodeExecutionData(executionId, "explanation.txt", explanation)
+            }
         }
 
         return ToolCallResult(
