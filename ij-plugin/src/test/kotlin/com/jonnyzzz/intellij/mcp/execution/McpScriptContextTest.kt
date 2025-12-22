@@ -28,8 +28,10 @@ class McpScriptContextTest : BasePlatformTestCase() {
         val messages = mutableListOf<String>()
         val progressMessages = mutableListOf<String>()
         val exceptions = mutableListOf<Pair<String, Throwable>>()
-        var failed = false
+        private var failed = false
         var failureMessage: String? = null
+
+        override val isFailed: Boolean get() = failed
 
         override fun logMessage(message: String) {
             messages += message

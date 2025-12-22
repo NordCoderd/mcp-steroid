@@ -34,8 +34,10 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         val messages = mutableListOf<String>()
         val progressMessages = mutableListOf<String>()
         val exceptions = mutableListOf<Pair<String, Throwable>>()
-        var failed = false
+        private var failed = false
         var failureMessage: String? = null
+
+        override val isFailed: Boolean get() = failed
 
         override fun logMessage(message: String) {
             messages += message
@@ -84,12 +86,12 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         // Either has messages (success) or failed (error) - but completes fast
         assertTrue(
             "Should complete with output or error",
-            builder.messages.isNotEmpty() || builder.failed
+            builder.messages.isNotEmpty() || builder.isFailed
         )
     }
 
     private fun TestResultBuilder.hasAnyOutput(): Boolean {
-        return failed || messages.isNotEmpty() || exceptions.isNotEmpty() || progressMessages.isNotEmpty()
+        return isFailed || messages.isNotEmpty() || exceptions.isNotEmpty() || progressMessages.isNotEmpty()
     }
 
     /**
@@ -173,7 +175,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
 
         // Either SUCCESS (if engine is available) or ERROR (if not)
         // If successful, verify FIFO order in output
-        if (!builder.failed && builder.messages.isNotEmpty()) {
+        if (!builder.isFailed && builder.messages.isNotEmpty()) {
             assertTrue("Should have 3 messages", builder.messages.size >= 3)
             assertEquals("First message", "First", builder.messages[0])
             assertEquals("Second message", "Second", builder.messages[1])
@@ -195,7 +197,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         executor.executeWithProgress(nextExecutionId(), testExecParams(errorCode), builder)
 
         // Should fail
-        assertTrue("Should fail", builder.failed)
+        assertTrue("Should fail", builder.isFailed)
     }
 
     /**
@@ -214,6 +216,6 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         executor.executeWithProgress(nextExecutionId(), testExecParams(slowCode, timeout = 1), builder)
 
         // Should fail due to timeout (or error if engine not available)
-        assertTrue("Should fail", builder.failed)
+        assertTrue("Should fail", builder.isFailed)
     }
 }
