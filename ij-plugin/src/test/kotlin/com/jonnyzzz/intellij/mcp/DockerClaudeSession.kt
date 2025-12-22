@@ -1,48 +1,57 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp
 
+import com.intellij.openapi.Disposable
 import java.io.File
 
 /**
  * Manages a Claude CLI session running inside a Docker container.
  * This provides complete isolation from the local system, preventing
  * MCP server registrations from affecting the local Claude config.
- *
- * The API key is read from ~/.anthropic file.
  */
-class DockerClaudeSession private constructor(
-    containerId: String,
-    workDir: File,
-    private val apiKey: String
-) : DockerSession(containerId, workDir) {
+class DockerClaudeSession(
+    private val session: DockerSession,
+    private val apiKey: String,
+    private val debug: Boolean = false,
+) : AiAgentSession {
 
-    override val logPrefix = "DOCKER-CLAUDE"
+    fun toAiSession() : AiAgentSession = this
 
-    init {
-        // Register API key for filtering in logs
-        processRunner.addSecretFilter(apiKey)
+    fun registerMcp(mcpUrl: String, mcpName : String) = apply {
+        runInContainer(
+            "mcp",
+            "add", "--transport", "http",
+            mcpName,
+            mcpUrl
+        )
+            .assertExitCode(0, message = "MCP server registration")
+            .assertNoErrorsInOutput("MCP server registration")
     }
 
     /**
      * Run a claude command inside the Docker container.
      * Debug mode is always enabled to see MCP connection details.
      */
-    fun run(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
+    fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
         val claudeArgs = buildList {
             add("claude")
-            add("--debug")
-            add("--mcp-debug")
-            add("--verbose")
+            if (debug) {
+                add("--debug")
+                add("--mcp-debug")
+                add("--verbose")
+            }
             addAll(args.toList())
         }
-        return runInContainer(
-            claudeArgs,
-            timeoutSeconds,
-            enableDebugEnv = true,
-            extraEnvVars = mapOf(
-                "CLAUDE_CODE_DEBUG" to "1",
-                "ANTHROPIC_API_KEY" to apiKey
-            )
+        return session.runInContainer(
+            args = claudeArgs.toTypedArray(),
+            timeoutSeconds = timeoutSeconds,
+            extraEnvVars = buildMap {
+                put("ANTHROPIC_API_KEY", apiKey)
+                if (debug) {
+                    put("CLAUDE_CODE_DEBUG", "1")
+                    put("DEBUG", "*")
+                }
+            }
         )
     }
 
@@ -51,139 +60,26 @@ class DockerClaudeSession private constructor(
      *
      * @param prompt The prompt to send to Claude
      * @param timeoutSeconds Maximum time to wait for the command
-     * @param allowedTools Optional list of tools to allow (e.g., "mcp__serverName__*")
-     * @param mcpConfigFile Optional path to MCP config JSON file (for --mcp-config)
-     * @param strictMcpConfig If true, use --strict-mcp-config to only use specified MCP servers
-     * @param permissionMode Optional permission mode (e.g., "bypassPermissions")
-     * @param tools Optional list of tools to enable (for --tools flag)
      *
      * Note: Due to a bug in Claude CLI v1.0.73 (issue #5593), when using --mcp-config,
      * we need to use "--" separator before the prompt to prevent argument parsing issues.
      * See: https://github.com/anthropics/claude-code/issues/5593
      */
-    fun runPrompt(
+    override fun runPrompt(
         prompt: String,
-        timeoutSeconds: Long = 120,
-        allowedTools: List<String>? = null,
-        mcpConfigFile: String? = null,
-        strictMcpConfig: Boolean = false,
-        permissionMode: String? = null,
-        tools: List<String>? = null
+        timeoutSeconds: Long,
     ): ProcessResult {
         val claudeArgs = buildList {
-            add("claude")
-            add("--debug")
-            add("--verbose")
-            add("--mcp-debug")
-
-            // MCP config file - must come before other args due to CLI bug
-            if (mcpConfigFile != null) {
-                add("--mcp-config")
-                add(mcpConfigFile)
-            }
-
-            // Strict MCP config mode
-            if (strictMcpConfig) {
-                add("--strict-mcp-config")
-            }
-
-            // Permission mode
-            if (permissionMode != null) {
-                add("--permission-mode")
-                add(permissionMode)
-            }
-
-            // Tools to enable
-            if (tools != null && tools.isNotEmpty()) {
-                add("--tools")
-                add(tools.joinToString(","))
-            }
-
-            // Allow MCP tools in print mode (required since v0.2.54)
-            if (allowedTools != null && allowedTools.isNotEmpty()) {
-                add("--allowedTools")
-                add(allowedTools.joinToString(","))
-            }
-
-            // Use "--" separator when --mcp-config is used (workaround for CLI bug #5593)
-            if (mcpConfigFile != null) {
-                add("--")
-            }
-
+            // Permission mode, necessary to allow MCP
+            add("--permission-mode")
+            add("bypassPermissions")
             add("-p")
             add(prompt)
         }
         return runInContainer(
-            claudeArgs,
-            timeoutSeconds,
-            enableDebugEnv = true,
-            extraEnvVars = mapOf(
-                "CLAUDE_CODE_DEBUG" to "1",
-                "MCP_DEBUG" to "1",
-                "ANTHROPIC_API_KEY" to apiKey
-            )
+            *claudeArgs.toTypedArray(),
+            timeoutSeconds = timeoutSeconds
         )
-    }
-
-    /**
-     * Run claude doctor to check health
-     */
-    fun runDoctor(timeoutSeconds: Long = 30): ProcessResult {
-        return runInContainer(
-            listOf("claude", "doctor"),
-            timeoutSeconds,
-            enableDebugEnv = true,
-            extraEnvVars = mapOf(
-                "ANTHROPIC_API_KEY" to apiKey
-            )
-        )
-    }
-
-    /**
-     * List MCP servers
-     */
-    fun listMcpServers(timeoutSeconds: Long = 30): ProcessResult {
-        return run("mcp", "list", timeoutSeconds = timeoutSeconds)
-    }
-
-    /**
-     * Create an MCP config JSON file in the container
-     */
-    fun createMcpConfigFile(serverName: String, serverUrl: String, fileName: String = "mcp-config.json"): ProcessResult {
-        val mcpConfig = """
-{
-    "mcpServers": {
-        "$serverName": {
-            "type": "http",
-            "url": "$serverUrl"
-        }
-    }
-}
-""".trim()
-        return runRaw("bash", "-c", "cat > $fileName <<'EOF'\n$mcpConfig\nEOF")
-    }
-
-    /**
-     * Configure MCP server in .mcp.json
-     */
-    fun configureMcpServer(serverName: String, serverUrl: String): ProcessResult {
-        val mcpConfig = """
-{
-    "mcpServers": {
-        "$serverName": {
-            "url": "$serverUrl"
-        }
-    }
-}
-""".trim()
-        val script = """
-set -e
-mkdir -p ~/work
-cat > ~/work/.mcp.json <<'EOF'
-$mcpConfig
-EOF
-""".trimIndent()
-        return runRaw("bash", "-c", script)
     }
 
     companion object {
@@ -197,18 +93,13 @@ EOF
             error("ANTHROPIC_API_KEY is required for Claude CLI tests (set env or ~/.anthropic)")
         }
 
-        fun create(): DockerClaudeSession {
-            val tempDir = createTempDirectory("claude-test")
-            println("[DOCKER-CLAUDE] Creating new session in temp dir: $tempDir")
-
-            buildDockerImage("claude-cli-test:latest", File("src/test/docker/claude-cli/Dockerfile"), "DOCKER-CLAUDE")
-
-            val containerId = startContainer("claude-cli-test:latest", tempDir, "DOCKER-CLAUDE")
-
+        fun create(
+            parentDisposable: Disposable,
+        ): DockerClaudeSession {
+            println("[DOCKER-CLAUDE] Creating new session")
             val apiKey = readAnthropicApiKey()
-
-            println("[DOCKER-CLAUDE] Session created in container: $containerId")
-            return DockerClaudeSession(containerId, tempDir, apiKey)
+            val session = DockerSession.startDockerSession(parentDisposable, "claude-cli", listOf(apiKey))
+            return DockerClaudeSession(session, apiKey)
         }
     }
 }

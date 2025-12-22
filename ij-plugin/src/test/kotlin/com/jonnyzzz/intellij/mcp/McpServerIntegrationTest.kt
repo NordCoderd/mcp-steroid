@@ -27,9 +27,8 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     private lateinit var client: HttpClient
 
     override fun setUp() {
+        setServerPortProperties()
         super.setUp()
-        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
-        setRegistryPropertyForTest("mcp.steroids.server.port", "17820")
         client = HttpClient(CIO) {
             expectSuccess = false
         }

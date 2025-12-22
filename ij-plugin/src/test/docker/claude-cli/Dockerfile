@@ -1,5 +1,7 @@
 FROM ubuntu:22.04
 
+ARG CACHE_BUST=1
+
 # Install dependencies including Node.js 20+ (required for Claude Code CLI)
 # Following the same pattern as Codex CLI Dockerfile for consistency
 RUN apt-get update && \

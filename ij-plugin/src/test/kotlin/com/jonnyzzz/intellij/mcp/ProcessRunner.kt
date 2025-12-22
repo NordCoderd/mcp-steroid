@@ -1,7 +1,11 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp
 
+import junit.framework.TestCase.assertEquals
+import junit.framework.TestCase.assertFalse
+import org.junit.Assert
 import java.io.File
+import java.io.InputStream
 import java.util.concurrent.TimeUnit
 
 /**
@@ -13,26 +17,49 @@ data class ProcessResult(
     val stderr: String
 )
 
+fun ProcessResult.assertOutputContains(vararg expectedOutput: String, message: String = "") = apply {
+    for (s in expectedOutput) {
+        Assert.assertTrue("Process $message output must container $s\n$this", output.contains(s) || stderr.contains(s))
+    }
+}
+
+fun ProcessResult.assertExitCode(expectedExitCode: Int, message: String = "") = apply {
+    assertEquals("Process $message exist code is $exitCode != $expectedExitCode", expectedExitCode, exitCode)
+}
+
+fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
+    val combined = output + "\n" + stderr
+
+    // Check for explicit ERROR patterns (case-insensitive)
+    val errorPatterns = listOf(
+        Regex("(?i)\\*\\*ERROR:", RegexOption.MULTILINE),
+        Regex("(?i)^ERROR:", RegexOption.MULTILINE),
+        Regex("(?i)tool .* is not available", RegexOption.IGNORE_CASE),
+        Regex("(?i)not registered or accessible", RegexOption.IGNORE_CASE),
+        Regex("(?i)failed to connect", RegexOption.IGNORE_CASE),
+    )
+
+    for (pattern in errorPatterns) {
+        val match = pattern.find(combined)
+        assertFalse(
+            "$message: Found error pattern '${pattern.pattern}' in output. " +
+                    "Match: '${match?.value}'. Full output:\n$combined",
+            match != null
+        )
+    }
+}
+
 /**
  * Utility for running processes with consistent logging.
  * All output is logged to stdout with prefixes for easy debugging.
  * Supports filtering secrets from log output.
  */
-class ProcessRunner {
-    private val secretPatterns = mutableListOf<String>()
-
+class ProcessRunner(
+    private val logPrefix: String,
+    private val secretPatterns: List<String>,
+) {
     /**
-     * Add a secret pattern that should be filtered from log output.
-     * The secret will be replaced with [REDACTED] in all logged output.
-     */
-    fun addSecretFilter(secret: String) {
-        if (secret.isNotBlank()) {
-            secretPatterns.add(secret)
-        }
-    }
-
-    /**
-     * Filter secrets from text, replacing them with [REDACTED].
+     * Filter secrets from text, replacing them with REDACTED.
      */
     private fun filterSecrets(text: String): String {
         var result = text
@@ -59,7 +86,6 @@ class ProcessRunner {
         description: String,
         workingDir: File,
         timeoutSeconds: Long = 30,
-        logPrefix: String = "PROCESS"
     ): ProcessResult {
         // Filter secrets from command line and description for logging
         val filteredCommand = command.map { filterSecrets(it) }
@@ -75,20 +101,31 @@ class ProcessRunner {
         val process = processBuilder.start()
         process.outputStream.close()
 
+        fun readOutput(stream: InputStream, prefix: String, target: StringBuilder) {
+            runCatching {
+                stream.reader().use { reader ->
+                    while (process.isAlive) {
+                        Thread.sleep(100)
+                        reader.forEachLine { line ->
+                            val filterSecrets = filterSecrets(line)
+                            println("[$prefix] $filterSecrets")
+                            target.appendLine(filterSecrets)
+                        }
+                    }
+                }
+            }
+        }
+
+
         val outputBuilder = StringBuilder()
         val errorBuilder = StringBuilder()
 
         val outputThread = Thread {
-            process.inputStream.reader().forEachLine { line ->
-                println("[$logPrefix OUT] ${filterSecrets(line)}")
-                outputBuilder.appendLine(line)
-            }
+            readOutput(process.inputStream, "$logPrefix OUT", outputBuilder)
         }
+
         val errorThread = Thread {
-            process.errorStream.reader().forEachLine { line ->
-                println("[$logPrefix ERR] ${filterSecrets(line)}")
-                errorBuilder.appendLine(line)
-            }
+            readOutput(process.errorStream, "$logPrefix ERR", errorBuilder)
         }
 
         outputThread.start()
@@ -107,26 +144,6 @@ class ProcessRunner {
 
         val exitCode = process.exitValue()
         println("[$logPrefix] Exit code: $exitCode")
-
         return ProcessResult(exitCode, outputBuilder.toString(), errorBuilder.toString())
-    }
-
-    companion object {
-        /**
-         * Default instance without any secret filtering.
-         * For backwards compatibility with existing code.
-         */
-        private val defaultInstance = ProcessRunner()
-
-        /**
-         * Run a process using the default instance (no secret filtering).
-         */
-        fun run(
-            command: List<String>,
-            description: String,
-            workingDir: File,
-            timeoutSeconds: Long = 30,
-            logPrefix: String = "PROCESS"
-        ): ProcessResult = defaultInstance.run(command, description, workingDir, timeoutSeconds, logPrefix)
     }
 }

@@ -1,5 +1,7 @@
 FROM ubuntu:22.04
 
+ARG CACHE_BUST=1
+
 # Install dependencies including Node.js 20+ (required for Codex)
 RUN apt-get update && \
     apt-get install -y curl ca-certificates gnupg && \

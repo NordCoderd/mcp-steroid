@@ -2,35 +2,114 @@
 package com.jonnyzzz.intellij.mcp
 
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.util.Disposer
 import java.io.File
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * Base class for managing CLI sessions running inside Docker containers.
  * Provides common functionality for building images, starting/stopping containers,
  * and running commands.
  */
-abstract class DockerSession(
-    protected val containerId: String,
-    protected val workDir: File,
-) : AutoCloseable, Disposable {
+interface DockerSession {
+    fun runInContainer(
+        vararg args: String,
+        timeoutSeconds: Long = 30,
+        extraEnvVars: Map<String, String> = emptyMap()
+    ): ProcessResult
 
-    /** Name used for logging */
-    protected abstract val logPrefix: String
+    companion object
+}
 
-    /** Process runner with secret filtering. Subclasses can add secrets via addSecretFilter() */
-    protected val processRunner = ProcessRunner()
-
+interface AiAgentSession {
     /**
-     * Run an arbitrary command inside the Docker container.
+     * Run codex exec for non-interactive mode.
      */
-    fun runRaw(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
-        return runInContainer(args.toList(), timeoutSeconds)
+    fun runPrompt(
+        prompt: String,
+        timeoutSeconds: Long = 120
+    ): ProcessResult
+}
+
+class DockerSessionScope(
+    val workDir: File,
+    val logPrefix: String,
+    secretPatterns: List<String>,
+) {
+    val processRunner = ProcessRunner(logPrefix, secretPatterns)
+
+    fun buildDockerImage(
+        imageName: String,
+        dockerfilePath: File,
+        timeoutSeconds: Long
+    ) {
+        require(dockerfilePath.exists() && dockerfilePath.isFile) { "File does not exist: $dockerfilePath" }
+
+
+        val nowDate = DateTimeFormatter.ISO_DATE.format(LocalDateTime.now())
+        val result = processRunner.run(
+            listOf("docker", "build", "-t", imageName, "--build-arg", "CACHE_BUST=$nowDate", "."),
+            description = "Build Docker image $imageName",
+            workingDir = dockerfilePath.parentFile,
+            timeoutSeconds = timeoutSeconds,
+        )
+
+        if (result.exitCode != 0) {
+            throw IllegalStateException("Failed to build Docker image. Exit code: ${result.exitCode}\n${result.stderr}")
+        }
+        println("[$logPrefix] Docker image built successfully")
     }
 
-    protected fun runInContainer(
+    fun startContainer(
+        imageName: String,
+    ): String {
+        val command = buildList {
+            add("docker")
+            add("run")
+            add("-d")
+            add("--add-host=host.docker.internal:host-gateway")
+            add(imageName)
+        }
+
+        val result = processRunner.run(
+            command,
+            description = "Start container from $imageName",
+            workingDir = workDir,
+            timeoutSeconds = 30,
+        )
+
+        val containerId = result.output.trim()
+        if (result.exitCode != 0 || containerId.isEmpty()) {
+            throw IllegalStateException("Failed to start Docker container: ${result.stderr}")
+        }
+
+        println("[$logPrefix] Container started: $containerId")
+        return containerId
+    }
+
+    fun killContainer(containerId: String) {
+        processRunner.run(
+            listOf("docker", "kill", containerId),
+            description = "kill container",
+            workingDir = workDir,
+            timeoutSeconds = 10,
+        )
+
+        processRunner.run(
+            listOf("docker", "rm", "-f", containerId),
+            description = "Remove container",
+            workingDir = workDir,
+            timeoutSeconds = 5,
+        )
+
+        println("[$logPrefix] Container removed successfully")
+    }
+
+    fun runInContainer(
+        containerId: String,
         args: List<String>,
         timeoutSeconds: Long,
-        enableDebugEnv: Boolean = false,
         extraEnvVars: Map<String, String> = emptyMap()
     ): ProcessResult {
         // Escape the command for shell execution inside docker
@@ -50,11 +129,6 @@ abstract class DockerSession(
                 add("-e")
                 add("$key=$value")
             }
-            // Enable debug environment variables
-            if (enableDebugEnv) {
-                add("-e")
-                add("DEBUG=*")
-            }
             add(containerId)
             add("bash")
             add("-c")
@@ -66,93 +140,58 @@ abstract class DockerSession(
             description = "In container: ${args.joinToString(" ")}",
             workingDir = workDir,
             timeoutSeconds = timeoutSeconds,
-            logPrefix = logPrefix
         )
     }
+}
 
-    override fun dispose() {
-        close()
-    }
+fun DockerSession.Companion.startDockerSession(
+    parentDisposable: Disposable,
+    dockerFileBase: String, //aka codex-cli
+    secretPatterns: List<String> = listOf(),
+): DockerSession {
+    val dockerDisposable = Disposer.newDisposable(parentDisposable)
 
-    override fun close() {
+    val dockerfilePath = File("src/test/docker/$dockerFileBase/Dockerfile")
+    require(dockerfilePath.isFile) { "Docker file $dockerfilePath must exist" }
+
+    val logPrefix = dockerFileBase.uppercase().replace("/", "-")
+    val workDir = createTempDirectory(logPrefix.lowercase())
+    println("[$logPrefix] Creating new session in temp dir: $workDir")
+    Disposer.register(dockerDisposable, Disposable {
+        workDir.deleteRecursively()
+        println("[$logPrefix] Temp directory cleaned up: $workDir")
+    })
+
+    val scope = DockerSessionScope(workDir, logPrefix, secretPatterns)
+    val imageName = "$dockerFileBase-test"
+
+    //TODO: drop image it it's older than one day
+    scope.buildDockerImage(
+        imageName = imageName,
+        dockerfilePath,
+        timeoutSeconds = 600
+    )
+
+    //we are not disposing the image
+    val containerId = scope.startContainer(imageName)
+    Disposer.register(parentDisposable, Disposable {
         println("[$logPrefix] Stopping and removing container: $containerId")
-        try {
-            ProcessRunner.run(
-                listOf("docker", "kill", containerId),
-                description = "kill container",
-                workingDir = workDir,
-                timeoutSeconds = 10,
-                logPrefix = "DOCKER"
-            )
+        scope.killContainer(containerId)
+    })
 
-            ProcessRunner.run(
-                listOf("docker", "rm", "-f", containerId),
-                description = "Remove container",
-                workingDir = workDir,
-                timeoutSeconds = 5,
-                logPrefix = "DOCKER"
-            )
-
-            println("[$logPrefix] Container removed successfully")
-
-            workDir.deleteRecursively()
-            println("[$logPrefix] Temp directory cleaned up: $workDir")
-        } catch (e: Exception) {
-            println("[$logPrefix] Failed to clean up: ${e.message}")
+    return object : DockerSession {
+        override fun runInContainer(
+            vararg args: String,
+            timeoutSeconds: Long,
+            extraEnvVars: Map<String, String>
+        ): ProcessResult {
+            return scope.runInContainer(containerId, args.toList(), timeoutSeconds, extraEnvVars)
         }
     }
+}
 
-    companion object {
-        fun createTempDirectory(prefix: String): File {
-            val tempDir = File(System.getProperty("java.io.tmpdir"), "$prefix-${System.currentTimeMillis()}")
-            tempDir.mkdirs()
-            return tempDir
-        }
-
-        fun buildDockerImage(imageName: String, dockerfilePath: File, logPrefix: String, timeoutSeconds: Long = 300) {
-            val result = ProcessRunner.run(
-                listOf("docker", "build", "-t", imageName, "."),
-                description = "Build Docker image $imageName",
-                workingDir = dockerfilePath.parentFile,
-                timeoutSeconds = timeoutSeconds,
-                logPrefix = "DOCKER-BUILD"
-            )
-
-            if (result.exitCode != 0) {
-                throw IllegalStateException("Failed to build Docker image. Exit code: ${result.exitCode}\n${result.stderr}")
-            }
-
-            println("[$logPrefix] Docker image built successfully")
-        }
-
-        fun startContainer(
-            imageName: String,
-            workDir: File,
-            logPrefix: String,
-        ): String {
-            val command = buildList {
-                add("docker")
-                add("run")
-                add("-d")
-                add("--add-host=host.docker.internal:host-gateway")
-                add(imageName)
-            }
-
-            val result = ProcessRunner.run(
-                command,
-                description = "Start container from $imageName",
-                workingDir = workDir,
-                timeoutSeconds = 30,
-                logPrefix = "DOCKER"
-            )
-
-            val containerId = result.output.trim()
-            if (result.exitCode != 0 || containerId.isEmpty()) {
-                throw IllegalStateException("Failed to start Docker container: ${result.stderr}")
-            }
-
-            println("[$logPrefix] Container started: $containerId")
-            return containerId
-        }
-    }
+private fun createTempDirectory(prefix: String): File {
+    val tempDir = File(System.getProperty("java.io.tmpdir"), "docker-$prefix-${System.currentTimeMillis()}")
+    tempDir.mkdirs()
+    return tempDir
 }
