@@ -292,31 +292,44 @@ Context provided inside `execute { }` blocks:
   - `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
   - `mcp.steroids.review.timeout`: Review timeout in seconds
   - `mcp.steroids.execution.timeout`: Script execution timeout
-  - `mcp.steroids.daemon.recovery`: Enable automatic Kotlin daemon recovery (default: true)
+  - `mcp.steroids.daemon.kill.before.compile`: Kill Kotlin daemon before each compilation (default: true)
+  - `mcp.steroids.daemon.recovery`: Enable reactive daemon recovery on errors (default: true, used when proactive kill is disabled)
 
-### Kotlin Daemon Recovery
+### Kotlin Daemon Management
 
-The plugin includes automatic recovery from Kotlin daemon failures ("Service is dying" errors):
+The plugin manages the Kotlin daemon to prevent classpath corruption issues that cause "incomplete code" or "Service is dying" errors.
 
-**Retry Strategy**:
+**Default Mode: Proactive Daemon Kill** (`mcp.steroids.daemon.kill.before.compile=true`)
+
+Before each script compilation:
+1. Kill any existing Kotlin daemon (delete `.run` files)
+2. Wait 3s for daemon cleanup
+3. Compile with fresh daemon that has correct classpath
+
+This prevents classpath corruption where the daemon loses plugin classes and reports misleading "incomplete code" errors.
+
+**Important**: Proactive daemon kill only works in production (running IDE). In tests, fresh daemons don't receive the plugin classpath from the test sandbox, causing "incomplete code" errors. Tests must use reactive mode (`false`).
+
+**Alternative Mode: Reactive Recovery** (`mcp.steroids.daemon.kill.before.compile=false`)
+
+When proactive kill is disabled, the plugin uses reactive recovery:
 1. **Attempt 1**: Normal script execution
-2. **Attempt 2**: If daemon dying, wait 2s and retry (daemon may auto-recover)
-3. **Attempt 3**: Force kill daemon (delete `.run` files), wait 3s, retry
-
-**How it works**:
-- Detects "Service is dying" or "Could not connect to Kotlin compile daemon" errors
-- On second failure, deletes daemon `.run` files from the daemon directory
-- Daemon monitors these files and shuts down when they're deleted
-- Also cleans up stale client marker files (`*-is-running`)
-- New daemon auto-starts on next compilation attempt (`autostart=true`)
+2. **Attempt 2**: If "Service is dying" error, wait 2s and retry
+3. **Attempt 3**: Force kill daemon, wait 3s, retry
 
 **Daemon directory locations**:
 - macOS: `~/Library/Application Support/kotlin/daemon`
 - Windows: `%LOCALAPPDATA%/kotlin/daemon`
 - Linux: `~/.kotlin/daemon`
 
-**Disable recovery** (for debugging):
+**Switch to reactive mode** (less aggressive, for faster iteration):
 ```kotlin
+Registry.get("mcp.steroids.daemon.kill.before.compile").setValue(false)
+```
+
+**Disable all daemon management** (for debugging):
+```kotlin
+Registry.get("mcp.steroids.daemon.kill.before.compile").setValue(false)
 Registry.get("mcp.steroids.daemon.recovery").setValue(false)
 ```
 
