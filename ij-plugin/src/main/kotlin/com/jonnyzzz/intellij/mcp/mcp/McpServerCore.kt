@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.mcp
 
+import com.intellij.openapi.diagnostic.thisLogger
 import kotlinx.serialization.json.*
 
 /**
@@ -12,6 +13,7 @@ class McpServerCore(
     private val capabilities: ServerCapabilities,
     private val instructions: String? = null,
 ) {
+    private val log = thisLogger()
     val sessionManager = McpSessionManager()
     val toolRegistry = McpToolRegistry()
 
@@ -26,9 +28,9 @@ class McpServerCore(
             return encodeError(JsonNull, JsonRpcErrorCodes.PARSE_ERROR, "Parse error: ${e.message}")
         }
 
-        return when {
-            jsonElement is JsonArray -> handleBatch(jsonElement, session)
-            jsonElement is JsonObject -> handleSingle(jsonElement, session)
+        return when (jsonElement) {
+            is JsonArray -> handleBatch(jsonElement, session)
+            is JsonObject -> handleSingle(jsonElement, session)
             else -> encodeError(JsonNull, JsonRpcErrorCodes.INVALID_REQUEST, "Invalid request")
         }
     }
@@ -81,6 +83,7 @@ class McpServerCore(
     }
 
     private fun handleNotification(method: String) {
+        log.info("Client notification: $method")
         when (method) {
             McpMethods.INITIALIZED -> {
                 // Client confirmed initialization - nothing special needed
@@ -136,7 +139,6 @@ class McpServerCore(
         val result = toolRegistry.callTool(callParams, session)
         return encodeResult(id, McpJson.encodeToJsonElement(result))
     }
-
     private fun encodeResult(id: JsonElement, result: JsonElement): String {
         val response = JsonRpcResponse(id = id, result = result)
         return McpJson.encodeToString(JsonRpcResponse.serializer(), response)
