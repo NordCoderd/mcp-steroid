@@ -68,14 +68,20 @@ class CodeEvalManager(
 
     /**
      * Checks if the exception indicates the Kotlin daemon is dying.
+     * Traverses the full cause chain since the error can be deeply nested:
+     * IdeScriptException → ScriptException → IllegalStateException("Service is dying")
      */
     private fun isDaemonDyingError(e: Throwable): Boolean {
-        val message = e.message ?: ""
-        val causeMessage = e.cause?.message ?: ""
-        return message.contains("Service is dying") ||
-                causeMessage.contains("Service is dying") ||
-                message.contains("Could not connect to Kotlin compile daemon") ||
-                causeMessage.contains("Could not connect to Kotlin compile daemon")
+        var current: Throwable? = e
+        while (current != null) {
+            val message = current.message ?: ""
+            if (message.contains("Service is dying") ||
+                message.contains("Could not connect to Kotlin compile daemon")) {
+                return true
+            }
+            current = current.cause
+        }
+        return false
     }
 
     /**
