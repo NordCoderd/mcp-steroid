@@ -4,8 +4,7 @@ package com.jonnyzzz.intellij.mcp.storage
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
-import kotlinx.serialization.json.buildJsonObject
+import com.jonnyzzz.intellij.mcp.testExecParams
 import org.junit.Assert.assertNotEquals
 import kotlin.time.Duration.Companion.seconds
 
@@ -24,14 +23,6 @@ class ExecutionStorageTest : BasePlatformTestCase() {
         super.setUp()
         storage = project.service()
     }
-
-    private fun testExecParams(code: String, taskId: String = "test-task") = ExecCodeParams(
-        taskId = taskId,
-        code = code,
-        reason = "test",
-        timeout = 60,
-        rawParams = buildJsonObject { }
-    )
 
     fun testWriteNewExecution(): Unit = timeoutRunBlocking(10.seconds) {
         val code = "execute { println(\"Hello\") }"

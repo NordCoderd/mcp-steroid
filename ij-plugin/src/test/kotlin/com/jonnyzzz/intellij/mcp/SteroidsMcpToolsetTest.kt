@@ -6,9 +6,7 @@ import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
-import kotlinx.serialization.json.buildJsonObject
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -22,14 +20,6 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         // Disable review mode for tests
         setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
     }
-
-    private fun testExecParams(code: String, timeout: Int = 30) = ExecCodeParams(
-        taskId = "test-task",
-        code = code,
-        reason = "test",
-        timeout = timeout,
-        rawParams = buildJsonObject { }
-    )
 
     private fun getTextContent(result: com.jonnyzzz.intellij.mcp.mcp.ToolCallResult): String {
         return result.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }

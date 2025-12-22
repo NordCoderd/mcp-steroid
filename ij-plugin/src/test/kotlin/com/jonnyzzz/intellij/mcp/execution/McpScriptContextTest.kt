@@ -3,6 +3,7 @@ package com.jonnyzzz.intellij.mcp.execution
 
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.intellij.mcp.TestResultBuilder
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import kotlinx.serialization.json.buildJsonObject
 
@@ -19,36 +20,6 @@ class McpScriptContextTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         executionId = ExecutionId("test-execution-id")
-    }
-
-    /**
-     * Simple test implementation of ExecutionResultBuilder that collects messages.
-     */
-    private class TestResultBuilder : ExecutionResultBuilder {
-        val messages = mutableListOf<String>()
-        val progressMessages = mutableListOf<String>()
-        val exceptions = mutableListOf<Pair<String, Throwable>>()
-        private var failed = false
-        var failureMessage: String? = null
-
-        override val isFailed: Boolean get() = failed
-
-        override fun logMessage(message: String) {
-            messages += message
-        }
-
-        override fun logProgress(message: String) {
-            progressMessages += message
-        }
-
-        override fun logException(message: String, throwable: Throwable) {
-            exceptions += message to throwable
-        }
-
-        override fun reportFailed(message: String) {
-            failed = true
-            failureMessage = message
-        }
     }
 
     private fun createContext(resultBuilder: TestResultBuilder = TestResultBuilder()): Pair<McpScriptContextImpl, TestResultBuilder> {

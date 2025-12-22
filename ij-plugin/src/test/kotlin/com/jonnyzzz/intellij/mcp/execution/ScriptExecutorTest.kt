@@ -4,9 +4,9 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
+import com.jonnyzzz.intellij.mcp.TestResultBuilder
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
-import kotlinx.serialization.json.buildJsonObject
+import com.jonnyzzz.intellij.mcp.testExecParams
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -25,45 +25,6 @@ import kotlin.time.Duration.Companion.seconds
 class ScriptExecutorTest : BasePlatformTestCase() {
 
     private val executor: ScriptExecutor get() = project.service()
-
-    /**
-     * Test implementation of ExecutionResultBuilder that collects messages.
-     * Note: Uses NoOpProgressReporter pattern for tests that don't need MCP progress.
-     */
-    private class TestResultBuilder : ExecutionResultBuilder {
-        val messages = mutableListOf<String>()
-        val progressMessages = mutableListOf<String>()
-        val exceptions = mutableListOf<Pair<String, Throwable>>()
-        private var failed = false
-        var failureMessage: String? = null
-
-        override val isFailed: Boolean get() = failed
-
-        override fun logMessage(message: String) {
-            messages += message
-        }
-
-        override fun logProgress(message: String) {
-            progressMessages += message
-        }
-
-        override fun logException(message: String, throwable: Throwable) {
-            exceptions += message to throwable
-        }
-
-        override fun reportFailed(message: String) {
-            failed = true
-            failureMessage = message
-        }
-    }
-
-    private fun testExecParams(code: String, timeout: Int = 60) = ExecCodeParams(
-        taskId = "test-task",
-        code = code,
-        reason = "test",
-        timeout = timeout,
-        rawParams = buildJsonObject { }
-    )
 
     private var executionCounter = 0
     private fun nextExecutionId() = ExecutionId("test-${++executionCounter}")
