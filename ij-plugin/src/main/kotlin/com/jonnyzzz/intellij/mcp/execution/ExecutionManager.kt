@@ -49,7 +49,7 @@ class ExecutionManager(
 
                 val builder = responseBuilder(this, executionId, mcpProgressReporter)
                 try {
-                    builder.logMessage("execution_id: ${executionId.executionId}\n use it to report feedback: steroid_execute_feedback execution_id=...")
+                    builder.logMessage("execution_id: ${executionId.executionId}\n use it to report feedback: steroid_execute_feedback")
 
                     val finalResult = project.service<ReviewManager>().requestReview(executionId, exec, builder)
                     if (!finalResult) {
