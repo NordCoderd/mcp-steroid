@@ -91,6 +91,10 @@ class ExecutionStorage(
         writeCodeExecutionData(executionId, "error.txt", text)
     }
 
+    suspend fun writeCodeSuccessEvent(executionId: ExecutionId, text: String = "SUCCESS") {
+        writeCodeExecutionData(executionId, "success.txt", text)
+    }
+
     suspend fun appendExecutionEventJson(executionId: ExecutionId, json: String) {
         withContext(Dispatchers.IO) {
             val file = executionId.dir.resolve("output.jsonl")
@@ -147,6 +151,10 @@ class ExecutionStorage(
         storage.writeCodeExecutionData(executionId, "execution-id.txt", executionId.executionId)
 
         return executionId
+    }
+
+    suspend fun writeWrappedScript(executionId: ExecutionId, code: String) {
+        writeCodeExecutionData(executionId, "script-wrapped.kts", code)
     }
 
     /**
