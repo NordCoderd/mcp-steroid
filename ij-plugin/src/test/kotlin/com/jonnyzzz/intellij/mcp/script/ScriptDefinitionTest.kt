@@ -5,7 +5,6 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.execution.McpScriptContext
 import kotlin.script.experimental.api.*
 import kotlin.script.experimental.jvm.JvmDependency
-import kotlin.script.experimental.jvm.jvm
 
 /**
  * Tests for MCP Steroid script definition.
@@ -26,7 +25,7 @@ class ScriptDefinitionTest : BasePlatformTestCase() {
         assertNotNull("Script definition should have default imports", imports)
 
         // Verify key IntelliJ imports are present
-        val importStrings = imports!!.map { it.toString() }
+        val importStrings = imports!!.map { it }
         assertTrue(
             "Should have Project import",
             importStrings.any { it.contains("com.intellij.openapi.project") }
@@ -405,11 +404,11 @@ class ScriptDefinitionTest : BasePlatformTestCase() {
         assertNotNull("Script definition should have default imports", imports)
         assertTrue(
             "Should have Project import",
-            imports!!.any { it.toString().contains("com.intellij.openapi.project") }
+            imports!!.any { it.contains("com.intellij.openapi.project") }
         )
         assertTrue(
             "Should have coroutines import",
-            imports.any { it.toString().contains("kotlinx.coroutines") }
+            imports.any { it.contains("kotlinx.coroutines") }
         )
     }
 
