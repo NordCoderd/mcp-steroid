@@ -292,46 +292,31 @@ Context provided inside `execute { }` blocks:
   - `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
   - `mcp.steroids.review.timeout`: Review timeout in seconds
   - `mcp.steroids.execution.timeout`: Script execution timeout
-  - `mcp.steroids.daemon.kill.before.compile`: Kill Kotlin daemon before each compilation (default: true)
-  - `mcp.steroids.daemon.recovery`: Enable reactive daemon recovery on errors (default: true, used when proactive kill is disabled)
+
+### Script Preprocessing (CodeButcher)
+
+User-submitted scripts are preprocessed by `CodeButcher.wrapWithImports()` before compilation:
+
+1. **Import extraction**: User imports (including `; import ...` patterns) are extracted from code
+2. **Default imports**: Standard IntelliJ/Kotlin imports are added
+3. **Import merging**: User imports are placed after default imports, before the `execute` binding
+4. **Code assembly**: The rest of user code follows
+
+This preprocessing is critical - imports MUST appear at the top of Kotlin scripts. Placing imports after code statements causes "incomplete code" errors.
 
 ### Kotlin Daemon Management
 
-The plugin manages the Kotlin daemon to prevent classpath corruption issues that cause "incomplete code" or "Service is dying" errors.
+The `KotlinDaemonManager` service handles Kotlin daemon lifecycle issues:
 
-**Default Mode: Proactive Daemon Kill** (`mcp.steroids.daemon.kill.before.compile=true`)
-
-Before each script compilation:
-1. Kill any existing Kotlin daemon (delete `.run` files)
-2. Wait 3s for daemon cleanup
-3. Compile with fresh daemon that has correct classpath
-
-This prevents classpath corruption where the daemon loses plugin classes and reports misleading "incomplete code" errors.
-
-**Important**: Proactive daemon kill only works in production (running IDE). In tests, fresh daemons don't receive the plugin classpath from the test sandbox, causing "incomplete code" errors. Tests must use reactive mode (`false`).
-
-**Alternative Mode: Reactive Recovery** (`mcp.steroids.daemon.kill.before.compile=false`)
-
-When proactive kill is disabled, the plugin uses reactive recovery:
-1. **Attempt 1**: Normal script execution
-2. **Attempt 2**: If "Service is dying" error, wait 2s and retry
-3. **Attempt 3**: Force kill daemon, wait 3s, retry
+**"Service is dying" errors**: The daemon can enter a dying state during shutdown while still being discoverable. The plugin detects this and can retry or force-restart the daemon.
 
 **Daemon directory locations**:
 - macOS: `~/Library/Application Support/kotlin/daemon`
 - Windows: `%LOCALAPPDATA%/kotlin/daemon`
 - Linux: `~/.kotlin/daemon`
 
-**Switch to reactive mode** (less aggressive, for faster iteration):
-```kotlin
-Registry.get("mcp.steroids.daemon.kill.before.compile").setValue(false)
-```
+**Note**: Earlier documentation incorrectly attributed "incomplete code" errors to daemon classpath issues. The actual cause was the script preprocessing bug (import merging) - now fixed in `CodeButcher.kt`.
 
-**Disable all daemon management** (for debugging):
-```kotlin
-Registry.get("mcp.steroids.daemon.kill.before.compile").setValue(false)
-Registry.get("mcp.steroids.daemon.recovery").setValue(false)
-```
 
 ## IntelliJ Platform Coding Principles
 
