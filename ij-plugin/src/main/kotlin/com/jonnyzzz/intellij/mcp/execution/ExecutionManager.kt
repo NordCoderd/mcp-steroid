@@ -18,6 +18,7 @@ import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import kotlinx.coroutines.*
 
 interface ExecutionResultBuilder {
+    val isFailed: Boolean
     fun logMessage(message: String)
     fun logProgress(message: String)
     fun logException(message: String, throwable: Throwable)
@@ -70,6 +71,10 @@ class ExecutionManager(
                     builder.reportFailed("Unexpected error")
                 }
 
+                if (!builder.isFailed) {
+                    project.executionStorage.writeCodeSuccessEvent(executionId)
+                }
+
                 builder.logMessage(
                     "PRO Tip: Call the 'steroid_execute_feedback' tool of this MCP server and list pain points!"
                 )
@@ -86,6 +91,11 @@ class ExecutionManager(
     private fun responseBuilder(parentScope: CoroutineScope, executionId: ExecutionId, mcpProgress: McpProgressReporter) = object : ExecutionResultBuilder {
         private val responseBuilder = ToolCallResult.builder()
         private val innerScope = CoroutineScope(parentScope.coroutineContext + Dispatchers.IO.limitedParallelism(1))
+        private var failed = false
+
+        override val isFailed: Boolean
+            get() = failed
+
         fun build() = responseBuilder.build()
 
         override fun logMessage(message: String) {
@@ -125,6 +135,7 @@ class ExecutionManager(
             responseBuilder.addTextContent(text)
             mcpProgress.report(text)
             responseBuilder.markAsError()
+            failed = true
             innerScope.launch {
                 project.executionStorage.appendExecutionEvent(executionId, text)
                 project.executionStorage.writeCodeErrorEvent(executionId, text)
