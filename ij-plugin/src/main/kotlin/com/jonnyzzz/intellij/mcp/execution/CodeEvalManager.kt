@@ -231,6 +231,18 @@ class CodeEvalManager(
                     log.warn(message)
                 }
                 resultBuilder.reportFailed(message)
+
+                // Log code for "incomplete code" errors for debugging
+                if (e.message?.contains("incomplete code") == true ||
+                    e.cause?.message?.contains("incomplete code") == true) {
+                    log.warn("Incomplete code error - saving wrapped code for debugging")
+                    project.executionStorage.writeCodeExecutionData(
+                        executionId,
+                        "incomplete-code-debug.kt",
+                        "// Error: ${e.message}\n// Wrapped code that caused the error:\n\n$wrappedCode"
+                    )
+                }
+
                 return null
 
             } finally {
