@@ -6,7 +6,6 @@ import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.testExecParams
-import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Path
@@ -25,19 +24,14 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
 
     /**
      * Extracts the execution ID from the ToolCallResult's structuredContent.
-     * The structuredContent is a JSON array containing ExecutionInfo objects.
+     * The structuredContent is a JSON object with executionId as a key.
      */
     private fun getExecutionIdFromResult(result: ToolCallResult): String {
         val structuredContent = result.structuredContent
             ?: error("No structuredContent in result")
 
-        val array = structuredContent.jsonArray
-        val executionInfo = array.firstOrNull {
-            it.jsonObject.containsKey("executionId")
-        } ?: error("No executionId found in structuredContent: $structuredContent")
-
-        return executionInfo.jsonObject["executionId"]?.jsonPrimitive?.content
-            ?: error("executionId is null")
+        return structuredContent.jsonObject["executionId"]?.jsonPrimitive?.content
+            ?: error("No executionId found in structuredContent: $structuredContent")
     }
 
     /**
