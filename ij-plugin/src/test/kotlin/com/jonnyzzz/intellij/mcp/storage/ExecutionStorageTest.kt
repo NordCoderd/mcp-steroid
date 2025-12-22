@@ -92,7 +92,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
         val params = testExecParams(code)
         val executionId = storage.writeNewExecution(params)
 
-        val reviewPath = storage.writeCodeReviewFile(executionId, params)
+        val reviewPath = storage.writeCodeReviewFile(executionId, code)
         assertTrue("Review file should exist", java.nio.file.Files.exists(reviewPath))
 
         val savedCode = java.nio.file.Files.readString(reviewPath)
@@ -104,7 +104,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
         val params = testExecParams(code)
         val executionId = storage.writeNewExecution(params)
 
-        val reviewPath = storage.writeCodeReviewFile(executionId, params)
+        val reviewPath = storage.writeCodeReviewFile(executionId, code)
         assertTrue("Review file should exist", java.nio.file.Files.exists(reviewPath))
 
         storage.removeCodeReviewFile(executionId)

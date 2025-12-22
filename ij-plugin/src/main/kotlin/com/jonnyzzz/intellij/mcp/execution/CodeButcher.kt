@@ -12,25 +12,39 @@ class CodeButcher {
      * Wrap user code with imports and execute binding.
      * This is exposed so the review can show the final code.
      */
-    fun wrapWithImports(code: String): String = buildString {
-        appendLine(
-            """
-            import com.intellij.openapi.project.*
-            import com.intellij.openapi.application.*
-            import com.intellij.openapi.application.readAction
-            import com.intellij.openapi.application.writeAction
-            import com.intellij.openapi.vfs.*
-            import com.intellij.openapi.editor.*
-            import com.intellij.openapi.fileEditor.*
-            import com.intellij.openapi.command.*
-            import com.intellij.psi.*
-            import kotlinx.coroutines.*
-            """.trimIndent()
-        )
-        appendLine()
-        // Bridge the script binding to a strongly-typed function in the script scope
-        appendLine("val execute = bindings[\"execute\"] as (suspend com.jonnyzzz.intellij.mcp.execution.McpScriptContext.() -> Unit) -> Unit")
-        appendLine()
-        append(code)
+    fun wrapWithImports(code: String): String {
+        val importLines = mutableListOf<String>()
+        val otherLines = mutableListOf<String>()
+
+        for (line in code.lineSequence()) {
+            if (line.trim().trimStart(';').trim().startsWith("import ")) {
+                importLines.add(line)
+            } else {
+                otherLines.add(line)
+            }
+        }
+
+        return buildString {
+            appendLine("import com.intellij.openapi.project.*")
+            appendLine("import com.intellij.openapi.application.*")
+            appendLine("import com.intellij.openapi.application.readAction")
+            appendLine("import com.intellij.openapi.application.writeAction")
+            appendLine("import com.intellij.openapi.vfs.*")
+            appendLine("import com.intellij.openapi.editor.*")
+            appendLine("import com.intellij.openapi.fileEditor.*")
+            appendLine("import com.intellij.openapi.command.*")
+            appendLine("import com.intellij.psi.*")
+            appendLine("import kotlinx.coroutines.*")
+            appendLine()
+            appendLine("//imports from the submitted code")
+            importLines.forEach { appendLine(it) }
+
+            // Bridge the script binding to a strongly-typed function in the script scope
+            appendLine("val execute = bindings[\"execute\"] as (suspend com.jonnyzzz.intellij.mcp.execution.McpScriptContext.() -> Unit) -> Unit")
+            appendLine()
+            appendLine()
+            appendLine("//the rest of submitted code")
+            otherLines.forEach { appendLine(it) }
+        }
     }
 }

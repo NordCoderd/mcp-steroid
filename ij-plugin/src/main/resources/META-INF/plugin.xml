@@ -33,9 +33,6 @@
         <registryKey key="mcp.steroids.server.host" defaultValue="127.0.0.1"
             description="MCP server bind address (use 0.0.0.0 for Docker access)"/>
 
-        <registryKey key="mcp.steroids.daemon.kill.before.compile" defaultValue="true"
-            description="Kill Kotlin daemon before each compilation to ensure clean classpath (default: true)"/>
-
         <!-- Start MCP server when IDE is ready -->
         <postStartupActivity
                 implementation="com.jonnyzzz.intellij.mcp.server.SteroidsMcpServerStartupActivity"/>

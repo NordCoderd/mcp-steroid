@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.mcp.builder
@@ -33,7 +34,7 @@ interface ExecutionResultBuilder {
 class ExecutionManager(
     private val project: Project,
 ) : Disposable {
-    private val log = Logger.getInstance(ExecutionManager::class.java)
+    private val log = thisLogger()
 
     override fun dispose() = Unit
 
@@ -72,7 +73,7 @@ class ExecutionManager(
                 }
 
                 if (!builder.isFailed) {
-                    project.executionStorage.writeCodeSuccessEvent(executionId)
+                    project.executionStorage.writeCodeExecutionData(executionId, "success.txt", "Execution successful")
                 }
 
                 builder.logMessage(
@@ -89,7 +90,7 @@ class ExecutionManager(
     }
 
     private fun responseBuilder(parentScope: CoroutineScope, executionId: ExecutionId, mcpProgress: McpProgressReporter) = object : ExecutionResultBuilder {
-        private val responseBuilder = ToolCallResult.builder()
+        private val responseBuilder = ToolCallResult.builder().setExecutionId(executionId)
         private val innerScope = CoroutineScope(parentScope.coroutineContext + Dispatchers.IO.limitedParallelism(1))
         private var failed = false
 

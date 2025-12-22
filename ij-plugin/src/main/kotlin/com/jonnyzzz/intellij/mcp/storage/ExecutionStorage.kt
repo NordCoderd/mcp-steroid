@@ -91,10 +91,6 @@ class ExecutionStorage(
         writeCodeExecutionData(executionId, "error.txt", text)
     }
 
-    suspend fun writeCodeSuccessEvent(executionId: ExecutionId, text: String = "SUCCESS") {
-        writeCodeExecutionData(executionId, "success.txt", text)
-    }
-
     suspend fun appendExecutionEventJson(executionId: ExecutionId, json: String) {
         withContext(Dispatchers.IO) {
             val file = executionId.dir.resolve("output.jsonl")
@@ -230,8 +226,8 @@ class ExecutionStorage(
         log.debug("mcp-run folder is not under any content root, no exclusion needed")
     }
 
-    suspend fun writeCodeReviewFile(executionId: ExecutionId, execCodeParams: ExecCodeParams): Path {
-        return writeCodeExecutionData(executionId, "review.kts", execCodeParams.code)
+    suspend fun writeCodeReviewFile(executionId: ExecutionId, codeForReview: String): Path {
+        return writeCodeExecutionData(executionId, "review.kts", codeForReview)
     }
 
     suspend fun removeCodeReviewFile(executionId: ExecutionId) {

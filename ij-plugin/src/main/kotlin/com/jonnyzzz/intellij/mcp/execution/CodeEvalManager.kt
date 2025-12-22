@@ -11,12 +11,10 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.StringWriter
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.script.ScriptException
 
 data class EvalResult(val result: List<suspend McpScriptContext.() -> Unit>)
 
@@ -65,20 +63,6 @@ class CodeEvalManager(
         val wrappedCode = codeButcher.wrapWithImports(code)
         project.executionStorage.writeWrappedScript(executionId, wrappedCode)
 
-        // Proactive daemon kill mode (default): Kill daemon before compilation to ensure clean classpath
-        // This prevents "incomplete code" errors caused by stale daemon state
-        if (kotlinDaemonManager.isProactiveDaemonKillEnabled()) {
-            log.info("Proactive daemon kill mode: cleaning up daemon before compilation")
-            resultBuilder.logProgress("Preparing Kotlin compiler...")
-
-            // Kill any existing daemon to ensure fresh classpath
-            val daemonKilled = kotlinDaemonManager.forceKillKotlinDaemon()
-            if (daemonKilled) {
-                log.info("Killed existing Kotlin daemon, waiting for cleanup...")
-                delay(kotlinDaemonManager.DAEMON_KILL_RETRY_DELAY_MS)
-            }
-        }
-
         val scope = DisposableScope(executionId)
         try {
             log.info("Compiling script $executionId")
@@ -112,58 +96,49 @@ class CodeEvalManager(
                 return null
             }
 
+            project.executionStorage.writeCodeExecutionData(executionId, "compilation-success.txt", "Compiled")
             return EvalResult(capturedBlocks.toList())
         } catch (e: Throwable) {
             val message = "Error executing script $executionId: ${e.message}"
-            // Non-recoverable error or exhausted retries
-            if (e !is ScriptException) {
-                log.warn(message, e)
-                resultBuilder.logException(message, e)
-            } else {
-                log.warn(message)
-                resultBuilder.logMessage(message)
+
+            if (e.toString().contains("Service is dying", ignoreCase = true)) {
+                log.warn("Kotlin daemon is dying detected: ${e.message}", e)
+                kotlinDaemonManager.forceKillKotlinDaemon()
+                resultBuilder.logMessage("WARN: Script compilation/evaluation failed: Kotlin Daemon is dying. TRY AGAIN otherwise let user know")
+                project.executionStorage.writeCodeExecutionData(
+                    executionId,
+                    "dying-kotlin-debug.txt",
+                    buildString {
+                        appendLine("Error: ${e.message}")
+                        appendLine(e)
+                        appendLine(e.stackTraceToString())
+                    }
+                )
             }
+
+            if (e.toString().contains("Incomplete code", ignoreCase = true)
+                || e.toString().contains("Code is incomplete", ignoreCase = true)) {
+
+                log.warn("Kotlin incomplete code error detected: ${e.message}", e)
+                resultBuilder.logMessage("WARN: Script compilation/evaluation failed: Incomplete code error. It usually means you put 'import' incorrectly or break Kotlin syntax")
+
+                project.executionStorage.writeCodeExecutionData(
+                    executionId,
+                    "incomplete-code-debug.txt",
+                    buildString {
+                        appendLine("Error: ${e.message}")
+                        appendLine(e)
+                        appendLine(e.stackTraceToString())
+                    }
+                )
+            }
+
+            log.warn(message, e)
+            resultBuilder.logException(message, e)
             resultBuilder.reportFailed(message)
-
-            // Log code for debugging
-            logDebugInfoOnError(e, executionId, wrappedCode)
-
             return null
         } finally {
             Disposer.dispose(scope)
-        }
-    }
-
-    /**
-     * Log debug information when compilation fails with certain errors.
-     */
-    private suspend fun logDebugInfoOnError(e: Throwable, executionId: ExecutionId, wrappedCode: String) {
-        // Log code for "incomplete code" errors for debugging
-        if (e.message?.contains("incomplete code") == true ||
-            e.cause?.message?.contains("incomplete code") == true) {
-            log.warn("Incomplete code error - saving wrapped code for debugging")
-            project.executionStorage.writeCodeExecutionData(
-                executionId,
-                "incomplete-code-debug.kts",
-                "" +
-                        "// Error: ${e.message}\n" +
-                        "// Wrapped code that caused the error:\n\n" +
-                        wrappedCode
-            )
-        }
-
-        // Log code for "unresolved reference" errors (classpath issues)
-        if (e.message?.contains("unresolved reference") == true ||
-            e.cause?.message?.contains("unresolved reference") == true) {
-            log.warn("Unresolved reference error - likely classpath issue, saving debug info")
-            project.executionStorage.writeCodeExecutionData(
-                executionId,
-                "classpath-error-debug.kts",
-                "" +
-                        "// Error: ${e.message}\n" +
-                        "// This usually means the Kotlin daemon doesn't have the plugin classes.\n" +
-                        wrappedCode
-            )
         }
     }
 

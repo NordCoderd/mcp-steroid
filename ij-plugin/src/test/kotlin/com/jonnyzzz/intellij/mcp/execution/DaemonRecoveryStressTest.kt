@@ -33,8 +33,6 @@ class DaemonRecoveryStressTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         daemonManager.forceKillKotlinDaemon()
-
-        setRegistryPropertyForTest("mcp.steroids.daemon.kill.before.compile", "false")
     }
 
     private var executionCounter = 0

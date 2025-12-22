@@ -37,23 +37,12 @@ inline val kotlinDaemonManager: KotlinDaemonManager get() = service()
  *
  * **Proactive daemon kill only works in production** (running IDE).
  * In tests, fresh daemons don't receive the plugin classpath from the test sandbox.
- * Tests must use reactive mode (`mcp.steroids.daemon.kill.before.compile=false`).
  *
  * @see <a href="https://kotlinlang.org/docs/kotlin-daemon.html">Kotlin Daemon Documentation</a>
  */
 @Service(Service.Level.APP)
 class KotlinDaemonManager {
     private val log = thisLogger()
-    val DAEMON_KILL_RETRY_DELAY_MS = 1000L
-
-    /**
-     * Returns true if proactive daemon kill is enabled via registry key.
-     * When enabled (default), the Kotlin daemon is killed before each compilation
-     * to ensure a clean classpath state.
-     */
-    fun isProactiveDaemonKillEnabled(): Boolean {
-        return Registry.`is`("mcp.steroids.daemon.kill.before.compile")
-    }
 
     /**
      * Gets the Kotlin daemon directory path based on the operating system.
