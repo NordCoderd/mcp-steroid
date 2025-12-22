@@ -44,8 +44,7 @@ inline val kotlinDaemonManager: KotlinDaemonManager get() = service()
 @Service(Service.Level.APP)
 class KotlinDaemonManager {
     private val log = thisLogger()
-    val DAEMON_DYING_RETRY_DELAY_MS = 2000L
-    val DAEMON_KILL_RETRY_DELAY_MS = 3000L
+    val DAEMON_KILL_RETRY_DELAY_MS = 1000L
 
     /**
      * Returns true if proactive daemon kill is enabled via registry key.
@@ -54,33 +53,6 @@ class KotlinDaemonManager {
      */
     fun isProactiveDaemonKillEnabled(): Boolean {
         return Registry.`is`("mcp.steroids.daemon.kill.before.compile")
-    }
-
-    /**
-     * Returns true if reactive daemon recovery is enabled via registry key.
-     * This is the fallback mode when proactive kill is disabled.
-     * When enabled, the daemon is killed only after "Service is dying" errors.
-     */
-    fun isReactiveDaemonRecoveryEnabled(): Boolean {
-        return Registry.`is`("mcp.steroids.daemon.recovery")
-    }
-
-    /**
-     * Checks if the exception indicates the Kotlin daemon is dying.
-     * Traverses the full cause chain since the error can be deeply nested:
-     * IdeScriptException -> ScriptException -> IllegalStateException("Service is dying")
-     */
-    fun isDaemonDyingError(e: Throwable): Boolean {
-        var current: Throwable? = e
-        while (current != null) {
-            val message = current.message ?: ""
-            if (message.contains("Service is dying") ||
-                message.contains("Could not connect to Kotlin compile daemon")) {
-                return true
-            }
-            current = current.cause
-        }
-        return false
     }
 
     /**
@@ -103,6 +75,7 @@ class KotlinDaemonManager {
                     File(home, "AppData/Local/kotlin/daemon")
                 }
             }
+
             else -> File(home, ".kotlin/daemon") // Linux and others
         }
     }
@@ -176,46 +149,5 @@ class KotlinDaemonManager {
         if (!daemonDir.exists()) return 0
         return daemonDir.listFiles()?.count { it.name.endsWith(".run") } ?: 0
     }
-
-    /**
-     * Returns information about the daemon directory for diagnostic purposes.
-     */
-    fun getDaemonDiagnostics(): DaemonDiagnostics {
-        val daemonDir = getKotlinDaemonDir()
-        if (daemonDir == null || !daemonDir.exists()) {
-            return DaemonDiagnostics(
-                directoryPath = daemonDir?.absolutePath ?: "unknown",
-                exists = false,
-                runFileCount = 0,
-                clientMarkerCount = 0,
-                runFiles = emptyList(),
-                clientMarkers = emptyList()
-            )
-        }
-
-        val files = daemonDir.listFiles() ?: emptyArray()
-        val runFiles = files.filter { it.name.endsWith(".run") }.map { it.name }
-        val clientMarkers = files.filter { it.name.contains("-is-running") }.map { it.name }
-
-        return DaemonDiagnostics(
-            directoryPath = daemonDir.absolutePath,
-            exists = true,
-            runFileCount = runFiles.size,
-            clientMarkerCount = clientMarkers.size,
-            runFiles = runFiles,
-            clientMarkers = clientMarkers
-        )
-    }
 }
 
-/**
- * Diagnostic information about the Kotlin daemon state.
- */
-data class DaemonDiagnostics(
-    val directoryPath: String,
-    val exists: Boolean,
-    val runFileCount: Int,
-    val clientMarkerCount: Int,
-    val runFiles: List<String>,
-    val clientMarkers: List<String>
-)

@@ -11,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import org.junit.Assert
 import kotlin.time.Duration.Companion.minutes
 
 /**
@@ -35,55 +36,49 @@ class DaemonRecoveryStressTest : BasePlatformTestCase() {
 
     override fun setUp() {
         super.setUp()
-        // Disable proactive daemon kill - we want to test reactive recovery
-        // Proactive kill doesn't work in tests because fresh daemons don't get plugin classpath
-        setRegistryPropertyForTest("mcp.steroids.daemon.kill.before.compile", "false")
+        daemonManager.forceKillKotlinDaemon()
 
-        // Note: We do NOT kill the daemon here because:
-        // 1. Fresh daemons in test environment don't get plugin classes
-        // 2. We rely on the existing daemon having correct classpath from test setup
-        // 3. Reactive recovery will handle any "Service is dying" errors
+        setRegistryPropertyForTest("mcp.steroids.daemon.kill.before.compile", "false")
     }
 
     private var executionCounter = 0
     private fun nextExecutionId() = ExecutionId("stress-${++executionCounter}")
 
-    /**
-     * Run a simple script multiple times in sequence.
-     * This tests basic sequential stress on the daemon.
-     */
-    fun testSequentialCompilationStress(): Unit = timeoutRunBlocking(2.minutes) {
+    fun testSequentialCompilationSimple(): Unit = timeoutRunBlocking(2.minutes) {
         val simpleCode = """
             execute {
-                println("Iteration")
+                println("Iteration${System.currentTimeMillis()}")
             }
         """.trimIndent()
-
-        var successCount = 0
-        var failCount = 0
-        var daemonDyingCount = 0
 
         // Run 20 sequential compilations
         repeat(20) { iteration ->
             val builder = TestResultBuilder()
             executor.executeWithProgress(nextExecutionId(), testExecParams(simpleCode), builder)
+            println(builder.toString())
 
-            if (builder.isFailed) {
-                failCount++
-                if (builder.hasDaemonDyingError()) {
-                    daemonDyingCount++
-                    println("Daemon dying detected on iteration $iteration")
-                }
-            } else if (builder.messages.isNotEmpty()) {
-                successCount++
-            }
+            Assert.assertFalse("Builder must not fail", builder.isFailed)
         }
+    }
 
-        println("Sequential stress test: success=$successCount, fail=$failCount, daemonDying=$daemonDyingCount")
+    fun testSequentialCompilationStress(): Unit = timeoutRunBlocking(2.minutes) {
+        val simpleCode = """
+            import java.util.UUID
+            
+            execute {
+                println(UUID.randomUUID().toString())
+                println("Iteration${System.currentTimeMillis()}")
+            }
+        """.trimIndent()
 
-        // If script engine is available, we expect some successes
-        // If daemon recovery is working, we should not have persistent failures
-        assertTrue("Should have some completions", successCount + failCount > 0)
+        // Run 20 sequential compilations
+        repeat(20) { iteration ->
+            val builder = TestResultBuilder()
+            executor.executeWithProgress(nextExecutionId(), testExecParams(simpleCode), builder)
+            println(builder.toString())
+
+            Assert.assertFalse("Builder must not fail", builder.isFailed)
+        }
     }
 
     /**
@@ -100,10 +95,8 @@ class DaemonRecoveryStressTest : BasePlatformTestCase() {
 
             // With imports (outside execute block)
             """
-                import java.util.UUID
 
                 execute {
-                    println(UUID.randomUUID().toString())
                 }
             """.trimIndent(),
 

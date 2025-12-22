@@ -61,12 +61,17 @@ class TestResultBuilder : ExecutionResultBuilder {
         return msg.contains("Service is dying") || msg.contains("Could not connect to Kotlin compile daemon")
     }
 
-    fun reset() {
-        messages.clear()
-        progressMessages.clear()
-        exceptions.clear()
-        failed = false
-        failureMessage = null
+    override fun toString() = buildString {
+        appendLine("TestResultBuilder")
+        appendLine("failed=$failed")
+        messages.forEach { appendLine("MESSAGE: $it") }
+        progressMessages.forEach { appendLine("PROGRESS: $it") }
+        exceptions.forEach {
+            appendLine("EXCEPTION: ${it.first}")
+            appendLine(it.second.toString())
+            appendLine(it.second.stackTraceToString())
+        }
+        appendLine("Failure message: $failureMessage")
     }
 }
 

@@ -36,9 +36,6 @@
         <registryKey key="mcp.steroids.daemon.kill.before.compile" defaultValue="true"
             description="Kill Kotlin daemon before each compilation to ensure clean classpath (default: true)"/>
 
-        <registryKey key="mcp.steroids.daemon.recovery" defaultValue="true"
-            description="Enable reactive daemon recovery on 'Service is dying' errors (used when proactive kill is disabled)"/>
-
         <!-- Start MCP server when IDE is ready -->
         <postStartupActivity
                 implementation="com.jonnyzzz.intellij.mcp.server.SteroidsMcpServerStartupActivity"/>
