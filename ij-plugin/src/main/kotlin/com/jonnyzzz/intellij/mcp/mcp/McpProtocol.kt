@@ -160,7 +160,8 @@ data class ToolCallParams(
 data class ToolCallResult(
     val content: List<ContentItem>,
     val isError: Boolean = false,
-    val structuredContent: JsonElement? = null,
+    //NOTE: structured result makes LLM ignore all content's and thus it gets blind
+    //val structuredContent: JsonElement? = null,
 )
 
 // ==================== Content Types ====================

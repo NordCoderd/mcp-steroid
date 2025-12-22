@@ -4,7 +4,9 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.intellij.mcp.getExecutionIdFromResult
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
+import com.jonnyzzz.intellij.mcp.setServerPortProperties
 import com.jonnyzzz.intellij.mcp.testExecParams
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -17,21 +19,8 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
     private val manager: ExecutionManager get() = project.service()
 
     override fun setUp() {
+        setServerPortProperties()
         super.setUp()
-        // Ensure review mode is NEVER for tests
-        com.intellij.openapi.util.registry.Registry.get("mcp.steroids.review.mode").setValue("NEVER")
-    }
-
-    /**
-     * Extracts the execution ID from the ToolCallResult's structuredContent.
-     * The structuredContent is a JSON object with executionId as a key.
-     */
-    private fun getExecutionIdFromResult(result: ToolCallResult): String {
-        val structuredContent = result.structuredContent
-            ?: error("No structuredContent in result")
-
-        return structuredContent.jsonObject["executionId"]?.jsonPrimitive?.content
-            ?: error("No executionId found in structuredContent: $structuredContent")
     }
 
     /**

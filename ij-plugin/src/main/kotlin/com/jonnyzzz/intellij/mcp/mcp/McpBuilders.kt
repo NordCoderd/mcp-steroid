@@ -2,16 +2,18 @@
 package com.jonnyzzz.intellij.mcp.mcp
 
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
 
 fun ToolCallResult.Companion.builder() = ToolCallBuilder()
 
 class ToolCallBuilder {
     private val contents = mutableListOf<ContentItem>()
     private var isError = false
-    private val structuredContents = mutableMapOf<String, JsonElement>()
 
     fun addTextContent(content: String): ToolCallBuilder = addContent(ContentItem.Text(content))
     fun addContent(content: ContentItem): ToolCallBuilder = apply {
@@ -20,16 +22,16 @@ class ToolCallBuilder {
 
     fun markAsError(): ToolCallBuilder = apply {
         isError = true
-        structuredContents["has_errors"] = JsonPrimitive(true)
     }
 
     fun setExecutionId(executionId: ExecutionId): ToolCallBuilder = apply {
-        structuredContents["executionId"] = JsonPrimitive(executionId.executionId)
+        addTextContent("Execution ID: ${executionId.executionId}")
     }
 
-    fun build() = ToolCallResult(
-        content = contents.toList(),
-        isError = isError,
-        structuredContent = JsonObject(structuredContents)
-    )
+    fun build(): ToolCallResult {
+        return ToolCallResult(
+            content = contents.toList(),
+            isError = isError,
+        )
+    }
 }

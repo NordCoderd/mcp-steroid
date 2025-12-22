@@ -1,10 +1,16 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp
 
+import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.execution.ExecutionResultBuilder
+import com.jonnyzzz.intellij.mcp.mcp.ContentItem
+import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import java.nio.file.Path
 
 /**
  * Test utilities for MCP server tests.
@@ -90,3 +96,23 @@ fun testExecParams(
     timeout = timeout,
     rawParams = buildJsonObject { }
 )
+
+
+/**
+ * Extracts the execution ID from the ToolCallResult's structuredContent.
+ * The structuredContent is a JSON object with executionId as a key.
+ */
+fun getExecutionIdFromResult(result: ToolCallResult): String {
+    val executionId = result.content.mapNotNull {
+        if (it is ContentItem.Text) {
+            val prefix = "Execution ID:"
+            if (it.text.startsWith(prefix, ignoreCase = true)) {
+                return@mapNotNull it.text.removePrefix(prefix).trim()
+            }
+        }
+        null
+    }.distinct().singleOrNull() ?: error("No execution Id in result")
+    println("Result: $executionId")
+    return executionId
+}
+
