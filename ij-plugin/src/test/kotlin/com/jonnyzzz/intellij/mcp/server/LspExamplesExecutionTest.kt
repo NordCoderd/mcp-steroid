@@ -162,4 +162,20 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should include hover header", text.contains("Hover Information"))
     }
+
+    fun testCompletionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/completion.kts")
+        val code = configureExample(
+            raw,
+            filePath = sampleFilePath,
+            line = positions.methodCallName.line,
+            column = positions.methodCallName.column
+        )
+
+        val result = executeExample("completion", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should include completion header", text.contains("Completion at"))
+    }
 }
