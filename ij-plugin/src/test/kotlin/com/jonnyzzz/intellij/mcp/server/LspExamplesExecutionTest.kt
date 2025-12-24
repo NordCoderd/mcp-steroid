@@ -189,4 +189,21 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should include document symbols header", text.contains("Document Symbols"))
     }
+
+    fun testRenameExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/rename.kts")
+        val code = configureExample(
+            raw,
+            filePath = sampleFilePath,
+            line = positions.classDeclaration.line,
+            column = positions.classDeclaration.column,
+            newName = "GreeterRenamed"
+        )
+
+        val result = executeExample("rename", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should include rename analysis header", text.contains("Rename Analysis"))
+    }
 }
