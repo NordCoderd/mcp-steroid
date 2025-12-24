@@ -1049,4 +1049,70 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             System.clearProperty(propertyKey)
         }
     }
+
+    /**
+     * Tests that MCP resources are properly listed and can be read.
+     * Verifies the "IntelliJ API Power User Guide" resource is available.
+     */
+    fun testResourcesListAndRead(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        // List resources
+        val listResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":"resources-list","method":"resources/list"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, listResponse.status)
+        val listRpc = McpJson.decodeFromString<JsonRpcResponse>(listResponse.bodyAsText())
+        assertNull("resources/list should succeed", listRpc.error)
+
+        val resourcesList = McpJson.decodeFromJsonElement<ResourcesListResult>(listRpc.result!!)
+        assertTrue("Should have at least one resource", resourcesList.resources.isNotEmpty())
+
+        val skillResource = resourcesList.resources.find { it.name.contains("Power User Guide") }
+        assertNotNull("Should have IntelliJ API Power User Guide resource", skillResource)
+        assertEquals("text/markdown", skillResource!!.mimeType)
+        assertTrue("Resource should have catchy description", skillResource.description?.contains("RECOMMENDED") == true)
+
+        // Read the resource
+        val readResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(buildJsonObject {
+                put("jsonrpc", "2.0")
+                put("id", "resources-read")
+                put("method", "resources/read")
+                putJsonObject("params") {
+                    put("uri", skillResource.uri)
+                }
+            }.toString())
+        }
+
+        assertEquals(HttpStatusCode.OK, readResponse.status)
+        val readRpc = McpJson.decodeFromString<JsonRpcResponse>(readResponse.bodyAsText())
+        assertNull("resources/read should succeed", readRpc.error)
+
+        val readResult = McpJson.decodeFromJsonElement<ResourceReadResult>(readRpc.result!!)
+        assertEquals(1, readResult.contents.size)
+
+        val content = readResult.contents.first()
+        assertEquals(skillResource.uri, content.uri)
+        assertEquals("text/markdown", content.mimeType)
+        assertNotNull("Resource should have text content", content.text)
+        assertTrue("Content should contain SKILL.md content", content.text!!.contains("IntelliJ MCP Steroid"))
+        assertTrue("Content should contain quickstart", content.text!!.contains("Quickstart"))
+    }
 }

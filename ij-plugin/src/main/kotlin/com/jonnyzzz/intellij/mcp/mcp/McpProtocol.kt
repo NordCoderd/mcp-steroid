@@ -269,6 +269,48 @@ data class CreateMessageResult(
     val stopReason: String? = null, // "endTurn" | "stopSequence" | "maxTokens" | etc.
 )
 
+// ==================== MCP Resources ====================
+
+/**
+ * MCP Resource - represents a piece of content the server can provide.
+ */
+@Serializable
+data class Resource(
+    val uri: String,
+    val name: String,
+    val description: String? = null,
+    val mimeType: String? = null,
+)
+
+@Serializable
+data class ResourcesListParams(
+    val cursor: String? = null,
+)
+
+@Serializable
+data class ResourcesListResult(
+    val resources: List<Resource>,
+    val nextCursor: String? = null,
+)
+
+@Serializable
+data class ResourceReadParams(
+    val uri: String,
+)
+
+@Serializable
+data class ResourceReadResult(
+    val contents: List<ResourceContent>,
+)
+
+@Serializable
+data class ResourceContent(
+    val uri: String,
+    val mimeType: String? = null,
+    val text: String? = null,
+    val blob: String? = null,
+)
+
 // ==================== MCP Methods ====================
 
 object McpMethods {
@@ -276,6 +318,8 @@ object McpMethods {
     const val INITIALIZED = "notifications/initialized"
     const val TOOLS_LIST = "tools/list"
     const val TOOLS_CALL = "tools/call"
+    const val RESOURCES_LIST = "resources/list"
+    const val RESOURCES_READ = "resources/read"
     const val PROGRESS = "notifications/progress"
     const val TOOLS_LIST_CHANGED = "notifications/tools/list_changed"
     const val PING = "ping"

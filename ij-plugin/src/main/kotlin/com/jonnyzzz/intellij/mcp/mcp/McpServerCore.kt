@@ -16,6 +16,7 @@ class McpServerCore(
     private val log = thisLogger()
     val sessionManager = McpSessionManager()
     val toolRegistry = McpToolRegistry()
+    val resourceRegistry = McpResourceRegistry()
 
     /**
      * Handle an incoming JSON-RPC message and return a response (if applicable).
@@ -100,6 +101,8 @@ class McpServerCore(
             McpMethods.PING -> handlePing(id)
             McpMethods.TOOLS_LIST -> handleToolsList(id)
             McpMethods.TOOLS_CALL -> handleToolsCall(id, params, session)
+            McpMethods.RESOURCES_LIST -> handleResourcesList(id)
+            McpMethods.RESOURCES_READ -> handleResourcesRead(id, params)
             else -> encodeError(id, JsonRpcErrorCodes.METHOD_NOT_FOUND, "Method not found: $method")
         }
     }
@@ -161,6 +164,30 @@ class McpServerCore(
         val result = toolRegistry.callTool(callParams, session)
         return encodeResult(id, McpJson.encodeToJsonElement(result))
     }
+
+    private fun handleResourcesList(id: JsonElement): String {
+        val resources = resourceRegistry.listResources()
+        val result = ResourcesListResult(resources = resources)
+        return encodeResult(id, McpJson.encodeToJsonElement(result))
+    }
+
+    private fun handleResourcesRead(id: JsonElement, params: JsonObject?): String {
+        if (params == null) {
+            return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Missing resource read params")
+        }
+
+        val readParams = try {
+            McpJson.decodeFromJsonElement<ResourceReadParams>(params)
+        } catch (e: Exception) {
+            return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Invalid resource read params: ${e.message}")
+        }
+
+        val result = resourceRegistry.readResource(readParams.uri)
+            ?: return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Resource not found: ${readParams.uri}")
+
+        return encodeResult(id, McpJson.encodeToJsonElement(result))
+    }
+
     private fun encodeResult(id: JsonElement, result: JsonElement): String {
         val response = JsonRpcResponse(id = id, result = result)
         return McpJson.encodeToString(JsonRpcResponse.serializer(), response)

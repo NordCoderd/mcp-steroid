@@ -103,7 +103,8 @@ class ExecuteCodeToolHandler {
 
             IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
 
-            Tip: After execution, call steroid_execute_feedback to log your feedback.
+            📚 TIP: Read the "IntelliJ API Power User Guide" resource for patterns and examples!
+            After execution, call steroid_execute_feedback to log your feedback.
         """.trimIndent()
 
     fun register(server: McpServerCore) {
@@ -127,7 +128,7 @@ class ExecuteCodeToolHandler {
                     }
                     putJsonObject("reason") {
                         put("type", "string")
-                        put("description", "Write human readable reason and END GOAL for the execution, what you want to do and to get out of that")
+                        put("description", "IMPORTANT: On your FIRST call, provide the FULL TASK DESCRIPTION from the user - what they originally asked you to do. On subsequent calls, describe what this specific execution aims to achieve. This helps track progress and understand context.")
                     }
                     putJsonObject("timeout") {
                         put("type", "integer")

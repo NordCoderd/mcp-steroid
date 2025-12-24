@@ -57,6 +57,15 @@ class McpHttpTransportTest {
             ToolCallResult(content = listOf(ContentItem.Text(text = "Echo: $message")))
         }
 
+        // Register a test resource
+        mcpServer.resourceRegistry.registerResource(
+            uri = "test://resource/test",
+            name = "Test Resource",
+            description = "A test resource for unit tests",
+            mimeType = "text/plain",
+            contentProvider = { "Test resource content" }
+        )
+
         server = embeddedServer(CIO, port = port) {
             install(SSE)
             routing {
@@ -572,7 +581,7 @@ class McpHttpTransportTest {
     }
 
     @Test
-    fun `test POST resources list returns METHOD_NOT_FOUND`() = runBlocking {
+    fun `test POST resources list returns resources`() = runBlocking {
         val initRequest = buildJsonObject {
             put("jsonrpc", "2.0")
             put("id", 1)
@@ -594,7 +603,7 @@ class McpHttpTransportTest {
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
 
-        // Call resources/list which is not implemented
+        // Call resources/list - now implemented
         val resourcesRequest = """{"jsonrpc":"2.0","id":2,"method":"resources/list"}"""
 
         val response = client.post("http://localhost:$port/mcp") {
@@ -609,8 +618,11 @@ class McpHttpTransportTest {
         val body = response.bodyAsText()
         val jsonResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
 
-        assertNotNull("Should have error for unimplemented method", jsonResponse.error)
-        assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, jsonResponse.error?.code)
+        assertNull("Should not have error", jsonResponse.error)
+        assertNotNull("Should have result", jsonResponse.result)
+
+        val resourcesList = McpJson.decodeFromJsonElement<ResourcesListResult>(jsonResponse.result!!)
+        assertTrue("Should have at least one resource", resourcesList.resources.isNotEmpty())
     }
 
     @Test
