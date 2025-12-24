@@ -130,4 +130,20 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should include output header", text.contains("Definition"))
     }
+
+    fun testFindReferencesExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/find-references.kts")
+        val code = configureExample(
+            raw,
+            filePath = sampleFilePath,
+            line = positions.methodDeclaration.line,
+            column = positions.methodDeclaration.column
+        )
+
+        val result = executeExample("find-references", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should mention references", text.contains("references", ignoreCase = true))
+    }
 }
