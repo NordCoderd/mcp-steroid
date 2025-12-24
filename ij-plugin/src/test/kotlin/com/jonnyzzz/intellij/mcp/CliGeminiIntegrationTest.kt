@@ -20,7 +20,7 @@ import kotlin.time.Duration.Companion.seconds
  * See: https://github.com/google-gemini/gemini-cli/issues/15449
  */
 @Ignore("Disabled: Gemini CLI has a bug with HTTP MCP transport - https://github.com/google-gemini/gemini-cli/issues/15449")
-class CliGeminiIntegrationTest : CliIntegrationTestBase() {
+abstract class CliGeminiIntegrationTest : CliIntegrationTestBase() {
     private fun geminiSession() = DockerGeminiSession.create(testRootDisposable)
 
     override fun newAiSession(): AiAgentSession = geminiSession().registerMcp(resolveDockerUrl(), "intellij")
