@@ -249,4 +249,15 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should include signature help header", text.contains("Signature Help"))
     }
+
+    fun testWorkspaceSymbolExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/workspace-symbol.kts")
+        val code = configureExample(raw, query = "Greeter")
+
+        val result = executeExample("workspace-symbol", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should include workspace symbol header", text.contains("Workspace Symbol Search"))
+    }
 }
