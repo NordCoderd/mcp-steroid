@@ -217,4 +217,20 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should include format preview header", text.contains("Format Preview"))
     }
+
+    fun testCodeActionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/code-action.kts")
+        val code = configureExample(
+            raw,
+            filePath = sampleFilePath,
+            line = positions.codeActionTarget.line,
+            column = positions.codeActionTarget.column
+        )
+
+        val result = executeExample("code-action", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should include code actions header", text.contains("Code Actions"))
+    }
 }
