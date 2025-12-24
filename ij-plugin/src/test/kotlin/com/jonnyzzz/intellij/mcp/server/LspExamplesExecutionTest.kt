@@ -4,10 +4,12 @@ package com.jonnyzzz.intellij.mcp.server
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.testExecParams
+import java.io.File
 import kotlin.time.Duration.Companion.seconds
 
 class LspExamplesExecutionTest : BasePlatformTestCase() {
@@ -33,8 +35,13 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
                 println(message)
             }
         """.trimIndent()
-        val psiFile = myFixture.addFileToProject("src/sample/LspSample.kt", sampleText)
-        sampleFilePath = psiFile.virtualFile.path
+        val basePath = project.basePath ?: error("Project base path is not available")
+        val ioFile = File(basePath, "src/sample/LspSample.kt")
+        ioFile.parentFile.mkdirs()
+        ioFile.writeText(sampleText)
+        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(ioFile)
+            ?: error("Failed to refresh sample file in VFS: ${ioFile.path}")
+        sampleFilePath = ioFile.path
         positions = SamplePositions(
             classDeclaration = lineColumnFor(sampleText, "class Greeter", "class ".length),
             classUsage = lineColumnFor(sampleText, "Greeter(\"World\")"),
@@ -115,6 +122,19 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         return result.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
     }
 
+    private fun assertExampleResult(
+        result: ToolCallResult,
+        header: String,
+        ignoreCase: Boolean = false
+    ) {
+        val text = getTextContent(result)
+        assertTrue("Should execute without error. Output:\n$text", !result.isError)
+        assertTrue(
+            "Expected output to contain \"$header\". Output:\n$text",
+            text.contains(header, ignoreCase = ignoreCase)
+        )
+    }
+
     fun testGoToDefinitionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/go-to-definition.kts")
         val code = configureExample(
@@ -125,10 +145,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         )
 
         val result = executeExample("go-to-definition", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include output header", text.contains("Definition"))
+        assertExampleResult(result, "definition", ignoreCase = true)
     }
 
     fun testFindReferencesExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -141,10 +158,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         )
 
         val result = executeExample("find-references", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should mention references", text.contains("references", ignoreCase = true))
+        assertExampleResult(result, "references", ignoreCase = true)
     }
 
     fun testHoverExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -157,10 +171,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         )
 
         val result = executeExample("hover", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include hover header", text.contains("Hover Information"))
+        assertExampleResult(result, "Hover Information")
     }
 
     fun testCompletionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -173,10 +184,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         )
 
         val result = executeExample("completion", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include completion header", text.contains("Completion at"))
+        assertExampleResult(result, "Completion at")
     }
 
     fun testDocumentSymbolsExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -184,10 +192,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val code = configureExample(raw, filePath = sampleFilePath)
 
         val result = executeExample("document-symbols", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include document symbols header", text.contains("Document Symbols"))
+        assertExampleResult(result, "Document Symbols")
     }
 
     fun testRenameExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -201,10 +206,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         )
 
         val result = executeExample("rename", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include rename analysis header", text.contains("Rename Analysis"))
+        assertExampleResult(result, "Rename Analysis")
     }
 
     fun testFormattingExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -212,10 +214,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val code = configureExample(raw, filePath = sampleFilePath)
 
         val result = executeExample("formatting", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include format preview header", text.contains("Format Preview"))
+        assertExampleResult(result, "Format Preview")
     }
 
     fun testCodeActionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -228,10 +227,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         )
 
         val result = executeExample("code-action", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include code actions header", text.contains("Code Actions"))
+        assertExampleResult(result, "Code Actions")
     }
 
     fun testSignatureHelpExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -244,10 +240,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         )
 
         val result = executeExample("signature-help", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include signature help header", text.contains("Signature Help"))
+        assertExampleResult(result, "Signature Help")
     }
 
     fun testWorkspaceSymbolExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
@@ -255,9 +248,6 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val code = configureExample(raw, query = "Greeter")
 
         val result = executeExample("workspace-symbol", code)
-
-        assertTrue("Should execute without error", !result.isError)
-        val text = getTextContent(result)
-        assertTrue("Should include workspace symbol header", text.contains("Workspace Symbol Search"))
+        assertExampleResult(result, "Workspace Symbol Search")
     }
 }
