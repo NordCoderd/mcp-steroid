@@ -1,0 +1,155 @@
+/**
+ * LSP: textDocument/codeAction - Code Actions / Quick Fixes
+ *
+ * This example demonstrates how to get available code actions (quick fixes,
+ * refactorings) at a given position, similar to Alt+Enter in IDEs.
+ *
+ * IntelliJ API used:
+ * - ShowIntentionActionsHandler - Get available intentions
+ * - IntentionManager - List registered intentions
+ * - LocalInspectionTool - Run inspections to find problems
+ * - QuickFix - Fixes for inspection problems
+ *
+ * Parameters to customize:
+ * - filePath: Absolute path to the file
+ * - line/column: Position to get code actions for
+ *
+ * Output: List of available code actions
+ */
+
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
+import com.intellij.codeInsight.intention.IntentionAction
+import com.intellij.codeInsight.intention.IntentionManager
+import com.intellij.codeInspection.*
+import com.intellij.openapi.editor.EditorFactory
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.psi.PsiManager
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.PsiErrorElement
+
+execute {
+    // Configuration - modify these for your use case
+    val filePath = "/path/to/your/File.kt"  // TODO: Set your file path
+    val line = 10      // 1-based line number
+    val column = 15    // 1-based column number
+
+    waitForSmartMode()
+
+    val result = readAction {
+        // Find the virtual file
+        val virtualFile = findFile(filePath)
+            ?: return@readAction "File not found: $filePath"
+
+        // Get PSI file
+        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
+            ?: return@readAction "Cannot parse file: $filePath"
+
+        // Get document
+        val document = FileDocumentManager.getInstance().getDocument(virtualFile)
+            ?: return@readAction "Cannot get document for: $filePath"
+
+        // Convert line/column to offset
+        val offset = document.getLineStartOffset(line - 1) + (column - 1)
+
+        // Create an editor for intention checking
+        val editor = EditorFactory.getInstance().createEditor(document, project)
+
+        try {
+            editor.caretModel.moveToOffset(offset)
+
+            val element = psiFile.findElementAt(offset)
+                ?: return@readAction "No element at position ($line:$column)"
+
+            buildString {
+                appendLine("Code Actions at $filePath:$line:$column")
+                appendLine("=" .repeat(50))
+                appendLine()
+
+                // 1. Check for syntax errors
+                val errors = PsiTreeUtil.findChildrenOfType(psiFile, PsiErrorElement::class.java)
+                if (errors.isNotEmpty()) {
+                    appendLine("Syntax Errors (${errors.size}):")
+                    errors.take(5).forEach { error ->
+                        val errorLine = document.getLineNumber(error.textOffset) + 1
+                        appendLine("  - Line $errorLine: ${error.errorDescription}")
+                    }
+                    appendLine()
+                }
+
+                // 2. List available intentions (general)
+                appendLine("Available Intentions:")
+                appendLine("-".repeat(30))
+
+                val intentionManager = IntentionManager.getInstance()
+                val allIntentions = intentionManager.intentionActions
+
+                // Filter intentions that are available at this position
+                var availableCount = 0
+                allIntentions.forEach { intention ->
+                    try {
+                        if (intention.isAvailable(project, editor, psiFile)) {
+                            availableCount++
+                            if (availableCount <= 15) {
+                                appendLine("  [Intention] ${intention.text}")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        // Some intentions may throw during availability check
+                    }
+                }
+                if (availableCount > 15) {
+                    appendLine("  ... and ${availableCount - 15} more intentions")
+                }
+                if (availableCount == 0) {
+                    appendLine("  (no intentions available at this position)")
+                }
+                appendLine()
+
+                // 3. List inspection-based problems in the file
+                appendLine("Inspection Problems in File:")
+                appendLine("-".repeat(30))
+
+                val inspectionManager = InspectionManager.getInstance(project)
+                val profile = InspectionProjectProfileManager.getInstance(project).currentProfile
+
+                val tools = profile.getAllEnabledInspectionTools(project)
+                var problemCount = 0
+
+                tools.take(20).forEach { toolWrapper ->
+                    val tool = toolWrapper.tool
+                    if (tool is LocalInspectionTool) {
+                        try {
+                            val problems = tool.checkFile(psiFile, inspectionManager, false)
+                            problems?.forEach { problem ->
+                                problemCount++
+                                if (problemCount <= 10) {
+                                    val probOffset = problem.psiElement?.textOffset ?: 0
+                                    val probLine = document.getLineNumber(probOffset) + 1
+                                    appendLine("  Line $probLine: ${problem.descriptionTemplate?.take(60)}")
+
+                                    // List available fixes
+                                    problem.fixes?.forEach { fix ->
+                                        appendLine("    -> Fix: ${fix.name}")
+                                    }
+                                }
+                            }
+                        } catch (e: Exception) {
+                            // Inspection may fail
+                        }
+                    }
+                }
+                if (problemCount > 10) {
+                    appendLine("  ... and ${problemCount - 10} more problems")
+                }
+                if (problemCount == 0) {
+                    appendLine("  (no inspection problems found)")
+                }
+            }
+        } finally {
+            EditorFactory.getInstance().releaseEditor(editor)
+        }
+    }
+
+    println(result)
+}
