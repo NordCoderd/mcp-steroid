@@ -146,4 +146,20 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should mention references", text.contains("references", ignoreCase = true))
     }
+
+    fun testHoverExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/hover.kts")
+        val code = configureExample(
+            raw,
+            filePath = sampleFilePath,
+            line = positions.messageUsage.line,
+            column = positions.messageUsage.column
+        )
+
+        val result = executeExample("hover", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should include hover header", text.contains("Hover Information"))
+    }
 }
