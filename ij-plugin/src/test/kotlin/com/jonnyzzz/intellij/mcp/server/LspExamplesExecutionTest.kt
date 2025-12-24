@@ -178,4 +178,15 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should include completion header", text.contains("Completion at"))
     }
+
+    fun testDocumentSymbolsExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/document-symbols.kts")
+        val code = configureExample(raw, filePath = sampleFilePath)
+
+        val result = executeExample("document-symbols", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should include document symbols header", text.contains("Document Symbols"))
+    }
 }
