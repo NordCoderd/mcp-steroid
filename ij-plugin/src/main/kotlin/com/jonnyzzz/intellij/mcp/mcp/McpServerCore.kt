@@ -60,7 +60,29 @@ class McpServerCore(
             return null
         }
 
+        // Check if this is a response to a server-initiated request (has id but no method)
         if (method == null) {
+            // This might be a response to a server request (like sampling)
+            val idString = id.toString().trim('"')
+            val result = json["result"]
+            val error = json["error"]
+
+            if (result != null) {
+                if (session.handleResponse(idString, result)) {
+                    // Successfully routed the response, no need to reply
+                    return null
+                }
+            } else if (error != null) {
+                val rpcError = try {
+                    McpJson.decodeFromJsonElement<JsonRpcError>(error)
+                } catch (e: Exception) {
+                    JsonRpcError(code = -1, message = "Unknown error")
+                }
+                if (session.handleErrorResponse(idString, rpcError)) {
+                    return null
+                }
+            }
+
             return encodeError(id, JsonRpcErrorCodes.INVALID_REQUEST, "Missing method")
         }
 

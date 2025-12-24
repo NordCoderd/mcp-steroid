@@ -206,6 +206,69 @@ data class ProgressParams(
     val message: String? = null,
 )
 
+// ==================== MCP Sampling ====================
+
+/**
+ * Parameters for sampling/createMessage request.
+ * Server sends this to client to request LLM completion.
+ * Per MCP 2025-06-18 specification.
+ */
+@Serializable
+data class CreateMessageParams(
+    val messages: List<SamplingMessage>,
+    val modelPreferences: ModelPreferences? = null,
+    val systemPrompt: String? = null,
+    val includeContext: String? = null, // "allServers" | "none" | "thisServer"
+    val maxTokens: Int? = null,
+)
+
+@Serializable
+data class SamplingMessage(
+    val role: String, // "user" | "assistant"
+    val content: SamplingContent,
+)
+
+@Serializable
+sealed class SamplingContent {
+    @Serializable
+    @SerialName("text")
+    data class Text(
+        val text: String,
+    ) : SamplingContent()
+
+    @Serializable
+    @SerialName("image")
+    data class Image(
+        val data: String,
+        val mimeType: String,
+    ) : SamplingContent()
+}
+
+@Serializable
+data class ModelPreferences(
+    val hints: List<ModelHint>? = null,
+    val costPriority: Double? = null,
+    val speedPriority: Double? = null,
+    val intelligencePriority: Double? = null,
+)
+
+@Serializable
+data class ModelHint(
+    val name: String? = null,
+)
+
+/**
+ * Result from sampling/createMessage.
+ * Client returns this with the LLM's response.
+ */
+@Serializable
+data class CreateMessageResult(
+    val role: String, // "assistant"
+    val content: SamplingContent,
+    val model: String? = null,
+    val stopReason: String? = null, // "endTurn" | "stopSequence" | "maxTokens" | etc.
+)
+
 // ==================== MCP Methods ====================
 
 object McpMethods {
@@ -216,4 +279,5 @@ object McpMethods {
     const val PROGRESS = "notifications/progress"
     const val TOOLS_LIST_CHANGED = "notifications/tools/list_changed"
     const val PING = "ping"
+    const val SAMPLING_CREATE_MESSAGE = "sampling/createMessage"
 }

@@ -5,9 +5,12 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.jonnyzzz.intellij.mcp.server.McpProgressReporter
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonObject
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Registry for MCP tools.
@@ -105,7 +108,85 @@ data class ToolCallContext(
     val params: ToolCallParams,
     val session: McpSession,
     val mcpProgressReporter: McpProgressReporter,
-)
+) {
+    /**
+     * Check if the client supports sampling (LLM completion requests).
+     */
+    fun supportsSampling(): Boolean = session.supportsSampling()
+
+    /**
+     * Request an LLM completion from the client via MCP sampling.
+     *
+     * This sends a sampling/createMessage request to the client and waits for the response.
+     * The client will use its configured LLM to generate a completion.
+     *
+     * @param messages The conversation messages to send
+     * @param systemPrompt Optional system prompt
+     * @param modelPreferences Optional model selection hints
+     * @param maxTokens Optional maximum tokens for the response
+     * @param timeout Maximum time to wait for the response
+     * @return The completion result, or null if sampling is not supported or timed out
+     * @throws McpRequestException if the client returns an error
+     */
+    suspend fun requestSampling(
+        messages: List<SamplingMessage>,
+        systemPrompt: String? = null,
+        modelPreferences: ModelPreferences? = null,
+        maxTokens: Int? = null,
+        timeout: Duration = 60.seconds,
+    ): CreateMessageResult? {
+        if (!supportsSampling()) {
+            return null
+        }
+
+        val params = CreateMessageParams(
+            messages = messages,
+            systemPrompt = systemPrompt,
+            modelPreferences = modelPreferences,
+            maxTokens = maxTokens,
+        )
+
+        val paramsJson = McpJson.encodeToJsonElement(params).jsonObject
+
+        val result = session.sendRequest(
+            method = McpMethods.SAMPLING_CREATE_MESSAGE,
+            params = paramsJson,
+            timeout = timeout,
+        ) ?: return null
+
+        return McpJson.decodeFromJsonElement<CreateMessageResult>(result)
+    }
+
+    /**
+     * Simple helper to request a text completion from the client.
+     *
+     * @param prompt The user prompt to send
+     * @param systemPrompt Optional system prompt
+     * @param timeout Maximum time to wait for the response
+     * @return The completion text, or null if sampling is not supported or failed
+     */
+    suspend fun requestCompletion(
+        prompt: String,
+        systemPrompt: String? = null,
+        timeout: Duration = 60.seconds,
+    ): String? {
+        val result = requestSampling(
+            messages = listOf(
+                SamplingMessage(
+                    role = "user",
+                    content = SamplingContent.Text(text = prompt)
+                )
+            ),
+            systemPrompt = systemPrompt,
+            timeout = timeout,
+        ) ?: return null
+
+        return when (val content = result.content) {
+            is SamplingContent.Text -> content.text
+            is SamplingContent.Image -> "[Image content]"
+        }
+    }
+}
 
 /**
  * Internal representation of a registered tool with its handler.

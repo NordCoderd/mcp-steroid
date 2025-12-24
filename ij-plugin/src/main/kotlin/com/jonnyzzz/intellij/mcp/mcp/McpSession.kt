@@ -2,16 +2,25 @@
 package com.jonnyzzz.intellij.mcp.mcp
 
 import com.intellij.openapi.diagnostic.Logger
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonObject
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 private val log = Logger.getInstance("com.jonnyzzz.intellij.mcp.mcp.McpSession")
 
 /**
  * Represents an MCP session with its state and notification channel.
+ * Supports bidirectional requests for features like sampling.
  */
 class McpSession(
     val id: String = UUID.randomUUID().toString()
@@ -30,6 +39,11 @@ class McpSession(
 
     private val notificationChannel = Channel<JsonRpcNotification>(Channel.BUFFERED)
 
+    // For server-to-client requests (like sampling)
+    private val requestIdCounter = AtomicLong(0)
+    private val pendingRequests = ConcurrentHashMap<String, CompletableDeferred<JsonElement>>()
+    private val outgoingRequestsChannel = Channel<JsonRpcRequest>(Channel.BUFFERED)
+
     /**
      * Mark session as initialized after successful initialize/initialized exchange.
      */
@@ -37,6 +51,13 @@ class McpSession(
         clientInfo = info
         clientCapabilities = capabilities
         initialized = true
+    }
+
+    /**
+     * Check if client supports sampling capability.
+     */
+    fun supportsSampling(): Boolean {
+        return clientCapabilities?.sampling != null
     }
 
     /**
@@ -52,12 +73,105 @@ class McpSession(
     fun notifications(): Flow<JsonRpcNotification> = notificationChannel.consumeAsFlow()
 
     /**
+     * Get flow of outgoing requests (server-to-client).
+     * Used for SSE transport or batched responses.
+     */
+    fun outgoingRequests(): Flow<JsonRpcRequest> = outgoingRequestsChannel.consumeAsFlow()
+
+    /**
+     * Send a request to the client and await response.
+     * This is used for sampling/createMessage and other bidirectional operations.
+     *
+     * @param method The JSON-RPC method to call
+     * @param params The parameters for the method
+     * @param timeout Maximum time to wait for response
+     * @return The result from the client, or null if timeout/error
+     */
+    suspend fun sendRequest(
+        method: String,
+        params: JsonObject,
+        timeout: Duration = 60.seconds
+    ): JsonElement? {
+        val requestId = "server-${requestIdCounter.incrementAndGet()}"
+        val deferred = CompletableDeferred<JsonElement>()
+
+        pendingRequests[requestId] = deferred
+
+        val request = JsonRpcRequest(
+            id = McpJson.parseToJsonElement("\"$requestId\""),
+            method = method,
+            params = params
+        )
+
+        log.info("[MCP Session ${id}] Sending server-to-client request: $method (id: $requestId)")
+        outgoingRequestsChannel.trySend(request)
+
+        return try {
+            withTimeoutOrNull(timeout) {
+                deferred.await()
+            }
+        } finally {
+            pendingRequests.remove(requestId)
+        }
+    }
+
+    /**
+     * Handle a response to a server-initiated request.
+     * Called when client sends a response matching one of our pending requests.
+     *
+     * @param id The request ID from the response
+     * @param result The result from the client
+     * @return true if this was a pending server-to-client request
+     */
+    fun handleResponse(id: String, result: JsonElement): Boolean {
+        val deferred = pendingRequests[id]
+        if (deferred != null) {
+            log.info("[MCP Session ${this.id}] Received response for server request: $id")
+            deferred.complete(result)
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Handle an error response to a server-initiated request.
+     */
+    fun handleErrorResponse(id: String, error: JsonRpcError): Boolean {
+        val deferred = pendingRequests[id]
+        if (deferred != null) {
+            log.warn("[MCP Session ${this.id}] Received error for server request: $id - ${error.message}")
+            deferred.completeExceptionally(McpRequestException(error))
+            return true
+        }
+        return false
+    }
+
+    /**
+     * Check if there are pending outgoing requests.
+     */
+    fun hasPendingRequests(): Boolean = pendingRequests.isNotEmpty()
+
+    /**
+     * Get pending request IDs (for debugging/testing).
+     */
+    fun getPendingRequestIds(): Set<String> = pendingRequests.keys.toSet()
+
+    /**
      * Close the session.
      */
     fun close() {
         notificationChannel.close()
+        outgoingRequestsChannel.close()
+        // Cancel any pending requests
+        pendingRequests.values.forEach { it.cancel() }
+        pendingRequests.clear()
     }
 }
+
+/**
+ * Exception thrown when a server-to-client request fails.
+ */
+class McpRequestException(val error: JsonRpcError) : Exception("MCP request failed: ${error.message}")
 
 /**
  * Manages active MCP sessions.

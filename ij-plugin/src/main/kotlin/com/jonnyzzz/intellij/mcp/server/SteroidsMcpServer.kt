@@ -45,6 +45,11 @@ class SteroidsMcpServer(
     val mcpUrl: String get() = "http://localhost:$port/mcp"
     val skillUrl: String get() = "http://localhost:$port/skill.md"
 
+    /**
+     * Get the underlying MCP server core for testing or tool registration.
+     */
+    fun getServer(): McpServerCore = mcpServer
+
     private val mcpServer = McpServerCore(
         serverInfo = ServerInfo(
             name = "intellij-mcp-steroid",
