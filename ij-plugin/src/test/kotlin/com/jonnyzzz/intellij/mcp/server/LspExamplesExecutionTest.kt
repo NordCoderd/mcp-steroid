@@ -206,4 +206,15 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should include rename analysis header", text.contains("Rename Analysis"))
     }
+
+    fun testFormattingExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/formatting.kts")
+        val code = configureExample(raw, filePath = sampleFilePath)
+
+        val result = executeExample("formatting", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should include format preview header", text.contains("Format Preview"))
+    }
 }
