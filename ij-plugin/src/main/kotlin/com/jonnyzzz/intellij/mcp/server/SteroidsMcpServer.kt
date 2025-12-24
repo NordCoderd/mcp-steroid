@@ -77,7 +77,7 @@ class SteroidsMcpServer(
             service<ExecuteFeedbackToolHandler>().register(mcpServer)
 
             // Register resources
-            registerResources()
+            service<SkillResourceHandler>().register(mcpServer)
 
             val configuredPort = Registry.intValue("mcp.steroids.server.port")
 
@@ -157,19 +157,19 @@ class SteroidsMcpServer(
                     get("/") {
                         call.respondText(
                             contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = loadSkillMd()
+                            text = SkillResourceHandler.loadSkillMd()
                         )
                     }
                     get("/skill.md") {
                         call.respondText(
                             contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = loadSkillMd()
+                            text = SkillResourceHandler.loadSkillMd()
                         )
                     }
                     get("/SKILL.md") {
                         call.respondText(
                             contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = loadSkillMd()
+                            text = SkillResourceHandler.loadSkillMd()
                         )
                     }
                 }
@@ -298,35 +298,6 @@ class SteroidsMcpServer(
 
              $serverUrl
         """.trimMargin()
-    }
-
-    private fun registerResources() {
-        mcpServer.resourceRegistry.registerResource(
-            uri = "intellij://skill/intellij-api-poweruser-guide",
-            name = "IntelliJ API Power User Guide",
-            description = """
-                🚀 RECOMMENDED: Read this guide to become an IntelliJ API power user!
-
-                Contains essential patterns, code examples, and best practices for:
-                - PSI navigation and code analysis
-                - Refactoring operations (rename, extract, inline)
-                - Code search and find usages
-                - Running inspections and quick fixes
-                - Project structure traversal
-                - File and editor operations
-
-                Reading this resource will make your IntelliJ API code 10x more effective.
-            """.trimIndent(),
-            mimeType = "text/markdown",
-            contentProvider = ::loadSkillMd
-        )
-    }
-
-    private fun loadSkillMd(): String {
-        return javaClass.getResourceAsStream("/skill/SKILL.md")
-            ?.bufferedReader()
-            ?.readText()
-            ?: error("SKILL.md resource is not found")
     }
 
     private fun findFreePort(): Int {

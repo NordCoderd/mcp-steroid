@@ -1,0 +1,53 @@
+/* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+package com.jonnyzzz.intellij.mcp.server
+
+import com.intellij.openapi.components.Service
+import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
+
+/**
+ * Handler for the IntelliJ API Power User Guide resource.
+ * Serves the SKILL.md content as an MCP resource.
+ */
+@Service(Service.Level.APP)
+class SkillResourceHandler {
+
+    fun register(server: McpServerCore) {
+        server.resourceRegistry.registerResource(
+            uri = RESOURCE_URI,
+            name = RESOURCE_NAME,
+            description = RESOURCE_DESCRIPTION,
+            mimeType = "text/markdown",
+            contentProvider = ::loadSkillMd
+        )
+    }
+
+    companion object {
+        const val RESOURCE_URI = "intellij://skill/intellij-api-poweruser-guide"
+        const val RESOURCE_NAME = "IntelliJ API Power User Guide"
+
+        val RESOURCE_DESCRIPTION = """
+            🚀 RECOMMENDED: Read this guide to become an IntelliJ API power user!
+
+            Contains essential patterns, code examples, and best practices for:
+            - PSI navigation and code analysis
+            - Refactoring operations (rename, extract, inline)
+            - Code search and find usages
+            - Running inspections and quick fixes
+            - Project structure traversal
+            - File and editor operations
+
+            Reading this resource will make your IntelliJ API code 10x more effective.
+        """.trimIndent()
+
+        /**
+         * Load the SKILL.md content from resources.
+         * Can be used by both MCP resource and HTTP endpoints.
+         */
+        fun loadSkillMd(): String {
+            return SkillResourceHandler::class.java.getResourceAsStream("/skill/SKILL.md")
+                ?.bufferedReader()
+                ?.readText()
+                ?: error("SKILL.md resource is not found")
+        }
+    }
+}
