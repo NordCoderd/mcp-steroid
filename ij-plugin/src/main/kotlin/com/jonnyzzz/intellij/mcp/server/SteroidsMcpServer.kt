@@ -326,7 +326,7 @@ class SteroidsMcpServer(
         return javaClass.getResourceAsStream("/skill/SKILL.md")
             ?.bufferedReader()
             ?.readText()
-            ?: "# IntelliJ MCP Steroid\n\nSKILL.md not found in resources"
+            ?: error("SKILL.md resource is not found")
     }
 
     private fun findFreePort(): Int {
@@ -334,11 +334,14 @@ class SteroidsMcpServer(
     }
 
     private fun buildWellKnownMcpJson(port: Int): String {
+        //TODO: for some scenarios it may not be localhost!
+        //TODO: use the request URL from the HTTP instead,
+        // fallback to localhost:port only as last resort
         return """
             {
                 "mcpServers": {
                     "intellij-mcp-steroid": {
-                        "url": "http://localhost:$port/mcp"
+                        "url": "http://localhost:$port/mcp" 
                     }
                 }
             }
