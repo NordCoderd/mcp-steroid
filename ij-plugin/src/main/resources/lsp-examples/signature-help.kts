@@ -79,7 +79,7 @@ execute {
 
                 // Try to get the reference to the called function
                 val reference = callExpression.references.firstOrNull()
-                    ?: PsiTreeUtil.findChildOfType(callExpression, PsiReference::class.java)
+                    ?: PsiTreeUtil.findChildOfType(callExpression, PsiElement::class.java)?.reference
 
                 val resolved = reference?.resolve()
 
