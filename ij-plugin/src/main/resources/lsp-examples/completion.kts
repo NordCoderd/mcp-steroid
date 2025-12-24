@@ -18,7 +18,6 @@
 
 import com.intellij.codeInsight.completion.*
 import com.intellij.codeInsight.lookup.LookupElement
-import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
@@ -32,73 +31,67 @@ execute {
 
     waitForSmartMode()
 
-    val result = readAction {
-        // Find the virtual file
-        val virtualFile = findFile(filePath)
-            ?: return@readAction "File not found: $filePath"
+    // Find the virtual file
+    val virtualFile = findFile(filePath)
+        ?: return@execute println("File not found: $filePath")
 
-        // Get PSI file
+    val (psiFile, document) = readAction {
         val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-            ?: return@readAction "Cannot parse file: $filePath"
-
-        // Get document
         val document = FileDocumentManager.getInstance().getDocument(virtualFile)
-            ?: return@readAction "Cannot get document for: $filePath"
+        psiFile to document
+    }
+    if (psiFile == null) {
+        return@execute println("Cannot parse file: $filePath")
+    }
+    if (document == null) {
+        return@execute println("Cannot get document for: $filePath")
+    }
 
-        // Convert line/column to offset
-        val offset = document.getLineStartOffset(line - 1) + (column - 1)
+    // Convert line/column to offset
+    val offset = document.getLineStartOffset(line - 1) + (column - 1)
 
-        // Create an editor for the completion request
-        val editor = EditorFactory.getInstance().createEditor(document, project)
+    val result = readAction {
+        // Get element at position
+        val element = psiFile.findElementAt(offset)
+            ?: psiFile.findElementAt(offset - 1)
+            ?: return@readAction "No element at position ($line:$column)"
 
-        try {
-            // Position caret
-            editor.caretModel.moveToOffset(offset)
+        // Collect completions manually by analyzing context
+        val completions = mutableListOf<String>()
 
-            // Get element at position
-            val element = psiFile.findElementAt(offset)
-                ?: psiFile.findElementAt(offset - 1)
-                ?: return@readAction "No element at position ($line:$column)"
+        // Get completion contributor for this file type
+        val contributors = CompletionContributor.forLanguage(psiFile.language)
 
-            // Collect completions manually by analyzing context
-            val completions = mutableListOf<String>()
+        buildString {
+            appendLine("Completion at $filePath:$line:$column")
+            appendLine("=========================================")
+            appendLine()
+            appendLine("Context element: ${element.text?.take(30)}")
+            appendLine("Element type: ${element.javaClass.simpleName}")
+            appendLine()
 
-            // Get completion contributor for this file type
-            val contributors = CompletionContributor.forLanguage(psiFile.language)
+            // Check what's available at this position
+            val parent = element.parent
+            appendLine("Parent: ${parent?.javaClass?.simpleName}")
+            appendLine()
 
-            buildString {
-                appendLine("Completion at $filePath:$line:$column")
-                appendLine("=========================================")
-                appendLine()
-                appendLine("Context element: ${element.text?.take(30)}")
-                appendLine("Element type: ${element.javaClass.simpleName}")
-                appendLine()
-
-                // Check what's available at this position
-                val parent = element.parent
-                appendLine("Parent: ${parent?.javaClass?.simpleName}")
-                appendLine()
-
-                // List available contributors
-                appendLine("Available completion contributors:")
-                contributors.take(5).forEach { contributor ->
-                    appendLine("  - ${contributor.javaClass.simpleName}")
-                }
-                appendLine()
-
-                // For a real completion, you would need to set up the full
-                // completion infrastructure. Here we show what's available:
-                appendLine("Note: Full programmatic completion requires")
-                appendLine("      setting up CompletionProcess which is")
-                appendLine("      typically triggered by user action.")
-                appendLine()
-                appendLine("Alternative approaches:")
-                appendLine("1. Use the IDE's completion action directly")
-                appendLine("2. Analyze the PSI context to suggest completions")
-                appendLine("3. Use CodeInsightTestCase for testing completions")
+            // List available contributors
+            appendLine("Available completion contributors:")
+            contributors.take(5).forEach { contributor ->
+                appendLine("  - ${contributor.javaClass.simpleName}")
             }
-        } finally {
-            EditorFactory.getInstance().releaseEditor(editor)
+            appendLine()
+
+            // For a real completion, you would need to set up the full
+            // completion infrastructure. Here we show what's available:
+            appendLine("Note: Full programmatic completion requires")
+            appendLine("      setting up CompletionProcess which is")
+            appendLine("      typically triggered by user action.")
+            appendLine()
+            appendLine("Alternative approaches:")
+            appendLine("1. Use the IDE's completion action directly")
+            appendLine("2. Analyze the PSI context to suggest completions")
+            appendLine("3. Use CodeInsightTestCase for testing completions")
         }
     }
 
