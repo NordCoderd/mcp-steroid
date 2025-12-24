@@ -103,7 +103,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         return updated
     }
 
-    private fun executeExample(exampleId: String, code: String): ToolCallResult {
+    private suspend fun executeExample(exampleId: String, code: String): ToolCallResult {
         val manager = project.service<ExecutionManager>()
         return manager.executeWithProgress(
             testExecParams(code, taskId = "lsp-$exampleId", reason = "lsp example"),
