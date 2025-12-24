@@ -233,4 +233,20 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should include code actions header", text.contains("Code Actions"))
     }
+
+    fun testSignatureHelpExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/lsp-examples/signature-help.kts")
+        val code = configureExample(
+            raw,
+            filePath = sampleFilePath,
+            line = positions.methodCallArg.line,
+            column = positions.methodCallArg.column
+        )
+
+        val result = executeExample("signature-help", code)
+
+        assertTrue("Should execute without error", !result.isError)
+        val text = getTextContent(result)
+        assertTrue("Should include signature help header", text.contains("Signature Help"))
+    }
 }
