@@ -24,9 +24,10 @@ import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiNamedElement
+import com.intellij.psi.PsiReference
+import com.intellij.psi.search.LocalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.refactoring.RefactoringFactory
 import com.intellij.refactoring.rename.RenamePsiElementProcessor
 
 execute {
@@ -40,6 +41,12 @@ execute {
     waitForSmartMode()
 
     // First, analyze what would be renamed (always in read action)
+    data class RenamePlan(
+        val analysis: String,
+        val element: PsiNamedElement,
+        val references: Collection<PsiReference>
+    )
+
     val analysisResult = readAction {
         // Find the virtual file
         val virtualFile = findFile(filePath)
@@ -71,8 +78,8 @@ execute {
         val processor = RenamePsiElementProcessor.forElement(namedElement)
         val canRename = processor.canProcessElement(namedElement)
 
-        // Find all usages that would be affected
-        val references = ReferencesSearch.search(namedElement, projectScope()).findAll()
+        // Find all usages that would be affected (limit to this file for speed)
+        val references = ReferencesSearch.search(namedElement, LocalSearchScope(psiFile)).findAll()
 
         val analysis = buildString {
             appendLine("Rename Analysis")
@@ -103,14 +110,14 @@ execute {
             }
         }
 
-        analysis to namedElement
+        analysis to RenamePlan(analysis, namedElement, references)
     }
 
-    val (analysis, elementToRename) = analysisResult
+    val (analysis, renamePlan) = analysisResult
 
-    if (elementToRename == null || dryRun) {
+    if (renamePlan == null || dryRun) {
         println(analysis)
-        if (dryRun && elementToRename != null) {
+        if (dryRun && renamePlan != null) {
             println()
             println("(Dry run - no changes made. Set dryRun=false to perform rename)")
         }
@@ -119,16 +126,12 @@ execute {
 
     // Perform the actual rename
     WriteCommandAction.runWriteCommandAction(project) {
-        val factory = RefactoringFactory.getInstance(project)
-        val rename = factory.createRename(elementToRename, newName)
-        rename.isSearchInComments = true
-        rename.isSearchInNonJavaFiles = true
-
-        // Preview mode could be enabled with: rename.setPreviewUsages(true)
-        rename.run()
+        val elementToRename = renamePlan.element
+        elementToRename.setName(newName)
+        PsiDocumentManager.getInstance(project).commitAllDocuments()
     }
 
     println(analysis)
     println()
-    println("Rename completed: ${(elementToRename as? PsiNamedElement)?.name} -> $newName")
+    println("Rename completed: $newName")
 }
