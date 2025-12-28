@@ -2,6 +2,8 @@
 package com.jonnyzzz.intellij.mcp.server
 
 import com.intellij.openapi.components.service
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -10,12 +12,16 @@ import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.testExecParams
 import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 
 class LspExamplesExecutionTest : BasePlatformTestCase() {
     private val handler = LspExamplesResourceHandler()
     private lateinit var sampleFilePath: String
     private lateinit var positions: SamplePositions
+
+    override fun runInDispatchThread(): Boolean = false
 
     override fun setUp() {
         super.setUp()
@@ -87,6 +93,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         query: String? = null,
         searchType: String? = null,
         newName: String? = null,
+        dryRun: Boolean? = null,
     ): String {
         var updated = code
         if (filePath != null) {
@@ -107,15 +114,20 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         if (newName != null) {
             updated = updated.replace(Regex("val newName = \".*?\""), "val newName = \"$newName\"")
         }
+        if (dryRun != null) {
+            updated = updated.replace(Regex("val dryRun\\s*=\\s*\\w+"), "val dryRun = $dryRun")
+        }
         return updated
     }
 
     private suspend fun executeExample(exampleId: String, code: String): ToolCallResult {
         val manager = project.service<ExecutionManager>()
-        return manager.executeWithProgress(
-            testExecParams(code, taskId = "lsp-$exampleId", reason = "lsp example"),
-            NoOpProgressReporter
-        )
+        return withContext(Dispatchers.Default) {
+            manager.executeWithProgress(
+                testExecParams(code, taskId = "lsp-$exampleId", reason = "lsp example"),
+                NoOpProgressReporter
+            )
+        }
     }
 
     private fun getTextContent(result: ToolCallResult): String {
@@ -202,11 +214,18 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             filePath = sampleFilePath,
             line = positions.classDeclaration.line,
             column = positions.classDeclaration.column,
-            newName = "GreeterRenamed"
+            newName = "GreeterRenamed",
+            dryRun = false
         )
 
         val result = executeExample("rename", code)
         assertExampleResult(result, "Rename Analysis")
+        val updatedText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(sampleFilePath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        assertTrue("Rename should update class declaration", updatedText.contains("class GreeterRenamed"))
     }
 
     fun testFormattingExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
