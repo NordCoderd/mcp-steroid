@@ -76,6 +76,21 @@ Execute Kotlin code in IntelliJ's runtime.
 ### `steroid_execute_feedback`
 Rate execution results. Use after `steroid_execute_code`.
 
+## MCP Resources (Use Them)
+
+This server exposes built-in resources through the MCP resource APIs. These are the fastest way to load full examples and guides without guessing or copy/pasting from the web.
+
+**How to access resources:**
+1. Call `list_mcp_resources` to discover available resources.
+2. Call `read_mcp_resource` with the resource URI to load the content.
+
+**Key resources provided by this server:**
+- `intellij://skill/intellij-api-poweruser-guide` - This guide as a resource.
+- `intellij://lsp/overview` - Overview of LSP-like examples and how to use them.
+- `intellij://lsp/<id>` - Runnable Kotlin scripts (e.g., `go-to-definition`, `find-references`, `rename`, `code-action`, `signature-help`).
+
+These resources are designed to be plugged directly into `steroid_execute_code` after you configure file paths/positions.
+
 ## Critical Rules
 
 ### 1. Execute Block is a SUSPEND Function
