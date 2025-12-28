@@ -4,23 +4,24 @@ package com.jonnyzzz.intellij.mcp.server
 import com.intellij.openapi.components.service
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.platform.ide.progress.runWithModalProgressBlocking
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.testExecParams
 import java.io.File
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.seconds
 
 class LspExamplesExecutionTest : BasePlatformTestCase() {
     private val handler = LspExamplesResourceHandler()
     private lateinit var sampleFilePath: String
     private lateinit var positions: SamplePositions
+
+    override fun runInDispatchThread(): Boolean = false
 
     override fun setUp() {
         super.setUp()
@@ -121,26 +122,12 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
 
     private suspend fun executeExample(exampleId: String, code: String): ToolCallResult {
         val manager = project.service<ExecutionManager>()
-        return manager.executeWithProgress(
-            testExecParams(code, taskId = "lsp-$exampleId", reason = "lsp example"),
-            NoOpProgressReporter
-        )
-    }
-
-    private fun <T> runWithTimeout(title: String, action: suspend CoroutineScope.() -> T): T {
-        return runWithModalProgressBlocking(project, title) {
-            try {
-                withTimeout(60.seconds) {
-                    action()
-                }
-            } catch (error: TimeoutCancellationException) {
-                throw AssertionError(error)
-            }
+        return withContext(Dispatchers.Default) {
+            manager.executeWithProgress(
+                testExecParams(code, taskId = "lsp-$exampleId", reason = "lsp example"),
+                NoOpProgressReporter
+            )
         }
-    }
-
-    private fun runExample(exampleId: String, code: String) = runWithTimeout("LSP $exampleId") {
-        executeExample(exampleId, code)
     }
 
     private fun getTextContent(result: ToolCallResult): String {
@@ -160,7 +147,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         )
     }
 
-    fun testGoToDefinitionExampleExecutes() {
+    fun testGoToDefinitionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/go-to-definition.kts")
         val code = configureExample(
             raw,
@@ -169,11 +156,11 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             column = positions.classUsage.column
         )
 
-        val result = runExample("go-to-definition", code)
+        val result = executeExample("go-to-definition", code)
         assertExampleResult(result, "definition", ignoreCase = true)
     }
 
-    fun testFindReferencesExampleExecutes() {
+    fun testFindReferencesExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/find-references.kts")
         val code = configureExample(
             raw,
@@ -182,11 +169,11 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             column = positions.methodDeclaration.column
         )
 
-        val result = runExample("find-references", code)
+        val result = executeExample("find-references", code)
         assertExampleResult(result, "references", ignoreCase = true)
     }
 
-    fun testHoverExampleExecutes() {
+    fun testHoverExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/hover.kts")
         val code = configureExample(
             raw,
@@ -195,11 +182,11 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             column = positions.messageUsage.column
         )
 
-        val result = runExample("hover", code)
+        val result = executeExample("hover", code)
         assertExampleResult(result, "Hover Information")
     }
 
-    fun testCompletionExampleExecutes() {
+    fun testCompletionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/completion.kts")
         val code = configureExample(
             raw,
@@ -208,19 +195,19 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             column = positions.methodCallName.column
         )
 
-        val result = runExample("completion", code)
+        val result = executeExample("completion", code)
         assertExampleResult(result, "Completion at")
     }
 
-    fun testDocumentSymbolsExampleExecutes() {
+    fun testDocumentSymbolsExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/document-symbols.kts")
         val code = configureExample(raw, filePath = sampleFilePath)
 
-        val result = runExample("document-symbols", code)
+        val result = executeExample("document-symbols", code)
         assertExampleResult(result, "Document Symbols")
     }
 
-    fun testRenameExampleExecutes() {
+    fun testRenameExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/rename.kts")
         val code = configureExample(
             raw,
@@ -231,28 +218,25 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             dryRun = false
         )
 
-        val (result, updatedText) = runWithTimeout("LSP rename") {
-            val result = executeExample("rename", code)
-            val updatedText = readAction {
-                val vf = LocalFileSystem.getInstance().findFileByPath(sampleFilePath) ?: return@readAction ""
-                val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
-                document.text
-            }
-            result to updatedText
-        }
+        val result = executeExample("rename", code)
         assertExampleResult(result, "Rename Analysis")
+        val updatedText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(sampleFilePath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
         assertTrue("Rename should update class declaration", updatedText.contains("class GreeterRenamed"))
     }
 
-    fun testFormattingExampleExecutes() {
+    fun testFormattingExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/formatting.kts")
         val code = configureExample(raw, filePath = sampleFilePath)
 
-        val result = runExample("formatting", code)
+        val result = executeExample("formatting", code)
         assertExampleResult(result, "Format Preview")
     }
 
-    fun testCodeActionExampleExecutes() {
+    fun testCodeActionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/code-action.kts")
         val code = configureExample(
             raw,
@@ -261,11 +245,11 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             column = positions.codeActionTarget.column
         )
 
-        val result = runExample("code-action", code)
+        val result = executeExample("code-action", code)
         assertExampleResult(result, "Code Actions")
     }
 
-    fun testSignatureHelpExampleExecutes() {
+    fun testSignatureHelpExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/signature-help.kts")
         val code = configureExample(
             raw,
@@ -274,15 +258,15 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             column = positions.methodCallArg.column
         )
 
-        val result = runExample("signature-help", code)
+        val result = executeExample("signature-help", code)
         assertExampleResult(result, "Signature Help")
     }
 
-    fun testWorkspaceSymbolExampleExecutes() {
+    fun testWorkspaceSymbolExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
         val raw = handler.loadExample("/lsp-examples/workspace-symbol.kts")
         val code = configureExample(raw, query = "Greeter")
 
-        val result = runExample("workspace-symbol", code)
+        val result = executeExample("workspace-symbol", code)
         assertExampleResult(result, "Workspace Symbol Search")
     }
 }
