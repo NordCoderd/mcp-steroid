@@ -88,6 +88,8 @@ This server exposes built-in resources through the MCP resource APIs. These are 
 - `intellij://skill/intellij-api-poweruser-guide` - This guide as a resource.
 - `intellij://lsp/overview` - Overview of LSP-like examples and how to use them.
 - `intellij://lsp/<id>` - Runnable Kotlin scripts (e.g., `go-to-definition`, `find-references`, `rename`, `code-action`, `signature-help`).
+- `intellij://ide/overview` - Overview of IDE power operation examples (refactorings, inspections, generation).
+- `intellij://ide/<id>` - Runnable Kotlin scripts (e.g., `extract-method`, `introduce-variable`, `change-signature`, `safe-delete`, `optimize-imports`).
 
 These resources are designed to be plugged directly into `steroid_execute_code` after you configure file paths/positions.
 

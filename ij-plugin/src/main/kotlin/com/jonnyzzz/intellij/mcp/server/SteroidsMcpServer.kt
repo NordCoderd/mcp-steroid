@@ -79,6 +79,7 @@ class SteroidsMcpServer(
             // Register resources
             service<SkillResourceHandler>().register(mcpServer)
             service<LspExamplesResourceHandler>().register(mcpServer)
+            service<IdeExamplesResourceHandler>().register(mcpServer)
 
             val configuredPort = Registry.intValue("mcp.steroids.server.port")
 
