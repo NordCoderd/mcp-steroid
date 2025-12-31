@@ -17,7 +17,7 @@
  * Output: Summary of extraction or error message
  */
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.PsiManager
@@ -97,12 +97,7 @@ execute {
             return@execute
         }
 
-        val isTestMode = ApplicationManager.getApplication().isUnitTestMode
-        if (isTestMode) {
-            writeAction { ExtractMethodHandler.extractMethod(project, processor) }
-        } else {
-            ExtractMethodHandler.extractMethod(project, processor)
-        }
+        writeIntentReadAction { ExtractMethodHandler.extractMethod(project, processor) }
 
         println("Extracted method: $newMethodName")
     } finally {

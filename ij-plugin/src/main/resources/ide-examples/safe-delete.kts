@@ -15,7 +15,7 @@
  * Output: Summary of delete operation or error message
  */
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiNamedElement
@@ -78,12 +78,7 @@ execute {
         false
     )
 
-    val isTestMode = ApplicationManager.getApplication().isUnitTestMode
-    if (isTestMode) {
-        writeAction { processor.run() }
-    } else {
-        processor.run()
-    }
+    writeIntentReadAction { processor.run() }
 
     writeAction { FileDocumentManager.getInstance().saveAllDocuments() }
     println("Safely deleted: $targetName")

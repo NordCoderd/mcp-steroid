@@ -8,6 +8,10 @@ Use IntelliJ for everything where you can, it makes you 100x professional!
 You must never ignore warnings or errors, instead, figure out
 how to fix that the right way.
 
+Do not add test-only branches (for example, `ApplicationManager.getApplication().isUnitTestMode`);
+make production and test paths match by using the correct IntelliJ actions (for example,
+`writeIntentReadAction` or `writeCommandAction`).
+
 We love tests, and tests must show the reality. A failing test is much must
 better than a test that does not check the problems. Make sure you fix tests.
 

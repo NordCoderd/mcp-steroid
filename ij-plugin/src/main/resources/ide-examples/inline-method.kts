@@ -18,7 +18,7 @@
  * Output: Summary of inline operation or error message
  */
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.PsiManager
@@ -95,12 +95,7 @@ execute {
             )
         }
 
-        val isTestMode = ApplicationManager.getApplication().isUnitTestMode
-        if (isTestMode) {
-            writeAction { processor.run() }
-        } else {
-            processor.run()
-        }
+        writeIntentReadAction { processor.run() }
 
         println("Inlined method: $methodName")
     } finally {
