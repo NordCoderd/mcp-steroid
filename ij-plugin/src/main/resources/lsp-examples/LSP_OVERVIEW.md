@@ -50,6 +50,30 @@ using IntelliJ Platform APIs. Each example is a complete script for `steroid_exe
 - **ReadAction**: Required for reading PSI (use `readAction { }`)
 - **WriteAction**: Required for modifying PSI (use `writeAction { }`)
 
+## Language Availability
+
+These examples rely on language plugins to provide PSI, references, intentions, and refactorings.
+IntelliJ IDEA ships Java + Kotlin out of the box. Other languages (JavaScript/TypeScript, Python, Go, etc.)
+require their plugins to be installed and enabled.
+
+If a script returns "No references found" or "No element at position", first check language availability.
+You can probe what is available at runtime:
+
+```kotlin
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.lang.Language
+
+execute {
+    val actionIds = ActionManager.getInstance().getActionIdList("").toSet()
+    println("Has Java actions: " + actionIds.contains("NewJavaSpecialFile"))
+    println("Has Kotlin actions: " + actionIds.contains("Kotlin.NewFile"))
+    println("Languages: " + Language.getRegisteredLanguages().map { it.id }.sorted())
+}
+```
+
+If a language lacks reference providers, fall back to PSI traversal (`PsiNamedElement`),
+Structure View (`LanguageStructureViewBuilder`), or inspection output.
+
 ## Important Notes
 
 - Always call `waitForSmartMode()` before accessing indices
