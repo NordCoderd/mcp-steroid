@@ -86,7 +86,12 @@ class SkillReference {
      * Success message with documentation link.
      */
     val successFooter: String
-        get() = "📚 More patterns: $skillUrl"
+        get() = buildString {
+            append("📚 TIP: Browse MCP resources (resources/list). ")
+            append("Start with intellij://skill/intellij-api-poweruser-guide, ")
+            append("intellij://ide/overview, ")
+            append("intellij://lsp/overview")
+        }
 
     companion object {
         fun getInstance(): SkillReference = service()

@@ -52,8 +52,10 @@ execute {
         val element = psiFile.findElementAt(offset)
             ?: return@readAction "No element at position ($line:$column)"
 
-        // Try to find reference and resolve it
-        val reference = element.reference
+        // Try to find a reference on this element or its parents
+        val reference = generateSequence(element) { it.parent }
+            .mapNotNull { it.reference }
+            .firstOrNull()
         val resolved = reference?.resolve()
 
         if (resolved != null) {

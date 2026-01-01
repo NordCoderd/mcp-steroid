@@ -3,6 +3,14 @@ package com.jonnyzzz.intellij.mcp
 
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.intellij.mcp.mcp.McpJson
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
@@ -57,19 +65,48 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
                 project.basePath.toString(),
                 message = "AI must show 'PROJECTS:' output from actual tool call.")
 
-        // 4. The PROJECTS line should contain actual data (array or object), not an error
         val projectsLine = result.output.lines().find { it.contains("PROJECTS:") }
+            ?: error("PROJECTS: line is missing from output.")
+        val projectNames = extractProjectNames(projectsLine)
         assertTrue(
-            "PROJECTS: line must contain actual project data ([ or {), not error. " +
-                    "Line: $projectsLine",
-            projectsLine != null && (projectsLine.contains("[") || projectsLine.contains("{"))
+            "PROJECTS: line must contain project data. Line: $projectsLine",
+            projectNames.isNotEmpty()
         )
-
-        // 5. The PROJECTS data should contain at least one project entry
         assertTrue(
             "PROJECTS: should contain actual project name. Line: $projectsLine",
-            projectsLine != null && projectsLine.contains("\"name\":")
+            projectNames.contains(project.name)
         )
+    }
+
+    private fun extractProjectNames(projectsLine: String): List<String> {
+        val payload = projectsLine.substringAfter("PROJECTS:").trim()
+        return extractProjectNamesFromPayload(payload)
+    }
+
+    private fun extractProjectNamesFromPayload(payload: String): List<String> {
+        val element = runCatching { McpJson.parseToJsonElement(payload) }.getOrNull() ?: return emptyList()
+        return when (element) {
+            is JsonObject -> extractProjectNamesFromObject(element)
+            is JsonArray -> extractProjectNamesFromContentItems(element)
+            else -> emptyList()
+        }
+    }
+
+    private fun extractProjectNamesFromObject(element: JsonObject): List<String> {
+        val projects = element["projects"]?.jsonArray ?: return emptyList()
+        return projects.mapNotNull { it.jsonObject["name"].stringValue() }
+    }
+
+    private fun extractProjectNamesFromContentItems(element: JsonArray): List<String> {
+        return element.flatMap { item ->
+            val text = item.jsonObject["text"].stringValue() ?: return@flatMap emptyList()
+            extractProjectNamesFromPayload(text)
+        }
+    }
+
+    private fun JsonElement?.stringValue(): String? {
+        val primitive = this as? JsonPrimitive ?: return null
+        return primitive.content
     }
 
     /**
