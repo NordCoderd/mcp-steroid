@@ -7,6 +7,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.common.timeoutRunBlocking
@@ -30,6 +31,16 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     private lateinit var moveTargetDirPath: String
     private lateinit var safeDeletePath: String
     private lateinit var greeterImplPath: String
+    private lateinit var pullUpBasePath: String
+    private lateinit var pullUpChildPath: String
+    private lateinit var pushDownBasePath: String
+    private lateinit var pushDownChildAPath: String
+    private lateinit var pushDownChildBPath: String
+    private lateinit var extractSourcePath: String
+    private lateinit var extractTargetDirPath: String
+    private lateinit var moveClassPath: String
+    private lateinit var moveClassTargetDirPath: String
+    private lateinit var constructorSamplePath: String
     private lateinit var refactorPositions: RefactorPositions
     private lateinit var safeDeletePosition: LineColumn
 
@@ -95,7 +106,8 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
             inlineCall = lineColumnFor(refactorText, "inlineTarget(5)", 1),
             changeSignature = lineColumnFor(refactorText, "public int add", "public int ".length),
             extractStartLine = lineColumnFor(refactorText, "total += 1;").line,
-            extractEndLine = lineColumnFor(refactorText, "total += 3;").line
+            extractEndLine = lineColumnFor(refactorText, "total += 3;").line,
+            callHierarchy = lineColumnFor(refactorText, "add(1, 2)")
         )
 
         val importsText = """
@@ -193,6 +205,86 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
             }
         """.trimIndent()
         writeSampleFile("src/sample/BaseTypeImplB.java", implBText)
+
+        val pullUpBaseText = """
+            package sample.pullup;
+
+            public class PullUpBase {
+            }
+        """.trimIndent()
+        pullUpBasePath = writeSampleFile("src/sample/pullup/PullUpBase.java", pullUpBaseText)
+
+        val pullUpChildText = """
+            package sample.pullup;
+
+            public class PullUpChild extends PullUpBase {
+                public int moveUp(int value) {
+                    return value + 1;
+                }
+            }
+        """.trimIndent()
+        pullUpChildPath = writeSampleFile("src/sample/pullup/PullUpChild.java", pullUpChildText)
+
+        val pushDownBaseText = """
+            package sample.pushdown;
+
+            public class PushDownBase {
+                public int moveDown(int value) {
+                    return value + 2;
+                }
+            }
+        """.trimIndent()
+        pushDownBasePath = writeSampleFile("src/sample/pushdown/PushDownBase.java", pushDownBaseText)
+
+        val pushDownChildAText = """
+            package sample.pushdown;
+
+            public class PushDownChildA extends PushDownBase {
+            }
+        """.trimIndent()
+        pushDownChildAPath = writeSampleFile("src/sample/pushdown/PushDownChildA.java", pushDownChildAText)
+
+        val pushDownChildBText = """
+            package sample.pushdown;
+
+            public class PushDownChildB extends PushDownBase {
+            }
+        """.trimIndent()
+        pushDownChildBPath = writeSampleFile("src/sample/pushdown/PushDownChildB.java", pushDownChildBText)
+
+        val extractSourceText = """
+            package sample.extract;
+
+            public class ExtractSource {
+                public String work(String input) {
+                    return "Hello " + input;
+                }
+            }
+        """.trimIndent()
+        extractSourcePath = writeSampleFile("src/sample/extract/ExtractSource.java", extractSourceText)
+        extractTargetDirPath = createTargetDir("src/sample/extract")
+
+        val moveClassText = """
+            package sample.moveclass;
+
+            public class MoveClassSample {
+                public String name() {
+                    return "move";
+                }
+            }
+        """.trimIndent()
+        moveClassPath = writeSampleFile("src/sample/moveclass/MoveClassSample.java", moveClassText)
+        moveClassTargetDirPath = createTargetDir("src/sample/movedclass")
+
+        val constructorText = """
+            package sample;
+
+            public class ConstructorSample {
+                private final int id;
+                private final String name;
+            }
+        """.trimIndent()
+        constructorSamplePath = writeSampleFile("src/sample/ConstructorSample.java", constructorText)
     }
 
     private fun writeSampleFile(relativePath: String, text: String): String {
@@ -224,7 +316,8 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
         val inlineCall: LineColumn,
         val changeSignature: LineColumn,
         val extractStartLine: Int,
-        val extractEndLine: Int
+        val extractEndLine: Int,
+        val callHierarchy: LineColumn
     )
 
     private fun lineColumnAt(text: String, offset: Int): LineColumn {
@@ -261,6 +354,17 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
         baseMethodName: String? = null,
         classFqn: String? = null,
         methodName: String? = null,
+        sourceClassFqn: String? = null,
+        targetClassFqn: String? = null,
+        memberName: String? = null,
+        interfaceName: String? = null,
+        targetPackage: String? = null,
+        runConfigName: String? = null,
+        executorId: String? = null,
+        maxResults: Int? = null,
+        maxInspections: Int? = null,
+        fileName: String? = null,
+        fileExtension: String? = null,
         dryRun: Boolean? = null
     ): String {
         var updated = code
@@ -334,6 +438,66 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
             updated = updated.replace(
                 Regex("val methodName = \".*?\""),
                 "val methodName = \"${escapeKotlinString(methodName)}\""
+            )
+        }
+        if (sourceClassFqn != null) {
+            updated = updated.replace(
+                Regex("val sourceClassFqn = \".*?\""),
+                "val sourceClassFqn = \"${escapeKotlinString(sourceClassFqn)}\""
+            )
+        }
+        if (targetClassFqn != null) {
+            updated = updated.replace(
+                Regex("val targetClassFqn = \".*?\""),
+                "val targetClassFqn = \"${escapeKotlinString(targetClassFqn)}\""
+            )
+        }
+        if (memberName != null) {
+            updated = updated.replace(
+                Regex("val memberName = \".*?\""),
+                "val memberName = \"${escapeKotlinString(memberName)}\""
+            )
+        }
+        if (interfaceName != null) {
+            updated = updated.replace(
+                Regex("val interfaceName = \".*?\""),
+                "val interfaceName = \"${escapeKotlinString(interfaceName)}\""
+            )
+        }
+        if (targetPackage != null) {
+            updated = updated.replace(
+                Regex("val targetPackage = \".*?\""),
+                "val targetPackage = \"${escapeKotlinString(targetPackage)}\""
+            )
+        }
+        if (runConfigName != null) {
+            updated = updated.replace(
+                Regex("val runConfigName = \".*?\""),
+                "val runConfigName = \"${escapeKotlinString(runConfigName)}\""
+            )
+        }
+        if (executorId != null) {
+            updated = updated.replace(
+                Regex("val executorId = \".*?\""),
+                "val executorId = \"${escapeKotlinString(executorId)}\""
+            )
+        }
+        if (maxResults != null) {
+            updated = updated.replace(Regex("val maxResults\\s*=\\s*\\d+"), "val maxResults = $maxResults")
+        }
+        if (maxInspections != null) {
+            updated = updated.replace(Regex("val maxInspections\\s*=\\s*\\d+"), "val maxInspections = $maxInspections")
+        }
+        if (fileName != null) {
+            updated = updated.replace(
+                Regex("val fileName = \".*?\""),
+                "val fileName = \"${escapeKotlinString(fileName)}\""
+            )
+        }
+        if (fileExtension != null) {
+            updated = updated.replace(
+                Regex("val fileExtension = \".*?\""),
+                "val fileExtension = \"${escapeKotlinString(fileExtension)}\""
             )
         }
         if (dryRun != null) {
@@ -562,5 +726,193 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
         val output = getTextContent(result)
         assertTrue(output.contains("BaseTypeImplA"))
         assertTrue(output.contains("BaseTypeImplB"))
+    }
+
+    fun testCallHierarchyExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/call-hierarchy.kts")
+        val code = configureExample(
+            raw,
+            filePath = refactorSamplePath,
+            line = refactorPositions.callHierarchy.line,
+            column = refactorPositions.callHierarchy.column,
+            maxResults = 10
+        )
+
+        val result = executeExample("call-hierarchy", code)
+        assertExampleResult(result, "Callers of")
+        val output = getTextContent(result)
+        assertTrue(output.contains("useAdd"))
+    }
+
+    fun testRunConfigurationExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/run-configuration.kts")
+        val result = executeExample("run-configuration", raw)
+        assertExampleResult(result, "Run Configurations")
+    }
+
+    fun testPullUpMembersExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/pull-up-members.kts")
+        val code = configureExample(
+            raw,
+            sourceClassFqn = "sample.pullup.PullUpChild",
+            targetClassFqn = "sample.pullup.PullUpBase",
+            memberName = "moveUp",
+            dryRun = false
+        )
+
+        val result = executeExample("pull-up-members", code)
+        assertExampleResult(result, "Pulled up member")
+        val baseText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(pullUpBasePath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        val childText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(pullUpChildPath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        assertTrue(baseText.contains("moveUp"))
+        assertTrue(!childText.contains("moveUp"))
+    }
+
+    fun testPushDownMembersExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/push-down-members.kts")
+        val code = configureExample(
+            raw,
+            sourceClassFqn = "sample.pushdown.PushDownBase",
+            memberName = "moveDown",
+            dryRun = false
+        )
+
+        val result = executeExample("push-down-members", code)
+        assertExampleResult(result, "Pushed down member")
+        val baseText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(pushDownBasePath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        val childAText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(pushDownChildAPath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        val childBText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(pushDownChildBPath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        assertTrue(!baseText.contains("moveDown"))
+        assertTrue(childAText.contains("moveDown"))
+        assertTrue(childBText.contains("moveDown"))
+    }
+
+    fun testExtractInterfaceExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/extract-interface.kts")
+        val code = configureExample(
+            raw,
+            sourceClassFqn = "sample.extract.ExtractSource",
+            interfaceName = "ExtractedApi",
+            targetDirPath = extractTargetDirPath,
+            memberName = "work",
+            dryRun = false
+        )
+
+        val result = executeExample("extract-interface", code)
+        assertExampleResult(result, "Extracted interface")
+        val interfacePath = Paths.get(extractTargetDirPath, "ExtractedApi.java").toString()
+        val interfaceText = readAction {
+            val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(interfacePath)
+            val found = if (vf != null) vf else run {
+                var candidate: VirtualFile? = null
+                val root = project.basePath?.let { LocalFileSystem.getInstance().findFileByPath(it) }
+                if (root != null) {
+                    VfsUtilCore.iterateChildrenRecursively(root, null) { file ->
+                        if (!file.isDirectory && file.name == "ExtractedApi.java") {
+                            candidate = file
+                            return@iterateChildrenRecursively false
+                        }
+                        true
+                    }
+                }
+                candidate
+            }
+            found?.let { VfsUtil.loadText(it) } ?: ""
+        }
+        val sourceText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(extractSourcePath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        assertTrue(interfaceText.contains("interface ExtractedApi"))
+        assertTrue(sourceText.contains("implements ExtractedApi"))
+    }
+
+    fun testMoveClassExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/move-class.kts")
+        val code = configureExample(
+            raw,
+            classFqn = "sample.moveclass.MoveClassSample",
+            targetPackage = "sample.movedclass",
+            targetDirPath = moveClassTargetDirPath,
+            dryRun = false
+        )
+
+        val result = executeExample("move-class", code)
+        assertExampleResult(result, "Moved class")
+        val oldExists = readAction { LocalFileSystem.getInstance().findFileByPath(moveClassPath) != null }
+        val newPath = Paths.get(moveClassTargetDirPath, "MoveClassSample.java").toString()
+        val newText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(newPath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        assertTrue(!oldExists)
+        assertTrue(newText.contains("package sample.movedclass"))
+    }
+
+    fun testGenerateConstructorExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/generate-constructor.kts")
+        val code = configureExample(
+            raw,
+            classFqn = "sample.ConstructorSample",
+            dryRun = false
+        )
+
+        val result = executeExample("generate-constructor", code)
+        assertExampleResult(result, "Generated constructor")
+        val updatedText = readAction {
+            val vf = LocalFileSystem.getInstance().findFileByPath(constructorSamplePath) ?: return@readAction ""
+            val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
+            document.text
+        }
+        assertTrue(updatedText.contains("ConstructorSample("))
+    }
+
+    fun testProjectDependenciesExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/project-dependencies.kts")
+        val result = executeExample("project-dependencies", raw)
+        assertExampleResult(result, "Project Dependencies")
+    }
+
+    fun testInspectionSummaryExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/inspection-summary.kts")
+        val result = executeExample("inspection-summary", raw)
+        assertExampleResult(result, "Enabled inspections")
+    }
+
+    fun testProjectSearchExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
+        val raw = handler.loadExample("/ide-examples/project-search.kts")
+        val code = configureExample(
+            raw,
+            fileName = "RefactorSample.java",
+            fileExtension = "java",
+            maxResults = 10
+        )
+
+        val result = executeExample("project-search", code)
+        assertExampleResult(result, "Project Search Results")
+        val output = getTextContent(result)
+        assertTrue(output.contains("RefactorSample.java"))
     }
 }
