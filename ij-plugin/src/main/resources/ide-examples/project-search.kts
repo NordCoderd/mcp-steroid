@@ -1,0 +1,64 @@
+/**
+ * IDE: Project Search (Index)
+ *
+ * This example searches project files by name or file type using indices.
+ *
+ * IntelliJ API used:
+ * - FilenameIndex - Search files by name
+ * - FileTypeIndex - Search files by file type
+ * - FileTypeManager - Resolve file type by extension
+ *
+ * Parameters to customize:
+ * - fileName: Exact file name to search for (optional)
+ * - fileExtension: File extension to search for (optional)
+ * - maxResults: Limit the number of results shown
+ *
+ * Output: Search results with file paths
+ */
+
+import com.intellij.openapi.fileTypes.FileTypeManager
+import com.intellij.psi.search.FileTypeIndex
+import com.intellij.psi.search.FilenameIndex
+
+execute {
+    // Configuration - modify these for your use case
+    val fileName = "RefactorSample.java" // Leave empty to skip name search
+    val fileExtension = "java"           // Leave empty to skip extension search
+    val maxResults = 20
+
+    waitForSmartMode()
+
+    val result = readAction {
+        buildString {
+            appendLine("Project Search Results")
+            appendLine("======================")
+            appendLine()
+
+            if (fileName.isNotBlank()) {
+                val files = FilenameIndex.getVirtualFilesByName(project, fileName, projectScope())
+                appendLine("By name '$fileName' (${files.size}):")
+                files.take(maxResults).forEach { vf ->
+                    appendLine("  - ${vf.path}")
+                }
+                if (files.size > maxResults) {
+                    appendLine("  ... and ${files.size - maxResults} more")
+                }
+                appendLine()
+            }
+
+            if (fileExtension.isNotBlank()) {
+                val fileType = FileTypeManager.getInstance().getFileTypeByExtension(fileExtension)
+                val files = FileTypeIndex.getFiles(fileType, projectScope())
+                appendLine("By extension '.$fileExtension' (${files.size}):")
+                files.take(maxResults).forEach { vf ->
+                    appendLine("  - ${vf.path}")
+                }
+                if (files.size > maxResults) {
+                    appendLine("  ... and ${files.size - maxResults} more")
+                }
+            }
+        }
+    }
+
+    println(result)
+}

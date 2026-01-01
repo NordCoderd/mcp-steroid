@@ -1,0 +1,70 @@
+/**
+ * IDE: Run Configuration
+ *
+ * This example lists available run configurations and can optionally
+ * execute one via a chosen executor.
+ *
+ * IntelliJ API used:
+ * - RunManager - Access run configurations
+ * - ProgramRunnerUtil - Execute configurations
+ * - ExecutorRegistry - Select executor
+ *
+ * Parameters to customize:
+ * - runConfigName: Exact configuration name (empty = list only)
+ * - executorId: Executor ID (DefaultRunExecutor.EXECUTOR_ID for Run)
+ * - dryRun: Set false to execute
+ *
+ * Output: List of configurations and optional execution status
+ */
+
+import com.intellij.execution.RunManager
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.ExecutorRegistry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+execute {
+    // Configuration - modify these for your use case
+    val runConfigName = ""  // Leave empty to list only
+    val executorId = DefaultRunExecutor.EXECUTOR_ID
+    val dryRun = true
+
+    waitForSmartMode()
+
+    val manager = RunManager.getInstance(project)
+    val settings = manager.allSettings
+
+    println("Run Configurations (${settings.size}):")
+    settings.forEach { setting ->
+        val typeName = setting.type.displayName
+        println("  - ${setting.name} ($typeName)")
+    }
+
+    if (runConfigName.isBlank()) {
+        println("Set runConfigName to execute a configuration.")
+        return@execute
+    }
+
+    val setting = settings.firstOrNull { it.name == runConfigName }
+    if (setting == null) {
+        println("Run configuration not found: $runConfigName")
+        return@execute
+    }
+
+    val executor = ExecutorRegistry.getInstance().getExecutorById(executorId)
+    if (executor == null) {
+        println("Executor not found: $executorId")
+        return@execute
+    }
+
+    if (dryRun) {
+        println("Dry run: would execute '${setting.name}' with executor '$executorId'.")
+        return@execute
+    }
+
+    withContext(Dispatchers.EDT) {
+        ProgramRunnerUtil.executeConfiguration(setting, executor)
+    }
+    println("Started run configuration: ${setting.name}")
+}
