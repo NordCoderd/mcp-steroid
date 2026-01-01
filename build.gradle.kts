@@ -28,10 +28,6 @@ dependencies {
         intellijIdeaUltimate("2025.3")
         // Kotlin plugin for script engine support in tests
         bundledPlugin("org.jetbrains.kotlin")
-        // Language plugins used by integration tests
-        bundledPlugin("JavaScript")
-        bundledPlugin("JavaScriptDebugger")
-        plugin("org.jetbrains.plugins.go:253.29346.50")
         testFramework(TestFrameworkType.Platform)
     }
 

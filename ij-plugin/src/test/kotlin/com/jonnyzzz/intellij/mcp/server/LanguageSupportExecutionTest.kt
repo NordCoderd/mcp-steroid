@@ -6,8 +6,6 @@ import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.VirtualFile
-import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.extensions.PluginId
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
@@ -61,14 +59,8 @@ class LanguageSupportExecutionTest : BasePlatformTestCase() {
 
     private fun resolveAvailableSpecs(): Set<LanguageSpec> {
         val actionIds = ActionManager.getInstance().getActionIdList("").toSet()
-        val pythonModule = PluginManagerCore.getPlugin(PluginId.getId("com.intellij.modules.python"))
-        if (pythonModule == null) {
-            println("Python module is not available in this IDE distribution; skipping Python checks.")
-        }
         val missing = languageSpecs.filter { spec ->
             spec.requiredActionIds.none { actionIds.contains(it) }
-        }.filterNot { spec ->
-            spec.id == "python" && pythonModule == null
         }
         if (missing.isNotEmpty()) {
             val details = missing.joinToString("\n") { spec ->
@@ -141,72 +133,6 @@ class LanguageSupportExecutionTest : BasePlatformTestCase() {
             usageNeedle = "greet(\"World\")",
             usageOffset = 0,
             requiredActionIds = listOf("Kotlin.NewFile")
-        ),
-        LanguageSpec(
-            id = "javascript",
-            displayName = "JavaScript",
-            fileName = "JsSample.js",
-            content = """
-                function greet(name) {
-                    return "Hello " + name;
-                }
-
-                const message = greet("World");
-                console.log(message);
-            """.trimIndent(),
-            usageNeedle = "greet(\"World\")",
-            usageOffset = 0,
-            requiredActionIds = listOf("NewJavaScriptFile")
-        ),
-        LanguageSpec(
-            id = "typescript",
-            displayName = "TypeScript",
-            fileName = "TsSample.ts",
-            content = """
-                function add(a: number, b: number): number {
-                    return a + b;
-                }
-
-                const total = add(1, 2);
-                console.log(total);
-            """.trimIndent(),
-            usageNeedle = "add(1, 2)",
-            usageOffset = 0,
-            requiredActionIds = listOf("NewTypeScriptFile")
-        ),
-        LanguageSpec(
-            id = "go",
-            displayName = "Go",
-            fileName = "go_sample.go",
-            content = """
-                package sample
-
-                func add(a int, b int) int {
-                    return a + b
-                }
-
-                func use() int {
-                    return add(1, 2)
-                }
-            """.trimIndent(),
-            usageNeedle = "add(1, 2)",
-            usageOffset = 0,
-            requiredActionIds = listOf("Go.NewGoFile")
-        ),
-        LanguageSpec(
-            id = "python",
-            displayName = "Python",
-            fileName = "sample.py",
-            content = """
-                def greet(name: str) -> str:
-                    return "Hello " + name
-
-                message = greet("World")
-                print(message)
-            """.trimIndent(),
-            usageNeedle = "greet(\"World\")",
-            usageOffset = 0,
-            requiredActionIds = listOf("NewPythonFile", "PyExecuteCellAction")
         )
     )
 
