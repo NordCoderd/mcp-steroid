@@ -2,18 +2,21 @@
 package com.jonnyzzz.intellij.mcp.server
 
 import com.intellij.openapi.components.service
+import com.intellij.openapi.application.WriteAction
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.testExecParams
-import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
 
 class LspExamplesExecutionTest : BasePlatformTestCase() {
@@ -42,12 +45,19 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
             }
         """.trimIndent()
         val basePath = project.basePath ?: error("Project base path is not available")
-        val ioFile = File(basePath, "src/sample/LspSample.kt")
-        ioFile.parentFile.mkdirs()
-        ioFile.writeText(sampleText)
-        LocalFileSystem.getInstance().refreshAndFindFileByIoFile(ioFile)
-            ?: error("Failed to refresh sample file in VFS: ${ioFile.path}")
-        sampleFilePath = ioFile.path
+        val srcVf = WriteAction.computeAndWait<VirtualFile, RuntimeException> {
+            VfsUtil.createDirectories(Paths.get(basePath, "src").toString())
+        }
+        PsiTestUtil.addSourceRoot(module, srcVf)
+        val file = WriteAction.computeAndWait<VirtualFile, RuntimeException> {
+            val filePath = Paths.get(basePath, "src/sample/LspSample.kt")
+            val parent = VfsUtil.createDirectories(filePath.parent.toString())
+            val name = filePath.fileName.toString()
+            val child = parent.findChild(name) ?: parent.createChildData(this, name)
+            VfsUtil.saveText(child, sampleText)
+            child
+        }
+        sampleFilePath = file.path
         positions = SamplePositions(
             classDeclaration = lineColumnFor(sampleText, "class Greeter", "class ".length),
             classUsage = lineColumnFor(sampleText, "Greeter(\"World\")"),
@@ -221,7 +231,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
         val result = executeExample("rename", code)
         assertExampleResult(result, "Rename Analysis")
         val updatedText = readAction {
-            val vf = LocalFileSystem.getInstance().findFileByPath(sampleFilePath) ?: return@readAction ""
+            val vf = VfsUtil.findFile(Paths.get(sampleFilePath), true) ?: return@readAction ""
             val document = FileDocumentManager.getInstance().getDocument(vf) ?: return@readAction ""
             document.text
         }
