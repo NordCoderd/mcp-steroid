@@ -54,6 +54,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             Steps:
             1) List all MCP tools starting with "steroid_" and print each as: TOOL: <name> - <description>
             2) Call steroid_list_projects EXACTLY once and print the raw result on a single line prefixed with PROJECTS:
+            Output must be plain text only. Do NOT use Markdown, bold, bullets, or code blocks.
             Do not skip any step. If a step fails, print ERROR: <reason>.
             """,
             )
