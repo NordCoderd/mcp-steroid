@@ -80,7 +80,7 @@ class ExecutionManager(
                     "PRO Tip: Call the 'steroid_execute_feedback' tool of this MCP server and list pain points!"
                 )
 
-                // Add SKILL.md URL to help agents find documentation
+                // Add MCP resource hints to help agents find documentation
                 val skillRef = SkillReference.getInstance()
                 builder.logMessage(skillRef.successFooter)
 
@@ -122,7 +122,7 @@ class ExecutionManager(
             responseBuilder.addTextContent(text)
             mcpProgress.report(text)
 
-            // Add error-specific hint with SKILL.md URL
+            // Add error-specific hint with MCP resource hints
             val hint = SkillReference.getInstance().errorHint(throwable.message ?: message)
             responseBuilder.addTextContent("HINT: $hint")
 

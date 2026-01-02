@@ -5,8 +5,8 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 
 /**
- * Application service providing SKILL.md references and brief tips for LLM agents.
- * Keeps responses small by pointing to the full documentation URL.
+ * Application service providing MCP resource references and brief tips for LLM agents.
+ * Keeps responses small by pointing to MCP resources.
  *
  * Usage:
  * ```kotlin
@@ -38,8 +38,15 @@ class SkillReference {
         append("4. Never use runBlocking - you're in a coroutine")
     }
 
+    private val resourceHint: String = buildString {
+        append("📚 TIP: Browse MCP resources (resources/list). ")
+        append("Start with intellij://skill/intellij-api-poweruser-guide, ")
+        append("intellij://ide/overview, ")
+        append("intellij://lsp/overview")
+    }
+
     /**
-     * Returns a tip message with the SKILL.md URL.
+     * Returns a tip message with MCP resource hints.
      */
     fun tipWithUrl(context: String = ""): String {
         return buildString {
@@ -47,8 +54,8 @@ class SkillReference {
                 appendLine(context)
                 appendLine()
             }
-            appendLine("📚 Full API documentation and examples: $skillUrl")
-            appendLine("   Fetch this URL for patterns on PSI, refactoring, code completion, and more.")
+            appendLine(resourceHint)
+            appendLine("   Use resources/read to fetch patterns on PSI, refactoring, code completion, and more.")
         }
     }
 
@@ -78,7 +85,7 @@ class SkillReference {
         return buildString {
             appendLine(hint)
             appendLine()
-            appendLine("📚 Full documentation: $skillUrl")
+            appendLine(resourceHint)
         }
     }
 
@@ -86,12 +93,7 @@ class SkillReference {
      * Success message with documentation link.
      */
     val successFooter: String
-        get() = buildString {
-            append("📚 TIP: Browse MCP resources (resources/list). ")
-            append("Start with intellij://skill/intellij-api-poweruser-guide, ")
-            append("intellij://ide/overview, ")
-            append("intellij://lsp/overview")
-        }
+        get() = resourceHint
 
     companion object {
         fun getInstance(): SkillReference = service()
