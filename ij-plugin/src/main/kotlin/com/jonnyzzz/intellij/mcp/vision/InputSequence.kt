@@ -194,7 +194,7 @@ class InputSequenceParser {
         while (index < sequence.length) {
             val ch = sequence[index]
             if (ch == '\n' || ch == '\r') {
-                val token = current.toString().trim()
+                val token = normalizeToken(current.toString())
                 if (token.isNotEmpty()) {
                     tokens.add(token)
                 }
@@ -215,7 +215,7 @@ class InputSequenceParser {
             index++
         }
 
-        val tail = current.toString().trim()
+        val tail = normalizeToken(current.toString())
         if (tail.isNotEmpty()) {
             tokens.add(tail)
         }
@@ -239,6 +239,12 @@ class InputSequenceParser {
             index++
         }
         return index < sequence.length && sequence[index] == ':'
+    }
+
+    private fun normalizeToken(raw: String): String {
+        val trimmed = raw.trim()
+        val withoutTrailingComma = trimmed.removeSuffix(",").trim()
+        return withoutTrailingComma
     }
 
     private fun stripComments(sequence: String): String {

@@ -114,6 +114,20 @@ class InputSequenceParserTest {
         assertTrue(steps[1] is InputStep.PressKey)
     }
 
+    @Test
+    fun parseTrailingCommaBeforeNewline() {
+        val steps = parser.parse(
+            """
+            stick:ALT,
+            press:F4
+            """.trimIndent()
+        )
+
+        assertEquals(2, steps.size)
+        assertTrue(steps[0] is InputStep.StickKey)
+        assertTrue(steps[1] is InputStep.PressKey)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsUnknownOperation() {
         parser.parse("noop:1")

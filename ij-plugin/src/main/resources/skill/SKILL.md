@@ -107,7 +107,7 @@ Send input events (keyboard + mouse) using a sequence string.
 - `task_id` (required): Task identifier for logging
 - `reason` (required): Why the input is needed
 - `screenshot_execution_id` (required): Execution ID from `steroid_take_screenshot` or `takeIdeScreenshot()`
-- `sequence` (required): Comma-separated or newline-separated input sequence (commas inside values are allowed unless they look like `, <step>:`)
+- `sequence` (required): Comma-separated or newline-separated input sequence (commas inside values are allowed unless they look like `, <step>:`; commas are optional when using newlines)
 
 **Sequence examples:**
 - `stick:ALT, delay:400, press:F4, type:hurra`
@@ -116,6 +116,7 @@ Send input events (keyboard + mouse) using a sequence string.
 
 **Notes:**
 - Comma separators are detected by `, <step>:` patterns, so avoid typing `, delay:` etc in text.
+- Trailing commas before a newline are ignored.
 - Use `#` for comments until the end of the line.
 - Targets default to screenshot coordinates; use `screen:` for absolute screen pixels.
 

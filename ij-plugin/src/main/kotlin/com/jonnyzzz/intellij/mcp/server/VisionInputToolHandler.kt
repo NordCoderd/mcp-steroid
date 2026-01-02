@@ -33,7 +33,7 @@ class VisionInputToolHandler {
         HEAVY ENDPOINT: This is intended for debugging and tricky configuration only.
         Prefer steroid_execute_code for regular automation.
 
-        Sequence format (comma-separated or newline-separated steps):
+        Sequence format (comma-separated or newline-separated steps; commas optional with newlines):
         - stick:ALT           (hold a key until the end)
         - delay:400           (milliseconds)
         - press:CTRL+P        (press key with modifiers)
@@ -42,6 +42,7 @@ class VisionInputToolHandler {
         - click:Right@screen:400,300     (click at screen coords)
 
         Comma separators are detected by ", <step>:" patterns, so avoid typing ", delay:" etc.
+        Trailing commas before a newline are ignored.
         Use "#" for comments until the end of the line.
 
         All keys are released at the end of the sequence.
