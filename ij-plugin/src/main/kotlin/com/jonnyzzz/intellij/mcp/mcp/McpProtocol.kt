@@ -53,6 +53,7 @@ object JsonRpcErrorCodes {
     const val METHOD_NOT_FOUND = -32601
     const val INVALID_PARAMS = -32602
     const val INTERNAL_ERROR = -32603
+    const val SESSION_EXPIRED = -32001
 }
 
 // ==================== MCP Initialize ====================

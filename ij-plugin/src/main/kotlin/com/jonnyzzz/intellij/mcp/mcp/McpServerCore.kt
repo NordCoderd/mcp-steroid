@@ -9,7 +9,7 @@ import kotlinx.serialization.json.*
  * Independent of transport layer.
  */
 class McpServerCore(
-    private val serverInfo: ServerInfo,
+    val serverInfo: ServerInfo,
     private val capabilities: ServerCapabilities,
     private val instructions: String? = null,
 ) {

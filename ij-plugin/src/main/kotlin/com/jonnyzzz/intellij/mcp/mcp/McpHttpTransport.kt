@@ -7,6 +7,10 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * MCP Streamable HTTP Transport implementation for Ktor.
@@ -29,6 +33,8 @@ object McpHttpTransport {
     const val SESSION_HEADER = "Mcp-Session-Id"
     private const val CONTENT_TYPE_JSON = "application/json"
     private const val CONTENT_TYPE_SSE = "text/event-stream"
+    private const val UNKNOWN_SESSION_MESSAGE =
+        "Unknown session. The MCP server has changed or restarted; please reinitialize and refresh the MCP configuration."
 
     /**
      * Install MCP routes at the specified path.
@@ -52,7 +58,7 @@ object McpHttpTransport {
             // - Server MUST return Content-Type: text/event-stream OR HTTP 405 Method Not Allowed
             get {
                 addCorsHeaders(call)
-                handleGet(call)
+                handleGet(call, server)
             }
 
             // DELETE - Terminate session
@@ -114,6 +120,13 @@ object McpHttpTransport {
             return
         }
 
+        val body = call.receiveText()
+        if (body.isBlank()) {
+            log.warn("[MCP] Empty request body")
+            call.respond(HttpStatusCode.BadRequest, "Empty request body")
+            return
+        }
+
         val sessionId = call.request.header(SESSION_HEADER)
         val (session, isNewSession) = if (sessionId != null) {
             val existingSession = server.sessionManager.getSession(sessionId)
@@ -121,22 +134,14 @@ object McpHttpTransport {
                 log.debug("[MCP] Using existing session: $sessionId")
                 existingSession to false
             } else {
-                // Session ID was provided but not found - this happens when IDE restarts
-                // Create a new session automatically to support seamless reconnection
                 log.info("[MCP] Unknown session ID: $sessionId (likely IDE was restarted)")
-                log.info("[MCP] Client (User-Agent: $userAgent) - creating new session for seamless reconnection")
-                server.sessionManager.createSession() to true
+                val requestId = parseRequestId(body)
+                respondUnknownSession(call, requestId)
+                return
             }
         } else {
             log.info("[MCP] No session ID provided, creating new session")
             server.sessionManager.createSession() to true
-        }
-
-        val body = call.receiveText()
-        if (body.isBlank()) {
-            log.warn("[MCP] Empty request body")
-            call.respond(HttpStatusCode.BadRequest, "Empty request body")
-            return
         }
 
         // Log the request body (truncated for large payloads)
@@ -175,7 +180,7 @@ object McpHttpTransport {
      * Important: Claude CLI sends "Accept: application/json, text/event-stream"
      * which means it accepts both - we should return JSON in this case.
      */
-    private suspend fun handleGet(call: ApplicationCall) {
+    private suspend fun handleGet(call: ApplicationCall, server: McpServerCore) {
         val remoteHost = call.request.local.remoteHost
         val userAgent = call.request.userAgent() ?: "unknown"
         log.info("[MCP] GET request from $remoteHost (User-Agent: $userAgent)")
@@ -186,10 +191,13 @@ object McpHttpTransport {
         // This is the common case for health checks from Claude CLI
         if (acceptHeader == null || acceptsJson(acceptHeader)) {
             log.info("[MCP] GET request from $remoteHost - returning server info (accepts JSON)")
-            call.respondText(
-                """{"name":"intellij-mcp-steroid","version":"1.0.0","status":"available"}""",
-                ContentType.Application.Json
-            )
+            val serverInfo = server.serverInfo
+            val payload = buildJsonObject {
+                put("name", serverInfo.name)
+                put("version", serverInfo.version)
+                put("status", "available")
+            }
+            call.respondText(McpJson.encodeToString(JsonObject.serializer(), payload), ContentType.Application.Json)
             return
         }
 
@@ -228,6 +236,25 @@ object McpHttpTransport {
             val mediaType = part.trim().split(";").first().trim()
             mediaType == CONTENT_TYPE_SSE || mediaType == "*/*" || mediaType == "text/*"
         }
+    }
+
+    private fun parseRequestId(body: String): JsonElement? {
+        return runCatching {
+            val json = McpJson.parseToJsonElement(body)
+            (json as? JsonObject)?.get("id")
+        }.getOrNull()
+    }
+
+    private suspend fun respondUnknownSession(call: ApplicationCall, requestId: JsonElement?) {
+        val response = JsonRpcResponse(
+            id = requestId ?: JsonNull,
+            error = JsonRpcError(
+                code = JsonRpcErrorCodes.SESSION_EXPIRED,
+                message = UNKNOWN_SESSION_MESSAGE
+            )
+        )
+        val payload = McpJson.encodeToString(JsonRpcResponse.serializer(), response)
+        call.respondText(payload, ContentType.Application.Json, HttpStatusCode.NotFound)
     }
 
     private suspend fun handleDelete(call: ApplicationCall, server: McpServerCore) {

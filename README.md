@@ -248,6 +248,8 @@ curl -X POST http://localhost:63150/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"steroid_list_projects"}}'
 ```
 
+**Session recovery**: If a request with `Mcp-Session-Id` returns HTTP 404, the session has expired or the server restarted. Re-send an `initialize` request without a session header (and refresh the server URL if needed).
+
 ## MCP Tools
 
 All tools are prefixed with `steroid_` to distinguish them from IntelliJ's built-in MCP tools.

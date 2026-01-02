@@ -452,7 +452,7 @@ class McpHttpTransportTest {
         val response = client.get("http://localhost:$port/mcp")
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(response.bodyAsText().contains("intellij-mcp-steroid"))
+        assertServerInfo(response)
     }
 
     @Test
@@ -463,7 +463,7 @@ class McpHttpTransportTest {
         }
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(response.bodyAsText().contains("intellij-mcp-steroid"))
+        assertServerInfo(response)
     }
 
     @Test
@@ -474,7 +474,7 @@ class McpHttpTransportTest {
         }
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(response.bodyAsText().contains("intellij-mcp-steroid"))
+        assertServerInfo(response)
     }
 
     @Test
@@ -486,7 +486,14 @@ class McpHttpTransportTest {
         }
 
         assertEquals(HttpStatusCode.OK, response.status)
-        assertTrue(response.bodyAsText().contains("intellij-mcp-steroid"))
+        assertServerInfo(response)
+    }
+
+    private suspend fun assertServerInfo(response: HttpResponse) {
+        val json = McpJson.parseToJsonElement(response.bodyAsText()).jsonObject
+        assertEquals(mcpServer.serverInfo.name, json["name"]?.jsonPrimitive?.content)
+        assertEquals(mcpServer.serverInfo.version, json["version"]?.jsonPrimitive?.content)
+        assertEquals("available", json["status"]?.jsonPrimitive?.content)
     }
 
     // ==================== Unknown Method Tests ====================
