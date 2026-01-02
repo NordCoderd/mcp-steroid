@@ -108,6 +108,15 @@ interface McpScriptContext {
      */
     fun progress(message: String)
 
+    /**
+     * Capture a screenshot of the IDE frame and send it as image content in the MCP response.
+     * The image is saved under the execution folder with the provided filename.
+     *
+     * @param fileName file name for the persisted screenshot (default: ide-screenshot.png)
+     * @return absolute path to the saved screenshot, or null if capture failed
+     */
+    suspend fun takeIdeScreenshot(fileName: String = "ide-screenshot.png"): String?
+
     // ============================================================
     // IDE Utilities - Waiting
     // ============================================================

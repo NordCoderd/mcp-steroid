@@ -36,6 +36,7 @@ class TestResultBuilder : ExecutionResultBuilder {
     val messages = mutableListOf<String>()
     val progressMessages = mutableListOf<String>()
     val exceptions = mutableListOf<Pair<String, Throwable>>()
+    val images = mutableListOf<TestImage>()
     private var failed = false
     var failureMessage: String? = null
 
@@ -49,6 +50,10 @@ class TestResultBuilder : ExecutionResultBuilder {
         progressMessages += message
     }
 
+    override fun logImage(mimeType: String, data: String, fileName: String) {
+        images += TestImage(mimeType = mimeType, data = data, fileName = fileName)
+    }
+
     override fun logException(message: String, throwable: Throwable) {
         exceptions += message to throwable
     }
@@ -59,7 +64,7 @@ class TestResultBuilder : ExecutionResultBuilder {
     }
 
     fun hasAnyOutput(): Boolean {
-        return failed || messages.isNotEmpty() || exceptions.isNotEmpty() || progressMessages.isNotEmpty()
+        return failed || messages.isNotEmpty() || exceptions.isNotEmpty() || progressMessages.isNotEmpty() || images.isNotEmpty()
     }
 
     fun hasDaemonDyingError(): Boolean {
@@ -72,6 +77,7 @@ class TestResultBuilder : ExecutionResultBuilder {
         appendLine("failed=$failed")
         messages.forEach { appendLine("MESSAGE: $it") }
         progressMessages.forEach { appendLine("PROGRESS: $it") }
+        images.forEach { appendLine("IMAGE: ${it.fileName} (${it.mimeType})") }
         exceptions.forEach {
             appendLine("EXCEPTION: ${it.first}")
             appendLine(it.second.toString())
@@ -80,6 +86,12 @@ class TestResultBuilder : ExecutionResultBuilder {
         appendLine("Failure message: $failureMessage")
     }
 }
+
+data class TestImage(
+    val mimeType: String,
+    val data: String,
+    val fileName: String,
+)
 
 /**
  * Creates ExecCodeParams for tests with sensible defaults.
@@ -115,4 +127,3 @@ fun getExecutionIdFromResult(result: ToolCallResult): String {
     println("Result: $executionId")
     return executionId
 }
-

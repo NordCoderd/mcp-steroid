@@ -38,6 +38,12 @@ data class ExecutionId(val executionId: String)
 data class TextMessage(val text: String)
 
 @Serializable
+data class ImageMessage(
+    val fileName: String,
+    val mimeType: String,
+)
+
+@Serializable
 data class ToolCallMetadata(
     val toolName: String,
     val timestamp: String,
@@ -59,6 +65,7 @@ inline val Project.executionStorage : ExecutionStorage get() = service()
  *     script.kts          - Original code submitted by LLM
  *     parameters.json     - Execution parameters
  *     output.jsonl        - Output messages (append-only)
+ *     ide-screenshot.png  - Optional screenshot captured during execution
  *     result.json         - Final execution result
  *     review.kts          - Code shown for review (may have user edits)
  *     review-result.json  - Review outcome with user feedback
@@ -131,6 +138,22 @@ class ExecutionStorage(
             path.writeText(data)
         }
         return path
+    }
+
+    suspend fun writeBinaryExecutionData(executionId: ExecutionId, name: String, data: ByteArray): Path {
+        val path = executionId.dir.resolve(name)
+        withContext(Dispatchers.IO) {
+            ensureBaseDirExcluded()
+            Files.write(path, data)
+        }
+        return path
+    }
+
+    fun resolveExecutionPath(executionId: ExecutionId, name: String): Path {
+        require(!name.contains("..") && !name.contains("/") && !name.contains("\\")) {
+            "Invalid execution file name: $name"
+        }
+        return executionId.dir.resolve(name)
     }
 
     fun findExecutionId(executionId: String) : ExecutionId? {

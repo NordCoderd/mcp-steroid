@@ -7,6 +7,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.mcp.builder
 import com.jonnyzzz.intellij.mcp.review.ReviewManager
@@ -15,6 +16,7 @@ import com.jonnyzzz.intellij.mcp.server.McpProgressReporter
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
 import com.jonnyzzz.intellij.mcp.server.SkillReference
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import com.jonnyzzz.intellij.mcp.storage.ImageMessage
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import kotlinx.coroutines.*
 
@@ -22,6 +24,7 @@ interface ExecutionResultBuilder {
     val isFailed: Boolean
     fun logMessage(message: String)
     fun logProgress(message: String)
+    fun logImage(mimeType: String, data: String, fileName: String)
     fun logException(message: String, throwable: Throwable)
     fun reportFailed(message: String)
 }
@@ -114,6 +117,16 @@ class ExecutionManager(
             mcpProgress.report(text)
             innerScope.launch {
                 project.executionStorage.appendExecutionEvent(executionId, text)
+            }
+        }
+
+        override fun logImage(mimeType: String, data: String, fileName: String) {
+            responseBuilder.addContent(ContentItem.Image(data = data, mimeType = mimeType))
+            innerScope.launch {
+                project.executionStorage.appendExecutionEvent(
+                    executionId,
+                    ImageMessage(fileName = fileName, mimeType = mimeType)
+                )
             }
         }
 

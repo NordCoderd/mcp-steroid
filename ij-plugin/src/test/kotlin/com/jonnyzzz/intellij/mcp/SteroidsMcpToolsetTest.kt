@@ -7,6 +7,9 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
+import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import java.nio.file.Files
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -14,6 +17,8 @@ import kotlin.time.Duration.Companion.seconds
  * These tests verify that the ExecutionManager correctly executes code.
  */
 class SteroidsMcpToolsetTest : BasePlatformTestCase() {
+
+    override fun runInDispatchThread(): Boolean = false
 
     override fun setUp() {
         super.setUp()
@@ -115,5 +120,34 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         // If marked as error, it should have error message
         assertTrue("Should be error", result.isError)
         assertTrue("Error should have message", text.isNotEmpty())
+    }
+
+    fun testExecuteCodeWithScreenshot(): Unit = timeoutRunBlocking(60.seconds) {
+        val manager = project.service<ExecutionManager>()
+        myFixture.configureByText("ScreenshotTest.txt", "Screenshot test content")
+
+        val result = manager.executeWithProgress(
+            testExecParams(
+                """
+                execute {
+                    takeIdeScreenshot()
+                }
+                """.trimIndent()
+            ),
+            NoOpProgressReporter
+        )
+
+        assertFalse("Execution should succeed", result.isError)
+        val image = result.content.filterIsInstance<ContentItem.Image>().singleOrNull()
+        assertNotNull("Should return image content", image)
+        assertEquals("image/png", image!!.mimeType)
+        assertTrue("Image data should be non-empty", image.data.isNotBlank())
+
+        val executionId = getExecutionIdFromResult(result)
+        val screenshotPath = project.executionStorage.resolveExecutionPath(
+            ExecutionId(executionId),
+            "ide-screenshot.png"
+        )
+        assertTrue("Screenshot file should be persisted", Files.exists(screenshotPath))
     }
 }
