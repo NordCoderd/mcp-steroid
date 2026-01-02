@@ -76,17 +76,22 @@ Use polling via `get_result` to retrieve execution output.
 
 ```kotlin
 plugins {
-    id("org.jetbrains.intellij.platform") version "2.1.0"
-    kotlin("jvm") version "2.1.0"
+    id("org.jetbrains.intellij.platform") version "2.10.5"
+    kotlin("jvm") version "2.2.21"
+    kotlin("plugin.serialization") version "2.2.21"
 }
 
 dependencies {
     intellijPlatform {
-        intellijIdeaCommunity("2025.3")
-        bundledPlugin("com.intellij.java")
+        intellijIdeaUltimate("2025.3")
+        localPlugin(kotlinPluginPath)
+        localPlugin(javaPluginPath)
+        testFramework(TestFrameworkType.Platform)
     }
 }
 ```
+
+`kotlinPluginPath` and `javaPluginPath` are resolved from the local IDE distribution; see `build.gradle.kts`.
 
 ### 1.2 Update plugin.xml
 

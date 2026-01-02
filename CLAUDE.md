@@ -57,6 +57,12 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 ./gradlew verifyPlugin
 ```
 
+## Build Notes
+
+- IDE distributions are cached under `.intellijPlatform/ides/IU-2025.3` (`intellijPlatform.caching.ides.enabled = true`).
+- The build moves `plugins/fullLine/lib/modules/intellij.fullLine.yaml.jar` to `.bak` inside the local IDE cache to avoid plugin-structure warnings; the Gradle cache is not modified.
+- Tests use `localPlugin(...)` for the Kotlin and Java plugins to align with the IDE classpath.
+
 ## Technology Stack
 
 - **Gradle**: 8.11.1 with Kotlin DSL
@@ -228,7 +234,7 @@ Run specific test class:
 
 ### Test Dependencies
 
-The Kotlin plugin (`org.jetbrains.kotlin`) is added as a bundled dependency to enable Kotlin script engine in tests. Without it, `IdeScriptEngineManager.getEngineByFileExtension("kts", null)` returns null.
+The Kotlin and Java plugins are loaded from the local IntelliJ distribution via `localPlugin(...)` to keep the test classpath aligned with the IDE and avoid bundled plugin scan warnings. Without the Kotlin plugin, `IdeScriptEngineManager.getEngineByFileExtension("kts", null)` returns null.
 
 ### Test Patterns
 
