@@ -85,6 +85,35 @@ class InputSequenceParserTest {
         assertEquals(10, delay.ms)
     }
 
+    @Test
+    fun parseNewLines() {
+        val steps = parser.parse(
+            """
+            stick:ALT
+            press:F4
+            """.trimIndent()
+        )
+
+        assertEquals(2, steps.size)
+        assertTrue(steps[0] is InputStep.StickKey)
+        assertTrue(steps[1] is InputStep.PressKey)
+    }
+
+    @Test
+    fun parseComments() {
+        val steps = parser.parse(
+            """
+            stick:ALT # hold modifier
+            # comment line
+            press:F4 # close window
+            """.trimIndent()
+        )
+
+        assertEquals(2, steps.size)
+        assertTrue(steps[0] is InputStep.StickKey)
+        assertTrue(steps[1] is InputStep.PressKey)
+    }
+
     @Test(expected = IllegalArgumentException::class)
     fun rejectsUnknownOperation() {
         parser.parse("noop:1")

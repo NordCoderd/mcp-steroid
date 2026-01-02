@@ -41,7 +41,8 @@ sealed class InputStep {
 
 class InputSequenceParser {
     fun parse(sequence: String): List<InputStep> {
-        val trimmed = sequence.trim()
+        val sanitized = stripComments(sequence)
+        val trimmed = sanitized.trim()
         require(trimmed.isNotEmpty()) { "sequence is empty" }
 
         val tokens = tokenize(trimmed)
@@ -192,6 +193,15 @@ class InputSequenceParser {
         var index = 0
         while (index < sequence.length) {
             val ch = sequence[index]
+            if (ch == '\n' || ch == '\r') {
+                val token = current.toString().trim()
+                if (token.isNotEmpty()) {
+                    tokens.add(token)
+                }
+                current.setLength(0)
+                index++
+                continue
+            }
             if (ch == ',' && isSeparatorAt(sequence, index)) {
                 val token = current.toString().trim()
                 if (token.isNotEmpty()) {
@@ -229,6 +239,16 @@ class InputSequenceParser {
             index++
         }
         return index < sequence.length && sequence[index] == ':'
+    }
+
+    private fun stripComments(sequence: String): String {
+        val builder = StringBuilder()
+        for (line in sequence.lineSequence()) {
+            val sanitized = line.substringBefore("#")
+            builder.append(sanitized)
+            builder.append('\n')
+        }
+        return builder.toString()
     }
 
     companion object {
