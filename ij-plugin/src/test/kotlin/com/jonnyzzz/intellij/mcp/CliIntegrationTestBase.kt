@@ -180,4 +180,47 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             .assertNoErrorsInOutput(message = "prompt")
             .assertOutputContains(marker, message = "steroid_execute_code should output '$marker'")
     }
+
+    fun testExecSessionReset(): Unit = timeoutRunBlocking(360.seconds) {
+        val session = newAiSession()
+
+        session.runPrompt(
+            """
+            You are testing MCP integration. You MUST call steroid_execute_code exactly three times, in order.
+            Reason: cli session reset test, and distinct task_id values.
+
+            Call #1 code:
+            execute {
+                println("EXEC1_OK")
+            }
+
+            Call #2 code:
+            import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
+
+            execute {
+                val server = SteroidsMcpServer.getInstance().getServer()
+                val forgotten = server.sessionManager.forgetAllSessionsForTest()
+                println("SESSIONS_FORGOTTEN: " + forgotten)
+            }
+
+            Call #3 code:
+            execute {
+                println("EXEC2_OK")
+            }
+
+            After each call, extract the output line containing the marker and print:
+            RESULT1: <line with EXEC1_OK>
+            RESULT2: <line with SESSIONS_FORGOTTEN:>
+            RESULT3: <line with EXEC2_OK>
+
+            Output must be plain text only. Do NOT use Markdown, lists, or code blocks.
+            If any step fails, print ERROR: <reason>.
+            """.trimIndent(),
+        )
+            .assertExitCode(0, "prompt")
+            .assertNoErrorsInOutput(message = "prompt")
+            .assertOutputContains("RESULT1:", "EXEC1_OK", message = "exec #1 should run")
+            .assertOutputContains("RESULT2:", "SESSIONS_FORGOTTEN:", message = "exec #2 should run")
+            .assertOutputContains("RESULT3:", "EXEC2_OK", message = "exec #3 should run")
+    }
 }

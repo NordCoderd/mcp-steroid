@@ -2,7 +2,6 @@
 package com.jonnyzzz.intellij.mcp.mcp
 
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.util.test.TestOnly
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -10,7 +9,7 @@ import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonObject
+import org.jetbrains.annotations.TestOnly
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
