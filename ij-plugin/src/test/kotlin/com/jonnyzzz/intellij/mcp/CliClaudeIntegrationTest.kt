@@ -71,40 +71,44 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
     fun testExecSessionResetAndMcpList(): Unit = timeoutRunBlocking(360.seconds) {
         val session = claudeSession().registerMcp(resolveDockerUrl(), "intellij")
 
-        runExecCode(
-            session,
+        session.runPrompt(
             """
+            You are testing MCP integration. You MUST call steroid_execute_code exactly three times, in order.
+            Use project_name: intellij-mcp-steroid, reason: cli session reset test, and distinct task_id values.
+
+            Call #1 code:
             execute {
                 println("EXEC1_OK")
             }
-            """.trimIndent(),
-            "EXEC1_OK",
-        )
 
-        runExecCode(
-            session,
-            """
+            Call #2 code:
             import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
 
             execute {
                 val server = SteroidsMcpServer.getInstance().getServer()
-                val sessionIds = server.sessionManager.getAllSessions().map { it.id }
-                sessionIds.forEach { server.sessionManager.removeSession(it) }
-                println("SESSIONS_CLEARED: " + sessionIds.size)
+                val forgotten = server.sessionManager.forgetAllSessionsForTest()
+                println("SESSIONS_FORGOTTEN: " + forgotten)
             }
-            """.trimIndent(),
-            "SESSIONS_CLEARED:",
-        )
 
-        runExecCode(
-            session,
-            """
+            Call #3 code:
             execute {
                 println("EXEC2_OK")
             }
+
+            After each call, extract the output line containing the marker and print:
+            RESULT1: <line with EXEC1_OK>
+            RESULT2: <line with SESSIONS_FORGOTTEN:>
+            RESULT3: <line with EXEC2_OK>
+
+            Output must be plain text only. Do NOT use Markdown, lists, or code blocks.
+            If any step fails, print ERROR: <reason>.
             """.trimIndent(),
-            "EXEC2_OK",
         )
+            .assertExitCode(0, "prompt")
+            .assertNoErrorsInOutput(message = "prompt")
+            .assertOutputContains("RESULT1:", "EXEC1_OK", message = "exec #1 should run")
+            .assertOutputContains("RESULT2:", "SESSIONS_FORGOTTEN:", message = "exec #2 should run")
+            .assertOutputContains("RESULT3:", "EXEC2_OK", message = "exec #3 should run")
 
         session.runInContainer("mcp", "list")
             .assertExitCode(0, "mcp list")

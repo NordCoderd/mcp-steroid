@@ -2,6 +2,7 @@
 package com.jonnyzzz.intellij.mcp.mcp
 
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.util.test.TestOnly
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -226,4 +227,12 @@ class McpSessionManager {
      * Get count of active sessions.
      */
     fun getSessionCount(): Int = sessions.size
+
+    @TestOnly
+    fun forgetAllSessionsForTest(): Int {
+        val count = sessions.size
+        sessions.clear()
+        log.info("[MCP SessionManager] Forgot all sessions without disposing (previous count: $count)")
+        return count
+    }
 }
