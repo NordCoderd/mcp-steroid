@@ -248,7 +248,7 @@ curl -X POST http://localhost:63150/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"steroid_list_projects"}}'
 ```
 
-**Session recovery**: If a request arrives with an unknown `Mcp-Session-Id` (IDE restart), the server creates a new session and returns a fresh `Mcp-Session-Id` header. Clients should update the stored session ID and continue without re-registering the server.
+**Session recovery**: If a request arrives with an unknown `Mcp-Session-Id` (IDE restart), the server creates a new session and returns a fresh `Mcp-Session-Id` header plus `Mcp-Session-Notice` explaining the reset. Clients should update the stored session ID and continue without re-registering the server.
 
 ## MCP Tools
 
@@ -718,12 +718,15 @@ The project includes integration tests that verify MCP server functionality:
   - Tests MCP server registration, tool discovery, and documented workflow
   - Includes system property test verifying end-to-end MCP execution
 - `CodexCliIntegrationTest.kt` - Tests OpenAI Codex CLI integration (requires Docker, OPENAI_API_KEY)
+  - Includes a three-step execute_code flow (exec → forget sessions → exec) and MCP list validation
   - Tests TOML configuration and tool invocation
   - Includes system property test verifying end-to-end MCP execution
   - Note: `codex mcp add` only supports stdio servers; HTTP uses TOML config
 - `ScriptExecutorTest.kt` - Tests script execution with fast failure semantics
 - `ExecutionManagerTest.kt` - Tests execution manager with progress reporting
 - `SteroidsMcpToolsetTest.kt` - Tests MCP tool execution flow
+- `ScriptExecutionAvailabilityTest.kt` - Fast-fail smoke test to detect broken execute_code engine
+- `OcrProcessClientTest.kt` - Runs OCR extraction against bundled test images via the `ocr-tesseract` helper app
 
 **Shell Scripts** (in `integration-test/`):
 - `test-sse-tools.sh` - Tests HTTP transport directly via curl
