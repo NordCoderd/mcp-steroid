@@ -47,7 +47,7 @@ class VisionInputToolHandler {
 
         All keys are released at the end of the sequence.
 
-        The input is delivered to the window captured by steroid_take_screenshot (window_id from metadata).
+        The input is delivered to the window captured by steroid_take_screenshot (window_id from metadata) and the focus is forced to that window.
 
         After execution, call steroid_execute_feedback to log your feedback.
     """.trimIndent()

@@ -128,6 +128,8 @@ Send input events (keyboard + mouse) using a sequence string.
 - Trailing commas before a newline are ignored.
 - Use `#` for comments until the end of the line.
 - Targets default to screenshot coordinates; use `screen:` for absolute screen pixels.
+- Input focuses the screenshot window before dispatching events.
+- Input focuses the screenshot window before dispatching events.
 
 ### `steroid_execute_code`
 Execute Kotlin code in IntelliJ's runtime.

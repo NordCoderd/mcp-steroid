@@ -69,6 +69,7 @@ Notes:
 - Trailing commas before a newline are ignored.
 - Use `#` for comments until the end of the line.
 - Targets default to screenshot coordinates; use `screen:` for absolute screen pixels.
+- Input focuses the screenshot window before dispatching events.
 
 ### `steroid_execute_code`
 Execute Kotlin code directly in IntelliJ's runtime. This is your primary tool.

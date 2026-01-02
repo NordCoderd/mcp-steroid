@@ -4,6 +4,7 @@ package com.jonnyzzz.intellij.mcp.vision
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.util.ui.ImageUtil
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
@@ -259,6 +260,9 @@ object VisionService {
             }
 
             try {
+                withContext(Dispatchers.EDT) {
+                    ensureFocus(rootComponent)
+                }
                 for (step in steps) {
                     when (step) {
                         is InputStep.Delay -> delay(step.ms)
@@ -296,12 +300,14 @@ object VisionService {
         }
 
         private fun stickKey(component: Component, step: InputStep.StickKey) {
+            ensureFocus(component)
             if (stuckKeys.add(step.keyCode)) {
                 dispatchKey(component, KeyEvent.KEY_PRESSED, step.keyCode, '\u0000', currentModifiers())
             }
         }
 
         private fun pressKey(component: Component, step: InputStep.PressKey) {
+            ensureFocus(component)
             val tempModifiers = step.modifiers.mapNotNull { modifierKeyCode(it) }
                 .filterNot { stuckKeys.contains(it) }
             tempModifiers.forEach { dispatchKey(component, KeyEvent.KEY_PRESSED, it, '\u0000', currentModifiers()) }
@@ -314,6 +320,7 @@ object VisionService {
 
         private fun typeText(component: Component, step: InputStep.TypeText) {
             val focus = focusOwner(component)
+            ensureFocus(focus)
             focus.requestFocusInWindow()
             step.text.forEach { ch ->
                 dispatchKey(focus, KeyEvent.KEY_TYPED, KeyEvent.VK_UNDEFINED, ch, currentModifiers())
@@ -342,6 +349,7 @@ object VisionService {
                 is InputTarget.Unsupported -> throw IllegalStateException("Unsupported target: ${target.raw}")
             }
 
+            ensureFocus(targetComponent)
             targetComponent.requestFocusInWindow()
 
             val modifiers = currentModifiers(step.modifiers)
@@ -374,6 +382,20 @@ object VisionService {
         private fun focusOwner(component: Component): Component {
             val focus = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().focusOwner
             return focus ?: component
+        }
+
+        private fun ensureFocus(component: Component) {
+            val window = component as? Window ?: SwingUtilities.getWindowAncestor(component)
+            if (window != null) {
+                if (!window.isActive) {
+                    window.toFront()
+                    window.requestFocus()
+                }
+            }
+
+            val focusManager = IdeFocusManager.findInstanceByComponent(component)
+                ?: IdeFocusManager.getGlobalInstance()
+            focusManager.requestFocus(component, true)
         }
 
         private fun releaseAll(component: Component) {
