@@ -44,10 +44,23 @@ class SkillResourceHandler {
      * Can be used by both MCP resource and HTTP endpoints.
      */
     fun loadSkillMd(): String {
-        return javaClass.getResourceAsStream("/skill/SKILL.md")
+        val content = javaClass.getResourceAsStream("/skill/SKILL.md")
             ?.bufferedReader()
             ?.readText()
             ?: error("SKILL.md resource is not found")
+        return injectPluginVersion(content)
+    }
+
+    private fun injectPluginVersion(content: String): String {
+        val version = PluginVersionResolver.resolve(javaClass.classLoader)
+        val headerEnd = content.indexOf("\n---", startIndex = 3)
+        if (content.startsWith("---") && headerEnd > 0) {
+            val header = content.substring(0, headerEnd)
+            val rest = content.substring(headerEnd)
+            val updatedHeader = header.replaceFirst(Regex("(?m)^  version:.*$"), "  version: \"$version\"")
+            return updatedHeader + rest
+        }
+        return content
     }
 }
 
