@@ -94,6 +94,11 @@ kotlin {
 }
 
 intellijPlatform {
+    caching {
+        ides {
+            enabled = true
+        }
+    }
     buildSearchableOptions = false
     pluginConfiguration {
         name = "IntelliJ MCP Steroid"
