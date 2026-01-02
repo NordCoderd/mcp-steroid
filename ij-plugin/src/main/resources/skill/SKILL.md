@@ -65,10 +65,12 @@ The IDE has indexed everything. It knows the code better than any file search.
 List all open projects. Returns project names for use with `steroid_execute_code`.
 
 ### `steroid_list_windows`
-List open IDE windows and their associated projects. Use this in multi-window setups to pick the correct `project_name` for screenshot/input tools.
+List open IDE windows and their associated projects. Some windows may not be tied to a project and a project can have multiple windows.
+Use this in multi-window setups to pick the correct `project_name` and `window_id` for screenshot/input tools.
 
 ### `steroid_list_windows`
-List open IDE windows and their associated projects. Use this in multi-window setups to pick the correct `project_name` for screenshot/input tools.
+List open IDE windows and their associated projects. Some windows may not be tied to a project and a project can have multiple windows.
+Use this in multi-window setups to pick the correct `project_name` and `window_id` for screenshot/input tools.
 
 ### `steroid_capabilities`
 List IDE capabilities such as installed plugins and registered languages.
@@ -95,13 +97,14 @@ Capture a screenshot of the IDE frame and return image content.
 - `project_name` (required): Target project name
 - `task_id` (required): Task identifier for logging
 - `reason` (required): Why the screenshot is needed
+- `window_id` (optional): Window id from `steroid_list_windows` to target a specific window
 
 **Artifacts (saved under the execution folder):**
 - `screenshot.png`
 - `screenshot-tree.md`
 - `screenshot-meta.json`
 
-Use the returned `execution_id` as `screenshot_execution_id` for `steroid_input`.
+Use the returned `execution_id` as `screenshot_execution_id` for `steroid_input`. The `window_id` is logged and stored in `screenshot-meta.json`.
 
 ### `steroid_input`
 Send input events (keyboard + mouse) using a sequence string.

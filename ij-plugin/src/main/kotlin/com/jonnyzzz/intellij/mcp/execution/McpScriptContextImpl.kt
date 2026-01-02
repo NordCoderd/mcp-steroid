@@ -96,6 +96,7 @@ class McpScriptContextImpl(
         return try {
             val artifacts = VisionService.capture(project, executionId)
             resultBuilder.logImage("image/png", Base64.getEncoder().encodeToString(artifacts.imageBytes), artifacts.meta.imageFile)
+            resultBuilder.logMessage("window_id: ${artifacts.meta.windowId}")
             resultBuilder.logMessage("Screenshot saved to ${artifacts.imagePath}")
             resultBuilder.logMessage("Component tree saved to ${artifacts.treePath}")
             resultBuilder.logMessage("Screenshot metadata saved to ${artifacts.metaPath}")

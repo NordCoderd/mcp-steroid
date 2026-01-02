@@ -272,13 +272,14 @@ Lists IDE capabilities such as installed plugins and registered languages.
 - `include_disabled_plugins` (optional): Include disabled plugins in the response (default: false)
 
 ### `steroid_list_windows`
-List open IDE windows and their associated projects. Use this when multiple windows are open to pick the right `project_name` for screenshot/input tools.
+List open IDE windows and their associated projects. Some windows may not be tied to a project and a project can have multiple windows.
+Use this when multiple windows are open to pick the right `project_name` and `window_id` for screenshot/input tools.
 
 **Returns**:
-- `projectName`, `projectPath`
+- `projectName`, `projectPath` (may be null for non-project windows)
 - `title`, `isActive`, `isVisible`
 - `bounds` (x, y, width, height)
-- `windowId` (diagnostic only)
+- `windowId` (use for `steroid_take_screenshot` targeting)
 
 ### `steroid_action_discovery`
 Discover available editor actions, quick-fixes, and gutter actions for a file and caret context.
@@ -301,13 +302,14 @@ Capture a screenshot of the IDE frame and return image content.
 - `project_name` (required): Name of an open project (from `steroid_list_projects`)
 - `task_id` (required): Task identifier for logging
 - `reason` (required): Why the screenshot is needed
+- `window_id` (optional): Window id from `steroid_list_windows` to target a specific window
 
 **Artifacts (saved under the execution folder):**
 - `screenshot.png`
 - `screenshot-tree.md`
 - `screenshot-meta.json`
 
-**Response**: Includes `image/png` content plus text output. Use the returned `execution_id` as `screenshot_execution_id` for `steroid_input`.
+**Response**: Includes `image/png` content plus text output. Logs `window_id` for use with `steroid_input` (stored in screenshot metadata).
 
 ### `steroid_input`
 Send input events (keyboard + mouse) using a sequence string.

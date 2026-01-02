@@ -20,6 +20,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import javax.swing.SwingUtilities
+import com.jonnyzzz.intellij.mcp.vision.WindowIdUtil
 
 /**
  * Handler for the steroid_list_windows MCP tool.
@@ -42,24 +43,43 @@ class ListWindowsToolHandler {
 
     private suspend fun handle(params: ToolCallParams): ToolCallResult {
         val windowInfos = withContext(Dispatchers.EDT) {
-            WindowManager.getInstance().getAllProjectFrames()
-                .map { frame ->
-                    val project = frame.project
-                    val component = frame.component
-                    val window = SwingUtilities.getWindowAncestor(component)
-                    val bounds = window?.bounds
+            val frames = WindowManager.getInstance().getAllProjectFrames().toList()
+            val frameInfos = frames.map { frame ->
+                val project = frame.project
+                val component = frame.component
+                val window = SwingUtilities.getWindowAncestor(component)
+                val bounds = window?.bounds
 
+                WindowInfo(
+                    projectName = project?.name,
+                    projectPath = project?.basePath,
+                    title = (window as? java.awt.Frame)?.title,
+                    isActive = window?.isActive ?: false,
+                    isVisible = window?.isVisible ?: false,
+                    bounds = bounds?.let { WindowBounds(it.x, it.y, it.width, it.height) },
+                    windowId = WindowIdUtil.compute(window, component)
+                )
+            }
+
+            val knownWindowIds = frameInfos.map { it.windowId }.toMutableSet()
+            val extraInfos = java.awt.Window.getWindows()
+                .filter { it.isDisplayable }
+                .mapNotNull { window ->
+                    val windowId = WindowIdUtil.compute(window, window)
+                    if (!knownWindowIds.add(windowId)) return@mapNotNull null
+                    val bounds = window.bounds
                     WindowInfo(
-                        projectName = project?.name,
-                        projectPath = project?.basePath,
+                        projectName = null,
+                        projectPath = null,
                         title = (window as? java.awt.Frame)?.title,
-                        isActive = window?.isActive ?: false,
-                        isVisible = window?.isVisible ?: false,
-                        bounds = bounds?.let { WindowBounds(it.x, it.y, it.width, it.height) },
-                        windowId = window?.let { "w-" + Integer.toHexString(System.identityHashCode(it)) }
-                            ?: "c-" + Integer.toHexString(System.identityHashCode(component))
+                        isActive = window.isActive,
+                        isVisible = window.isVisible,
+                        bounds = WindowBounds(bounds.x, bounds.y, bounds.width, bounds.height),
+                        windowId = windowId
                     )
                 }
+
+            frameInfos + extraInfos
         }
 
         val openProjects = readAction {

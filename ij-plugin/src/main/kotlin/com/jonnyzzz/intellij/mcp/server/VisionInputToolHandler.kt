@@ -47,6 +47,8 @@ class VisionInputToolHandler {
 
         All keys are released at the end of the sequence.
 
+        The input is delivered to the window captured by steroid_take_screenshot (window_id from metadata).
+
         After execution, call steroid_execute_feedback to log your feedback.
     """.trimIndent()
 
@@ -136,6 +138,10 @@ class VisionInputToolHandler {
             if (meta.system != "swing") {
                 throw IllegalStateException("Unsupported capture system '${meta.system}'. Only swing is supported.")
             }
+            if (meta.windowId.isNullOrBlank()) {
+                throw IllegalStateException("Screenshot metadata missing windowId; re-capture with the latest version.")
+            }
+            log("Using window_id: ${meta.windowId}")
 
             VisionService.executeInput(project, meta, parsed)
             log("Input sequence executed successfully.")

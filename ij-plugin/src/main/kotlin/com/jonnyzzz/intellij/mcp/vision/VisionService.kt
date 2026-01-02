@@ -14,8 +14,10 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.awt.Component
+import java.awt.Container
 import java.awt.Point
 import java.awt.Dimension
+import java.awt.Window
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
@@ -24,7 +26,6 @@ import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.imageio.ImageIO
-import javax.swing.JComponent
 import javax.swing.SwingUtilities
 import kotlin.math.roundToInt
 
@@ -39,6 +40,11 @@ data class ScreenshotMeta(
     val componentSize: Size,
     val imageSize: Size,
     val locationOnScreen: PointInfo?,
+    val windowId: String? = null,
+    val windowTitle: String? = null,
+    val windowBounds: Rect? = null,
+    val projectName: String? = null,
+    val projectPath: String? = null,
     val capturedAt: String,
 )
 
@@ -47,6 +53,9 @@ data class Size(val width: Int, val height: Int)
 
 @Serializable
 data class PointInfo(val x: Int, val y: Int)
+
+@Serializable
+data class Rect(val x: Int, val y: Int, val width: Int, val height: Int)
 
 data class ScreenshotArtifacts(
     val imageBytes: ByteArray,
@@ -66,8 +75,8 @@ object VisionService {
         ignoreUnknownKeys = true
     }
 
-    suspend fun capture(project: Project, executionId: ExecutionId): ScreenshotArtifacts {
-        val capture = withContext(Dispatchers.EDT) { captureOnEdt(project) }
+    suspend fun capture(project: Project, executionId: ExecutionId, windowId: String? = null): ScreenshotArtifacts {
+        val capture = withContext(Dispatchers.EDT) { captureOnEdt(project, windowId) }
 
         val pngBytes = withContext(Dispatchers.IO) {
             val output = ByteArrayOutputStream()
@@ -92,6 +101,11 @@ object VisionService {
             componentSize = Size(capture.componentSize.width, capture.componentSize.height),
             imageSize = Size(capture.image.width, capture.image.height),
             locationOnScreen = capture.locationOnScreen?.let { PointInfo(it.x, it.y) },
+            windowId = capture.windowId,
+            windowTitle = capture.windowTitle,
+            windowBounds = capture.windowBounds,
+            projectName = capture.projectName,
+            projectPath = capture.projectPath,
             capturedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
         )
 
@@ -128,12 +142,15 @@ object VisionService {
         val componentName: String?,
         val componentSize: Dimension,
         val locationOnScreen: Point?,
+        val windowId: String,
+        val windowTitle: String?,
+        val windowBounds: Rect?,
+        val projectName: String?,
+        val projectPath: String?,
     )
 
-    private fun captureOnEdt(project: Project): CaptureInfo {
-        val component = WindowManager.getInstance().getIdeFrame(project)?.component
-            ?: FileEditorManager.getInstance(project).selectedTextEditor?.component
-            ?: throw IllegalStateException("No IDE frame or editor component available for screenshot")
+    private fun captureOnEdt(project: Project, windowId: String?): CaptureInfo {
+        val component = resolveComponent(project, windowId)
 
         val size = component.size
         val preferred = component.preferredSize
@@ -150,6 +167,10 @@ object VisionService {
 
         val tree = buildComponentTree(component)
         val location = runCatching { component.locationOnScreen }.getOrNull()
+        val window = SwingUtilities.getWindowAncestor(component)
+        val windowIdValue = WindowIdUtil.compute(window, component)
+        val windowBounds = window?.bounds?.let { Rect(it.x, it.y, it.width, it.height) }
+        val windowTitle = (window as? java.awt.Frame)?.title
 
         return CaptureInfo(
             image = image,
@@ -158,7 +179,37 @@ object VisionService {
             componentName = component.name,
             componentSize = Dimension(component.width, component.height),
             locationOnScreen = location,
+            windowId = windowIdValue,
+            windowTitle = windowTitle,
+            windowBounds = windowBounds,
+            projectName = project.name,
+            projectPath = project.basePath,
         )
+    }
+
+    private fun resolveComponent(project: Project, windowId: String?): Component {
+        if (windowId != null) {
+            val frames = WindowManager.getInstance().getAllProjectFrames()
+            frames.forEach { frame ->
+                val component = frame.component
+                val window = SwingUtilities.getWindowAncestor(component)
+                if (WindowIdUtil.compute(window, component) == windowId) {
+                    return component
+                }
+            }
+            val windows = Window.getWindows()
+            windows.forEach { window ->
+                if (!window.isDisplayable) return@forEach
+                if (WindowIdUtil.compute(window, window) == windowId) {
+                    return window
+                }
+            }
+            throw IllegalStateException("Window not found for window_id: $windowId")
+        }
+
+        return WindowManager.getInstance().getIdeFrame(project)?.component
+            ?: FileEditorManager.getInstance(project).selectedTextEditor?.component
+            ?: throw IllegalStateException("No IDE frame or editor component available for screenshot")
     }
 
     private fun buildComponentTree(component: Component, indent: String = "", depth: Int = 0): String {
@@ -176,7 +227,7 @@ object VisionService {
         }
         builder.append("\n")
 
-        if (component is JComponent && depth < 64) {
+        if (component is Container && depth < 64) {
             for (child in component.components) {
                 builder.append(buildComponentTree(child, indent + "  ", depth + 1))
             }
@@ -204,9 +255,8 @@ object VisionService {
 
         suspend fun execute(steps: List<InputStep>) {
             val rootComponent = withContext(Dispatchers.EDT) {
-                WindowManager.getInstance().getIdeFrame(project)?.component
-                    ?: FileEditorManager.getInstance(project).selectedTextEditor?.component
-            } ?: throw IllegalStateException("No IDE frame or editor component available for input")
+                resolveComponentForInput()
+            }
 
             try {
                 for (step in steps) {
@@ -223,6 +273,26 @@ object VisionService {
                     releaseAll(rootComponent)
                 }
             }
+        }
+
+        private fun resolveComponentForInput(): Component {
+            val windowId = meta.windowId ?: throw IllegalStateException("Screenshot metadata missing windowId")
+            val frames = WindowManager.getInstance().getAllProjectFrames()
+            frames.forEach { frame ->
+                val component = frame.component
+                val window = SwingUtilities.getWindowAncestor(component)
+                if (WindowIdUtil.compute(window, component) == windowId) {
+                    return component
+                }
+            }
+            val windows = Window.getWindows()
+            windows.forEach { window ->
+                if (!window.isDisplayable) return@forEach
+                if (WindowIdUtil.compute(window, window) == windowId) {
+                    return window
+                }
+            }
+            throw IllegalStateException("No IDE window found for windowId: $windowId")
         }
 
         private fun stickKey(component: Component, step: InputStep.StickKey) {

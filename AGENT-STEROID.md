@@ -20,7 +20,8 @@ The IDE has indexed everything. It knows the code better than any file search. *
 List all open projects in the IDE. Use this to get project names for `steroid_execute_code`.
 
 ### `steroid_list_windows`
-List open IDE windows and their associated projects. Use this in multi-window setups to pick the right `project_name` for screenshot/input tools.
+List open IDE windows and their associated projects. Some windows may not be tied to a project and a project can have multiple windows.
+Use this in multi-window setups to pick the right `project_name` and `window_id` for screenshot/input tools.
 
 ### `steroid_capabilities`
 List installed plugins and registered languages. Use this to verify language support or required plugins.
@@ -37,6 +38,7 @@ Parameters:
 - `project_name` (required): Target project from `steroid_list_projects`
 - `task_id` (required): Task identifier for logging
 - `reason` (required): Why the screenshot is needed
+- `window_id` (optional): Window id from `steroid_list_windows` to target a specific window
 
 Artifacts saved under the execution folder:
 - `screenshot.png`

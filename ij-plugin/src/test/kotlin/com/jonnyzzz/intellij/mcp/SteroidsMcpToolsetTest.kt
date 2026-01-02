@@ -9,6 +9,8 @@ import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import com.jonnyzzz.intellij.mcp.vision.ScreenshotMeta
+import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.time.Duration.Companion.seconds
 
@@ -19,6 +21,7 @@ import kotlin.time.Duration.Companion.seconds
 class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
     override fun runInDispatchThread(): Boolean = false
+    private val json = Json { ignoreUnknownKeys = true }
 
     override fun setUp() {
         super.setUp()
@@ -159,5 +162,9 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         assertTrue("Screenshot file should be persisted", Files.exists(screenshotPath))
         assertTrue("Component tree should be persisted", Files.exists(treePath))
         assertTrue("Screenshot metadata should be persisted", Files.exists(metaPath))
+
+        val metaText = Files.readString(metaPath)
+        val meta = json.decodeFromString(ScreenshotMeta.serializer(), metaText)
+        assertTrue("Screenshot metadata should include windowId", !meta.windowId.isNullOrBlank())
     }
 }

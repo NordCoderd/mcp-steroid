@@ -31,6 +31,8 @@ class VisionScreenshotToolHandler {
         HEAVY ENDPOINT: This is intended for debugging and tricky configuration only.
         Prefer steroid_execute_code for regular automation.
 
+        Use steroid_list_windows when multiple IDE windows are open and pass window_id to target a specific window.
+
         The screenshot and component tree are saved under the execution folder:
         - screenshot.png
         - screenshot-tree.md
@@ -58,6 +60,10 @@ class VisionScreenshotToolHandler {
                         put("type", "string")
                         put("description", "Reason for taking the screenshot. Required for audit logs.")
                     }
+                    putJsonObject("window_id") {
+                        put("type", "string")
+                        put("description", "Optional window id from steroid_list_windows to target a specific IDE window.")
+                    }
                 }
                 putJsonArray("required") {
                     add("project_name")
@@ -77,6 +83,7 @@ class VisionScreenshotToolHandler {
             ?: return errorResult("Missing required parameter: task_id")
         val reason = args["reason"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: reason")
+        val windowId = args["window_id"]?.jsonPrimitive?.contentOrNull
 
         val project = readAction {
             ProjectManager.getInstance().openProjects.find { it.name == projectName }
@@ -101,10 +108,11 @@ class VisionScreenshotToolHandler {
             log("execution_id: ${executionId.executionId}\n use it to report feedback: steroid_execute_feedback")
             log("WARNING: Heavy endpoint. Prefer steroid_execute_code for regular automation.")
 
-            val artifacts = VisionService.capture(project, executionId)
+            val artifacts = VisionService.capture(project, executionId, windowId)
             val imageBase64 = Base64.getEncoder().encodeToString(artifacts.imageBytes)
             builder.addContent(ContentItem.Image(data = imageBase64, mimeType = "image/png"))
 
+            log("window_id: ${artifacts.meta.windowId}")
             log("Screenshot saved to ${artifacts.imagePath}")
             log("Component tree saved to ${artifacts.treePath}")
             log("Screenshot metadata saved to ${artifacts.metaPath}")

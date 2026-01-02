@@ -155,6 +155,12 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val payload = listWindowsResult.content.filterIsInstance<ContentItem.Text>().firstOrNull()?.text ?: ""
         val windows = McpJson.decodeFromString(ListWindowsResponse.serializer(), payload)
         assertNotNull("Should return windows payload", windows)
+        if (windows.windows.isNotEmpty()) {
+            assertTrue(
+                "windows should include windowId values",
+                windows.windows.any { it.windowId.isNotBlank() }
+            )
+        }
     }
 
     private fun buildInitializeRequest() = buildJsonObject {
