@@ -30,8 +30,9 @@ Execute Kotlin code directly in IntelliJ IDEA's runtime with full access to the 
 ```
 1. steroid_list_projects → get list of open projects
 2. Pick a project_name from the list
-3. steroid_execute_code → run Kotlin code with that project
-4. steroid_execute_feedback → report success/failure for tracking
+3. steroid_capabilities → list installed plugins and languages (optional)
+4. steroid_execute_code → run Kotlin code with that project
+5. steroid_execute_feedback → report success/failure for tracking
 ```
 
 **Example session:**
@@ -63,6 +64,12 @@ The IDE has indexed everything. It knows the code better than any file search.
 ### `steroid_list_projects`
 List all open projects. Returns project names for use with `steroid_execute_code`.
 
+### `steroid_capabilities`
+List IDE capabilities such as installed plugins and registered languages.
+
+**Parameters:**
+- `include_disabled_plugins` (optional): Include disabled plugins in the response (default: false)
+
 ### `steroid_execute_code`
 Execute Kotlin code in IntelliJ's runtime.
 
@@ -72,6 +79,7 @@ Execute Kotlin code in IntelliJ's runtime.
 - `reason` (required): Human-readable explanation
 - `task_id` (required): Group related executions
 - `timeout` (optional): Timeout in seconds (default: 60)
+- `required_plugins` (optional): List of required plugin IDs (example: `com.intellij.database`)
 
 ### `steroid_execute_feedback`
 Rate execution results. Use after `steroid_execute_code`.
@@ -1388,6 +1396,14 @@ The MCP server runs inside IntelliJ. To verify:
 - `/skill.md` - Same as above
 - `/mcp` - MCP protocol endpoint for tool calls
 - `/.well-known/mcp.json` - MCP server discovery
+
+### MCP Resources (Preferred)
+Use MCP `resources/list` and `resources/read` instead of HTTP fetching when possible.
+
+Recommended resources:
+- `intellij://skill/intellij-api-poweruser-guide` - Full SKILL.md content as a resource
+- `intellij://ide/overview` - IDE usage overview and patterns
+- `intellij://lsp/overview` - LSP-style workflows and examples
 
 ### Common Issues
 - **"Project not found"** - Run `steroid_list_projects` first to get exact project names

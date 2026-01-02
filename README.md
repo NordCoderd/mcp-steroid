@@ -265,6 +265,12 @@ Lists all open projects in the IDE.
 }
 ```
 
+### `steroid_capabilities`
+Lists IDE capabilities such as installed plugins and registered languages.
+
+**Parameters**:
+- `include_disabled_plugins` (optional): Include disabled plugins in the response (default: false)
+
 ### `steroid_execute_code`
 Compiles and executes Kotlin code in the IDE's runtime context.
 
@@ -274,6 +280,7 @@ Compiles and executes Kotlin code in the IDE's runtime context.
 - `task_id` (required): Your task identifier to group related executions
 - `reason` (required): Human readable reason for the execution
 - `timeout`: Execution timeout in seconds (default: 60)
+- `required_plugins` (optional): List of required plugin IDs (example: `com.intellij.database`)
 
 **Execution Model**:
 - **Synchronous request-response** - the tool returns when execution completes

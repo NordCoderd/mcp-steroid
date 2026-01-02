@@ -1,12 +1,14 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
+import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.ProjectManager.getInstance
+import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
@@ -50,13 +52,16 @@ class ExecuteCodeToolHandler {
              This is similar to LSP tools but uses IntelliJ's native APIs, offering deeper code understanding
              and more features (refactorings, inspections, full project model).
 
-             You can do everything IntelliJ API allows you to do including, but not limited to
-             - code search
-             - code completion
-             - code introspection, including methods, API, coroutines, reflection
-             - errors and warnings highlighting
-             - tests execution
-             - automated code refactorings, such as rename or find usages
+            You can do everything IntelliJ API allows you to do including, but not limited to
+            - code search
+            - code completion
+            - code introspection, including methods, API, coroutines, reflection
+            - errors and warnings highlighting
+            - tests execution
+            - automated code refactorings, such as rename or find usages
+
+            Optional: Pass required plugin IDs via required_plugins to fail fast
+            when a capability depends on a plugin (see steroid_capabilities).
 
             CRITICAL RULES:
             1. The execute { } block is a SUSPEND function - prefer Kotlin coroutine APIs over blocking Java APIs
@@ -134,6 +139,17 @@ class ExecuteCodeToolHandler {
                         put("type", "integer")
                         put("description", "Execution timeout in seconds (default: 60)")
                     }
+                    putJsonObject("required_plugins") {
+                        put("type", "array")
+                        putJsonObject("items") {
+                            put("type", "string")
+                        }
+                        put(
+                            "description",
+                            "Optional list of required plugin IDs (example: com.intellij.database). " +
+                                "Use steroid_capabilities to list installed plugins."
+                        )
+                    }
                 }
                 putJsonArray("required") {
                     add("project_name")
@@ -158,6 +174,19 @@ class ExecuteCodeToolHandler {
             ?: return errorResult("Missing required parameter: task_id")
         val reason = args["reason"]?.jsonPrimitive?.contentOrNull
         val timeout = args["timeout"]?.jsonPrimitive?.intOrNull ?: Registry.intValue("mcp.steroids.execution.timeout", 60)
+        val requiredPlugins = args["required_plugins"]
+            ?.jsonArray
+            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
+            ?.filter { it.isNotBlank() }
+            ?: emptyList()
+
+        val missingPlugins = findMissingPlugins(requiredPlugins)
+        if (missingPlugins.isNotEmpty()) {
+            return errorResult(
+                "Missing required plugins: ${missingPlugins.joinToString(", ")}. " +
+                    "Use steroid_capabilities to list installed plugins."
+            )
+        }
 
         val project = readAction {
             getInstance().openProjects.find { it.name == projectName }
@@ -181,4 +210,13 @@ class ExecuteCodeToolHandler {
         content = listOf(ContentItem.Text(text = "ERROR: $message")),
         isError = true
     )
+
+    private fun findMissingPlugins(requiredPlugins: List<String>): List<String> {
+        if (requiredPlugins.isEmpty()) return emptyList()
+        return requiredPlugins.filter { pluginId ->
+            val resolvedId = PluginId.getId(pluginId)
+            val resolved = PluginManagerCore.getPlugin(resolvedId)
+            resolved == null || !PluginManagerCore.isLoaded(resolvedId)
+        }
+    }
 }

@@ -4,6 +4,7 @@ package com.jonnyzzz.intellij.mcp
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.mcp.*
+import com.jonnyzzz.intellij.mcp.server.CapabilitiesResponse
 import com.jonnyzzz.intellij.mcp.server.ListProjectsResponse
 import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
 import io.ktor.client.HttpClient
@@ -12,8 +13,10 @@ import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
 import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
@@ -153,6 +156,105 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             }
         }
     }.toString()
+
+    private suspend fun startSession(server: SteroidsMcpServer): String {
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+
+        assertEquals(HttpStatusCode.OK, initResponse.status)
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Server must issue MCP session id", sessionId)
+
+        val initRpc = McpJson.decodeFromString<JsonRpcResponse>(initResponse.bodyAsText())
+        assertNull("Initialize should not return error", initRpc.error)
+
+        return sessionId!!
+    }
+
+    fun testCapabilitiesToolListsPlugins(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+        val sessionId = startSession(server)
+
+        val capabilitiesResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(
+                buildJsonObject {
+                    put("jsonrpc", "2.0")
+                    put("id", "capabilities-1")
+                    put("method", "tools/call")
+                    putJsonObject("params") {
+                        put("name", "steroid_capabilities")
+                    }
+                }.toString()
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, capabilitiesResponse.status)
+        val capabilitiesRpc = McpJson.decodeFromString<JsonRpcResponse>(capabilitiesResponse.bodyAsText())
+        assertNull("steroid_capabilities should return result payload", capabilitiesRpc.error)
+        val capabilitiesResult = McpJson.decodeFromJsonElement<ToolCallResult>(capabilitiesRpc.result!!)
+        assertFalse("steroid_capabilities should succeed", capabilitiesResult.isError)
+        val payload = (capabilitiesResult.content.single() as ContentItem.Text).text
+        val capabilities = McpJson.decodeFromString<CapabilitiesResponse>(payload)
+        assertTrue("Should report IDE info", capabilities.ide.name.isNotBlank())
+        assertTrue("Should report plugins", capabilities.plugins.isNotEmpty())
+        assertTrue(
+            "Should include Java plugin",
+            capabilities.plugins.any { it.id == "com.intellij.java" && it.enabled }
+        )
+    }
+
+    fun testExecuteCodeRejectsMissingPlugins(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+        val sessionId = startSession(server)
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(
+                buildJsonObject {
+                    put("jsonrpc", "2.0")
+                    put("id", "execute-missing-plugin")
+                    put("method", "tools/call")
+                    putJsonObject("params") {
+                        put("name", "steroid_execute_code")
+                        putJsonObject("arguments") {
+                            put("project_name", project.name)
+                            put(
+                                "code",
+                                """
+                                execute {
+                                    println("should not run")
+                                }
+                                """.trimIndent()
+                            )
+                            put("reason", "Verify required_plugins gating")
+                            put("task_id", "integration-test-task-missing-plugin")
+                            putJsonArray("required_plugins") {
+                                add(JsonPrimitive("com.example.missing.plugin"))
+                            }
+                        }
+                    }
+                }.toString()
+            )
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+        assertNull("steroid_execute_code should return result payload", execRpc.error)
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+        assertTrue("Missing plugin request should be an error", execResult.isError)
+        assertTrue("Should mention missing plugin", execOutput.contains("Missing required plugins"))
+    }
 
     /**
      * Tests that the server responds correctly to GET requests with Claude CLI's Accept header.
