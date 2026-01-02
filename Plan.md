@@ -4,7 +4,7 @@ This plan reflects decisions from [Discussions.md](Discussions.md).
 
 **Target Version**: IntelliJ 2025.3+ (sinceBuild: 252.1)
 
-**Status**: ✅ V1 Implementation Complete
+**Status**: ✅ V1 Implementation Complete (incremental improvements ongoing)
 
 ---
 
@@ -18,6 +18,25 @@ This plan reflects decisions from [Discussions.md](Discussions.md).
 | Phase 4: MCP Toolset | ✅ Complete | All tools implemented |
 | Phase 5: Code Review | ✅ Complete | Editor notification panel, diff generation |
 | Phase 6: Testing | ✅ Complete | Unit and integration tests |
+
+---
+
+## Incremental Roadmap (Post V1)
+
+These items extend V1 without changing the core execution model.
+
+- Vision tools: screenshot + input actions with per-execution artifacts.
+  - `VisionScreenshotToolHandler`, `VisionInputToolHandler`, `ListWindowsToolHandler`
+- Action discovery: context-sensitive action/intentions enumeration.
+  - `ActionDiscoveryToolHandler`
+- Session recovery notice: unknown sessions create a new session and return a notice header.
+  - `McpHttpTransport`
+- OCR helper app: external `ocr-tesseract` process invoked via `OcrProcessClient`.
+  - `ocr-tesseract/`, `OcrProcessClient`
+- CLI integration hardening: multi-step exec flow and MCP list validation.
+  - `CliClaudeIntegrationTest`, `CliCodexIntegrationTest`
+- Script execution availability smoke test to catch engine regressions quickly.
+  - `ScriptExecutionAvailabilityTest`
 
 ---
 
