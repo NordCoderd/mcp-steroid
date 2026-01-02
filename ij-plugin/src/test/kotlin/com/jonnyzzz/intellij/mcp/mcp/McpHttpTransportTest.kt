@@ -310,8 +310,8 @@ class McpHttpTransportTest {
     }
 
     @Test
-    fun `test POST with unknown session creates new session`() = runBlocking {
-        // Server should create a new session for unknown session IDs (supports IDE restart)
+    fun `test POST with unknown session returns 404`() = runBlocking {
+        // Server should reject unknown session IDs per MCP spec
         val request = """{"jsonrpc":"2.0","id":1,"method":"tools/list"}"""
 
         val response = client.post("http://localhost:$port/mcp") {
@@ -321,13 +321,10 @@ class McpHttpTransportTest {
             setBody(request)
         }
 
-        // Server should accept the request and create a new session
-        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals(HttpStatusCode.NotFound, response.status)
 
-        // Server should return a new session ID
         val newSessionId = response.headers[McpHttpTransport.SESSION_HEADER]
-        assertNotNull("Server should return new session ID", newSessionId)
-        assertNotEquals("unknown-session-id", newSessionId)
+        assertNull("Server should not return a session ID", newSessionId)
     }
 
     @Test
@@ -361,8 +358,7 @@ class McpHttpTransportTest {
 
         assertEquals(HttpStatusCode.NoContent, deleteResponse.status)
 
-        // After deletion, requests with the old session ID should create a new session
-        // (same as unknown session handling for IDE restart support)
+        // After deletion, requests with the old session ID should be rejected
         val listRequest = """{"jsonrpc":"2.0","id":2,"method":"tools/list"}"""
         val afterDeleteResponse = client.post("http://localhost:$port/mcp") {
             contentType(ContentType.Application.Json)
@@ -371,12 +367,10 @@ class McpHttpTransportTest {
             setBody(listRequest)
         }
 
-        assertEquals(HttpStatusCode.OK, afterDeleteResponse.status)
+        assertEquals(HttpStatusCode.NotFound, afterDeleteResponse.status)
 
-        // Server should return a new session ID
         val newSessionId = afterDeleteResponse.headers[McpHttpTransport.SESSION_HEADER]
-        assertNotNull("Server should return new session ID after deleted session", newSessionId)
-        assertNotEquals(sessionId, newSessionId, "New session ID should be different")
+        assertNull("Server should not return a session ID after deleted session", newSessionId)
     }
 
     @Test

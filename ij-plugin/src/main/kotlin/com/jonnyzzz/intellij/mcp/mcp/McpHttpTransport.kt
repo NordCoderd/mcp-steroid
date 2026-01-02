@@ -10,6 +10,7 @@ import io.ktor.server.routing.*
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 
 /**
@@ -193,9 +194,9 @@ object McpHttpTransport {
             log.info("[MCP] GET request from $remoteHost - returning server info (accepts JSON)")
             val serverInfo = server.serverInfo
             val payload = buildJsonObject {
-                put("name", serverInfo.name)
-                put("version", serverInfo.version)
-                put("status", "available")
+                put("name", JsonPrimitive(serverInfo.name))
+                put("version", JsonPrimitive(serverInfo.version))
+                put("status", JsonPrimitive("available"))
             }
             call.respondText(McpJson.encodeToString(JsonObject.serializer(), payload), ContentType.Application.Json)
             return
