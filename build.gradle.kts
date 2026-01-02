@@ -1,9 +1,10 @@
+import org.gradle.api.tasks.Sync
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.intellij.platform.gradle.extensions.IntelliJPlatformExtension
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.net.HttpURLConnection
 import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
@@ -25,9 +26,6 @@ repositories {
 }
 
 val ktorVersion = "3.1.0"
-val tess4jVersion = "5.17.0"
-val tesseractPlatformVersion = "5.5.1-1.5.12"
-val leptonicaPlatformVersion = "1.85.0-1.5.12"
 val platformPathProvider = providers.provider {
     extensions.getByType<IntelliJPlatformExtension>().platformPath
 }
@@ -69,11 +67,6 @@ dependencies {
     implementation("io.ktor:ktor-server-sse:$ktorVersion") {
         exclude(group = "org.jetbrains.kotlinx")
     }
-
-    // OCR (Tesseract + native bundles)
-    implementation("net.sourceforge.tess4j:tess4j:$tess4jVersion")
-    implementation("org.bytedeco:tesseract-platform:$tesseractPlatformVersion")
-    implementation("org.bytedeco:leptonica-platform:$leptonicaPlatformVersion")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
@@ -122,6 +115,21 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
+        dependsOn(":ocr-tesseract:installDist")
+    }
+}
+
+tasks.named<Sync>("prepareSandbox") {
+    dependsOn(":ocr-tesseract:installDist")
+    from(project(":ocr-tesseract").layout.buildDirectory.dir("install/ocr-tesseract")) {
+        into("${rootProject.name}/ocr-tesseract")
+    }
+}
+
+tasks.named<Sync>("prepareTestSandbox") {
+    dependsOn(":ocr-tesseract:installDist")
+    from(project(":ocr-tesseract").layout.buildDirectory.dir("install/ocr-tesseract")) {
+        into("${rootProject.name}/ocr-tesseract")
     }
 }
 

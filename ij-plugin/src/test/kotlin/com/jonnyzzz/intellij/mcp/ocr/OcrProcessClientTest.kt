@@ -3,32 +3,35 @@ package com.jonnyzzz.intellij.mcp.ocr
 
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.Locale
-import javax.imageio.ImageIO
 import kotlin.time.Duration.Companion.seconds
 
-class OcrTextExtractorTest : BasePlatformTestCase() {
+class OcrProcessClientTest : BasePlatformTestCase() {
+
+    override fun runInDispatchThread(): Boolean = false
 
     fun testExtractsHelloOcrText(): Unit = timeoutRunBlocking(90.seconds) {
         val image = loadImage("hello-ocr.png")
-        val result = OcrTextExtractor.extractText(image)
+        val result = OcrProcessClient.extractText(image)
         assertContainsTokens(result, "HELLO", "OCR")
     }
 
     fun testExtractsMultiLineText(): Unit = timeoutRunBlocking(90.seconds) {
         val image = loadImage("multi-line.png")
-        val result = OcrTextExtractor.extractText(image)
+        val result = OcrProcessClient.extractText(image)
         assertContainsTokens(result, "FIRST", "LINE", "SECOND")
     }
 
     fun testExtractsNumbers(): Unit = timeoutRunBlocking(90.seconds) {
         val image = loadImage("numbers.png")
-        val result = OcrTextExtractor.extractText(image)
+        val result = OcrProcessClient.extractText(image)
         assertContainsTokens(result, "12345", "TEST")
     }
 
-    private fun loadImage(name: String) = requireNotNull(javaClass.getResource("/ocr/$name")).let { url ->
-        ImageIO.read(url) ?: error("Unable to read OCR test image: $name")
+    private fun loadImage(name: String): Path = requireNotNull(javaClass.getResource("/ocr/$name")).let { url ->
+        Paths.get(url.toURI())
     }
 
     private fun assertContainsTokens(result: OcrResult, vararg tokens: String) {

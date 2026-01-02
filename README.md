@@ -750,6 +750,7 @@ See [integration-test/README.md](integration-test/README.md) for details.
 
 - IDE distributions are cached under `.intellijPlatform/ides/IU-2025.3` (`intellijPlatform.caching.ides.enabled = true`).
 - The build moves `plugins/fullLine/lib/modules/intellij.fullLine.yaml.jar` to `.bak` inside the local IDE cache to avoid plugin-structure warnings; the Gradle cache is not modified.
+- The OCR helper app is built from the `ocr-tesseract` subproject and bundled under `ocr-tesseract/` inside the plugin distribution.
 
 ## Configuration
 
