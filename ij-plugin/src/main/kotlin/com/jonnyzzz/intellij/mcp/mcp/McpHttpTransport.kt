@@ -30,8 +30,11 @@ object McpHttpTransport {
     private val log = Logger.getInstance(McpHttpTransport::class.java)
 
     const val SESSION_HEADER = "Mcp-Session-Id"
+    const val SESSION_NOTICE_HEADER = "Mcp-Session-Notice"
     private const val CONTENT_TYPE_JSON = "application/json"
     private const val CONTENT_TYPE_SSE = "text/event-stream"
+    private const val UNKNOWN_SESSION_NOTICE =
+        "Unknown session; new session created. Update stored Mcp-Session-Id."
     /**
      * Install MCP routes at the specified path.
      */
@@ -83,8 +86,11 @@ object McpHttpTransport {
     private fun addCorsHeaders(call: ApplicationCall) {
         call.response.header("Access-Control-Allow-Origin", "*")
         call.response.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-        call.response.header("Access-Control-Allow-Headers", "Content-Type, Accept, $SESSION_HEADER")
-        call.response.header("Access-Control-Expose-Headers", SESSION_HEADER)
+        call.response.header(
+            "Access-Control-Allow-Headers",
+            "Content-Type, Accept, $SESSION_HEADER, $SESSION_NOTICE_HEADER"
+        )
+        call.response.header("Access-Control-Expose-Headers", "$SESSION_HEADER, $SESSION_NOTICE_HEADER")
     }
 
     private suspend fun handlePost(call: ApplicationCall, server: McpServerCore) {
@@ -124,19 +130,19 @@ object McpHttpTransport {
         }
 
         val sessionId = call.request.header(SESSION_HEADER)
-        val (session, isNewSession) = if (sessionId != null) {
+        val (session, isNewSession, sessionNotice) = if (sessionId != null) {
             val existingSession = server.sessionManager.getSession(sessionId)
             if (existingSession != null) {
                 log.debug("[MCP] Using existing session: $sessionId")
-                existingSession to false
+                Triple(existingSession, false, null)
             } else {
                 log.info("[MCP] Unknown session ID: $sessionId (likely IDE was restarted)")
                 log.info("[MCP] Creating new session for client (User-Agent: $userAgent)")
-                server.sessionManager.createSession() to true
+                Triple(server.sessionManager.createSession(), true, UNKNOWN_SESSION_NOTICE)
             }
         } else {
             log.info("[MCP] No session ID provided, creating new session")
-            server.sessionManager.createSession() to true
+            Triple(server.sessionManager.createSession(), true, null)
         }
 
         // Log the request body (truncated for large payloads)
@@ -149,6 +155,9 @@ object McpHttpTransport {
         if (isNewSession) {
             log.info("[MCP] Returning new session ID: ${session.id}")
             call.response.header(SESSION_HEADER, session.id)
+        }
+        if (sessionNotice != null) {
+            call.response.header(SESSION_NOTICE_HEADER, sessionNotice)
         }
 
         if (response != null) {

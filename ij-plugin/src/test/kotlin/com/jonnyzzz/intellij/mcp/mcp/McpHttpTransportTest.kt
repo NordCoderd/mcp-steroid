@@ -328,6 +328,9 @@ class McpHttpTransportTest {
         val newSessionId = response.headers[McpHttpTransport.SESSION_HEADER]
         assertNotNull("Server should return new session ID", newSessionId)
         assertNotEquals("unknown-session-id", newSessionId)
+        val notice = response.headers[McpHttpTransport.SESSION_NOTICE_HEADER]
+        assertNotNull("Server should return session notice for unknown session", notice)
+        assertTrue("Session notice should mention unknown session", notice!!.contains("Unknown session"))
     }
 
     @Test
@@ -377,6 +380,9 @@ class McpHttpTransportTest {
         val newSessionId = afterDeleteResponse.headers[McpHttpTransport.SESSION_HEADER]
         assertNotNull("Server should return new session ID after deleted session", newSessionId)
         assertNotEquals(sessionId, newSessionId, "New session ID should be different")
+        val notice = afterDeleteResponse.headers[McpHttpTransport.SESSION_NOTICE_HEADER]
+        assertNotNull("Server should return session notice after deleted session", notice)
+        assertTrue("Session notice should mention unknown session", notice!!.contains("Unknown session"))
     }
 
     @Test
