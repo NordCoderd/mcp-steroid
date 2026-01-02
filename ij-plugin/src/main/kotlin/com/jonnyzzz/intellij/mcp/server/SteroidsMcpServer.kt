@@ -77,6 +77,8 @@ class SteroidsMcpServer(
             service<ExecuteFeedbackToolHandler>().register(mcpServer)
             service<CapabilitiesToolHandler>().register(mcpServer)
             service<ActionDiscoveryToolHandler>().register(mcpServer)
+            service<VisionScreenshotToolHandler>().register(mcpServer)
+            service<VisionInputToolHandler>().register(mcpServer)
 
             // Register resources
             service<SkillResourceHandler>().register(mcpServer)

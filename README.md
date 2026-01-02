@@ -283,6 +283,44 @@ Discover available editor actions, quick-fixes, and gutter actions for a file an
 
 **Response**: JSON payload describing actions, intentions, gutter icons, and language context.
 
+### `steroid_take_screenshot`
+Capture a screenshot of the IDE frame and return image content.
+
+**HEAVY ENDPOINT**: Use only for debugging and tricky configuration. Prefer `steroid_execute_code` for regular automation.
+
+**Parameters**:
+- `project_name` (required): Name of an open project (from `steroid_list_projects`)
+- `task_id` (required): Task identifier for logging
+- `reason` (required): Why the screenshot is needed
+
+**Artifacts (saved under the execution folder):**
+- `screenshot.png`
+- `screenshot-tree.md`
+- `screenshot-meta.json`
+
+**Response**: Includes `image/png` content plus text output. Use the returned `execution_id` as `screenshot_execution_id` for `steroid_input`.
+
+### `steroid_input`
+Send input events (keyboard + mouse) using a sequence string.
+
+**HEAVY ENDPOINT**: Use only for debugging and tricky configuration. Prefer `steroid_execute_code` for regular automation.
+
+**Parameters**:
+- `project_name` (required): Name of an open project (from `steroid_list_projects`)
+- `task_id` (required): Task identifier for logging
+- `reason` (required): Why the input is needed
+- `screenshot_execution_id` (required): Execution ID from `steroid_take_screenshot` or `takeIdeScreenshot()`
+- `sequence` (required): Comma-separated input sequence (commas inside values are allowed unless they look like `, <step>:`)
+
+**Sequence examples**:
+- `stick:ALT, delay:400, press:F4, type:hurra`
+- `click:CTRL+Left@120,200`
+- `click:Right@screen:400,300`
+
+**Notes**:
+- Comma separators are detected by `, <step>:` patterns, so avoid typing `, delay:` etc in text.
+- Targets default to screenshot coordinates; use `screen:` for absolute screen pixels.
+
 ### `steroid_execute_code`
 Compiles and executes Kotlin code in the IDE's runtime context.
 
@@ -377,7 +415,7 @@ Key methods:
 - `printJson(obj)` - Serialize to pretty JSON (Jackson)
 - `printException(msg, throwable)` - Report an error without failing execution
 - `progress(message)` - Report progress (throttled to 1/sec)
-- `takeIdeScreenshot(fileName)` - Capture IDE screenshot and return image content
+- `takeIdeScreenshot(fileName)` - Capture IDE screenshot and return image content (artifacts saved as `screenshot.png`, `screenshot-tree.md`, `screenshot-meta.json`; fileName ignored)
 - `waitForSmartMode()` - Wait for indexing to complete
 
 **Note**: `readAction` and `writeAction` are NOT part of McpScriptContext. Use IntelliJ's coroutine-aware APIs directly:

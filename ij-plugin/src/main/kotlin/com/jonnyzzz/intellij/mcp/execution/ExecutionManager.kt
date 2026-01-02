@@ -16,7 +16,6 @@ import com.jonnyzzz.intellij.mcp.server.McpProgressReporter
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
 import com.jonnyzzz.intellij.mcp.server.SkillReference
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
-import com.jonnyzzz.intellij.mcp.storage.ImageMessage
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import kotlinx.coroutines.*
 
@@ -125,7 +124,7 @@ class ExecutionManager(
             innerScope.launch {
                 project.executionStorage.appendExecutionEvent(
                     executionId,
-                    ImageMessage(fileName = fileName, mimeType = mimeType)
+                    "IMAGE: $fileName ($mimeType)"
                 )
             }
         }

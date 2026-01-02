@@ -146,8 +146,18 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         val executionId = getExecutionIdFromResult(result)
         val screenshotPath = project.executionStorage.resolveExecutionPath(
             ExecutionId(executionId),
-            "ide-screenshot.png"
+            "screenshot.png"
+        )
+        val treePath = project.executionStorage.resolveExecutionPath(
+            ExecutionId(executionId),
+            "screenshot-tree.md"
+        )
+        val metaPath = project.executionStorage.resolveExecutionPath(
+            ExecutionId(executionId),
+            "screenshot-meta.json"
         )
         assertTrue("Screenshot file should be persisted", Files.exists(screenshotPath))
+        assertTrue("Component tree should be persisted", Files.exists(treePath))
+        assertTrue("Screenshot metadata should be persisted", Files.exists(metaPath))
     }
 }

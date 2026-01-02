@@ -4,26 +4,20 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
 import com.intellij.openapi.Disposable
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.wm.WindowManager
-import com.intellij.util.ui.ImageUtil
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import com.jonnyzzz.intellij.mcp.vision.VisionService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
-import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
-import javax.imageio.ImageIO
 import kotlin.coroutines.resume
 
 /**
@@ -96,44 +90,16 @@ class McpScriptContextImpl(
 
     override suspend fun takeIdeScreenshot(fileName: String): String? {
         checkDisposed()
-        val safeName = sanitizeScreenshotFileName(fileName)
+        if (fileName.isNotBlank() && fileName != "ide-screenshot.png") {
+            resultBuilder.logMessage("NOTE: takeIdeScreenshot ignores custom fileName and uses screenshot.png.")
+        }
         return try {
-            val component = withContext(Dispatchers.EDT) {
-                WindowManager.getInstance().getIdeFrame(project)?.component
-                    ?: FileEditorManager.getInstance(project).selectedTextEditor?.component
-            } ?: run {
-                resultBuilder.logMessage("No IDE frame or editor component available for screenshot.")
-                return null
-            }
-
-            val image = withContext(Dispatchers.EDT) {
-                val size = component.size
-                val preferred = component.preferredSize
-                val width = size.width.takeIf { it > 0 } ?: preferred.width.takeIf { it > 0 } ?: 1024
-                val height = size.height.takeIf { it > 0 } ?: preferred.height.takeIf { it > 0 } ?: 768
-
-                val buffered = ImageUtil.createImage(width, height, BufferedImage.TYPE_INT_ARGB)
-                val graphics = buffered.createGraphics()
-                try {
-                    component.printAll(graphics)
-                } finally {
-                    graphics.dispose()
-                }
-                buffered
-            }
-
-            val pngBytes = withContext(Dispatchers.IO) {
-                val output = ByteArrayOutputStream()
-                val written = ImageIO.write(image, "png", output)
-                if (!written) {
-                    throw IllegalStateException("No PNG writer available for screenshot")
-                }
-                output.toByteArray()
-            }
-
-            val path = project.executionStorage.writeBinaryExecutionData(executionId, safeName, pngBytes)
-            resultBuilder.logImage("image/png", Base64.getEncoder().encodeToString(pngBytes), safeName)
-            path.toString()
+            val artifacts = VisionService.capture(project, executionId)
+            resultBuilder.logImage("image/png", Base64.getEncoder().encodeToString(artifacts.imageBytes), artifacts.meta.imageFile)
+            resultBuilder.logMessage("Screenshot saved to ${artifacts.imagePath}")
+            resultBuilder.logMessage("Component tree saved to ${artifacts.treePath}")
+            resultBuilder.logMessage("Screenshot metadata saved to ${artifacts.metaPath}")
+            artifacts.imagePath.toString()
         } catch (e: Exception) {
             if (e is ProcessCanceledException) throw e
             resultBuilder.logException("Failed to capture IDE screenshot", e)
@@ -166,11 +132,5 @@ class McpScriptContextImpl(
             }
             waitForSmart()
         }
-    }
-
-    private fun sanitizeScreenshotFileName(fileName: String): String {
-        val trimmed = fileName.trim()
-        val baseName = trimmed.substringAfterLast('/').substringAfterLast('\\').ifBlank { "ide-screenshot.png" }
-        return if (baseName.endsWith(".png")) baseName else "$baseName.png"
     }
 }
