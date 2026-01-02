@@ -1,4 +1,7 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.extensions.IntelliJPlatformExtension
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.net.HttpURLConnection
 import java.net.URI
 import java.time.LocalDateTime
@@ -22,12 +25,30 @@ repositories {
 }
 
 val ktorVersion = "3.1.0"
+val platformPathProvider = providers.provider {
+    extensions.getByType<IntelliJPlatformExtension>().platformPath
+}
+val kotlinPluginPath = platformPathProvider.map { it.resolve("plugins/Kotlin") }
+val javaPluginPath = platformPathProvider.map { it.resolve("plugins/java") }
+
+configurations.named("intellijPlatformDependency").configure {
+    incoming.afterResolve {
+        val platformPath = extensions.getByType<IntelliJPlatformExtension>().platformPath
+        val fullLineDescriptor = platformPath.resolve("plugins/fullLine/lib/modules/intellij.fullLine.yaml.jar")
+        val backup = platformPath.resolve("plugins/fullLine/lib/modules/intellij.fullLine.yaml.jar.bak")
+        if (Files.exists(fullLineDescriptor)) {
+            // Work around a broken module descriptor that breaks plugin structure parsing.
+            Files.move(fullLineDescriptor, backup, StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
 
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.3")
-        // Kotlin plugin for script engine support in tests
-        bundledPlugin("org.jetbrains.kotlin")
+        // Avoid bundled plugin scan warnings by pointing to the local Kotlin plugin path.
+        localPlugin(kotlinPluginPath)
+        localPlugin(javaPluginPath)
         testFramework(TestFrameworkType.Platform)
     }
 
