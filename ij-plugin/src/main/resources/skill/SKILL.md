@@ -64,6 +64,12 @@ The IDE has indexed everything. It knows the code better than any file search.
 ### `steroid_list_projects`
 List all open projects. Returns project names for use with `steroid_execute_code`.
 
+### `steroid_list_windows`
+List open IDE windows and their associated projects. Use this in multi-window setups to pick the correct `project_name` for screenshot/input tools.
+
+### `steroid_list_windows`
+List open IDE windows and their associated projects. Use this in multi-window setups to pick the correct `project_name` for screenshot/input tools.
+
 ### `steroid_capabilities`
 List IDE capabilities such as installed plugins and registered languages.
 

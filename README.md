@@ -271,6 +271,15 @@ Lists IDE capabilities such as installed plugins and registered languages.
 **Parameters**:
 - `include_disabled_plugins` (optional): Include disabled plugins in the response (default: false)
 
+### `steroid_list_windows`
+List open IDE windows and their associated projects. Use this when multiple windows are open to pick the right `project_name` for screenshot/input tools.
+
+**Returns**:
+- `projectName`, `projectPath`
+- `title`, `isActive`, `isVisible`
+- `bounds` (x, y, width, height)
+- `windowId` (diagnostic only)
+
 ### `steroid_action_discovery`
 Discover available editor actions, quick-fixes, and gutter actions for a file and caret context.
 

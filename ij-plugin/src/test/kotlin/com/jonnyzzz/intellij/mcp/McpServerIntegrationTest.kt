@@ -7,6 +7,7 @@ import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.server.ActionDiscoveryResponse
 import com.jonnyzzz.intellij.mcp.server.CapabilitiesResponse
 import com.jonnyzzz.intellij.mcp.server.ListProjectsResponse
+import com.jonnyzzz.intellij.mcp.server.ListWindowsResponse
 import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -82,7 +83,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val toolNames = toolsList.tools.map { it.name }.toSet()
         assertTrue(
             "steroid tools should be advertised",
-            toolNames.containsAll(setOf("steroid_list_projects", "steroid_execute_code"))
+            toolNames.containsAll(setOf("steroid_list_projects", "steroid_list_windows", "steroid_execute_code"))
         )
 
         val listProjectsResponse = client.post(server.mcpUrl) {
@@ -122,6 +123,38 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             "Execution output should include marker text, got: $execOutput",
             execOutput.contains("Integration test execution from MCP")
         )
+    }
+
+    fun testListWindowsTool(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+
+        assertEquals(HttpStatusCode.OK, initResponse.status)
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Server must issue MCP session id", sessionId)
+
+        val listWindowsResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":"call-list-windows","method":"tools/call","params":{"name":"steroid_list_windows"}}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, listWindowsResponse.status)
+        val listWindowsRpc = McpJson.decodeFromString<JsonRpcResponse>(listWindowsResponse.bodyAsText())
+        assertNull("steroid_list_windows should not return JSON-RPC error", listWindowsRpc.error)
+        val listWindowsResult = McpJson.decodeFromJsonElement<ToolCallResult>(listWindowsRpc.result!!)
+        assertFalse("steroid_list_windows should succeed", listWindowsResult.isError)
+
+        val payload = listWindowsResult.content.filterIsInstance<ContentItem.Text>().firstOrNull()?.text ?: ""
+        val windows = McpJson.decodeFromString(ListWindowsResponse.serializer(), payload)
+        assertNotNull("Should return windows payload", windows)
     }
 
     private fun buildInitializeRequest() = buildJsonObject {
