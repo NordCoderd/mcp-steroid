@@ -248,7 +248,7 @@ curl -X POST http://localhost:63150/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"steroid_list_projects"}}'
 ```
 
-**Session recovery**: If a request with `Mcp-Session-Id` returns HTTP 404, the session has expired or the server restarted. Re-send an `initialize` request without a session header (and refresh the server URL if needed).
+**Session recovery**: If a request arrives with an unknown `Mcp-Session-Id` (IDE restart), the server creates a new session and returns a fresh `Mcp-Session-Id` header. Clients should update the stored session ID and continue without re-registering the server.
 
 ## MCP Tools
 

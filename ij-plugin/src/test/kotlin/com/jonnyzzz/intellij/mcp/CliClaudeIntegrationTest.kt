@@ -67,4 +67,48 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
             .assertOutputContains("Status:", "Connected", message = "MCP server registration")
             .assertNoErrorsInOutput(message = "MCP server registration")
     }
+
+    fun testExecSessionResetAndMcpList(): Unit = timeoutRunBlocking(360.seconds) {
+        val session = claudeSession().registerMcp(resolveDockerUrl(), "intellij")
+
+        runExecCode(
+            session,
+            """
+            execute {
+                println("EXEC1_OK")
+            }
+            """.trimIndent(),
+            "EXEC1_OK",
+        )
+
+        runExecCode(
+            session,
+            """
+            import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
+
+            execute {
+                val server = SteroidsMcpServer.getInstance().getServer()
+                val sessionIds = server.sessionManager.getAllSessions().map { it.id }
+                sessionIds.forEach { server.sessionManager.removeSession(it) }
+                println("SESSIONS_CLEARED: " + sessionIds.size)
+            }
+            """.trimIndent(),
+            "SESSIONS_CLEARED:",
+        )
+
+        runExecCode(
+            session,
+            """
+            execute {
+                println("EXEC2_OK")
+            }
+            """.trimIndent(),
+            "EXEC2_OK",
+        )
+
+        session.runInContainer("mcp", "list")
+            .assertExitCode(0, "mcp list")
+            .assertNoErrorsInOutput(message = "mcp list")
+            .assertOutputContains("intellij", message = "mcp list should contain registered server")
+    }
 }

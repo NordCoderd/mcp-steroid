@@ -7,8 +7,6 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -34,9 +32,6 @@ object McpHttpTransport {
     const val SESSION_HEADER = "Mcp-Session-Id"
     private const val CONTENT_TYPE_JSON = "application/json"
     private const val CONTENT_TYPE_SSE = "text/event-stream"
-    private const val UNKNOWN_SESSION_MESSAGE =
-        "Unknown session. The MCP server has changed or restarted; please reinitialize and refresh the MCP configuration."
-
     /**
      * Install MCP routes at the specified path.
      */
@@ -136,9 +131,8 @@ object McpHttpTransport {
                 existingSession to false
             } else {
                 log.info("[MCP] Unknown session ID: $sessionId (likely IDE was restarted)")
-                val requestId = parseRequestId(body)
-                respondUnknownSession(call, requestId)
-                return
+                log.info("[MCP] Creating new session for client (User-Agent: $userAgent)")
+                server.sessionManager.createSession() to true
             }
         } else {
             log.info("[MCP] No session ID provided, creating new session")
@@ -237,25 +231,6 @@ object McpHttpTransport {
             val mediaType = part.trim().split(";").first().trim()
             mediaType == CONTENT_TYPE_SSE || mediaType == "*/*" || mediaType == "text/*"
         }
-    }
-
-    private fun parseRequestId(body: String): JsonElement? {
-        return runCatching {
-            val json = McpJson.parseToJsonElement(body)
-            (json as? JsonObject)?.get("id")
-        }.getOrNull()
-    }
-
-    private suspend fun respondUnknownSession(call: ApplicationCall, requestId: JsonElement?) {
-        val response = JsonRpcResponse(
-            id = requestId ?: JsonNull,
-            error = JsonRpcError(
-                code = JsonRpcErrorCodes.SESSION_EXPIRED,
-                message = UNKNOWN_SESSION_MESSAGE
-            )
-        )
-        val payload = McpJson.encodeToString(JsonRpcResponse.serializer(), response)
-        call.respondText(payload, ContentType.Application.Json, HttpStatusCode.NotFound)
     }
 
     private suspend fun handleDelete(call: ApplicationCall, server: McpServerCore) {

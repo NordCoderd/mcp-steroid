@@ -556,7 +556,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertNull("tools/list should succeed with valid session", toolsRpc.error)
 
         // Step 3: Make a request with an unknown session ID
-        // Server should return 404 to force re-initialization per MCP spec.
+        // Server should create a new session for unknown session IDs (supports IDE restart)
         val unknownSessionResponse = client.post(server.mcpUrl) {
             contentType(ContentType.Application.Json)
             accept(ContentType.Application.Json)
@@ -565,25 +565,22 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         }
 
         assertEquals(
-            "Request with unknown session should return 404",
-            HttpStatusCode.NotFound,
+            "Request with unknown session should succeed (server creates new session)",
+            HttpStatusCode.OK,
             unknownSessionResponse.status
         )
 
-        // Server should not return a new session ID
+        // Server should return a new session ID
         val newSessionId = unknownSessionResponse.headers[McpHttpTransport.SESSION_HEADER]
-        assertNull("Server should not return session ID for unknown session", newSessionId)
-
-        // The response should be a JSON-RPC error instructing to re-initialize/update config
-        val unknownSessionRpc = McpJson.decodeFromString<JsonRpcResponse>(unknownSessionResponse.bodyAsText())
-        assertNotNull("Unknown session response should be an error", unknownSessionRpc.error)
-        val errorMessage = unknownSessionRpc.error?.message.orEmpty()
-        assertTrue(
-            "Error should mention reinitialize/update configuration, got: $errorMessage",
-            errorMessage.contains("reinitialize", ignoreCase = true) ||
-                    errorMessage.contains("refresh", ignoreCase = true) ||
-                    errorMessage.contains("configuration", ignoreCase = true)
+        assertNotNull("Server should return new session ID for unknown session", newSessionId)
+        assertFalse(
+            "New session ID should be different from the unknown one",
+            newSessionId == "unknown-session-id-12345"
         )
+
+        // The response should be valid
+        val unknownSessionRpc = McpJson.decodeFromString<JsonRpcResponse>(unknownSessionResponse.bodyAsText())
+        assertNull("tools/list should succeed with auto-created session", unknownSessionRpc.error)
     }
 
     /**
@@ -606,27 +603,34 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             setBody("""{"jsonrpc":"2.0","id":"1","method":"tools/call","params":{"name":"steroid_list_projects"}}""")
         }
 
-        // Server should reject the request with 404 per MCP spec
+        // Server should accept the request and create a new session
         assertEquals(
-            "Request with stale session should return 404",
-            HttpStatusCode.NotFound,
+            "Request with stale session should succeed",
+            HttpStatusCode.OK,
             response.status
         )
 
-        // Server should not return a new session ID
+        // Server should return a new session ID
         val newSessionId = response.headers[McpHttpTransport.SESSION_HEADER]
-        assertNull("Server should not return new session ID", newSessionId)
-
-        // Error response should explain how to recover
-        val error = McpJson.decodeFromString<JsonRpcResponse>(response.bodyAsText()).error
-        assertNotNull("Unknown session response should be an error", error)
-        val errorMessage = error?.message.orEmpty()
-        assertTrue(
-            "Error should mention reinitialize/update configuration, got: $errorMessage",
-            errorMessage.contains("reinitialize", ignoreCase = true) ||
-                    errorMessage.contains("refresh", ignoreCase = true) ||
-                    errorMessage.contains("configuration", ignoreCase = true)
+        assertNotNull("Server should return new session ID", newSessionId)
+        assertFalse(
+            "New session ID should be different from stale one",
+            newSessionId == staleSessionId
         )
+
+        // Step 2: Verify the new session works for subsequent requests
+        val followUpResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, newSessionId)
+            setBody("""{"jsonrpc":"2.0","id":"2","method":"tools/list"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, followUpResponse.status)
+
+        // No new session ID should be returned (we're using a valid one now)
+        val followUpSessionId = followUpResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNull("No new session ID should be returned for valid session", followUpSessionId)
     }
 
     /**

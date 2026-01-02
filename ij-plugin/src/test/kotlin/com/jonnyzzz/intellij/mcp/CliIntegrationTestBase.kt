@@ -155,4 +155,29 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
                 message = "Output should contain the system property value '$randomValue'"
             )
     }
+
+    protected fun runExecCode(
+        session: AiAgentSession,
+        code: String,
+        marker: String,
+    ): ProcessResult {
+        return session.runPrompt(
+            """
+            You are testing MCP integration. You MUST use steroid_execute_code.
+            Call steroid_execute_code with this code:
+            ```
+            $code
+            ```
+
+            After execution, find the line that contains "$marker" in the tool output
+            and print it as: RESULT: <that line>
+
+            Output must be plain text only. Do NOT use Markdown, lists, or code blocks.
+            If a step fails, print ERROR: <reason>.
+            """.trimIndent(),
+        )
+            .assertExitCode(0, "prompt")
+            .assertNoErrorsInOutput(message = "prompt")
+            .assertOutputContains(marker, message = "steroid_execute_code should output '$marker'")
+    }
 }
