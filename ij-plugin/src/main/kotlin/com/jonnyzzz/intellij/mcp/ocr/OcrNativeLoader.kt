@@ -13,6 +13,7 @@ import java.net.URL
 import java.net.URLClassLoader
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.StandardCopyOption
 import kotlin.io.path.isDirectory
 import kotlin.io.path.name
 
@@ -22,6 +23,8 @@ object OcrNativeLoader {
 
     @Volatile
     private var cached: OcrClassLoader? = null
+    @Volatile
+    private var cachedTessdataDir: Path? = null
 
     fun ensureLoaded(): ClassLoader {
         val existing = cached
@@ -43,10 +46,34 @@ object OcrNativeLoader {
         }
     }
 
+    fun ensureTessdataDir(loader: ClassLoader): Path {
+        val existing = cachedTessdataDir
+        if (existing != null) return existing
+
+        synchronized(this) {
+            val again = cachedTessdataDir
+            if (again != null) return again
+
+            val tessdataDir = resolveTessdataDir()
+            Files.createDirectories(tessdataDir)
+
+            copyResource(loader, "tessdata/eng.traineddata", tessdataDir.resolve("eng.traineddata"))
+            copyResource(loader, "tessdata/osd.traineddata", tessdataDir.resolve("osd.traineddata"))
+
+            cachedTessdataDir = tessdataDir
+            return tessdataDir
+        }
+    }
+
     private fun resolveNativeDir(): Path {
         val version = PluginVersionResolver.resolve(OcrNativeLoader::class.java.classLoader)
         val platform = platformId()
         return Path.of(PathManager.getSystemPath(), "mcp-ocr", "native", version, platform)
+    }
+
+    private fun resolveTessdataDir(): Path {
+        val version = PluginVersionResolver.resolve(OcrNativeLoader::class.java.classLoader)
+        return Path.of(PathManager.getSystemPath(), "mcp-ocr", "tessdata", version)
     }
 
     private fun platformId(): String {
@@ -99,6 +126,16 @@ object OcrNativeLoader {
         }
         log.warn("Unable to resolve plugin lib directory for OCR classloader")
         return emptyArray()
+    }
+
+    private fun copyResource(loader: ClassLoader, resource: String, target: Path) {
+        if (Files.exists(target) && Files.size(target) > 0) return
+
+        val stream = loader.getResourceAsStream(resource)
+            ?: throw IllegalStateException("OCR resource not found: $resource")
+        stream.use { input ->
+            Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING)
+        }
     }
 
     private fun loadNativeLibraries(loader: ClassLoader) {
