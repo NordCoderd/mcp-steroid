@@ -19,6 +19,12 @@ The IDE has indexed everything. It knows the code better than any file search. *
 ### `steroid_list_projects`
 List all open projects in the IDE. Use this to get project names for `steroid_execute_code`.
 
+### `steroid_capabilities`
+List installed plugins and registered languages. Use this to verify language support or required plugins.
+
+### `steroid_action_discovery`
+Discover available editor actions, quick-fixes, and gutter actions for a file and caret context.
+
 ### `steroid_execute_code`
 Execute Kotlin code directly in IntelliJ's runtime. This is your primary tool.
 

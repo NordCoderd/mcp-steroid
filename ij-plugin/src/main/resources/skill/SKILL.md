@@ -70,6 +70,16 @@ List IDE capabilities such as installed plugins and registered languages.
 **Parameters:**
 - `include_disabled_plugins` (optional): Include disabled plugins in the response (default: false)
 
+### `steroid_action_discovery`
+Discover available editor actions, quick-fixes, and gutter actions for a file and caret context.
+
+**Parameters:**
+- `project_name` (required): Target project name
+- `file_path` (required): Absolute or project-relative path to the file
+- `caret_offset` (optional): Caret offset within the file (default: 0)
+- `action_groups` (optional): Action group IDs to expand (default: editor popup + gutter)
+- `max_actions_per_group` (optional): Cap actions returned per group (default: 200)
+
 ### `steroid_execute_code`
 Execute Kotlin code in IntelliJ's runtime.
 
@@ -80,6 +90,9 @@ Execute Kotlin code in IntelliJ's runtime.
 - `task_id` (required): Group related executions
 - `timeout` (optional): Timeout in seconds (default: 60)
 - `required_plugins` (optional): List of required plugin IDs (example: `com.intellij.database`)
+
+**Extras:**
+- Inside `execute { }`, call `takeIdeScreenshot()` to attach an `image/png` payload to the response.
 
 ### `steroid_execute_feedback`
 Rate execution results. Use after `steroid_execute_code`.

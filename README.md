@@ -271,6 +271,18 @@ Lists IDE capabilities such as installed plugins and registered languages.
 **Parameters**:
 - `include_disabled_plugins` (optional): Include disabled plugins in the response (default: false)
 
+### `steroid_action_discovery`
+Discover available editor actions, quick-fixes, and gutter actions for a file and caret context.
+
+**Parameters**:
+- `project_name` (required): Name of an open project (from `steroid_list_projects`)
+- `file_path` (required): Absolute or project-relative path to the file
+- `caret_offset` (optional): Caret offset within the file (default: 0)
+- `action_groups` (optional): Action group IDs to expand (default: editor popup + gutter)
+- `max_actions_per_group` (optional): Cap actions returned per group (default: 200)
+
+**Response**: JSON payload describing actions, intentions, gutter icons, and language context.
+
 ### `steroid_execute_code`
 Compiles and executes Kotlin code in the IDE's runtime context.
 
@@ -365,6 +377,7 @@ Key methods:
 - `printJson(obj)` - Serialize to pretty JSON (Jackson)
 - `printException(msg, throwable)` - Report an error without failing execution
 - `progress(message)` - Report progress (throttled to 1/sec)
+- `takeIdeScreenshot(fileName)` - Capture IDE screenshot and return image content
 - `waitForSmartMode()` - Wait for indexing to complete
 
 **Note**: `readAction` and `writeAction` are NOT part of McpScriptContext. Use IntelliJ's coroutine-aware APIs directly:
