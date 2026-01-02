@@ -309,7 +309,7 @@ Capture a screenshot of the IDE frame and return image content.
 - `screenshot-tree.md`
 - `screenshot-meta.json`
 
-**Response**: Includes `image/png` content plus text output. Logs `window_id` for use with `steroid_input` (stored in screenshot metadata).
+**Response**: Includes `image/png` content plus text output. The response includes `window_id` for use with `steroid_input` (also stored in screenshot metadata).
 
 ### `steroid_input`
 Send input events (keyboard + mouse) using a sequence string.

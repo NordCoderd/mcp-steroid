@@ -104,7 +104,7 @@ Capture a screenshot of the IDE frame and return image content.
 - `screenshot-tree.md`
 - `screenshot-meta.json`
 
-Use the returned `execution_id` as `screenshot_execution_id` for `steroid_input`. The `window_id` is logged and stored in `screenshot-meta.json`.
+Use the returned `execution_id` as `screenshot_execution_id` for `steroid_input`. The response includes `window_id` (also stored in `screenshot-meta.json`).
 
 ### `steroid_input`
 Send input events (keyboard + mouse) using a sequence string.
