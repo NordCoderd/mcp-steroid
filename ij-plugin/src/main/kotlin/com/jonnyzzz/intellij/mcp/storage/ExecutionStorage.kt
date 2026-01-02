@@ -18,6 +18,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import org.jetbrains.kotlin.idea.gradleTooling.get
 import java.nio.file.Files
 import java.nio.file.Path
@@ -35,6 +37,15 @@ data class ExecutionId(val executionId: String)
 @Serializable
 data class TextMessage(val text: String)
 
+@Serializable
+data class ToolCallMetadata(
+    val toolName: String,
+    val timestamp: String,
+    val projectName: String,
+    val taskId: String? = null,
+    val arguments: JsonObject,
+)
+
 inline val Project.executionStorage : ExecutionStorage get() = service()
 
 /**
@@ -44,6 +55,7 @@ inline val Project.executionStorage : ExecutionStorage get() = service()
  * Directory structure:
  * .idea/mcp-run/
  *   {execution-id}/
+ *     tool.json          - Tool name + arguments metadata
  *     script.kts          - Original code submitted by LLM
  *     parameters.json     - Execution parameters
  *     output.jsonl        - Output messages (append-only)
@@ -132,7 +144,10 @@ class ExecutionStorage(
 
     suspend fun writeExecutionFeedback(taskId: String, element: ToolCallParams) : ExecutionId {
         val executionId = newExecutionId("feedback-$taskId")
+        writeToolMetadata(executionId, element.name, element.arguments, taskId)
         writeCodeExecutionData(executionId, "feedback.json", element)
+        writeCodeExecutionData(executionId, "params.json", element.arguments ?: buildJsonObject { })
+        writeCodeExecutionData(executionId, "execution-id.txt", executionId.executionId)
         return executionId
     }
 
@@ -148,12 +163,37 @@ class ExecutionStorage(
         val storage = project.executionStorage
 
         val executionId = storage.newExecutionId(exec.taskId)
+        storage.writeToolMetadata(executionId, "steroid_execute_code", exec.rawParams, exec.taskId)
         storage.writeCodeExecutionData(executionId, "params.json", exec.rawParams)
         storage.writeCodeExecutionData(executionId, "reason.txt", exec.reason)
         storage.writeCodeExecutionData(executionId, "script.kts", exec.code)
         storage.writeCodeExecutionData(executionId, "execution-id.txt", executionId.executionId)
 
         return executionId
+    }
+
+    suspend fun writeToolCall(toolName: String, arguments: JsonObject?, taskId: String? = null): ExecutionId {
+        val executionId = newExecutionId(taskId ?: "tool-$toolName")
+        writeToolMetadata(executionId, toolName, arguments, taskId)
+        writeCodeExecutionData(executionId, "params.json", arguments ?: buildJsonObject { })
+        writeCodeExecutionData(executionId, "execution-id.txt", executionId.executionId)
+        return executionId
+    }
+
+    private suspend fun writeToolMetadata(
+        executionId: ExecutionId,
+        toolName: String,
+        arguments: JsonObject?,
+        taskId: String? = null,
+    ) {
+        val metadata = ToolCallMetadata(
+            toolName = toolName,
+            timestamp = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
+            projectName = project.name,
+            taskId = taskId,
+            arguments = arguments ?: buildJsonObject { }
+        )
+        writeCodeExecutionData(executionId, "tool.json", metadata)
     }
 
     suspend fun writeWrappedScript(executionId: ExecutionId, code: String) {

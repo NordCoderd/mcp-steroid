@@ -6,7 +6,10 @@ import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.testExecParams
 import org.junit.Assert.assertNotEquals
+import java.nio.file.Path
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
 
 /**
  * Tests for ExecutionStorage.
@@ -33,6 +36,44 @@ class ExecutionStorageTest : BasePlatformTestCase() {
         // ID should have the format: eid_{timestamp}-{task-id}
         assertTrue("ID should start with eid_", executionId.executionId.startsWith("eid_"))
         assertTrue("ID should contain task ID", executionId.executionId.contains("test"))
+    }
+
+    fun testWriteNewExecutionWritesToolMetadata(): Unit = timeoutRunBlocking(10.seconds) {
+        val code = "execute { println(\"Hello\") }"
+        val params = testExecParams(code)
+
+        val executionId = storage.writeNewExecution(params)
+
+        val toolPath = Path.of(project.basePath!!, ".idea", "mcp-run", executionId.executionId, "tool.json")
+        assertTrue("tool.json should exist", java.nio.file.Files.exists(toolPath))
+
+        val metadata = storage.json.decodeFromString(ToolCallMetadata.serializer(), java.nio.file.Files.readString(toolPath))
+        assertEquals("Tool name should match", "steroid_execute_code", metadata.toolName)
+        assertEquals("Project name should match", project.name, metadata.projectName)
+        assertEquals("Task ID should match", params.taskId, metadata.taskId)
+    }
+
+    fun testWriteToolCallWritesMetadata(): Unit = timeoutRunBlocking(10.seconds) {
+        val args = kotlinx.serialization.json.buildJsonObject {
+            put("example", "value")
+        }
+
+        val executionId = storage.writeToolCall(
+            toolName = "steroid_list_projects",
+            arguments = args
+        )
+
+        val baseDir = Path.of(project.basePath!!, ".idea", "mcp-run", executionId.executionId)
+        val toolPath = baseDir.resolve("tool.json")
+        val paramsPath = baseDir.resolve("params.json")
+
+        assertTrue("tool.json should exist", java.nio.file.Files.exists(toolPath))
+        assertTrue("params.json should exist", java.nio.file.Files.exists(paramsPath))
+
+        val metadata = storage.json.decodeFromString(ToolCallMetadata.serializer(), java.nio.file.Files.readString(toolPath))
+        assertEquals("Tool name should match", "steroid_list_projects", metadata.toolName)
+        assertEquals("Project name should match", project.name, metadata.projectName)
+        assertEquals("Arguments should include example", "value", metadata.arguments["example"]?.jsonPrimitive?.content)
     }
 
     fun testDifferentTaskIdsProduceDifferentExecutionIds(): Unit = timeoutRunBlocking(10.seconds) {

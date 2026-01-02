@@ -1,10 +1,11 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.ProjectManager
 import com.jonnyzzz.intellij.mcp.mcp.*
+import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -26,19 +27,28 @@ class ListProjectsToolHandler {
                 putJsonObject("properties") { }
                 putJsonArray("required") { }
             }
-        ) { _ ->
-            handle()
+        ) { context ->
+            handle(context.params)
         }
     }
 
-    private fun handle(): ToolCallResult {
-        val projects = ApplicationManager.getApplication().runReadAction<List<ProjectInfo>> {
-            ProjectManager.getInstance().openProjects.map { project ->
-                ProjectInfo(
-                    name = project.name,
-                    path = project.basePath ?: ""
-                )
-            }
+    private suspend fun handle(params: ToolCallParams): ToolCallResult {
+        val openProjects = readAction {
+            ProjectManager.getInstance().openProjects.toList()
+        }
+
+        val projects = openProjects.map { project ->
+            ProjectInfo(
+                name = project.name,
+                path = project.basePath ?: ""
+            )
+        }
+
+        openProjects.forEach { project ->
+            project.executionStorage.writeToolCall(
+                toolName = "steroid_list_projects",
+                arguments = params.arguments
+            )
         }
 
         val response = ListProjectsResponse(projects)
