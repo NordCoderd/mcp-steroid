@@ -21,8 +21,6 @@ import io.ktor.server.sse.*
 import kotlinx.coroutines.*
 import java.net.BindException
 import java.net.ServerSocket
-import java.nio.file.Files
-import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
 
@@ -90,6 +88,9 @@ class SteroidsMcpServer(
                 log.info("MCP Steroid server started on $mcpUrl")
                 log.info("Note: If you restart IntelliJ, connected MCP clients (Claude CLI, etc.) will need to reconnect.")
                 log.info("      Client should re-run: claude mcp add --transport http intellij-steroid $mcpUrl")
+
+                // Write server URL to user home for easy discovery
+                ServerUrlWriter.getInstance().writeServerUrlToUserHome(mcpUrl)
             }
         } finally {
             startupLock.unlock()
@@ -243,62 +244,8 @@ class SteroidsMcpServer(
      * Should only be called after startServerIfNeeded() completes.
      */
     fun writeServerUrlToProject(project: Project) {
-        val serverUrl = mcpUrl
         check(port > 0) { "Server not started. Call startServerIfNeeded() first." }
-        writeServerUrlToProjectInternal(project, serverUrl)
-    }
-
-    private fun writeServerUrlToProjectInternal(project: Project, serverUrl: String) {
-        try {
-            val basePath = project.basePath ?: return
-            val ideaDir = Path.of(basePath, ".idea")
-            if (Files.exists(ideaDir)) {
-                val mcpFile = ideaDir.resolve("mcp-steroids.txt")
-                val content = buildMcpSteroidsFileContent(serverUrl)
-                Files.writeString(mcpFile, content)
-                log.warn("MCP Steroid server URL written to: $mcpFile")
-            }
-        } catch (e: Exception) {
-            log.error("Failed to write server URL to project folder: ${project.name}", e)
-        }
-    }
-
-    private fun buildMcpSteroidsFileContent(serverUrl: String): String {
-        return """
-             IntelliJ MCP Steroid Server
-             URL: $serverUrl
-            
-             === Claude Code CLI ===
-             
-             Add server:
-               claude mcp add --transport http intellij-steroid $serverUrl
-               claude mcp list
-               
-             Recommended:
-               claude mcp add playwright npx @playwright/mcp@latest
-               
-             Test:
-               claude -p "List all open projects using steroid_list_projects"
-            
-             === Codex CLI (TOML config) ===
-               codex mcp add intellij --url http://localhost:6315/mcp
-               codex mcp list
-
-             Recommended:
-               codex mcp add playwright npx "@playwright/mcp@latest"
-
-             Test:
-               codex exec "List all open projects using steroid_list_projects"
-
-             === Gemini CLI ===
-               gemini mcp add intellij-steroid $serverUrl --transport http --scope user
-               gemini mcp list
-
-             Test:
-               gemini "List all open projects using steroid_list_projects"
-
-             $serverUrl
-        """.trim().trimIndent()
+        ServerUrlWriter.getInstance().writeServerUrl(project, mcpUrl)
     }
 
     private fun findFreePort(): Int {
