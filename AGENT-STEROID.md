@@ -267,13 +267,48 @@ execute {
 }
 ```
 
-### 6. Restart the IDE
+### 6. Invoke IDE Actions (Including Restart)
+
+Use `ActionManager` to invoke any IDE action programmatically:
 
 ```kotlin
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+
 execute {
-    com.intellij.openapi.application.ApplicationManager.getApplication().restart()
+    val actionManager = ActionManager.getInstance()
+    val action = actionManager.getAction("RestartIde")  // Or any action ID
+
+    if (action == null) {
+        println("Action not found")
+        return@execute
+    }
+
+    // Create data context with project
+    val dataContext = SimpleDataContext.builder()
+        .add(CommonDataKeys.PROJECT, project)
+        .build()
+
+    // Invoke the action
+    println("Invoking action...")
+    ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
 }
 ```
+
+**Common action IDs:**
+| Action ID | Description |
+|-----------|-------------|
+| `RestartIde` | Restart IDE |
+| `InvalidateAndRestart` | Invalidate Caches and Restart |
+| `GotoFile` | Go to File dialog |
+| `GotoClass` | Go to Class dialog |
+| `GotoSymbol` | Go to Symbol dialog |
+| `FindInPath` | Find in Files |
+| `ReformatCode` | Reformat Code |
+
+**⚠️ WARNING**: `RestartIde` will terminate your MCP connection!
 
 ### 7. Inspect JAR Contents
 
@@ -369,12 +404,47 @@ execute {
 
 ```kotlin
 import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 
 execute {
-    val action = ActionManager.getInstance().getAction("GotoFile")
+    val actionManager = ActionManager.getInstance()
+    val action = actionManager.getAction("GotoFile")
+
     if (action != null) {
         println("Found action: ${action.templatePresentation.text}")
+
+        // To invoke it:
+        val dataContext = SimpleDataContext.builder()
+            .add(CommonDataKeys.PROJECT, project)
+            .build()
+        ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
     }
+}
+```
+
+### Discover Available Actions
+
+```kotlin
+import com.intellij.openapi.actionSystem.ActionManager
+
+execute {
+    val actionManager = ActionManager.getInstance()
+    val allActionIds = actionManager.getActionIds("")
+
+    // Find actions by keyword
+    val matchingActions = allActionIds.filter {
+        it.contains("refactor", ignoreCase = true)
+    }
+
+    matchingActions.take(20).forEach { actionId ->
+        val action = actionManager.getAction(actionId)
+        val text = action?.templatePresentation?.text ?: "N/A"
+        println("$actionId -> $text")
+    }
+
+    println("Total matching actions: ${matchingActions.size}")
 }
 ```
 

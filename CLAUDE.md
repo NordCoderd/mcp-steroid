@@ -640,6 +640,100 @@ To add a new MCP tool:
    val result = manager.executeWithProgress(params, NoOpProgressReporter)
    ```
 
+## IDE Control via execute_code
+
+You can invoke IDE actions programmatically via `steroid_execute_code`. This is useful for operations like restarting the IDE, invalidating caches, or triggering any IDE action.
+
+### Available Restart Actions
+
+| Action ID | Description |
+|-----------|-------------|
+| `RestartIde` | Restart IDE… |
+| `InvalidateAndRestart` | Invalidate Caches and Restart |
+| `RestartJCEFActionId` | Restart Web Browser (JCEF) |
+| `TypeScript.Restart.Service` | Restart TypeScript Service |
+
+### Restarting the IDE
+
+**⚠️ WARNING**: Executing `RestartIde` will restart the IDE, terminating your MCP connection. Only use this when you explicitly need to restart.
+
+```kotlin
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.CommonDataKeys
+import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+
+execute {
+    val actionManager = ActionManager.getInstance()
+    val restartAction = actionManager.getAction("RestartIde")
+
+    if (restartAction == null) {
+        println("RestartIde action not found")
+        return@execute
+    }
+
+    // Create data context with project
+    val dataContext = SimpleDataContext.builder()
+        .add(CommonDataKeys.PROJECT, project)
+        .build()
+
+    // Invoke the action
+    println("Restarting IDE...")
+    ActionUtil.invokeAction(restartAction, dataContext, "mcp", null, null)
+}
+```
+
+### Checking if an Action is Available
+
+Before invoking an action, you can check if it's enabled:
+
+```kotlin
+import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
+
+execute {
+    val actionManager = ActionManager.getInstance()
+    val action = actionManager.getAction("RestartIde")
+
+    val dataContext = SimpleDataContext.builder()
+        .add(CommonDataKeys.PROJECT, project)
+        .build()
+
+    val presentation = action?.templatePresentation?.clone() ?: Presentation()
+    val event = AnActionEvent.createFromDataContext("mcp", presentation, dataContext)
+
+    action?.update(event)
+
+    println("Action enabled: ${presentation.isEnabled}")
+    println("Action visible: ${presentation.isVisible}")
+}
+```
+
+### Listing All Actions
+
+To discover available actions:
+
+```kotlin
+import com.intellij.openapi.actionSystem.ActionManager
+
+execute {
+    val actionManager = ActionManager.getInstance()
+    val allActionIds = actionManager.getActionIds("")
+
+    // Filter for specific actions
+    val restartActions = allActionIds.filter {
+        it.contains("restart", ignoreCase = true)
+    }
+
+    restartActions.forEach { actionId ->
+        val action = actionManager.getAction(actionId)
+        val text = action?.templatePresentation?.text ?: "N/A"
+        println("$actionId -> $text")
+    }
+}
+```
+
 ## Writing Tests
 
 For execution tests:
