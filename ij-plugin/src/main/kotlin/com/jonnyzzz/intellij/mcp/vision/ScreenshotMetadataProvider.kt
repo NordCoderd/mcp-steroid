@@ -26,6 +26,17 @@ data class ScreenCaptureContext(
     fun withMetadata(metadata: List<ScreenshotMetadata>): ScreenCaptureContext {
         return copy(collectedMetadata = collectedMetadata + metadata)
     }
+
+    /**
+     * Find all image metadata from collected results.
+     */
+    fun findImages(): List<ScreenshotMetadata> =
+        collectedMetadata.filter { it.isImage() }
+
+    /**
+     * Find first image metadata from collected results.
+     */
+    fun findFirstImage(): ScreenshotMetadata? = findImages().firstOrNull()
 }
 
 /**
