@@ -84,6 +84,25 @@ Parameters:
 ### `steroid_execute_feedback`
 Provide feedback on execution results. Use after `steroid_execute_code` to rate success.
 
+### `steroid_open_project`
+Open a project in the IDE. This tool initiates the project opening process and returns quickly.
+
+**IMPORTANT**: This tool does NOT wait for the project to fully open. The project opening process may show dialogs (such as "Trust Project", project type selection, etc.) that require interaction. Use `steroid_take_screenshot` and `steroid_input` tools to interact with any dialogs that appear.
+
+Parameters:
+- `project_path` (required): Absolute path to the project directory to open
+- `task_id` (required): Task identifier for logging
+- `reason` (required): Why you are opening the project
+- `trust_project` (optional): If true, trust the project path before opening (skips trust dialog). Default: false
+- `force_new_frame` (optional): If true, always open in a new window. Default: false
+
+Workflow:
+1. Call `steroid_open_project` with the project path
+2. If `trust_project=true`, the project will be trusted automatically (no trust dialog)
+3. Call `steroid_take_screenshot` to see the current IDE state
+4. If dialogs are shown, use `steroid_input` to interact with them
+5. Call `steroid_list_projects` to verify the project is open
+
 ## Critical Rules
 
 ### 1. The `execute { }` Block is a SUSPEND Function

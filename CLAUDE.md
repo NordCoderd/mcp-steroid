@@ -132,6 +132,7 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 │   ├── ExecuteCodeToolHandler.kt          # steroid_execute_code tool
 │   ├── ExecuteFeedbackToolHandler.kt      # steroid_execute_feedback tool
 │   ├── ListProjectsToolHandler.kt         # steroid_list_projects tool
+│   ├── OpenProjectToolHandler.kt          # steroid_open_project tool (initiates project open)
 │   ├── PluginReloadToolHandler.kt         # Plugin reload tools
 │   └── McpProgressReporter.kt             # Progress reporting interface
 ├── mcp/

@@ -81,6 +81,7 @@ class SteroidsMcpServer(
             service<ActionDiscoveryToolHandler>().register(mcpServer)
             service<VisionScreenshotToolHandler>().register(mcpServer)
             service<VisionInputToolHandler>().register(mcpServer)
+            service<OpenProjectToolHandler>().register(mcpServer)
 
             // Register resources
             service<SkillResourceHandler>().register(mcpServer)
