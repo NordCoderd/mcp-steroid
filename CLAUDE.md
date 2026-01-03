@@ -5,10 +5,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **IMPORTANT: Re-read this file often as it changes frequently. Instructions here override default behavior.**
 
 ## MUST DO
-Use IntelliJ for everything where you can, it makes you 100x professional!
+Use IntelliJ MCP for everything where you can, it makes you 100x professional!
 
-You must never ignore warnings or errors, instead, figure out
-how to fix that the right way.
+You must never ignore warnings or errors, instead, figure out how to fix that the right way.
 
 Do not add test-only branches (for example, `ApplicationManager.getApplication().isUnitTestMode`);
 make production and test paths match by using the correct IntelliJ actions (for example,
@@ -17,14 +16,16 @@ make production and test paths match by using the correct IntelliJ actions (for 
 We love tests, and tests must show the reality. A failing test is much must
 better than a test that does not check the problems. Make sure you fix tests.
 
-Check you changes to see if there are no new warnings added to the code.
+Check your changes to see if there are no new warnings added to the code.
+
+You should log new ideas and tasks as GitHub issues, focus on the main goal. Iterate over tasks later.
 
 ## Workflow Best Practices
 
 ### Test-First Approach
 
-All bugs must be fixed using test-first approach:
-1. First add a failing test that reproduces the bug
+All bugs must be fixed using a test-first approach:
+1. First, add a failing test that reproduces the bug
 2. Then implement the fix to make the test pass
 3. Tests must verify the fix works and prevent regression
 4. Integration tests preferred for end-to-end verification
@@ -42,15 +43,21 @@ All bugs must be fixed using test-first approach:
 - [ ] Write tests for new functionality
 - [ ] Implement the feature
 - [ ] Run `./gradlew build` and `./gradlew test`
-- [ ] Update documentation
+- [ ] Deploy the plugin locally via `./gradlew deployPlugin`
+- [ ] Test your changes with the IntelliJ MCP
+- [ ] Review `./ai-tests/_INSTRUCTIONS.md` and add missing
+- [ ] Play tasks from `./ai-tests`
+- [ ] Update documentation and other .md files in the project
 - [ ] Commit with descriptive message
 - [ ] Verify tests pass
+- [ ] Update related GitHub issues with status, and explain the changes made
 
 ### Bug Fix Requirements
 
 1. Reproduce the problem with a test first
 2. Fix the test, then verify the fix
 3. Ensure no regressions in related functionality
+4. Run ./ai-tests to verify the fix works correctly
 
 ### Code Quality
 
