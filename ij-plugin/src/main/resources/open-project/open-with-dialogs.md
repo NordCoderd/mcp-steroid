@@ -1,0 +1,123 @@
+# Open Project (With Dialog Handling)
+
+Open a project and interactively handle any dialogs that appear.
+
+## Workflow
+
+### Step 1: Open the Project (Without Trust)
+
+Call `steroid_open_project` without trusting:
+
+```json
+{
+  "tool": "steroid_open_project",
+  "arguments": {
+    "project_path": "/absolute/path/to/your/project",
+    "task_id": "open-my-project",
+    "reason": "Opening project to review trust settings",
+    "trust_project": false
+  }
+}
+```
+
+### Step 2: Take a Screenshot
+
+Use `steroid_take_screenshot` to see the current IDE state:
+
+```json
+{
+  "tool": "steroid_take_screenshot",
+  "arguments": {
+    "project_name": "existing-project-name",
+    "task_id": "check-dialogs",
+    "reason": "Checking for trust dialog or other prompts"
+  }
+}
+```
+
+Note: You need an existing open project to take screenshots. If no project is open,
+the trust dialog may appear on the welcome screen.
+
+### Step 3: Handle Dialogs with Input
+
+If a dialog appears (e.g., Trust Project dialog), use `steroid_input`:
+
+```json
+{
+  "tool": "steroid_input",
+  "arguments": {
+    "project_name": "existing-project-name",
+    "task_id": "handle-trust-dialog",
+    "reason": "Clicking Trust Project button",
+    "screenshot_execution_id": "execution_id_from_screenshot",
+    "sequence": "click:Left@x,y"
+  }
+}
+```
+
+Replace `x,y` with the coordinates of the button from the screenshot.
+
+### Step 4: Repeat Until Project is Open
+
+Continue taking screenshots and handling dialogs until the project opens.
+
+### Step 5: Verify Project is Open
+
+```json
+{
+  "tool": "steroid_list_projects",
+  "arguments": {}
+}
+```
+
+## Trust Project Dialog
+
+The Trust Project dialog has these buttons:
+
+| Button | Action |
+|--------|--------|
+| **Trust Project** | Opens with full functionality |
+| **Preview in Safe Mode** | Opens with limited functionality |
+| **Don't Open** | Cancels the operation |
+
+## Example: Handling Trust Dialog
+
+```
+→ steroid_open_project(project_path="/path/to/untrusted-project", trust_project=false, ...)
+← Project opening initiated...
+
+→ steroid_take_screenshot(project_name="other-project", task_id="check", reason="Check for dialogs")
+← [Image showing Trust Project dialog with buttons at coordinates]
+
+→ steroid_input(
+    project_name="other-project",
+    task_id="click-trust",
+    reason="Click Trust Project button",
+    screenshot_execution_id="...",
+    sequence="click:Left@350,200"
+  )
+← Input delivered
+
+→ steroid_list_projects()
+← {"projects":[{"name":"untrusted-project","path":"/path/to/untrusted-project"}, ...]}
+```
+
+## When to Use This Approach
+
+- You want to review what the project does before trusting
+- You need to handle other dialogs (project type selection, etc.)
+- You're debugging project opening issues
+
+## Tips
+
+1. **Component Tree**: The screenshot response includes a component tree that shows
+   button locations and labels, making it easier to find click coordinates.
+
+2. **Multiple Dialogs**: Some projects may show multiple dialogs (trust, SDK selection,
+   project type). Handle each one sequentially.
+
+3. **Timeout**: If the project takes too long to open, check the IDE logs for errors.
+
+## Alternatives
+
+For faster opening without dialogs, use `trust_project=true` in `steroid_open_project`.
