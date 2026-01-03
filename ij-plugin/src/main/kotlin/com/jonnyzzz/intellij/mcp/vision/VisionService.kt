@@ -171,8 +171,9 @@ object VisionService {
      * Collects metadata from all registered providers.
      * Providers are called iteratively until all return Success or Skip.
      * Providers returning DependsOnOthers are retried after others complete.
+     * The context is updated with collected metadata after each provider completes.
      */
-    private suspend fun collectMetadataFromProviders(context: ScreenCaptureContext): List<ScreenshotMetadata> {
+    private suspend fun collectMetadataFromProviders(initialContext: ScreenCaptureContext): List<ScreenshotMetadata> {
         val providers = ScreenshotMetadataProvider.EP_NAME.extensionList
         if (providers.isEmpty()) {
             return emptyList()
@@ -181,6 +182,7 @@ object VisionService {
         val results = mutableListOf<ScreenshotMetadata>()
         val pending = providers.toMutableList()
         var previousPendingCount = pending.size + 1
+        var context = initialContext
 
         // Iterate until all providers complete or no progress is made
         while (pending.isNotEmpty() && pending.size < previousPendingCount) {
@@ -192,6 +194,8 @@ object VisionService {
                 when (val result = provider.provide(context)) {
                     is ProviderResult.Success -> {
                         results.add(result.metadata)
+                        // Update context with the new metadata for subsequent providers
+                        context = context.withMetadata(result.metadata)
                         iterator.remove()
                     }
                     is ProviderResult.Skip -> {

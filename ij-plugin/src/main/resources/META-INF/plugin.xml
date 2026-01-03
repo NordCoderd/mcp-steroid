@@ -45,6 +45,7 @@
 
         <!-- Screenshot metadata providers -->
         <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.SwingComponentTreeProvider"/>
+        <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.OcrMetadataProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">

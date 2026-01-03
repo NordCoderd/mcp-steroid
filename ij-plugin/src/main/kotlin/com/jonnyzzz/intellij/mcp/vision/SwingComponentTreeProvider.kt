@@ -9,16 +9,23 @@ import java.awt.Container
  */
 class SwingComponentTreeProvider : ScreenshotMetadataProvider {
 
+    override val type: String = TYPE
+
     override suspend fun provide(context: ScreenCaptureContext): ProviderResult {
         val tree = buildComponentTree(context.component)
         return ProviderResult.Success(
             ScreenshotMetadata(
-                type = "swing-tree",
-                fileName = "screenshot-tree.md",
+                type = TYPE,
+                fileName = FILE_NAME,
                 content = tree,
                 mimeType = "text/markdown",
             )
         )
+    }
+
+    companion object {
+        const val TYPE = "swing-tree"
+        const val FILE_NAME = "screenshot-tree.md"
     }
 
     private fun buildComponentTree(component: Component, indent: String = "", depth: Int = 0): String {
