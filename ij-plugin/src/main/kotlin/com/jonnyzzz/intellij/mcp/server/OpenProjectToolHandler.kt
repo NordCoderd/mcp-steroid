@@ -41,7 +41,7 @@ import java.nio.file.Path
 @Service(Service.Level.APP)
 class OpenProjectToolHandler(
     private val coroutineScope: CoroutineScope
-) {
+) : McpRegistrar {
     private val log = thisLogger()
     private val toolDescription = """
         Open a project in the IDE. This tool initiates the project opening process and returns quickly.
@@ -68,7 +68,7 @@ class OpenProjectToolHandler(
         After execution, call steroid_execute_feedback to log your feedback.
     """.trimIndent()
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_open_project",
             description = toolDescription,

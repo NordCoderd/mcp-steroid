@@ -26,7 +26,7 @@ import kotlinx.serialization.json.putJsonObject
  * Handler for the steroid_input MCP tool.
  */
 @Service(Service.Level.APP)
-class VisionInputToolHandler {
+class VisionInputToolHandler : McpRegistrar {
     private val toolDescription = """
         Send input events (keyboard + mouse) to the IDE using a sequence string.
 
@@ -52,7 +52,7 @@ class VisionInputToolHandler {
         After execution, call steroid_execute_feedback to log your feedback.
     """.trimIndent()
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_input",
             description = toolDescription,

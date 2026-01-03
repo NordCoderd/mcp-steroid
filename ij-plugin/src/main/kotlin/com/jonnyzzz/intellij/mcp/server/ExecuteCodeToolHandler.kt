@@ -40,7 +40,7 @@ data class ExecCodeParams(
  * Handler for the steroid_execute_code MCP tool.
  */
 @Service(Service.Level.APP)
-class ExecuteCodeToolHandler {
+class ExecuteCodeToolHandler : McpRegistrar {
     private val log = thisLogger()
 
     private val toolDescription get() = """
@@ -116,7 +116,7 @@ class ExecuteCodeToolHandler {
             After execution, call steroid_execute_feedback to log your feedback.
          """.trim().trimIndent()
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_execute_code",
             description = toolDescription,

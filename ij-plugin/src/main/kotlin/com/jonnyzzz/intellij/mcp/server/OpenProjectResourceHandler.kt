@@ -11,7 +11,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  */
 //TODO: validate naming, it looks like open-project is not correct
 @Service(Service.Level.APP)
-class OpenProjectResourceHandler {
+class OpenProjectResourceHandler : McpRegistrar {
 
     /**
      * Open project example resource definition.
@@ -71,7 +71,7 @@ class OpenProjectResourceHandler {
         )
     )
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         // Register overview resource
         server.resourceRegistry.registerResource(
             uri = "intellij://open-project/overview",

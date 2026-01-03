@@ -24,7 +24,7 @@ import kotlinx.serialization.json.*
  * - Association with a task_id
  */
 @Service(Service.Level.APP)
-class ExecuteFeedbackToolHandler {
+class ExecuteFeedbackToolHandler : McpRegistrar {
     private val log = thisLogger()
     private val json = Json {
         prettyPrint = true
@@ -50,7 +50,7 @@ class ExecuteFeedbackToolHandler {
             Feedback helps track execution history and identify patterns for improvement.
         """.trimIndent()
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_execute_feedback",
             description = toolDescription,

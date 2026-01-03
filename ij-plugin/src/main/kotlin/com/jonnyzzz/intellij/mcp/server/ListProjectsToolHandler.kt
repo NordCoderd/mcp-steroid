@@ -16,9 +16,9 @@ import kotlinx.serialization.json.putJsonObject
  * Handler for the steroid_list_projects MCP tool.
  */
 @Service(Service.Level.APP)
-class ListProjectsToolHandler {
+class ListProjectsToolHandler : McpRegistrar {
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_list_projects",
             description = "List all open projects in the IDE. Returns project names that can be used with steroid_execute_code and steroid_open_project.",

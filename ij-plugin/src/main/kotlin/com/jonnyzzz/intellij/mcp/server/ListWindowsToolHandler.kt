@@ -30,8 +30,8 @@ import javax.swing.SwingUtilities
  * Handler for the steroid_list_windows MCP tool.
  */
 @Service(Service.Level.APP)
-class ListWindowsToolHandler {
-    fun register(server: McpServerCore) {
+class ListWindowsToolHandler : McpRegistrar {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_list_windows",
             description = "List open IDE windows and their associated projects. Use this to choose project_name for screenshot/input tools in multi-window setups.",

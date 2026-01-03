@@ -118,8 +118,8 @@ data class GutterIconInfo(
  * Handler for the steroid_action_discovery MCP tool.
  */
 @Service(Service.Level.APP)
-class ActionDiscoveryToolHandler {
-    fun register(server: McpServerCore) {
+class ActionDiscoveryToolHandler : McpRegistrar {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_action_discovery",
             description = "Discover available editor actions, quick-fixes, and gutter actions for a file and caret offset.",

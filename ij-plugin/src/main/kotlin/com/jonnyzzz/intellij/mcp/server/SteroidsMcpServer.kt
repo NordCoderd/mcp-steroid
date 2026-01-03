@@ -40,7 +40,7 @@ class SteroidsMcpServer(
     private val portRef = AtomicReference(0)
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob() + Dispatchers.IO)
     private val startupLock = ReentrantLock()
-    private val pluginVersion = PluginVersionResolver.resolve(javaClass.classLoader)
+    private val pluginVersion = com.jonnyzzz.intellij.mcp.PluginVersionResolver.getInstance().version
 
     val port: Int get() = portRef.get()
     val mcpUrl: String get() = "http://localhost:$port/mcp"
@@ -72,22 +72,11 @@ class SteroidsMcpServer(
             // Double-check after acquiring lock
             if (port > 0) return
 
-            // Register tools
-            service<ListProjectsToolHandler>().register(mcpServer)
-            service<ListWindowsToolHandler>().register(mcpServer)
-            service<ExecuteCodeToolHandler>().register(mcpServer)
-            service<ExecuteFeedbackToolHandler>().register(mcpServer)
-            service<CapabilitiesToolHandler>().register(mcpServer)
-            service<ActionDiscoveryToolHandler>().register(mcpServer)
-            service<VisionScreenshotToolHandler>().register(mcpServer)
-            service<VisionInputToolHandler>().register(mcpServer)
-            service<OpenProjectToolHandler>().register(mcpServer)
-
-            // Register resources
-            service<SkillResourceHandler>().register(mcpServer)
-            service<LspExamplesResourceHandler>().register(mcpServer)
-            service<IdeExamplesResourceHandler>().register(mcpServer)
-            service<OpenProjectResourceHandler>().register(mcpServer)
+            // Register all MCP tools and resources via extension point
+            McpRegistrar.EP_NAME.extensionList.forEach { registrar ->
+                log.info("Registering MCP handler: ${registrar.javaClass.simpleName}")
+                registrar.register(mcpServer)
+            }
 
             val configuredPort = Registry.intValue("mcp.steroids.server.port")
 
@@ -158,9 +147,11 @@ class SteroidsMcpServer(
                         installMcp("/mcp", mcpServer)
                     }
                     get("/.well-known/mcp.json") {
+                        // Use request local info to build correct URL for the client
+                        val local = call.request.local
                         call.respondText(
                             contentType = ContentType.Application.Json,
-                            text = buildWellKnownMcpJson(portToTry)
+                            text = buildWellKnownMcpJson(local.scheme, local.serverHost, local.serverPort)
                         )
                     }
                     // Agent Skills endpoints - serve SKILL.md at root and /skill.md
@@ -249,11 +240,11 @@ class SteroidsMcpServer(
 
     /**
      * Write the MCP server URL to a specific project's .idea folder.
+     * Should only be called after startServerIfNeeded() completes.
      */
     fun writeServerUrlToProject(project: Project) {
         val serverUrl = mcpUrl
-        //TODO: wait for server to start!
-        assert(port > 0)
+        check(port > 0) { "Server not started. Call startServerIfNeeded() first." }
         writeServerUrlToProjectInternal(project, serverUrl)
     }
 
@@ -314,15 +305,13 @@ class SteroidsMcpServer(
         return ServerSocket(0).use { it.localPort }
     }
 
-    private fun buildWellKnownMcpJson(port: Int): String {
-        //TODO: for some scenarios it may not be localhost!
-        //TODO: use the request URL from the HTTP instead,
-        // fallback to localhost:port only as last resort
+    private fun buildWellKnownMcpJson(scheme: String, host: String, port: Int): String {
+        // Use the request's origin to build the correct URL for the client
         return """
             {
                 "mcpServers": {
                     "intellij-mcp-steroid": {
-                        "url": "http://localhost:$port/mcp" 
+                        "url": "$scheme://$host:$port/mcp"
                     }
                 }
             }

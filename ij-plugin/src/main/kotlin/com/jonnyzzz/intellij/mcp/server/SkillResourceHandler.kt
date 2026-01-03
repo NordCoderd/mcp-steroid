@@ -10,7 +10,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Serves the SKILL.md content as an MCP resource.
  */
 @Service(Service.Level.APP)
-class SkillResourceHandler {
+class SkillResourceHandler : McpRegistrar {
 
     val resourceUri = "intellij://skill/intellij-api-poweruser-guide"
     val resourceName = "IntelliJ API Power User Guide"
@@ -29,7 +29,7 @@ class SkillResourceHandler {
         Reading this resource will make your IntelliJ API code 10x more effective.
     """.trimIndent()
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         server.resourceRegistry.registerResource(
             uri = resourceUri,
             name = resourceName,
@@ -52,7 +52,7 @@ class SkillResourceHandler {
     }
 
     private fun injectPluginVersion(content: String): String {
-        val version = PluginVersionResolver.resolve(javaClass.classLoader)
+        val version = com.jonnyzzz.intellij.mcp.PluginVersionResolver.getInstance().version
         val headerEnd = content.indexOf("\n---", startIndex = 3)
         if (content.startsWith("---") && headerEnd > 0) {
             val header = content.substring(0, headerEnd)

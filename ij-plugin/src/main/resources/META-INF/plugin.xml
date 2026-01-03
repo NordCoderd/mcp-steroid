@@ -12,6 +12,32 @@
     <depends>com.intellij.modules.platform</depends>
     <depends optional="true" config-file="kotlin-scripting.xml">org.jetbrains.kotlin</depends>
 
+    <extensionPoints>
+        <!-- Extension point for registering MCP tools and resources -->
+        <extensionPoint
+            name="mcpRegistrar"
+            interface="com.jonnyzzz.intellij.mcp.server.McpRegistrar"
+            dynamic="true"/>
+    </extensionPoints>
+
+    <!-- MCP tool and resource registrars -->
+    <extensions defaultExtensionNs="com.jonnyzzz.intellij.mcp-steroid">
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ListProjectsToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ListWindowsToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ExecuteCodeToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ExecuteFeedbackToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.CapabilitiesToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ActionDiscoveryToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionScreenshotToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionInputToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.SkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.LspExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.IdeExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VcsExamplesResourceHandler"/>
+    </extensions>
+
     <extensions defaultExtensionNs="com.intellij">
         <!-- Review panel notification -->
         <editorNotificationProvider

@@ -11,7 +11,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * IntelliJ IDE operations beyond LSP.
  */
 @Service(Service.Level.APP)
-class IdeExamplesResourceHandler {
+class IdeExamplesResourceHandler : McpRegistrar {
 
     data class IdeExample(
         val id: String,
@@ -344,7 +344,7 @@ class IdeExamplesResourceHandler {
         )
     )
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         server.resourceRegistry.registerResource(
             uri = "intellij://ide/overview",
             name = "IDE Examples Overview",

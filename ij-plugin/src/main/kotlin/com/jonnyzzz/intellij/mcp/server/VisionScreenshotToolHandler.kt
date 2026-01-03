@@ -24,7 +24,7 @@ import java.util.Base64
  * Handler for the steroid_take_screenshot MCP tool.
  */
 @Service(Service.Level.APP)
-class VisionScreenshotToolHandler {
+class VisionScreenshotToolHandler : McpRegistrar {
     private val toolDescription = """
         Capture a screenshot of the IDE and return an image payload.
 
@@ -41,7 +41,7 @@ class VisionScreenshotToolHandler {
         After execution, call steroid_execute_feedback to log your feedback.
     """.trimIndent()
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_take_screenshot",
             description = toolDescription,

@@ -56,8 +56,8 @@ data class LanguageInfo(
  * Handler for the steroid_capabilities MCP tool.
  */
 @Service(Service.Level.APP)
-class CapabilitiesToolHandler {
-    fun register(server: McpServerCore) {
+class CapabilitiesToolHandler : McpRegistrar {
+    override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_capabilities",
             description = "List IDE capabilities such as installed plugins and registered languages.",

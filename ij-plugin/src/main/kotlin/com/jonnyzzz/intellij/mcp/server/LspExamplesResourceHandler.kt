@@ -11,7 +11,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * a common LSP method using IntelliJ Platform APIs.
  */
 @Service(Service.Level.APP)
-class LspExamplesResourceHandler {
+class LspExamplesResourceHandler : McpRegistrar {
 
     /**
      * LSP example resource definition.
@@ -192,7 +192,7 @@ class LspExamplesResourceHandler {
         )
     )
 
-    fun register(server: McpServerCore) {
+    override fun register(server: McpServerCore) {
         // Register overview resource
         server.resourceRegistry.registerResource(
             uri = "intellij://lsp/overview",

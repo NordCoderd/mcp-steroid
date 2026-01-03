@@ -57,6 +57,37 @@ All bugs must be fixed using test-first approach:
 - Run compile and tests when work is done
 - Avoid over-engineering - only add what's necessary
 
+### Issue-Driven Development
+
+When working on this repository, follow this structured workflow:
+
+1. **Review open issues first**
+   - Run `gh issue list` to see all open issues
+   - Prioritize by impact and dependencies
+   - Group related issues for efficient resolution
+
+2. **Work on issues one-by-one**
+   - Focus on a single issue until it's resolved
+   - Use the todo list to track progress within an issue
+   - Mark issue as complete only when fully verified
+
+3. **For each issue**:
+   - Read and understand the issue description
+   - Add a failing test that reproduces the problem (if applicable)
+   - Implement the fix/feature
+   - Run `./gradlew build` to verify
+   - Close the issue with `gh issue close <number>`
+
+4. **Create new issues for discovered work**
+   - If you find unrelated issues during work, create new GitHub issues
+   - Use `gh issue create` with clear title and description
+   - Don't scope-creep current issue - defer to new issues
+
+5. **Commit and verify frequently**
+   - Commit logical changes together
+   - Run tests after each significant change
+   - Keep commits focused and atomic
+
 ## IntelliJ and Coroutines
 
 Main APIs for synchronous return from blocking code:
