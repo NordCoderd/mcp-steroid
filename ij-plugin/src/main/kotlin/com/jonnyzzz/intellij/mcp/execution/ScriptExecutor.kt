@@ -60,6 +60,12 @@ class ScriptExecutor(
         // Create parent Disposable for this execution
         val executionDisposable = Disposer.newDisposable(this, "mcp-execution-$executionId")
 
+        // Create modality monitor to detect modal dialogs during execution
+        val modalityMonitor = ModalityStateMonitor(project, executionId, executionDisposable)
+        if (exec.cancelOnModal) {
+            modalityMonitor.start()
+        }
+
         // Create context for this execution with progress support
         val context = McpScriptContextImpl(
             project = project,
@@ -67,14 +73,8 @@ class ScriptExecutor(
             executionId = executionId,
             disposable = executionDisposable,
             resultBuilder = resultBuilder,
+            modalityMonitor = modalityMonitor,
         )
-
-        // Create modality monitor to detect modal dialogs during execution
-        val modalityMonitor = ModalityStateMonitor(project, executionId, executionDisposable)
-        context.modalityMonitor = modalityMonitor
-        if (exec.cancelOnModal) {
-            modalityMonitor.start()
-        }
 
         try {
             val capturedBlocks = evalResult.result
