@@ -22,6 +22,16 @@ You should log new ideas and tasks as GitHub issues, focus on the main goal. Ite
 
 ## Workflow Best Practices
 
+### IntelliJ API 
+
+Avoid using `object` or singletons in the code, use IntelliJ services instead.
+
+Prefer this instead of static `getInstance()` function
+```
+inline val serviceX: ServiceX get() = service()
+inline val Project.serviceY: ServiceY get() = service()
+```
+
 ### Test-First Approach
 
 All bugs must be fixed using a test-first approach:
