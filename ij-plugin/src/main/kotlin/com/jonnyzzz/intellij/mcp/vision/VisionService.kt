@@ -8,6 +8,7 @@ import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.util.ui.ImageUtil
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -89,7 +90,6 @@ data class ScreenshotArtifacts(
 }
 
 object VisionService {
-    private const val IMAGE_FILE = "screenshot.png"
     private const val META_FILE = "screenshot-meta.json"
 
     private val json = Json {
@@ -98,48 +98,48 @@ object VisionService {
     }
 
     suspend fun capture(project: Project, executionId: ExecutionId, windowId: String? = null): ScreenshotArtifacts {
-        val capture = withContext(Dispatchers.EDT) { captureOnEdt(project, windowId) }
-
-        val pngBytes = withContext(Dispatchers.IO) {
-            val output = ByteArrayOutputStream()
-            val written = ImageIO.write(capture.image, "png", output)
-            if (!written) {
-                throw IllegalStateException("No PNG writer available for screenshot")
-            }
-            output.toByteArray()
-        }
-
         val storage = project.executionStorage
-        val imagePath = storage.writeBinaryExecutionData(executionId, IMAGE_FILE, pngBytes)
         val executionDir = storage.resolveExecutionDir(executionId)
 
-        // Create context for metadata providers
-        val context = ScreenCaptureContext(
+        // Capture component info on EDT
+        val capture = withContext(Dispatchers.EDT) { captureOnEdt(project, windowId) }
+
+        // Create context for metadata providers (image is provided by ScreenshotImageProvider)
+        val initialContext = ScreenCaptureContext(
             project = project,
             component = withContext(Dispatchers.EDT) { resolveComponent(project, windowId) },
-            image = capture.image,
             executionDir = executionDir,
         )
 
-        // Collect metadata from all providers
-        val collectedMetadata = collectMetadataFromProviders(context)
+        // Collect metadata from all providers (including screenshot image)
+        val collectedMetadata = collectMetadataFromProviders(initialContext, storage, executionId)
 
-        // Write metadata files to storage
-        val treeFiles = mutableListOf<String>()
-        for (metadata in collectedMetadata) {
-            storage.writeCodeExecutionData(executionId, metadata.fileName, metadata.content)
-            treeFiles.add(metadata.fileName)
+        // Find screenshot image from collected metadata
+        val screenshotMetadata = collectedMetadata.find { it.type == ScreenshotImageProvider.TYPE }
+        val imageBytes = screenshotMetadata?.binaryContent
+            ?: throw IllegalStateException("No screenshot image provider available")
+        val imageFileName = screenshotMetadata.fileName
+
+        // Collect non-image files for treeFiles
+        val treeFiles = collectedMetadata
+            .filter { !it.isImage() }
+            .map { it.fileName }
+
+        // Load image to get dimensions
+        val imageSize = withContext(Dispatchers.IO) {
+            val image = javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(imageBytes))
+            Size(image.width, image.height)
         }
 
         val meta = ScreenshotMeta(
             system = "swing",
-            imageFile = IMAGE_FILE,
+            imageFile = imageFileName,
             treeFiles = treeFiles,
             metaFile = META_FILE,
             componentClass = capture.componentClass,
             componentName = capture.componentName,
             componentSize = Size(capture.componentSize.width, capture.componentSize.height),
-            imageSize = Size(capture.image.width, capture.image.height),
+            imageSize = imageSize,
             locationOnScreen = capture.locationOnScreen?.let { PointInfo(it.x, it.y) },
             windowId = capture.windowId,
             windowTitle = capture.windowTitle,
@@ -151,7 +151,8 @@ object VisionService {
 
         val metaPath = storage.writeCodeExecutionData(executionId, META_FILE, json.encodeToString(ScreenshotMeta.serializer(), meta))
 
-        // Use first tree file path if available (for backward compatibility)
+        // Get paths for artifacts
+        val imagePath = storage.resolveExecutionPath(executionId, imageFileName)
         val treePath = if (treeFiles.isNotEmpty()) {
             storage.resolveExecutionPath(executionId, treeFiles.first())
         } else {
@@ -159,7 +160,7 @@ object VisionService {
         }
 
         return ScreenshotArtifacts(
-            imageBytes = pngBytes,
+            imageBytes = imageBytes,
             imagePath = imagePath,
             treePath = treePath,
             metaPath = metaPath,
@@ -172,8 +173,13 @@ object VisionService {
      * Providers are called iteratively until all return Success or Skip.
      * Providers returning DependsOnOthers are retried after others complete.
      * The context is updated with collected metadata after each provider completes.
+     * Files are written to storage as each provider completes (so dependent providers can read them).
      */
-    private suspend fun collectMetadataFromProviders(initialContext: ScreenCaptureContext): List<ScreenshotMetadata> {
+    private suspend fun collectMetadataFromProviders(
+        initialContext: ScreenCaptureContext,
+        storage: ExecutionStorage,
+        executionId: ExecutionId,
+    ): List<ScreenshotMetadata> {
         val providers = ScreenshotMetadataProvider.EP_NAME.extensionList
         if (providers.isEmpty()) {
             return emptyList()
@@ -193,9 +199,13 @@ object VisionService {
                 val provider = iterator.next()
                 when (val result = provider.provide(context)) {
                     is ProviderResult.Success -> {
-                        results.add(result.metadata)
+                        // Write files to storage immediately so dependent providers can access them
+                        for (metadata in result.metadata) {
+                            writeMetadataToStorage(storage, executionId, metadata)
+                        }
+                        results.addAll(result.metadata)
                         // Update context with the new metadata for subsequent providers
-                        context = context.withMetadata(result.metadata)
+                        context = context.withMetadata(provider.type, result.metadata)
                         iterator.remove()
                     }
                     is ProviderResult.Skip -> {
@@ -209,6 +219,21 @@ object VisionService {
         }
 
         return results
+    }
+
+    /**
+     * Write metadata content to storage (text or binary).
+     */
+    private suspend fun writeMetadataToStorage(
+        storage: ExecutionStorage,
+        executionId: ExecutionId,
+        metadata: ScreenshotMetadata,
+    ) {
+        if (metadata.content != null) {
+            storage.writeCodeExecutionData(executionId, metadata.fileName, metadata.content)
+        } else if (metadata.binaryContent != null) {
+            storage.writeBinaryExecutionData(executionId, metadata.fileName, metadata.binaryContent)
+        }
     }
 
     suspend fun executeInput(

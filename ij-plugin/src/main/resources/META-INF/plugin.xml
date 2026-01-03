@@ -44,6 +44,7 @@
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VcsExamplesResourceHandler"/>
 
         <!-- Screenshot metadata providers -->
+        <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.ScreenshotImageProvider"/>
         <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.SwingComponentTreeProvider"/>
         <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.OcrMetadataProvider"/>
     </extensions>

@@ -6,27 +6,31 @@ import com.intellij.openapi.project.Project
 import java.awt.Component
 import java.awt.image.BufferedImage
 import java.nio.file.Path
+import javax.imageio.ImageIO
 
 /**
  * Context passed to screenshot metadata providers during capture.
  *
  * @property project The IntelliJ project
  * @property component The captured AWT component
- * @property image The captured screenshot image
  * @property executionDir Directory where metadata files are stored
- * @property collectedMetadata Results from providers that have already completed
+ * @property collectedMetadata Results from providers that have already completed (keyed by type)
  */
 data class ScreenCaptureContext(
     val project: Project,
     val component: Component,
-    val image: BufferedImage,
     val executionDir: Path,
-    val collectedMetadata: Map<String, ScreenshotMetadata> = emptyMap(),
+    val collectedMetadata: Map<String, List<ScreenshotMetadata>> = emptyMap(),
 ) {
     /**
-     * Get metadata from a specific provider type.
+     * Get all metadata items from a specific provider type.
      */
-    fun getMetadata(type: String): ScreenshotMetadata? = collectedMetadata[type]
+    fun getMetadata(type: String): List<ScreenshotMetadata> = collectedMetadata[type] ?: emptyList()
+
+    /**
+     * Get first metadata item from a specific provider type.
+     */
+    fun getFirstMetadata(type: String): ScreenshotMetadata? = collectedMetadata[type]?.firstOrNull()
 
     /**
      * Check if a specific provider has completed.
@@ -34,10 +38,36 @@ data class ScreenCaptureContext(
     fun hasMetadata(type: String): Boolean = collectedMetadata.containsKey(type)
 
     /**
-     * Create a new context with additional metadata.
+     * Find all image metadata from collected results.
      */
-    fun withMetadata(metadata: ScreenshotMetadata): ScreenCaptureContext =
-        copy(collectedMetadata = collectedMetadata + (metadata.type to metadata))
+    fun findImages(): List<ScreenshotMetadata> =
+        collectedMetadata.values.flatten().filter { it.isImage() }
+
+    /**
+     * Find first image metadata from collected results.
+     */
+    fun findFirstImage(): ScreenshotMetadata? = findImages().firstOrNull()
+
+    /**
+     * Load a BufferedImage from an image metadata item.
+     * Returns null if the metadata is not an image or the file doesn't exist.
+     */
+    fun loadImage(metadata: ScreenshotMetadata): BufferedImage? {
+        if (!metadata.isImage()) return null
+        val path = executionDir.resolve(metadata.fileName)
+        if (!java.nio.file.Files.exists(path)) return null
+        return try {
+            ImageIO.read(path.toFile())
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Create a new context with additional metadata from a provider.
+     */
+    fun withMetadata(type: String, metadata: List<ScreenshotMetadata>): ScreenCaptureContext =
+        copy(collectedMetadata = collectedMetadata + (type to metadata))
 }
 
 /**
@@ -45,9 +75,12 @@ data class ScreenCaptureContext(
  */
 sealed class ProviderResult {
     /**
-     * Provider produced metadata.
+     * Provider produced one or more metadata items.
      */
-    data class Success(val metadata: ScreenshotMetadata) : ProviderResult()
+    data class Success(val metadata: List<ScreenshotMetadata>) : ProviderResult() {
+        constructor(vararg items: ScreenshotMetadata) : this(items.toList())
+        constructor(item: ScreenshotMetadata) : this(listOf(item))
+    }
 
     /**
      * Provider depends on other providers to run first.
@@ -63,17 +96,59 @@ sealed class ProviderResult {
 
 /**
  * Metadata produced by a provider.
+ *
+ * Can contain either text content or binary content (for images).
  */
 data class ScreenshotMetadata(
-    /** Unique identifier for this metadata type (e.g., "swing-tree", "ocr") */
+    /** Unique identifier for this metadata type (e.g., "swing-tree", "ocr", "screenshot") */
     val type: String,
     /** File name for storing this metadata */
     val fileName: String,
-    /** Content to write to the file */
-    val content: String,
     /** MIME type of the content */
     val mimeType: String = "text/plain",
-)
+    /** Text content (mutually exclusive with binaryContent) */
+    val content: String? = null,
+    /** Binary content for images (mutually exclusive with content) */
+    val binaryContent: ByteArray? = null,
+) {
+    init {
+        require(content != null || binaryContent != null) {
+            "Either content or binaryContent must be provided"
+        }
+        require(content == null || binaryContent == null) {
+            "Cannot provide both content and binaryContent"
+        }
+    }
+
+    /**
+     * Check if this metadata contains an image.
+     */
+    fun isImage(): Boolean = mimeType.startsWith("image/")
+
+    /**
+     * Check if this metadata contains text.
+     */
+    fun isText(): Boolean = content != null
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ScreenshotMetadata) return false
+        return type == other.type &&
+                fileName == other.fileName &&
+                mimeType == other.mimeType &&
+                content == other.content &&
+                binaryContent.contentEquals(other.binaryContent)
+    }
+
+    override fun hashCode(): Int {
+        var result = type.hashCode()
+        result = 31 * result + fileName.hashCode()
+        result = 31 * result + mimeType.hashCode()
+        result = 31 * result + (content?.hashCode() ?: 0)
+        result = 31 * result + (binaryContent?.contentHashCode() ?: 0)
+        return result
+    }
+}
 
 /**
  * Extension point for providing screenshot metadata.

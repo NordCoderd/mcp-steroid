@@ -3,14 +3,18 @@ package com.jonnyzzz.intellij.mcp.vision
 
 import com.jonnyzzz.intellij.mcp.ocr.OcrLevel
 import com.jonnyzzz.intellij.mcp.ocr.OcrProcessClient
+import com.jonnyzzz.intellij.mcp.ocr.OcrResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
  * Provides OCR text extraction metadata for screenshots.
  *
- * Uses the bundled Tesseract OCR engine to extract text from the screenshot.
- * Outputs a markdown file with detected text blocks and their positions.
+ * Uses the bundled Tesseract OCR engine to extract text from images.
+ * Processes all images in the collected metadata and outputs a markdown
+ * file with detected text blocks and their positions.
+ *
+ * Depends on image providers (e.g., ScreenshotImageProvider) to run first.
  */
 class OcrMetadataProvider : ScreenshotMetadataProvider {
 
@@ -24,25 +28,40 @@ class OcrMetadataProvider : ScreenshotMetadataProvider {
             return ProviderResult.Skip
         }
 
-        // OCR needs the image file - construct path from execution dir
-        val imagePath = context.executionDir.resolve(IMAGE_FILE_NAME)
-        if (!java.nio.file.Files.exists(imagePath)) {
-            // Image not yet written - depend on other providers
+        // Find all images from collected metadata
+        val images = context.findImages()
+        if (images.isEmpty()) {
+            // No images yet - depend on other providers
             return ProviderResult.DependsOnOthers
         }
 
         return try {
-            val result = withContext(Dispatchers.IO) {
-                ocrClient.extractText(imagePath, language = "eng", level = OcrLevel.TEXT_LINE)
+            // Process all images
+            val allResults = mutableListOf<Pair<String, OcrResult>>()
+
+            for (imageMetadata in images) {
+                val imagePath = context.executionDir.resolve(imageMetadata.fileName)
+                if (!java.nio.file.Files.exists(imagePath)) {
+                    continue
+                }
+
+                val result = withContext(Dispatchers.IO) {
+                    ocrClient.extractText(imagePath, language = "eng", level = OcrLevel.TEXT_LINE)
+                }
+                allResults.add(imageMetadata.fileName to result)
             }
 
-            val content = buildOcrMarkdown(result)
+            if (allResults.isEmpty()) {
+                return ProviderResult.Skip
+            }
+
+            val content = buildOcrMarkdown(allResults)
             ProviderResult.Success(
                 ScreenshotMetadata(
                     type = TYPE,
                     fileName = FILE_NAME,
-                    content = content,
                     mimeType = "text/markdown",
+                    content = content,
                 )
             )
         } catch (e: Exception) {
@@ -51,26 +70,40 @@ class OcrMetadataProvider : ScreenshotMetadataProvider {
         }
     }
 
-    private fun buildOcrMarkdown(result: com.jonnyzzz.intellij.mcp.ocr.OcrResult): String {
+    private fun buildOcrMarkdown(results: List<Pair<String, OcrResult>>): String {
         val builder = StringBuilder()
         builder.appendLine("# OCR Results")
         builder.appendLine()
 
-        if (result.blocks.isEmpty()) {
-            builder.appendLine("No text detected in the screenshot.")
+        val totalBlocks = results.sumOf { it.second.blocks.size }
+        if (totalBlocks == 0) {
+            builder.appendLine("No text detected in the screenshot(s).")
             return builder.toString()
         }
 
-        builder.appendLine("Detected ${result.blocks.size} text block(s):")
-        builder.appendLine()
+        for ((imageName, result) in results) {
+            if (results.size > 1) {
+                builder.appendLine("## Image: $imageName")
+                builder.appendLine()
+            }
 
-        for ((index, block) in result.blocks.withIndex()) {
-            val bounds = block.bounds
-            builder.appendLine("## Block ${index + 1}")
-            builder.appendLine("- Position: (${bounds.x}, ${bounds.y})")
-            builder.appendLine("- Size: ${bounds.width}x${bounds.height}")
-            builder.appendLine("- Text: \"${block.text}\"")
+            if (result.blocks.isEmpty()) {
+                builder.appendLine("No text detected.")
+                builder.appendLine()
+                continue
+            }
+
+            builder.appendLine("Detected ${result.blocks.size} text block(s):")
             builder.appendLine()
+
+            for ((index, block) in result.blocks.withIndex()) {
+                val bounds = block.bounds
+                builder.appendLine("### Block ${index + 1}")
+                builder.appendLine("- Position: (${bounds.x}, ${bounds.y})")
+                builder.appendLine("- Size: ${bounds.width}x${bounds.height}")
+                builder.appendLine("- Text: \"${block.text}\"")
+                builder.appendLine()
+            }
         }
 
         return builder.toString()
@@ -79,6 +112,5 @@ class OcrMetadataProvider : ScreenshotMetadataProvider {
     companion object {
         const val TYPE = "ocr"
         const val FILE_NAME = "screenshot-ocr.md"
-        const val IMAGE_FILE_NAME = "screenshot.png"
     }
 }
