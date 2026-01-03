@@ -92,7 +92,7 @@ class VisionScreenshotToolHandler : McpRegistrar {
         val executionId = project.executionStorage.writeToolCall(
             toolName = "steroid_take_screenshot",
             arguments = args,
-            taskId = taskId
+            taskId = "screenshot-$taskId"
         )
         project.executionStorage.writeCodeExecutionData(executionId, "reason.txt", reason)
 

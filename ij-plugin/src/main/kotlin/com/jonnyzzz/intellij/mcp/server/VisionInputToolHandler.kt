@@ -112,7 +112,7 @@ class VisionInputToolHandler : McpRegistrar {
         val executionId = project.executionStorage.writeToolCall(
             toolName = "steroid_input",
             arguments = args,
-            taskId = taskId
+            taskId = "input-$taskId"
         )
         project.executionStorage.writeCodeExecutionData(executionId, "reason.txt", reason)
 
