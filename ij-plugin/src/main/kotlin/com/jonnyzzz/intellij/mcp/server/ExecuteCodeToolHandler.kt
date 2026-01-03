@@ -7,6 +7,7 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.ProjectManager.getInstance
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.util.registry.Registry
@@ -28,6 +29,7 @@ data class ExecCodeParams(
     val code: String,
     val reason: String,
     val timeout: Int,
+    //TODO: move that away from here, allow changes only via the McpScriptContext::doNotCancelOnModalityStateChange
     /** If true, cancel execution when a modal dialog appears and return screenshot. Default true. */
     val cancelOnModal: Boolean = true,
 
@@ -39,7 +41,7 @@ data class ExecCodeParams(
  */
 @Service(Service.Level.APP)
 class ExecuteCodeToolHandler {
-    private val log = Logger.getInstance(ExecuteCodeToolHandler::class.java)
+    private val log = thisLogger()
 
     private val toolDescription get() = """
              Execute Kotlin code in the IntelliJ-based IDE's runtime context with full access to IntelliJ APIs.
