@@ -1,7 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.ocr.app
 
-import kotlinx.serialization.Serializable
+import com.jonnyzzz.intellij.mcp.ocr.OcrLevel
+import com.jonnyzzz.intellij.mcp.ocr.OcrRect
+import com.jonnyzzz.intellij.mcp.ocr.OcrResult
+import com.jonnyzzz.intellij.mcp.ocr.OcrTextBlock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import net.sourceforge.tess4j.ITessAPI
@@ -18,25 +21,6 @@ import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import javax.imageio.ImageIO
 import kotlin.system.exitProcess
-
-@Serializable
-data class OcrRect(val x: Int, val y: Int, val width: Int, val height: Int)
-
-@Serializable
-data class OcrTextBlock(
-    val text: String,
-    val bounds: OcrRect,
-)
-
-@Serializable
-data class OcrResult(
-    val blocks: List<OcrTextBlock>,
-)
-
-enum class OcrLevel {
-    TEXT_LINE,
-    WORD,
-}
 
 private data class OcrOptions(
     val imagePath: Path,

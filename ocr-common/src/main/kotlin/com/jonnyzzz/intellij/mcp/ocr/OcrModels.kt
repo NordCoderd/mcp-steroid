@@ -3,7 +3,10 @@ package com.jonnyzzz.intellij.mcp.ocr
 
 import kotlinx.serialization.Serializable
 
-//TODO: These models look like a duplicate with the Ocr-tessaract, introduce common module instead
+/**
+ * Common OCR models shared between the main plugin and the ocr-tesseract CLI.
+ */
+
 @Serializable
 data class OcrRect(val x: Int, val y: Int, val width: Int, val height: Int)
 

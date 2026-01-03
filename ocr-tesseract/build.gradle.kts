@@ -16,6 +16,7 @@ val tesseractPlatformVersion = "5.5.1-1.5.12"
 val leptonicaPlatformVersion = "1.85.0-1.5.12"
 
 dependencies {
+    implementation(project(":ocr-common"))
     implementation("net.sourceforge.tess4j:tess4j:$tess4jVersion")
     implementation("org.bytedeco:tesseract-platform:$tesseractPlatformVersion")
     implementation("org.bytedeco:leptonica-platform:$leptonicaPlatformVersion")

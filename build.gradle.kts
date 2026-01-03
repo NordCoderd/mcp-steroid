@@ -53,6 +53,9 @@ dependencies {
         testFramework(TestFrameworkType.Platform)
     }
 
+    // OCR common models shared with ocr-tesseract CLI
+    implementation(project(":ocr-common"))
+
     // Kotlin scripting for script definition provider
     compileOnly("org.jetbrains.kotlin:kotlin-scripting-common:2.2.21")
     compileOnly("org.jetbrains.kotlin:kotlin-scripting-jvm:2.2.21")
