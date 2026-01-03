@@ -18,7 +18,6 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.nio.file.StandardCopyOption
 import javax.imageio.ImageIO
 import kotlin.system.exitProcess
 
@@ -144,14 +143,47 @@ private fun toTextBlock(word: Word): OcrTextBlock? {
 }
 
 private fun ensureTessdataDir(): Path {
-    //TODO: Make sure you copy that during build time in Gradle build
-    //TODO: The created application in that module must have these resources prepared
-    //TODO: Build must never put files under the user home folder!
-    val root = Path.of(System.getProperty("user.home"), ".mcp-ocr", "tessdata")
-    Files.createDirectories(root)
-    copyResource("tessdata/eng.traineddata", root.resolve("eng.traineddata"))
-    copyResource("tessdata/osd.traineddata", root.resolve("osd.traineddata"))
-    return root
+    // Find tessdata relative to the application installation directory.
+    // Distribution structure: ocr-tesseract/{bin,lib,tessdata}
+    val appRoot = findAppRoot()
+    val tessdataDir = appRoot.resolve("tessdata")
+
+    if (!Files.isDirectory(tessdataDir)) {
+        error("Tessdata directory not found: $tessdataDir. Ensure the application was built with './gradlew installDist'.")
+    }
+
+    // Verify required files exist
+    val requiredFiles = listOf("eng.traineddata", "osd.traineddata")
+    for (file in requiredFiles) {
+        val path = tessdataDir.resolve(file)
+        if (!Files.exists(path)) {
+            error("Required tessdata file not found: $path")
+        }
+    }
+
+    return tessdataDir
+}
+
+private fun findAppRoot(): Path {
+    // Try to find the app root from the classloader's jar location
+    val jarLocation = OcrResult::class.java.protectionDomain?.codeSource?.location?.toURI()
+    if (jarLocation != null) {
+        val jarPath = Paths.get(jarLocation)
+        // Expected structure: .../lib/ocr-common.jar or .../lib/ocr-tesseract.jar
+        // App root is parent of 'lib'
+        val parent = jarPath.parent
+        if (parent?.fileName?.toString() == "lib") {
+            return parent.parent
+        }
+    }
+
+    // Fallback: check current working directory
+    val cwd = Paths.get("").toAbsolutePath()
+    if (Files.isDirectory(cwd.resolve("tessdata"))) {
+        return cwd
+    }
+
+    error("Cannot determine application root directory. Run from the distribution directory or ensure TESSDATA_PREFIX is set.")
 }
 
 private fun ensureNativeLibraries() {
@@ -162,14 +194,4 @@ private fun ensureNativeLibraries() {
     val existing = System.getProperty("jna.library.path").orEmpty()
     val updated = if (existing.isBlank()) cacheDir else existing + File.pathSeparator + cacheDir
     System.setProperty("jna.library.path", updated)
-}
-
-private fun copyResource(resource: String, target: Path) {
-    if (Files.exists(target) && Files.size(target) > 0) return
-
-    val stream = OcrResult::class.java.classLoader.getResourceAsStream(resource)
-        ?: error("OCR resource not found: $resource")
-    stream.use { input ->
-        Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING)
-    }
 }
