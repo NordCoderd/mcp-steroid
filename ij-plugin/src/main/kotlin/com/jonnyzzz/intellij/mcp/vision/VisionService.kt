@@ -15,7 +15,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.awt.Component
-import java.awt.Container
 import java.awt.Point
 import java.awt.Dimension
 import java.awt.Window
@@ -26,13 +25,11 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.nio.file.Path
 import javax.imageio.ImageIO
 import javax.swing.SwingUtilities
 import kotlin.math.roundToInt
 
-//TODO: make the metadata object extensible, so each extension could provide
-//TODO: it's own serializable data object with additional info and the filename
-//TODO: basically the screenshot itself is yet another object in that collection, the first one
 @Serializable
 data class ScreenshotMeta(
     val system: String,
@@ -91,41 +88,16 @@ data class ScreenshotArtifacts(
     }
 }
 
-//TODO: This must be IntelliJ Component
 object VisionService {
     private const val IMAGE_FILE = "screenshot.png"
-    //TODO: the metadata should be provided via IntelliJ extension point, so move the
-    //TODO: specific providers to additional Extension Point implementations
-    //TODO: let extensions specify filenames
-    private const val TREE_FILE = "screenshot-tree.md"
     private const val META_FILE = "screenshot-meta.json"
-
-
-    //TODO: extensions design
-    //TODO: we create a generic interface for extensions to provide the
-    //TODO: screenshot and related metadata for a given context
-    //TODO: the implementation works as follows:
-    //TODO: we iterate over the all available providers
-    //TODO: each provider can provide the metadata (image, component tree, etc)
-    //TODO: so the provided metadata goes into the context
-    //TODO: or the provider can return special answer to indicate it depends from other providers
-    //TODO: we iterate over all providers which has not yet returned the answer
-    //TODO: once provider returned answer -- it is not executed anymore
-    //TODO: a provider may never return anything, there must be additional response (and exception) for such case
-    //TODO: --- so our goal is to refactor the current system into extension point based approach where all 3 providers are added
-    //TODO: --- next step is to support Compose controls and JCEF controls as additional tasks in the plan
-    //TODO: ---- deploy the MCP plugin and try it
 
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
     }
 
-    //TODO: Introduce the ScreenCaptureContext object, it will be better for the extensibility later
-    //TODO: Wrap the whole method in coroutineScope { .. } to make sure all nested coroutines are properly cancelled/awaited
     suspend fun capture(project: Project, executionId: ExecutionId, windowId: String? = null): ScreenshotArtifacts {
-        //TODO: make sure (really validate in the code, if that is executed with ModalityState.any()
-        //TODO: otherwise the capture will not work for modal dialogs
         val capture = withContext(Dispatchers.EDT) { captureOnEdt(project, windowId) }
 
         val pngBytes = withContext(Dispatchers.IO) {
@@ -139,12 +111,30 @@ object VisionService {
 
         val storage = project.executionStorage
         val imagePath = storage.writeBinaryExecutionData(executionId, IMAGE_FILE, pngBytes)
-        val treePath = storage.writeCodeExecutionData(executionId, TREE_FILE, capture.componentTree)
+        val executionDir = storage.resolveExecutionDir(executionId)
+
+        // Create context for metadata providers
+        val context = ScreenCaptureContext(
+            project = project,
+            component = withContext(Dispatchers.EDT) { resolveComponent(project, windowId) },
+            image = capture.image,
+            executionDir = executionDir,
+        )
+
+        // Collect metadata from all providers
+        val collectedMetadata = collectMetadataFromProviders(context)
+
+        // Write metadata files to storage
+        val treeFiles = mutableListOf<String>()
+        for (metadata in collectedMetadata) {
+            storage.writeCodeExecutionData(executionId, metadata.fileName, metadata.content)
+            treeFiles.add(metadata.fileName)
+        }
 
         val meta = ScreenshotMeta(
             system = "swing",
             imageFile = IMAGE_FILE,
-            treeFiles = listOf(TREE_FILE),
+            treeFiles = treeFiles,
             metaFile = META_FILE,
             componentClass = capture.componentClass,
             componentName = capture.componentName,
@@ -161,6 +151,13 @@ object VisionService {
 
         val metaPath = storage.writeCodeExecutionData(executionId, META_FILE, json.encodeToString(ScreenshotMeta.serializer(), meta))
 
+        // Use first tree file path if available (for backward compatibility)
+        val treePath = if (treeFiles.isNotEmpty()) {
+            storage.resolveExecutionPath(executionId, treeFiles.first())
+        } else {
+            storage.resolveExecutionPath(executionId, "screenshot-tree.md")
+        }
+
         return ScreenshotArtifacts(
             imageBytes = pngBytes,
             imagePath = imagePath,
@@ -168,6 +165,46 @@ object VisionService {
             metaPath = metaPath,
             meta = meta,
         )
+    }
+
+    /**
+     * Collects metadata from all registered providers.
+     * Providers are called iteratively until all return Success or Skip.
+     * Providers returning DependsOnOthers are retried after others complete.
+     */
+    private suspend fun collectMetadataFromProviders(context: ScreenCaptureContext): List<ScreenshotMetadata> {
+        val providers = ScreenshotMetadataProvider.EP_NAME.extensionList
+        if (providers.isEmpty()) {
+            return emptyList()
+        }
+
+        val results = mutableListOf<ScreenshotMetadata>()
+        val pending = providers.toMutableList()
+        var previousPendingCount = pending.size + 1
+
+        // Iterate until all providers complete or no progress is made
+        while (pending.isNotEmpty() && pending.size < previousPendingCount) {
+            previousPendingCount = pending.size
+            val iterator = pending.iterator()
+
+            while (iterator.hasNext()) {
+                val provider = iterator.next()
+                when (val result = provider.provide(context)) {
+                    is ProviderResult.Success -> {
+                        results.add(result.metadata)
+                        iterator.remove()
+                    }
+                    is ProviderResult.Skip -> {
+                        iterator.remove()
+                    }
+                    is ProviderResult.DependsOnOthers -> {
+                        // Keep in pending list for next iteration
+                    }
+                }
+            }
+        }
+
+        return results
     }
 
     suspend fun executeInput(
@@ -186,7 +223,6 @@ object VisionService {
 
     private data class CaptureInfo(
         val image: BufferedImage,
-        val componentTree: String,
         val componentClass: String,
         val componentName: String?,
         val componentSize: Dimension,
@@ -214,7 +250,6 @@ object VisionService {
             graphics.dispose()
         }
 
-        val tree = buildComponentTree(component)
         val location = runCatching { component.locationOnScreen }.getOrNull()
         val window = SwingUtilities.getWindowAncestor(component)
         val windowIdValue = WindowIdUtil.compute(window, component)
@@ -223,7 +258,6 @@ object VisionService {
 
         return CaptureInfo(
             image = image,
-            componentTree = tree,
             componentClass = component.javaClass.name,
             componentName = component.name,
             componentSize = Dimension(component.width, component.height),
@@ -268,41 +302,6 @@ object VisionService {
             }
         }
         return null
-    }
-
-    private fun buildComponentTree(component: Component, indent: String = "", depth: Int = 0): String {
-        val builder = StringBuilder()
-        val bounds = component.bounds
-        builder.append(indent).append("- ")
-        builder.append(component.javaClass.simpleName)
-        component.name?.let { builder.append("(name=").append(it).append(")") }
-        builder.append(" [").append(bounds.width).append("x").append(bounds.height).append("]")
-        if (!component.isVisible) builder.append(" hidden")
-
-        val text = extractText(component)
-        if (text != null) {
-            builder.append(" \"").append(text).append("\"")
-        }
-        builder.append("\n")
-
-        if (component is Container && depth < 64) {
-            for (child in component.components) {
-                builder.append(buildComponentTree(child, indent + "  ", depth + 1))
-            }
-        } else if (depth >= 64) {
-            builder.append(indent).append("  ").append("... depth limit reached\n")
-        }
-
-        return builder.toString()
-    }
-
-    private fun extractText(component: Component): String? {
-        return when (component) {
-            is javax.swing.JLabel -> component.text
-            is javax.swing.AbstractButton -> component.text
-            is javax.swing.text.JTextComponent -> component.text
-            else -> null
-        }?.takeIf { it.isNotBlank() }?.take(120)
     }
 
     private class SwingInputExecutor(

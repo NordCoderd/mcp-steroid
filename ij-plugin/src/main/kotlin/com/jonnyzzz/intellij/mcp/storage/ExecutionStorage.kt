@@ -100,6 +100,10 @@ class ExecutionStorage(
             return dir
         }
 
+    fun resolveExecutionDir(executionId: ExecutionId): Path {
+        return executionId.dir
+    }
+
     suspend fun appendExecutionEvent(executionId: ExecutionId, text: String) {
         appendExecutionEvent(executionId, TextMessage(text))
     }

@@ -18,6 +18,12 @@
             name="mcpRegistrar"
             interface="com.jonnyzzz.intellij.mcp.server.McpRegistrar"
             dynamic="true"/>
+
+        <!-- Extension point for screenshot metadata providers -->
+        <extensionPoint
+            name="screenshotMetadataProvider"
+            interface="com.jonnyzzz.intellij.mcp.vision.ScreenshotMetadataProvider"
+            dynamic="true"/>
     </extensionPoints>
 
     <!-- MCP tool and resource registrars -->
@@ -36,6 +42,9 @@
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.IdeExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VcsExamplesResourceHandler"/>
+
+        <!-- Screenshot metadata providers -->
+        <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.SwingComponentTreeProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
