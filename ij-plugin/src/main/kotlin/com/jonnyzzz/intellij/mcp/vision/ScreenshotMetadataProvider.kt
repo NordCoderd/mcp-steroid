@@ -4,9 +4,7 @@ package com.jonnyzzz.intellij.mcp.vision
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
 import java.awt.Component
-import java.awt.image.BufferedImage
 import java.nio.file.Path
-import javax.imageio.ImageIO
 
 /**
  * Context passed to screenshot metadata providers during capture.
@@ -20,54 +18,14 @@ data class ScreenCaptureContext(
     val project: Project,
     val component: Component,
     val executionDir: Path,
-    val collectedMetadata: Map<String, List<ScreenshotMetadata>> = emptyMap(),
+    val collectedMetadata: List<ScreenshotMetadata> = emptyList(),
 ) {
-    /**
-     * Get all metadata items from a specific provider type.
-     */
-    fun getMetadata(type: String): List<ScreenshotMetadata> = collectedMetadata[type] ?: emptyList()
-
-    /**
-     * Get first metadata item from a specific provider type.
-     */
-    fun getFirstMetadata(type: String): ScreenshotMetadata? = collectedMetadata[type]?.firstOrNull()
-
-    /**
-     * Check if a specific provider has completed.
-     */
-    fun hasMetadata(type: String): Boolean = collectedMetadata.containsKey(type)
-
-    /**
-     * Find all image metadata from collected results.
-     */
-    fun findImages(): List<ScreenshotMetadata> =
-        collectedMetadata.values.flatten().filter { it.isImage() }
-
-    /**
-     * Find first image metadata from collected results.
-     */
-    fun findFirstImage(): ScreenshotMetadata? = findImages().firstOrNull()
-
-    /**
-     * Load a BufferedImage from an image metadata item.
-     * Returns null if the metadata is not an image or the file doesn't exist.
-     */
-    fun loadImage(metadata: ScreenshotMetadata): BufferedImage? {
-        if (!metadata.isImage()) return null
-        val path = executionDir.resolve(metadata.fileName)
-        if (!java.nio.file.Files.exists(path)) return null
-        return try {
-            ImageIO.read(path.toFile())
-        } catch (e: Exception) {
-            null
-        }
-    }
-
     /**
      * Create a new context with additional metadata from a provider.
      */
-    fun withMetadata(type: String, metadata: List<ScreenshotMetadata>): ScreenCaptureContext =
-        copy(collectedMetadata = collectedMetadata + (type to metadata))
+    fun withMetadata(metadata: List<ScreenshotMetadata>): ScreenCaptureContext {
+        return copy(collectedMetadata = collectedMetadata + metadata)
+    }
 }
 
 /**
@@ -124,11 +82,6 @@ data class ScreenshotMetadata(
      * Check if this metadata contains an image.
      */
     fun isImage(): Boolean = mimeType.startsWith("image/")
-
-    /**
-     * Check if this metadata contains text.
-     */
-    fun isText(): Boolean = content != null
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true

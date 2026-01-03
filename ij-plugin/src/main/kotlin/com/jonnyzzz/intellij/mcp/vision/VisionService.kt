@@ -23,11 +23,8 @@ import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
-import java.io.ByteArrayOutputStream
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.nio.file.Path
-import javax.imageio.ImageIO
 import javax.swing.SwingUtilities
 import kotlin.math.roundToInt
 
@@ -205,7 +202,7 @@ object VisionService {
                         }
                         results.addAll(result.metadata)
                         // Update context with the new metadata for subsequent providers
-                        context = context.withMetadata(provider.type, result.metadata)
+                        context = context.withMetadata(result.metadata)
                         iterator.remove()
                     }
                     is ProviderResult.Skip -> {
