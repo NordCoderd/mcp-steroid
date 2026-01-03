@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 
+//TODO: Make it IntelliJ service instead, update AGENTS.md, we prefer services to objects
 object OcrProcessClient {
     private val log = Logger.getInstance(OcrProcessClient::class.java)
     //TODO: Plugin ID must not be hardcoded, use the same logic as for PluginVersionResolver to resolve it
