@@ -160,6 +160,9 @@ private fun toTextBlock(word: Word): OcrTextBlock? {
 }
 
 private fun ensureTessdataDir(): Path {
+    //TODO: Make sure you copy that during build time in Gradle build
+    //TODO: The created application in that module must have these resources prepared
+    //TODO: Build must never put files under the user home folder!
     val root = Path.of(System.getProperty("user.home"), ".mcp-ocr", "tessdata")
     Files.createDirectories(root)
     copyResource("tessdata/eng.traineddata", root.resolve("eng.traineddata"))
