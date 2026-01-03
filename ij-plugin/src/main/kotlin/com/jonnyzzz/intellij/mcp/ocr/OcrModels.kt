@@ -3,6 +3,7 @@ package com.jonnyzzz.intellij.mcp.ocr
 
 import kotlinx.serialization.Serializable
 
+//TODO: These models look like a duplicate with the Ocr-tessaract, introduce common module instead
 @Serializable
 data class OcrRect(val x: Int, val y: Int, val width: Int, val height: Int)
 
