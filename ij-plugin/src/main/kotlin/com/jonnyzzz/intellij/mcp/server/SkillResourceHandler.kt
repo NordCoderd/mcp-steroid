@@ -52,7 +52,7 @@ class SkillResourceHandler : McpRegistrar {
     }
 
     private fun injectPluginVersion(content: String): String {
-        val version = com.jonnyzzz.intellij.mcp.PluginVersionResolver.getInstance().version
+        val version = com.jonnyzzz.intellij.mcp.PluginDescriptorProvider.getInstance().version
         val headerEnd = content.indexOf("\n---", startIndex = 3)
         if (content.startsWith("---") && headerEnd > 0) {
             val header = content.substring(0, headerEnd)

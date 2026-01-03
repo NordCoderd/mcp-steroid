@@ -21,7 +21,7 @@ class IdeExamplesResourceHandler : McpRegistrar {
     )
 
     //TODO: it must work different way, it must just list resources
-    //TODO: which we have in the plugin (use PluginVersionResolver alike to resolve path)
+    //TODO: which we have in the plugin (use PluginDescriptorProvider alike to resolve path)
     //TODO: each resource entry must have header and the content
     //TODO: we parse the header to include each resource
     //TODO: thus there must be no hardcoded text like it is now.

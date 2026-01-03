@@ -5,27 +5,35 @@ import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.execution.process.ProcessOutput
 import com.intellij.execution.util.ExecUtil
-import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.SystemInfoRt
+import com.jonnyzzz.intellij.mcp.PluginDescriptorProvider
 import kotlinx.serialization.json.Json
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 
-//TODO: Make it IntelliJ service instead, update AGENTS.md, we prefer services to objects
-//TODO: make sure you use this extension in screenshot capture in addition to Swing component tree,
-//TODO: there must be extensible approach to provide additional image metadata that we call,
-//TODO: given a dialog, component and any other context that is possible
-object OcrProcessClient {
-    private val log = Logger.getInstance(OcrProcessClient::class.java)
-    //TODO: Plugin ID must not be hardcoded, use the same logic as for PluginVersionResolver to resolve it
-    private val pluginId = PluginId.getId("com.jonnyzzz.intellij.mcp-steroid")
+/**
+ * Service for OCR text extraction from images.
+ *
+ * Uses the bundled ocr-tesseract CLI tool to perform OCR on screenshots.
+ * The OCR process runs as a separate subprocess to avoid native library conflicts.
+ */
+@Service(Service.Level.APP)
+class OcrProcessClient {
+    private val log = thisLogger()
     private val json = Json { ignoreUnknownKeys = true }
 
-    private const val OCR_TIMEOUT_MS = 120_000
-
+    /**
+     * Extract text from an image file using OCR.
+     *
+     * @param imagePath Path to the image file
+     * @param language OCR language code (default: "eng")
+     * @param level OCR detection level (TEXT_LINE or WORD)
+     * @return OCR result with detected text blocks and their bounding boxes
+     */
     fun extractText(imagePath: Path, language: String = "eng", level: OcrLevel = OcrLevel.TEXT_LINE): OcrResult {
         require(Files.exists(imagePath)) { "OCR image does not exist: $imagePath" }
         val executable = resolveExecutable()
@@ -46,6 +54,18 @@ object OcrProcessClient {
             throw IllegalStateException("OCR returned empty output. stderr=${output.stderr.trim()}")
         }
         return json.decodeFromString(OcrResult.serializer(), stdout)
+    }
+
+    /**
+     * Check if OCR is available (executable exists and can be found).
+     */
+    fun isAvailable(): Boolean {
+        return try {
+            resolveExecutable()
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     private fun runProcess(commandLine: GeneralCommandLine): ProcessOutput {
@@ -69,8 +89,7 @@ object OcrProcessClient {
     }
 
     private fun resolveExecutable(): OcrExecutable {
-        val plugin = PluginManagerCore.getPlugin(pluginId)
-            ?: throw IllegalStateException("OCR process not available: plugin not found")
+        val plugin = PluginDescriptorProvider.getInstance().descriptor
         val ocrRoot = plugin.pluginPath.resolve("ocr-tesseract")
         val bin = if (SystemInfoRt.isWindows) "bin/ocr-tesseract.bat" else "bin/ocr-tesseract"
         val executable = ocrRoot.resolve(bin)
@@ -87,4 +106,10 @@ object OcrProcessClient {
     private fun OcrLevel.cliToken(): String = name.lowercase()
 
     private data class OcrExecutable(val path: Path, val root: Path)
+
+    companion object {
+        private const val OCR_TIMEOUT_MS = 120_000
+
+        fun getInstance(): OcrProcessClient = service()
+    }
 }

@@ -14,19 +14,19 @@ class OcrProcessClientTest : BasePlatformTestCase() {
 
     fun testExtractsHelloOcrText(): Unit = timeoutRunBlocking(90.seconds) {
         val image = loadImage("hello-ocr.png")
-        val result = OcrProcessClient.extractText(image)
+        val result = OcrProcessClient.getInstance().extractText(image)
         assertContainsTokens(result, "HELLO", "OCR")
     }
 
     fun testExtractsMultiLineText(): Unit = timeoutRunBlocking(90.seconds) {
         val image = loadImage("multi-line.png")
-        val result = OcrProcessClient.extractText(image)
+        val result = OcrProcessClient.getInstance().extractText(image)
         assertContainsTokens(result, "FIRST", "LINE", "SECOND")
     }
 
     fun testExtractsNumbers(): Unit = timeoutRunBlocking(90.seconds) {
         val image = loadImage("numbers.png")
-        val result = OcrProcessClient.extractText(image)
+        val result = OcrProcessClient.getInstance().extractText(image)
         assertContainsTokens(result, "12345", "TEST")
     }
 

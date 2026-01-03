@@ -38,7 +38,7 @@ class SteroidsMcpServer(
     private val portRef = AtomicReference(0)
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob() + Dispatchers.IO)
     private val startupLock = ReentrantLock()
-    private val pluginVersion = com.jonnyzzz.intellij.mcp.PluginVersionResolver.getInstance().version
+    private val pluginVersion = com.jonnyzzz.intellij.mcp.PluginDescriptorProvider.getInstance().version
 
     val port: Int get() = portRef.get()
     val mcpUrl: String get() = "http://localhost:$port/mcp"
