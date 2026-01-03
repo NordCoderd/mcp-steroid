@@ -35,6 +35,8 @@ class CodeButcher {
             appendLine("import com.intellij.openapi.command.*")
             appendLine("import com.intellij.psi.*")
             appendLine("import kotlinx.coroutines.*")
+            appendLine("import kotlin.time.Duration.Companion.seconds")
+            appendLine("import kotlin.time.Duration.Companion.minutes")
             appendLine()
             appendLine("//imports from the submitted code")
             importLines.forEach { appendLine(it) }

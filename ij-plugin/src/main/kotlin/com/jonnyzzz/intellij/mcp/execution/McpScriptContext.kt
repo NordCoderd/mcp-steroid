@@ -7,8 +7,11 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.psi.search.GlobalSearchScope
 import kotlinx.serialization.json.JsonElement
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import com.intellij.openapi.application.readAction as intellijReadAction
 import com.intellij.openapi.application.writeAction as intellijWriteAction
 import com.intellij.openapi.application.smartReadAction as intellijSmartReadAction
@@ -138,6 +141,78 @@ interface McpScriptContext {
      * ```
      */
     suspend fun waitForSmartMode()
+
+    // ============================================================
+    // IDE Utilities - Daemon Code Analysis
+    // ============================================================
+
+    /**
+     * Check if daemon code analyzer is currently running.
+     *
+     * ```kotlin
+     * execute {
+     *     if (isDaemonRunning()) {
+     *         println("Analysis in progress...")
+     *     }
+     * }
+     * ```
+     */
+    suspend fun isDaemonRunning(): Boolean
+
+    /**
+     * Wait for daemon code analyzer to complete highlighting on the given file.
+     * The file must be open in the editor for highlighting to work.
+     *
+     * @param file The virtual file to wait for analysis completion
+     * @param timeout Maximum time to wait (default: 30 seconds)
+     * @return true if highlighting completed, false if timeout occurred
+     *
+     * ```kotlin
+     * execute {
+     *     val file = findProjectFile("src/Main.kt") ?: error("File not found")
+     *     // Open file in editor first
+     *     withContext(Dispatchers.EDT) {
+     *         FileEditorManager.getInstance(project).openFile(file, true)
+     *     }
+     *     // Wait for analysis
+     *     val completed = waitForDaemonAnalysis(file)
+     *     if (completed) {
+     *         println("Analysis complete!")
+     *     }
+     * }
+     * ```
+     */
+    suspend fun waitForDaemonAnalysis(file: VirtualFile, timeout: Duration = 30.seconds): Boolean
+
+    /**
+     * Wait for daemon analysis and return all highlight infos for the file.
+     * Returns highlights with severity >= WEAK_WARNING by default.
+     *
+     * @param file The virtual file to get highlights for
+     * @param minSeverityValue Minimum severity value (default: WEAK_WARNING). Use HighlightSeverity.*.myVal
+     * @param timeout Maximum time to wait for analysis (default: 30 seconds)
+     * @return List of HighlightInfo for the file, or empty list if timeout
+     *
+     * ```kotlin
+     * execute {
+     *     val file = findProjectFile("src/Main.kt") ?: error("File not found")
+     *     // Open file in editor
+     *     withContext(Dispatchers.EDT) {
+     *         FileEditorManager.getInstance(project).openFile(file, true)
+     *     }
+     *     // Get all warnings and errors
+     *     val highlights = getHighlightsWhenReady(file)
+     *     highlights.forEach { info ->
+     *         println("${info.severity}: ${info.description}")
+     *     }
+     * }
+     * ```
+     */
+    suspend fun getHighlightsWhenReady(
+        file: VirtualFile,
+        minSeverityValue: Int = 200, // HighlightSeverity.WEAK_WARNING.myVal
+        timeout: Duration = 30.seconds
+    ): List<HighlightInfo>
 
     // ============================================================
     // Modal Dialog Control

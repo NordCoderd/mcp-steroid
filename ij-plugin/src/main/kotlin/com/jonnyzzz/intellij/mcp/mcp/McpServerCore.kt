@@ -76,7 +76,7 @@ class McpServerCore(
             } else if (error != null) {
                 val rpcError = try {
                     McpJson.decodeFromJsonElement<JsonRpcError>(error)
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     JsonRpcError(code = -1, message = "Unknown error")
                 }
                 if (session.handleErrorResponse(idString, rpcError)) {
@@ -203,7 +203,9 @@ class McpServerCore(
 
     /**
      * Send tools/list_changed notification to all sessions.
+     * Currently unused but part of MCP protocol API for future use.
      */
+    @Suppress("unused")
     fun notifyToolsListChanged() {
         val notification = JsonRpcNotification(method = McpMethods.TOOLS_LIST_CHANGED)
         sessionManager.getAllSessions().forEach { it.sendNotification(notification) }

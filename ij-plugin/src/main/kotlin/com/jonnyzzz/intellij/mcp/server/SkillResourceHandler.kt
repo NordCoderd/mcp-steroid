@@ -57,6 +57,7 @@ class SkillResourceHandler {
         if (content.startsWith("---") && headerEnd > 0) {
             val header = content.substring(0, headerEnd)
             val rest = content.substring(headerEnd)
+            @Suppress("RegExpRepeatedSpace") // Intentional: matches YAML indentation
             val updatedHeader = header.replaceFirst(Regex("(?m)^  version:.*$"), "  version: \"$version\"")
             return updatedHeader + rest
         }

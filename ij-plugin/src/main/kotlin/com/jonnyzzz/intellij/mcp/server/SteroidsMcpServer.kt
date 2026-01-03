@@ -37,7 +37,7 @@ class SteroidsMcpServer(
     private val log = thisLogger()
 
     private val serverRef = AtomicReference<EmbeddedServer<*, *>?>(null)
-    private val portRef = AtomicReference<Int>(0)
+    private val portRef = AtomicReference(0)
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob() + Dispatchers.IO)
     private val startupLock = ReentrantLock()
     private val pluginVersion = PluginVersionResolver.resolve(javaClass.classLoader)
@@ -223,7 +223,7 @@ class SteroidsMcpServer(
         return try {
             val address = if (host == "0.0.0.0") null else java.net.InetAddress.getByName(host)
             ServerSocket(port, 1, address).use { true }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             false
         }
     }

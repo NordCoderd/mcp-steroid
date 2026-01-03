@@ -143,7 +143,7 @@ class VisionInputToolHandler {
             }
             log("Using window_id: ${meta.windowId}")
 
-            VisionService.executeInput(project, meta, parsed)
+            VisionService.executeInput(meta, parsed)
             log("Input sequence executed successfully.")
         } catch (e: Exception) {
             val message = "Input execution failed: ${e.message}"

@@ -7,7 +7,6 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
@@ -15,10 +14,8 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.mcp.builder
-import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.boolean
@@ -49,17 +46,24 @@ class OpenProjectToolHandler(
     private val toolDescription = """
         Open a project in the IDE. This tool initiates the project opening process and returns quickly.
 
-        IMPORTANT: This tool does NOT wait for the project to fully open. The project opening
-        process may show dialogs (such as "Trust Project", project type selection, etc.) that
-        require interaction. Use steroid_take_screenshot and steroid_input tools to interact
-        with any dialogs that appear.
+        IMPORTANT: Project opening is ASYNCHRONOUS. This tool returns immediately after initiating
+        the open operation. You MUST poll to verify the project is fully ready before using it.
 
-        Workflow:
+        Verification Workflow:
         1. Call steroid_open_project with the project path
-        2. If trust_project=true, the project will be trusted automatically (no trust dialog)
-        3. Call steroid_take_screenshot to see the current IDE state
-        4. If dialogs are shown, use steroid_input to interact with them
-        5. Call steroid_list_projects to verify the project is open
+        2. Poll steroid_list_windows repeatedly (every 2-3 seconds) until:
+           - The project appears in the windows list
+           - modalDialogShowing is false (no dialogs blocking)
+           - indexingInProgress is false (indexing complete)
+           - projectInitialized is true
+        3. If modalDialogShowing is true, use steroid_take_screenshot + steroid_input to handle dialogs
+        4. Use steroid_take_screenshot to visually confirm the project is fully loaded
+        5. Verify with steroid_list_projects that the project appears
+
+        Dialog Handling:
+        - If trust_project=true (default), the trust dialog is skipped automatically
+        - Other dialogs (project type, SDK selection, etc.) may still appear
+        - Always check modalDialogShowing in steroid_list_windows response
 
         After execution, call steroid_execute_feedback to log your feedback.
     """.trimIndent()
@@ -151,16 +155,15 @@ class OpenProjectToolHandler(
             log("Initiating project open: $projectPath")
             log("force_new_frame: ${true}")
 
-            // Launch the project opening in a background coroutine
-            // We launch but don't await - we want to return quickly so the client
-            // can interact with any dialogs that appear using screenshot/input tools
+            // Open the project with proper UI-level initialization
+            // Using runConfigurators=true ensures modules and project structure are loaded
             withContext(Dispatchers.EDT) {
                 try {
                     val task = OpenProjectTask {
                         forceOpenInNewFrame = true
                         showWelcomeScreen = false
                         projectToClose = null
-                        projectRootDir = projectPath
+                        runConfigurators = true  // Critical: ensures modules are loaded properly
                     }
                     val result = ProjectManagerEx.getInstanceExAsync().openProject(projectPath, task)
                     if (result != null) {
@@ -177,11 +180,19 @@ class OpenProjectToolHandler(
 
             log("Project opening initiated. The process runs in the background.")
             log("")
-            log("NEXT STEPS:")
-            log("1. Wait a moment for the project to open (2-5 seconds)")
-            log("2. Call steroid_take_screenshot to see the current IDE state")
-            log("3. If dialogs appear (trust, project type, etc.), use steroid_input to interact")
-            log("4. Call steroid_list_projects to verify the project is open")
+            log("IMPORTANT: You MUST poll to verify the project is ready before using it.")
+            log("")
+            log("VERIFICATION WORKFLOW:")
+            log("1. Poll steroid_list_windows every 2-3 seconds until:")
+            log("   - The project appears in the windows list")
+            log("   - modalDialogShowing is false")
+            log("   - indexingInProgress is false")
+            log("   - projectInitialized is true")
+            log("2. If modalDialogShowing is true:")
+            log("   - Call steroid_take_screenshot to see the dialog")
+            log("   - Use steroid_input to interact with the dialog")
+            log("3. Use steroid_take_screenshot to visually confirm project is loaded")
+            log("4. Verify with steroid_list_projects that the project appears")
             log("")
             if (!trustProject) {
                 log("NOTE: trust_project was false. A 'Trust Project' dialog may appear.")

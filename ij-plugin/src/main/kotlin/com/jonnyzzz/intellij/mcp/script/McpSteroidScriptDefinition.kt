@@ -38,7 +38,9 @@ object McpSteroidScriptCompilationConfiguration : ScriptCompilationConfiguration
         "com.intellij.openapi.fileEditor.*",
         "com.intellij.openapi.command.*",
         "com.intellij.psi.*",
-        "kotlinx.coroutines.*"
+        "kotlinx.coroutines.*",
+        "kotlin.time.Duration.Companion.seconds",
+        "kotlin.time.Duration.Companion.minutes"
     )
 
     // Include IntelliJ platform and plugin classpath

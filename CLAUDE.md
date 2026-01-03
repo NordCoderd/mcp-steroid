@@ -17,6 +17,46 @@ better than a test that does not check the problems. Make sure you fix tests.
 
 Check you changes to see if there are no new warnings added to the code.
 
+## Workflow Best Practices
+
+### Test-First Approach
+
+All bugs must be fixed using test-first approach:
+1. First add a failing test that reproduces the bug
+2. Then implement the fix to make the test pass
+3. Tests must verify the fix works and prevent regression
+4. Integration tests preferred for end-to-end verification
+
+### Documentation as First-Class Citizen
+
+- Documentation is key - maintain .md files
+- Update documentation when implementation changes
+- Keep README.md and docs/*.md consistent with actual implementation
+
+### Feature Implementation Checklist
+
+- [ ] Read and understand requirements
+- [ ] Ask clarifying questions if ambiguous
+- [ ] Write tests for new functionality
+- [ ] Implement the feature
+- [ ] Run `./gradlew build` and `./gradlew test`
+- [ ] Update documentation
+- [ ] Commit with descriptive message
+- [ ] Verify tests pass
+
+### Bug Fix Requirements
+
+1. Reproduce the problem with a test first
+2. Fix the test, then verify the fix
+3. Ensure no regressions in related functionality
+
+### Code Quality
+
+- Never ignore warnings or errors - fix them properly
+- Check changes for new warnings
+- Run compile and tests when work is done
+- Avoid over-engineering - only add what's necessary
+
 ## IntelliJ and Coroutines
 
 Main APIs for synchronous return from blocking code:
@@ -761,3 +801,115 @@ class MyTest : BasePlatformTestCase() {
     }
 }
 ```
+
+## GitHub Issues Workflow
+
+### Finding and Creating Issues
+
+1. **Review source files using IntelliJ MCP**:
+   - Open files in the editor via `steroid_execute_code`
+   - Wait for IDE to highlight the file (wait for smart mode)
+   - Review warnings, errors, and suggestions from the IDE
+   - Check TODO/FIXME comments in code
+
+2. **Create GitHub issues for improvements**:
+   ```bash
+   gh issue create --repo jonnyzzz/intellij-mcp-steroids \
+     --title "Issue title" \
+     --body "Description"
+   ```
+
+3. **Link issues to code locations**:
+   - Reference file paths and line numbers
+   - Quote relevant code snippets
+   - Tag with appropriate labels
+
+### Working Through Issues
+
+1. **List open issues**:
+   ```bash
+   gh issue list --repo jonnyzzz/intellij-mcp-steroids
+   ```
+
+2. **Work on issues one by one**:
+   - Research IntelliJ codebase at `../intellij` for patterns
+   - Use IntelliJ MCP to explore APIs
+   - Implement the fix
+   - Run tests: `./gradlew test`
+   - Deploy: `./gradlew deployPlugin`
+
+3. **Close issues with commits**:
+   - Reference issue in commit message: `Fixes #123`
+
+## AI Tests
+
+The `ai-tests/` folder contains test prompts for validating MCP integration.
+
+### Running AI Tests
+
+1. Deploy fresh plugin:
+   ```bash
+   ./gradlew deployPlugin
+   ```
+
+2. Execute test prompts from `ai-tests/*.md` files
+
+3. Validate outcomes against expected results
+
+### Test Files
+
+- `01-code-execution.md` - Basic code execution
+- `02-project-info.md` - Project/window information
+- `03-screenshots.md` - Screenshot capture
+- `04-input-dispatch.md` - Keyboard/mouse input
+- `05-action-discovery.md` - Editor actions
+- `06-project-opening.md` - Project opening workflow
+
+See `ai-tests/_INSTRUCTIONS.md` for detailed usage.
+
+## Code Review Using IntelliJ MCP
+
+When reviewing code quality:
+
+1. **Open file in editor**:
+   ```kotlin
+   execute {
+       val file = findProjectFile("src/main/kotlin/path/to/File.kt")
+       if (file != null) {
+           com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+               .openFile(file, true)
+       }
+   }
+   ```
+
+2. **Wait for analysis**:
+   ```kotlin
+   execute {
+       waitForSmartMode()
+       // Wait additional time for daemon to complete
+       delay(2000)
+   }
+   ```
+
+3. **Get warnings and errors**:
+   ```kotlin
+   import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
+   import com.intellij.codeInsight.daemon.impl.HighlightInfo
+   import com.intellij.lang.annotation.HighlightSeverity
+
+   execute {
+       val file = findProjectPsiFile("src/main/kotlin/path/to/File.kt")
+       if (file != null) {
+           val highlights = readAction {
+               DaemonCodeAnalyzerEx.getInstanceEx(project)
+                   .getFileLevelHighlights(project, file)
+           }
+           highlights.forEach { println(it) }
+       }
+   }
+   ```
+
+4. **Create issues for findings**:
+   - Group related warnings
+   - Include file paths and line numbers
+   - Propose fixes where obvious

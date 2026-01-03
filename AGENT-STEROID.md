@@ -23,6 +23,29 @@ List all open projects in the IDE. Use this to get project names for `steroid_ex
 List open IDE windows and their associated projects. Some windows may not be tied to a project and a project can have multiple windows.
 Use this in multi-window setups to pick the right `project_name` and `window_id` for screenshot/input tools.
 
+**Response Fields (per window):**
+| Field | Description |
+|-------|-------------|
+| `projectName` | Project name (null if not a project window) |
+| `projectPath` | Project base path |
+| `windowId` | Unique window identifier for screenshot/input targeting |
+| `modalDialogShowing` | **True if any modal dialog is showing in IDE** |
+| `indexingInProgress` | **True if project is indexing (dumb mode)** |
+| `projectInitialized` | **True if project is fully initialized** |
+| `isActive` | Whether window is currently focused |
+| `isVisible` | Whether window is visible |
+
+**Response also includes `backgroundTasks` (list of running tasks):**
+| Field | Description |
+|-------|-------------|
+| `title` | Task title (e.g., "Indexing", "Building") |
+| `text` | Current status text |
+| `fraction` | Progress 0.0-1.0 (null if indeterminate) |
+| `isIndeterminate` | True if no percentage available |
+| `projectName` | Associated project name |
+
+Use the modality/indexing fields and `backgroundTasks` to poll for project readiness after `steroid_open_project`.
+
 ### `steroid_capabilities`
 List installed plugins and registered languages. Use this to verify language support or required plugins.
 
@@ -87,21 +110,26 @@ Provide feedback on execution results. Use after `steroid_execute_code` to rate 
 ### `steroid_open_project`
 Open a project in the IDE. This tool initiates the project opening process and returns quickly.
 
-**IMPORTANT**: This tool does NOT wait for the project to fully open. The project opening process may show dialogs (such as "Trust Project", project type selection, etc.) that require interaction. Use `steroid_take_screenshot` and `steroid_input` tools to interact with any dialogs that appear.
+**IMPORTANT**: Project opening is **ASYNCHRONOUS**. This tool returns immediately after initiating the open operation. You **MUST poll** `steroid_list_windows` to verify the project is fully ready.
 
 Parameters:
 - `project_path` (required): Absolute path to the project directory to open
 - `task_id` (required): Task identifier for logging
 - `reason` (required): Why you are opening the project
-- `trust_project` (optional): If true, trust the project path before opening (skips trust dialog). Default: false
-- `force_new_frame` (optional): If true, always open in a new window. Default: false
+- `trust_project` (optional): If true, trust the project path before opening (skips trust dialog). Default: true
 
-Workflow:
+**Verification Workflow (Required):**
 1. Call `steroid_open_project` with the project path
-2. If `trust_project=true`, the project will be trusted automatically (no trust dialog)
-3. Call `steroid_take_screenshot` to see the current IDE state
-4. If dialogs are shown, use `steroid_input` to interact with them
-5. Call `steroid_list_projects` to verify the project is open
+2. Poll `steroid_list_windows` every 2-3 seconds until:
+   - The project appears in the windows list
+   - `modalDialogShowing` is `false` (no dialogs blocking)
+   - `indexingInProgress` is `false` (indexing complete)
+   - `projectInitialized` is `true`
+3. If `modalDialogShowing` is `true`:
+   - Call `steroid_take_screenshot` to see the dialog
+   - Use `steroid_input` to interact with the dialog
+4. Use `steroid_take_screenshot` to visually confirm the project is loaded
+5. Verify with `steroid_list_projects` that the project appears
 
 ## Critical Rules
 

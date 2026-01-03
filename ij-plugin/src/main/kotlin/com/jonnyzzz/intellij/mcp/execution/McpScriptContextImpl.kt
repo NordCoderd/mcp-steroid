@@ -3,22 +3,34 @@ package com.jonnyzzz.intellij.mcp.execution
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.VirtualFile
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import com.jonnyzzz.intellij.mcp.vision.VisionService
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
+import kotlin.time.Duration
 
 /**
  * Implementation of McpScriptContext.
@@ -140,5 +152,99 @@ class McpScriptContextImpl(
         checkDisposed()
         log.info("[$executionId] Modal dialog cancellation disabled by script")
         modalityMonitor.doNotCancelOnModalityStateChange()
+    }
+
+    // ============================================================
+    // Daemon Code Analysis
+    // ============================================================
+
+    override suspend fun isDaemonRunning(): Boolean {
+        checkDisposed()
+        return readAction {
+            DaemonCodeAnalyzer.getInstance(project).isRunning
+        }
+    }
+
+    override suspend fun waitForDaemonAnalysis(file: VirtualFile, timeout: Duration): Boolean {
+        checkDisposed()
+        log.info("[$executionId] Waiting for daemon analysis on ${file.name}...")
+        resultBuilder.logProgress("Waiting for daemon analysis on ${file.name}...")
+
+        // First wait for smart mode
+        waitForSmartMode()
+
+        // Find the editor for the file
+        val editor = withContext(Dispatchers.EDT) {
+            FileEditorManager.getInstance(project).getEditors(file)
+                .filterIsInstance<TextEditor>()
+                .firstOrNull()
+        }
+
+        if (editor == null) {
+            log.warn("[$executionId] No text editor found for ${file.name}, cannot wait for highlighting")
+            return false
+        }
+
+        // Wait for highlighting to complete
+        val completed = withTimeoutOrNull(timeout) {
+            while (!disposed.get()) {
+                val isComplete = withContext(Dispatchers.EDT) {
+                    DaemonCodeAnalyzerEx.isHighlightingCompleted(editor, project)
+                }
+                if (isComplete) break
+                delay(50)
+            }
+            true
+        } ?: false
+
+        if (completed) {
+            log.info("[$executionId] Daemon analysis completed for ${file.name}")
+        } else {
+            log.warn("[$executionId] Timeout waiting for daemon analysis on ${file.name}")
+        }
+        return completed
+    }
+
+    override suspend fun getHighlightsWhenReady(
+        file: VirtualFile,
+        minSeverityValue: Int,
+        timeout: Duration
+    ): List<HighlightInfo> {
+        checkDisposed()
+
+        // Wait for analysis to complete
+        val completed = waitForDaemonAnalysis(file, timeout)
+        if (!completed) {
+            return emptyList()
+        }
+
+        // Get document for the file
+        val document = readAction {
+            com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(file)
+        } ?: return emptyList()
+
+        // Get all highlights
+        return readAction {
+            getHighlightsFromDaemon(document, minSeverityValue)
+        }
+    }
+
+    private fun getHighlightsFromDaemon(document: Document, minSeverityValue: Int): List<HighlightInfo> {
+        val allHighlights = mutableListOf<HighlightInfo>()
+
+        DaemonCodeAnalyzerEx.processHighlights(
+            document,
+            project,
+            null, // null severity means all severities
+            0,
+            document.textLength
+        ) { info ->
+            if (info.severity.myVal >= minSeverityValue) {
+                allHighlights.add(info)
+            }
+            true // continue processing
+        }
+
+        return allHighlights
     }
 }

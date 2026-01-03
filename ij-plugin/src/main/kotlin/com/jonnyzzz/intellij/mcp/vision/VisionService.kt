@@ -70,7 +70,26 @@ data class ScreenshotArtifacts(
     val treePath: java.nio.file.Path,
     val metaPath: java.nio.file.Path,
     val meta: ScreenshotMeta,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is ScreenshotArtifacts) return false
+        return imageBytes.contentEquals(other.imageBytes) &&
+                imagePath == other.imagePath &&
+                treePath == other.treePath &&
+                metaPath == other.metaPath &&
+                meta == other.meta
+    }
+
+    override fun hashCode(): Int {
+        var result = imageBytes.contentHashCode()
+        result = 31 * result + imagePath.hashCode()
+        result = 31 * result + treePath.hashCode()
+        result = 31 * result + metaPath.hashCode()
+        result = 31 * result + meta.hashCode()
+        return result
+    }
+}
 
 //TODO: This must be IntelliJ Component
 object VisionService {
@@ -84,18 +103,18 @@ object VisionService {
 
     //TODO: extensions design
     //TODO: we create a generic interface for extensions to provide the
-    //TODO: screenshot and related medatada for a given context
-    //TODO: the implmenetation work as follows:
+    //TODO: screenshot and related metadata for a given context
+    //TODO: the implementation works as follows:
     //TODO: we iterate over the all available providers
-    //TODO: each provider can provide the metatada (image, component tree, etc)
+    //TODO: each provider can provide the metadata (image, component tree, etc)
     //TODO: so the provided metadata goes into the context
     //TODO: or the provider can return special answer to indicate it depends from other providers
-    //TODO: we iterate over all provides which has not yet returned the answer
+    //TODO: we iterate over all providers which has not yet returned the answer
     //TODO: once provider returned answer -- it is not executed anymore
-    //TODO: a provider may never return anything, there must be additional response (and exception) for such cage
+    //TODO: a provider may never return anything, there must be additional response (and exception) for such case
     //TODO: --- so our goal is to refactor the current system into extension point based approach where all 3 providers are added
     //TODO: --- next step is to support Compose controls and JCEF controls as additional tasks in the plan
-    //TODP: ---- deploy the MCP plugin and try it
+    //TODO: ---- deploy the MCP plugin and try it
 
     private val json = Json {
         prettyPrint = true
@@ -152,11 +171,10 @@ object VisionService {
     }
 
     suspend fun executeInput(
-        project: Project,
         meta: ScreenshotMeta,
         steps: List<InputStep>,
     ) {
-        val executor = SwingInputExecutor(project, meta)
+        val executor = SwingInputExecutor(meta)
         executor.execute(steps)
     }
 
@@ -220,27 +238,36 @@ object VisionService {
 
     private fun resolveComponent(project: Project, windowId: String?): Component {
         if (windowId != null) {
-            val frames = WindowManager.getInstance().getAllProjectFrames()
-            frames.forEach { frame ->
-                val component = frame.component
-                val window = SwingUtilities.getWindowAncestor(component)
-                if (WindowIdUtil.compute(window, component) == windowId) {
-                    return component
-                }
-            }
-            val windows = Window.getWindows()
-            windows.forEach { window ->
-                if (!window.isDisplayable) return@forEach
-                if (WindowIdUtil.compute(window, window) == windowId) {
-                    return window
-                }
-            }
-            throw IllegalStateException("Window not found for window_id: $windowId")
+            return findComponentByWindowId(windowId)
+                ?: throw IllegalStateException("Window not found for window_id: $windowId")
         }
 
         return WindowManager.getInstance().getIdeFrame(project)?.component
             ?: FileEditorManager.getInstance(project).selectedTextEditor?.component
             ?: throw IllegalStateException("No IDE frame or editor component available for screenshot")
+    }
+
+    /**
+     * Find a component by window ID. Searches both project frames and all displayable windows.
+     * @return The component if found, null otherwise
+     */
+    private fun findComponentByWindowId(windowId: String): Component? {
+        // Search project frames first
+        for (frame in WindowManager.getInstance().allProjectFrames) {
+            val component = frame.component
+            val window = SwingUtilities.getWindowAncestor(component)
+            if (WindowIdUtil.compute(window, component) == windowId) {
+                return component
+            }
+        }
+        // Fall back to all displayable windows
+        for (window in Window.getWindows()) {
+            if (!window.isDisplayable) continue
+            if (WindowIdUtil.compute(window, window) == windowId) {
+                return window
+            }
+        }
+        return null
     }
 
     private fun buildComponentTree(component: Component, indent: String = "", depth: Int = 0): String {
@@ -279,7 +306,6 @@ object VisionService {
     }
 
     private class SwingInputExecutor(
-        private val project: Project,
         private val meta: ScreenshotMeta,
     ) {
         private val stuckKeys = LinkedHashSet<Int>()
@@ -311,22 +337,8 @@ object VisionService {
 
         private fun resolveComponentForInput(): Component {
             val windowId = meta.windowId ?: throw IllegalStateException("Screenshot metadata missing windowId")
-            val frames = WindowManager.getInstance().getAllProjectFrames()
-            frames.forEach { frame ->
-                val component = frame.component
-                val window = SwingUtilities.getWindowAncestor(component)
-                if (WindowIdUtil.compute(window, component) == windowId) {
-                    return component
-                }
-            }
-            val windows = Window.getWindows()
-            windows.forEach { window ->
-                if (!window.isDisplayable) return@forEach
-                if (WindowIdUtil.compute(window, window) == windowId) {
-                    return window
-                }
-            }
-            throw IllegalStateException("No IDE window found for windowId: $windowId")
+            return findComponentByWindowId(windowId)
+                ?: throw IllegalStateException("No IDE window found for windowId: $windowId")
         }
 
         private fun stickKey(component: Component, step: InputStep.StickKey) {
@@ -423,9 +435,7 @@ object VisionService {
                 }
             }
 
-            val focusManager = IdeFocusManager.findInstanceByComponent(component)
-                ?: IdeFocusManager.getGlobalInstance()
-            focusManager.requestFocus(component, true)
+            IdeFocusManager.findInstanceByComponent(component).requestFocus(component, true)
         }
 
         private fun releaseAll(component: Component) {
