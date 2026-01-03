@@ -55,11 +55,18 @@ class SwingComponentTreeProvider : ScreenshotMetadataProvider {
     }
 
     private fun extractText(component: Component): String? {
-        return when (component) {
+        val raw = when (component) {
             is javax.swing.JLabel -> component.text
             is javax.swing.AbstractButton -> component.text
             is javax.swing.text.JTextComponent -> component.text
             else -> null
-        }?.takeIf { it.isNotBlank() }?.take(120)
+        } ?: return null
+
+        // Sanitize: collapse whitespace (newlines, tabs, multiple spaces) into single space
+        val sanitized = raw
+            .replace(Regex("\\s+"), " ")
+            .trim()
+
+        return sanitized.takeIf { it.isNotBlank() }?.take(120)
     }
 }
