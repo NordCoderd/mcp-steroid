@@ -140,6 +140,31 @@ interface McpScriptContext {
     suspend fun waitForSmartMode()
 
     // ============================================================
+    // Modal Dialog Control
+    // ============================================================
+
+    /**
+     * Disable automatic cancellation when a modal dialog appears.
+     *
+     * By default, if a modal dialog appears during code execution, the execution
+     * is cancelled and a screenshot of the dialog is returned. Call this method
+     * to disable this behavior - useful when your code intentionally shows dialogs
+     * (like refactoring confirmations).
+     *
+     * ```kotlin
+     * execute {
+     *     // Disable modal dialog cancellation before invoking refactoring
+     *     doNotCancelOnModalityStateChange()
+     *
+     *     // Now refactoring dialogs won't cancel execution
+     *     ActionManager.getInstance().getAction("ExtractMethod")
+     *         // ...
+     * }
+     * ```
+     */
+    fun doNotCancelOnModalityStateChange()
+
+    // ============================================================
     // Read/Write Actions - Convenience Wrappers
     // ============================================================
     // These save you from importing com.intellij.openapi.application.readAction/writeAction

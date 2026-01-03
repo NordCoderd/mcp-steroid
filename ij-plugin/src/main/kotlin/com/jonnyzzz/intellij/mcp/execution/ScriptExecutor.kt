@@ -10,6 +10,7 @@ import com.intellij.openapi.util.Disposer
 import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import kotlinx.coroutines.*
+import kotlinx.coroutines.selects.select
 import kotlin.time.Duration.Companion.seconds
 
 inline val Project.scriptExecutor: ScriptExecutor get() = service()
@@ -69,12 +70,11 @@ class ScriptExecutor(
         )
 
         // Create modality monitor to detect modal dialogs during execution
-        // Note: Modality monitoring is currently disabled by default as it can interfere
-        // with normal IDE operations (like refactoring dialogs). The feature is available
-        // for use cases that specifically need to detect modal dialogs.
         val modalityMonitor = ModalityStateMonitor(project, executionId, executionDisposable)
-        // TODO: Enable modality monitoring via parameter when needed
-        // modalityMonitor.start()
+        context.modalityMonitor = modalityMonitor
+        if (exec.cancelOnModal) {
+            modalityMonitor.start()
+        }
 
         try {
             val capturedBlocks = evalResult.result
@@ -100,13 +100,29 @@ class ScriptExecutor(
 
                     try {
                         withTimeout(exec.timeout.seconds) {
-                            for ((index, block) in capturedBlocks.withIndex()) {
-                                yield()
-                                if (capturedBlocks.size > 1) {
-                                    log.info("Executing block #${index + 1}/${capturedBlocks.size} for $executionId")
-                                    context.progress("Executing block ${index + 1} of ${capturedBlocks.size}...")
+                            // Use select to race between execution and modal dialog detection
+                            val executionDeferred = async {
+                                for ((index, block) in capturedBlocks.withIndex()) {
+                                    yield()
+                                    if (capturedBlocks.size > 1) {
+                                        log.info("Executing block #${index + 1}/${capturedBlocks.size} for $executionId")
+                                        context.progress("Executing block ${index + 1} of ${capturedBlocks.size}...")
+                                    }
+                                    block(context)
                                 }
-                                block(context)
+                            }
+
+                            select {
+                                modalityMonitor.onModalDialog { dialogInfo ->
+                                    // Modal dialog detected - cancel execution and report
+                                    log.info("Modal dialog detected during execution $executionId: ${dialogInfo.modalEntity}")
+                                    executionDeferred.cancel("Modal dialog detected: ${dialogInfo.modalEntity}")
+                                    reportModalDialog(dialogInfo, resultBuilder)
+                                }
+                                executionDeferred.onAwait {
+                                    // Execution completed normally
+                                    log.info("Execution $executionId completed normally")
+                                }
                             }
                         }
                     } finally {

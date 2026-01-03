@@ -38,6 +38,9 @@ class McpScriptContextImpl(
 ) : McpScriptContext {
     private val log = Logger.getInstance(McpScriptContextImpl::class.java)
 
+    /** Set by ScriptExecutor to allow scripts to disable modal cancellation */
+    internal var modalityMonitor: ModalityStateMonitor? = null
+
     private val objectMapper = ObjectMapper().apply {
         enable(SerializationFeature.INDENT_OUTPUT)
         // Don't fail on empty beans
@@ -133,5 +136,11 @@ class McpScriptContextImpl(
             }
             waitForSmart()
         }
+    }
+
+    override fun doNotCancelOnModalityStateChange() {
+        checkDisposed()
+        log.info("[$executionId] Modal dialog cancellation disabled by script")
+        modalityMonitor?.doNotCancelOnModalityStateChange()
     }
 }

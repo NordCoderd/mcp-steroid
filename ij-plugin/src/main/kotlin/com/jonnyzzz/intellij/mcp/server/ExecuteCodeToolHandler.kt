@@ -28,6 +28,8 @@ data class ExecCodeParams(
     val code: String,
     val reason: String,
     val timeout: Int,
+    /** If true, cancel execution when a modal dialog appears and return screenshot. Default true. */
+    val cancelOnModal: Boolean = true,
 
     val rawParams: JsonObject,
 )

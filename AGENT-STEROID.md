@@ -187,6 +187,42 @@ execute {
 
     // IDE utilities (suspend functions):
     waitForSmartMode()  // Wait for indexing before PSI operations
+
+    // Modal dialog control:
+    doNotCancelOnModalityStateChange()  // Disable automatic cancellation on modal dialogs
+}
+```
+
+## Modal Dialog Handling
+
+By default, if a modal dialog appears during `execute {}` execution, the code is automatically cancelled and a screenshot of the dialog is returned. This is useful because:
+
+1. Modal dialogs (like "Restart IDE?") block the IDE and require user interaction
+2. The LLM agent can see the dialog screenshot and decide how to proceed (use `steroid_input`)
+3. Prevents scripts from hanging indefinitely waiting for user input
+
+**When modal cancellation fires:**
+- Execution is cancelled immediately
+- Screenshot of the dialog is captured and returned
+- The result includes "MODAL DIALOG DETECTED" message
+- Use `steroid_input` to interact with the dialog, or `steroid_take_screenshot` for a fresh view
+
+**Disabling modal cancellation:**
+
+If your script intentionally shows dialogs (like refactoring confirmations), call `doNotCancelOnModalityStateChange()` before the action:
+
+```kotlin
+execute {
+    // Disable modal cancellation - we expect a dialog
+    doNotCancelOnModalityStateChange()
+
+    // Now invoke action that shows a dialog
+    val actionManager = ActionManager.getInstance()
+    val action = actionManager.getAction("RestartIde")
+    val dataContext = SimpleDataContext.builder()
+        .add(CommonDataKeys.PROJECT, project)
+        .build()
+    ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
 }
 ```
 

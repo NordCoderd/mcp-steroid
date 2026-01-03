@@ -95,17 +95,20 @@ data class TestImage(
 
 /**
  * Creates ExecCodeParams for tests with sensible defaults.
+ * Note: cancelOnModal defaults to false for tests because most tests don't need modal detection.
  */
 fun testExecParams(
     code: String,
     taskId: String = "test-task",
     reason: String = "test",
-    timeout: Int = 60
+    timeout: Int = 60,
+    cancelOnModal: Boolean = false
 ) = ExecCodeParams(
     taskId = taskId,
     code = code,
     reason = reason,
     timeout = timeout,
+    cancelOnModal = cancelOnModal,
     rawParams = buildJsonObject { }
 )
 
