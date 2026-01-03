@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+**IMPORTANT: Re-read this file often as it changes frequently. Instructions here override default behavior.**
+
 ## MUST DO
 Use IntelliJ for everything where you can, it makes you 100x professional!
 
@@ -59,34 +61,70 @@ All bugs must be fixed using test-first approach:
 
 ### Issue-Driven Development
 
+**All tasks must be tracked as GitHub issues.** Use `gh` CLI for all issue management.
+
 When working on this repository, follow this structured workflow:
 
-1. **Review open issues first**
+1. **Log ALL tasks as GitHub issues**
+   - Every task, bug, or improvement must have a GitHub issue
+   - Use `gh issue create` with clear title and description
+   - Include steps to reproduce for bug reports
+   - Add acceptance criteria when possible
+
+2. **Review open issues first**
    - Run `gh issue list` to see all open issues
    - Prioritize by impact and dependencies
    - Group related issues for efficient resolution
 
-2. **Work on issues one-by-one**
+3. **Use issues to plan work**
+   - Leave comments on issues with ideas and suggestions
+   - Use `gh issue comment <number> --body "..."` to add thoughts
+   - Document design decisions and alternatives considered
+   - Update issue description if scope changes
+
+4. **Work on issues one-by-one**
    - Focus on a single issue until it's resolved
    - Use the todo list to track progress within an issue
    - Mark issue as complete only when fully verified
 
-3. **For each issue**:
+5. **For each issue**:
    - Read and understand the issue description
-   - Add a failing test that reproduces the problem (if applicable)
+   - Add a failing test that reproduces the problem
    - Implement the fix/feature
    - Run `./gradlew build` to verify
    - Close the issue with `gh issue close <number>`
 
-4. **Create new issues for discovered work**
+6. **Create new issues for discovered work**
    - If you find unrelated issues during work, create new GitHub issues
    - Use `gh issue create` with clear title and description
    - Don't scope-creep current issue - defer to new issues
 
-5. **Commit and verify frequently**
+7. **Commit and verify frequently**
    - Commit logical changes together
    - Run tests after each significant change
    - Keep commits focused and atomic
+
+### Testing Requirements
+
+- **Every fixed issue must have a dedicated test** - when an issue is resolved, there should be a clear test that verifies the fix
+- **Never fake tests** - it is acceptable to have a failing test; spend effort to fix the code, not to make the test pass artificially
+- **Tests must reflect reality** - a failing test is better than a passing test that doesn't check the actual problem
+
+### Code Review with IntelliJ MCP
+
+Before completing work:
+1. Use IntelliJ MCP (`steroid_execute_code`) to check for warnings and errors
+2. Run code inspections on changed files
+3. Resolve all warnings and errors - do not ignore them
+4. Verify no new warnings were introduced
+
+### Final Verification
+
+Once all work is done:
+1. Run `./gradlew build` to ensure everything compiles
+2. Run `./gradlew test` to verify all tests pass
+3. Check `ai-tests/` scenarios and ensure they work correctly
+4. Verify the changes don't break existing functionality
 
 ## IntelliJ and Coroutines
 
