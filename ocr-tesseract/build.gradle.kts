@@ -1,11 +1,10 @@
-import java.net.URI
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
+import de.undercouch.gradle.tasks.download.Download
 
 plugins {
     application
     kotlin("jvm") version "2.2.21"
     kotlin("plugin.serialization") version "2.2.21"
+    id("de.undercouch.download") version "5.6.0"
 }
 
 group = "com.jonnyzzz.intellij"
@@ -38,66 +37,55 @@ kotlin {
     jvmToolchain(21)
 }
 
-// Download tessdata files during build
-val tessdataDir = layout.buildDirectory.dir("tessdata")
+// Tessdata download configuration
 val tessdataFiles = listOf("eng.traineddata", "osd.traineddata")
+val tessdataDownloadDir = layout.buildDirectory.dir("tessdata-download")
+val tessdataDir = layout.buildDirectory.dir("tessdata")
 
-val downloadTessdata by tasks.registering {
+// Download tessdata files
+val downloadTessdata by tasks.registering(Download::class) {
     description = "Download Tesseract trained data files"
 
-    // Inputs: the version determines which files to download
+    val baseUrl = "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion"
+    src(tessdataFiles.map { "$baseUrl/$it" })
+    dest(tessdataDownloadDir)
+    overwrite(true)
+    onlyIfModified(true)
+}
+
+// Sync tessdata to clean directory (removes old artifacts)
+val syncTessdata by tasks.registering(Sync::class) {
+    description = "Sync tessdata files to distribution directory"
+    dependsOn(downloadTessdata)
+
+    from(tessdataDownloadDir)
+    into(tessdataDir)
+
+    // Inputs for up-to-date checking
     inputs.property("tessdataVersion", tessdataVersion)
     inputs.property("tessdataFiles", tessdataFiles.joinToString(","))
-
-    // Outputs: the tessdata directory
-    outputs.dir(tessdataDir)
-
-    doLast {
-        val dir = tessdataDir.get().asFile
-        dir.mkdirs()
-
-        val baseUrl = "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion"
-
-        tessdataFiles.forEach { filename ->
-            val target = dir.resolve(filename)
-            if (!target.exists() || target.length() == 0L) {
-                println("Downloading $filename (tessdata $tessdataVersion)...")
-                val url = URI.create("$baseUrl/$filename").toURL()
-                val connection = url.openConnection()
-                val input = connection.inputStream
-                try {
-                    Files.copy(input, target.toPath(), StandardCopyOption.REPLACE_EXISTING)
-                } finally {
-                    input.close()
-                }
-                println("Downloaded $filename (${target.length()} bytes)")
-            } else {
-                println("$filename already exists (${target.length()} bytes)")
-            }
-        }
-    }
 }
 
 // Include tessdata in the distribution
 distributions {
     main {
         contents {
-            from(downloadTessdata) {
+            from(syncTessdata) {
                 into("tessdata")
             }
         }
     }
 }
 
-// Ensure tessdata is downloaded before building the distribution
+// Ensure tessdata is synced before building the distribution
 tasks.named("installDist") {
-    dependsOn(downloadTessdata)
+    dependsOn(syncTessdata)
 }
 
 tasks.named("distZip") {
-    dependsOn(downloadTessdata)
+    dependsOn(syncTessdata)
 }
 
 tasks.named("distTar") {
-    dependsOn(downloadTessdata)
+    dependsOn(syncTessdata)
 }
