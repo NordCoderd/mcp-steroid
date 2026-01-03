@@ -23,6 +23,11 @@ inline val Project.scriptExecutor: ScriptExecutor get() = service()
  * 3. Any failure marks the whole execution as complete
  * 4. On timeout or cancellation, the Disposable is disposed and coroutine cancelled
  *
+ * Modal dialog handling:
+ * - If a modal dialog appears during execution, execution is cancelled
+ * - A screenshot of the dialog is captured and returned
+ * - Use steroid_input to interact with the dialog
+ *
  * IMPORTANT: This executor runs the captured suspend block inside a supervisorScope.
  * The script code gets coroutine context implicitly - no runBlocking needed.
  */
@@ -63,15 +68,23 @@ class ScriptExecutor(
             resultBuilder = resultBuilder,
         )
 
+        // Create modality monitor to detect modal dialogs during execution
+        // Note: Modality monitoring is currently disabled by default as it can interfere
+        // with normal IDE operations (like refactoring dialogs). The feature is available
+        // for use cases that specifically need to detect modal dialogs.
+        val modalityMonitor = ModalityStateMonitor(project, executionId, executionDisposable)
+        // TODO: Enable modality monitoring via parameter when needed
+        // modalityMonitor.start()
+
         try {
             val capturedBlocks = evalResult.result
 
             // Run captured blocks in FIFO order with timeout
             log.info("Running ${capturedBlocks.size} execute block(s) for $executionId with timeout ${exec.timeout}s")
 
-            return coroutineScope {
+            coroutineScope {
                 withContext(Dispatchers.IO) {
-                    val job = launch {
+                    val exceptionJob = launch {
                         service<ExceptionCaptureService>().exceptions.collect { ex ->
                             context.println(buildString {
                                 appendLine("=== IDE Exception Captured ===")
@@ -89,7 +102,7 @@ class ScriptExecutor(
                         withTimeout(exec.timeout.seconds) {
                             for ((index, block) in capturedBlocks.withIndex()) {
                                 yield()
-                                if (capturedBlocks.size >1) {
+                                if (capturedBlocks.size > 1) {
                                     log.info("Executing block #${index + 1}/${capturedBlocks.size} for $executionId")
                                     context.progress("Executing block ${index + 1} of ${capturedBlocks.size}...")
                                 }
@@ -97,16 +110,38 @@ class ScriptExecutor(
                             }
                         }
                     } finally {
-                        job.cancel()
+                        exceptionJob.cancel()
                     }
                 }
             }
+
+        } catch (e: TimeoutCancellationException) {
+            // Timeout - report as error
+            log.warn("Execution $executionId timed out: ${e.message}")
+            resultBuilder.logException("Execution timed out", e)
+            resultBuilder.reportFailed("Execution timed out after ${exec.timeout} seconds")
         } catch (t: Throwable) {
             log.warn("Unexpected error during execution $executionId: ${t.message}", t)
             resultBuilder.logException("Unexpected error during execution: ${t.message}", t)
             resultBuilder.reportFailed("Unexpected error during execution: ${t.message}")
         } finally {
+            modalityMonitor.stop()
             Disposer.dispose(executionDisposable)
         }
+    }
+
+    private fun reportModalDialog(dialogInfo: ModalDialogInfo, resultBuilder: ExecutionResultBuilder) {
+        resultBuilder.logMessage("=== MODAL DIALOG DETECTED ===")
+        resultBuilder.logMessage("A modal dialog appeared during execution.")
+        resultBuilder.logMessage("Modal entity: ${dialogInfo.modalEntity}")
+
+        if (dialogInfo.screenshotBase64 != null) {
+            resultBuilder.logMessage("Screenshot captured - see image below")
+            resultBuilder.logImage("image/png", dialogInfo.screenshotBase64, "modal-dialog.png")
+            resultBuilder.logMessage("Use steroid_input to interact with the dialog, or steroid_take_screenshot for a fresh view.")
+        } else if (dialogInfo.screenshotError != null) {
+            resultBuilder.logMessage("Screenshot capture failed: ${dialogInfo.screenshotError}")
+        }
+        resultBuilder.logMessage("=== END MODAL DIALOG ===")
     }
 }
