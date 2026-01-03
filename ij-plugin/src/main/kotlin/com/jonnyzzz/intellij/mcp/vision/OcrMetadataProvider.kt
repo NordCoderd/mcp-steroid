@@ -1,22 +1,25 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.vision
 
+import com.intellij.openapi.diagnostic.thisLogger
 import com.jonnyzzz.intellij.mcp.ocr.OcrLevel
 import com.jonnyzzz.intellij.mcp.ocr.OcrProcessClient
 import com.jonnyzzz.intellij.mcp.ocr.OcrResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.nio.file.Files
 
 /**
  * Provides OCR text extraction metadata for screenshots.
  *
  * Uses the bundled Tesseract OCR engine to extract text from images.
- * Processes all images in the collected metadata and outputs a markdown
+ * Processes all images in the collected metadata and outputs a Markdown
  * file with detected text blocks and their positions.
  *
  * Depends on image providers (e.g., ScreenshotImageProvider) to run first.
  */
 class OcrMetadataProvider : ScreenshotMetadataProvider {
+    private val log = thisLogger()
 
     override val type: String = TYPE
 
@@ -41,7 +44,7 @@ class OcrMetadataProvider : ScreenshotMetadataProvider {
 
             for (imageMetadata in images) {
                 val imagePath = context.executionDir.resolve(imageMetadata.fileName)
-                if (!java.nio.file.Files.exists(imagePath)) {
+                if (!Files.exists(imagePath)) {
                     continue
                 }
 
@@ -64,7 +67,8 @@ class OcrMetadataProvider : ScreenshotMetadataProvider {
                     content = content,
                 )
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            log.warn("OCR failed for images: ${images.joinToString(", ") { it.fileName }}: ${e.message}", e)
             // OCR failed - skip rather than fail the entire capture
             ProviderResult.Skip
         }
