@@ -541,7 +541,30 @@ If `.kts` files show errors:
 
 ## Plugin Deployment
 
-### Deploy to Local IntelliJ Instance
+### Hot Reload to Running IDE (Recommended)
+
+Use the `deployPlugin` task to hot-reload the plugin into running IntelliJ instances:
+
+```bash
+# Build and hot-reload to all running IDEs
+./gradlew deployPlugin
+```
+
+**Requirements:**
+- The [Plugin Hot Reload](https://plugins.jetbrains.com/plugin/24027-plugin-hot-reload) plugin must be installed in IntelliJ
+- IntelliJ must be running with a project open
+
+**How it works:**
+1. Builds the plugin ZIP
+2. Finds running IDEs by looking for `~/.PID.hot-reload` files
+3. POSTs the plugin to each IDE's hot-reload endpoint
+4. The IDE unloads the old version and loads the new one without restart
+
+**ALWAYS use this after making changes** - it's much faster than restarting IntelliJ.
+
+### Deploy to Local IntelliJ Instance (Cold Deploy)
+
+For deployments that require IDE restart:
 
 ```bash
 # Build and deploy to IntelliJ 253
@@ -549,6 +572,8 @@ If `.kts` files show errors:
 
 # This deploys to: ~/intellij-253/config/plugins/intellij-mcp-steroid/
 ```
+
+After cold deploy, restart IntelliJ to load the new plugin version.
 
 ## Committing Changes
 
