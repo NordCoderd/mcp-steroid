@@ -16,6 +16,7 @@ import java.nio.file.Path
 
 object OcrProcessClient {
     private val log = Logger.getInstance(OcrProcessClient::class.java)
+    //TODO: Plugin ID must not be hardcoded, use the same logic as for PluginVersionResolver to resolve it
     private val pluginId = PluginId.getId("com.jonnyzzz.intellij.mcp-steroid")
     private val json = Json { ignoreUnknownKeys = true }
 
