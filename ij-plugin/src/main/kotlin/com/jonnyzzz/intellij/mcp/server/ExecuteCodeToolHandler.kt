@@ -114,7 +114,7 @@ class ExecuteCodeToolHandler {
 
             📚 TIP: Read the "IntelliJ API Power User Guide" resource for patterns and examples!
             After execution, call steroid_execute_feedback to log your feedback.
-        """.trimIndent()
+         """.trim().trimIndent()
 
     fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(

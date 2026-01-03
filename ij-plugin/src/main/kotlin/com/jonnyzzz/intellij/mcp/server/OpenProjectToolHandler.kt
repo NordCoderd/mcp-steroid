@@ -19,6 +19,7 @@ import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.buildJsonObject
@@ -84,11 +85,7 @@ class OpenProjectToolHandler(
                     }
                     putJsonObject("trust_project") {
                         put("type", "boolean")
-                        put("description", "If true, trust the project path before opening (skips trust dialog). Default: false")
-                    }
-                    putJsonObject("force_new_frame") {
-                        put("type", "boolean")
-                        put("description", "If true, always open in a new window. Default: false")
+                        put("description", "If true, trust the project path before opening (skips trust dialog). Default: true")
                     }
                 }
                 putJsonArray("required") {
@@ -109,8 +106,7 @@ class OpenProjectToolHandler(
             ?: return errorResult("Missing required parameter: task_id")
         val reason = args["reason"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: reason")
-        val trustProject = args["trust_project"]?.jsonPrimitive?.boolean ?: false
-        val forceNewFrame = args["force_new_frame"]?.jsonPrimitive?.boolean ?: false
+        val trustProject = args["trust_project"]?.jsonPrimitive?.boolean ?: true
 
         val projectPath = try {
             Path.of(projectPathStr)
@@ -138,35 +134,10 @@ class OpenProjectToolHandler(
                 .build()
         }
 
-        // Use an existing open project for storage (if any), or we'll log without storage
-        val storageProject: Project? = readAction {
-            ProjectManager.getInstance().openProjects.firstOrNull()
-        }
-
-        // Set up execution tracking if we have a project to store to
-        data class ExecutionContext(
-            val project: Project,
-            val executionId: com.jonnyzzz.intellij.mcp.storage.ExecutionId
-        )
-        val execContext: ExecutionContext? = storageProject?.let { proj ->
-            val execId = proj.executionStorage.writeToolCall(
-                toolName = "steroid_open_project",
-                arguments = args,
-                taskId = taskId
-            )
-            proj.executionStorage.writeCodeExecutionData(execId, "reason.txt", reason)
-            ExecutionContext(proj, execId)
-        }
-
         val builder = ToolCallResult.builder()
-        execContext?.let { builder.setExecutionId(it.executionId) }
-
-        suspend fun log(message: String) {
+        fun log(message: String) {
             builder.addTextContent(message)
             context.mcpProgressReporter.report(message)
-            execContext?.let { ctx ->
-                ctx.project.executionStorage.appendExecutionEvent(ctx.executionId, message)
-            }
         }
 
         try {
@@ -178,18 +149,20 @@ class OpenProjectToolHandler(
             }
 
             log("Initiating project open: $projectPath")
-            log("force_new_frame: $forceNewFrame")
+            log("force_new_frame: ${true}")
 
             // Launch the project opening in a background coroutine
             // We launch but don't await - we want to return quickly so the client
             // can interact with any dialogs that appear using screenshot/input tools
-            coroutineScope.launch(Dispatchers.EDT) {
+            withContext(Dispatchers.EDT) {
                 try {
                     val task = OpenProjectTask {
-                        forceOpenInNewFrame = forceNewFrame
+                        forceOpenInNewFrame = true
                         showWelcomeScreen = false
+                        projectToClose = null
+                        projectRootDir = projectPath
                     }
-                    val result = ProjectManagerEx.getInstanceEx().openProjectAsync(projectPath, task)
+                    val result = ProjectManagerEx.getInstanceExAsync().openProject(projectPath, task)
                     if (result != null) {
                         log.info("Project opened successfully: ${result.name}")
                     } else {
@@ -214,13 +187,9 @@ class OpenProjectToolHandler(
                 log("NOTE: trust_project was false. A 'Trust Project' dialog may appear.")
                 log("      Set trust_project=true to skip the trust dialog.")
             }
-
         } catch (e: Exception) {
             val message = "Failed to initiate project open: ${e.message}"
             builder.addTextContent("ERROR: $message").markAsError()
-            execContext?.let { ctx ->
-                ctx.project.executionStorage.writeCodeErrorEvent(ctx.executionId, message)
-            }
         }
 
         return builder.build()

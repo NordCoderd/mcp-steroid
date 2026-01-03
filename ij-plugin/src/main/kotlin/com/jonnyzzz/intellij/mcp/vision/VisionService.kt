@@ -30,6 +30,9 @@ import javax.imageio.ImageIO
 import javax.swing.SwingUtilities
 import kotlin.math.roundToInt
 
+//TODO: make the metadata object extensible, so each extension could provide
+//TODO: it's own serializable data object with additional info and the filename
+//TODO: basically the screenshot itself is yet another object in that collection, the first one
 @Serializable
 data class ScreenshotMeta(
     val system: String,
@@ -59,24 +62,51 @@ data class PointInfo(val x: Int, val y: Int)
 data class Rect(val x: Int, val y: Int, val width: Int, val height: Int)
 
 data class ScreenshotArtifacts(
+    //TODO: replace with load method and handle in the custom way when serializing
+    //TODO: include content-type
     val imageBytes: ByteArray,
+    //TODO: use imports
     val imagePath: java.nio.file.Path,
     val treePath: java.nio.file.Path,
     val metaPath: java.nio.file.Path,
     val meta: ScreenshotMeta,
 )
 
+//TODO: This must be IntelliJ Component
 object VisionService {
     private const val IMAGE_FILE = "screenshot.png"
+    //TODO: the metadata should be provided via IntelliJ extension point, so move the
+    //TODO: specific providers to additional Extension Point implementations
+    //TODO: let extensions specify filenames
     private const val TREE_FILE = "screenshot-tree.md"
     private const val META_FILE = "screenshot-meta.json"
+
+
+    //TODO: extensions design
+    //TODO: we create a generic interface for extensions to provide the
+    //TODO: screenshot and related medatada for a given context
+    //TODO: the implmenetation work as follows:
+    //TODO: we iterate over the all available providers
+    //TODO: each provider can provide the metatada (image, component tree, etc)
+    //TODO: so the provided metadata goes into the context
+    //TODO: or the provider can return special answer to indicate it depends from other providers
+    //TODO: we iterate over all provides which has not yet returned the answer
+    //TODO: once provider returned answer -- it is not executed anymore
+    //TODO: a provider may never return anything, there must be additional response (and exception) for such cage
+    //TODO: --- so our goal is to refactor the current system into extension point based approach where all 3 providers are added
+    //TODO: --- next step is to support Compose controls and JCEF controls as additional tasks in the plan
+    //TODP: ---- deploy the MCP plugin and try it
 
     private val json = Json {
         prettyPrint = true
         ignoreUnknownKeys = true
     }
 
+    //TODO: Introduce the ScreenCaptureContext object, it will be better for the extensibility later
+    //TODO: Wrap the whole method in coroutineScope { .. } to make sure all nested coroutines are properly cancelled/awaited
     suspend fun capture(project: Project, executionId: ExecutionId, windowId: String? = null): ScreenshotArtifacts {
+        //TODO: make sure (really validate in the code, if that is executed with ModalityState.any()
+        //TODO: otherwise the capture will not work for modal dialogs
         val capture = withContext(Dispatchers.EDT) { captureOnEdt(project, windowId) }
 
         val pngBytes = withContext(Dispatchers.IO) {

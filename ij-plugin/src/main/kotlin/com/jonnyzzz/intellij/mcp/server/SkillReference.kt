@@ -40,7 +40,9 @@ class SkillReference {
 
     private val resourceHint: String = buildString {
         append("📚 TIP: Browse MCP resources (resources/list). ")
-        append("Start with intellij://skill/intellij-api-poweruser-guide, ")
+        append("Start with ")
+        //TODO: generate the list of resources dynamically
+        append("intellij://skill/intellij-api-poweruser-guide, ")
         append("intellij://ide/overview, ")
         append("intellij://lsp/overview")
     }
@@ -48,6 +50,7 @@ class SkillReference {
     /**
      * Returns a tip message with MCP resource hints.
      */
+    //TODO: it's not used, looks like by mistake
     fun tipWithUrl(context: String = ""): String {
         return buildString {
             if (context.isNotEmpty()) {

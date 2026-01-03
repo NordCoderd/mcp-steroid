@@ -21,7 +21,7 @@ class ListProjectsToolHandler {
     fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
             name = "steroid_list_projects",
-            description = "List all open projects in the IDE. Returns project names that can be used with steroid_execute_code.",
+            description = "List all open projects in the IDE. Returns project names that can be used with steroid_execute_code and steroid_open_project.",
             inputSchema = buildJsonObject {
                 put("type", "object")
                 putJsonObject("properties") { }

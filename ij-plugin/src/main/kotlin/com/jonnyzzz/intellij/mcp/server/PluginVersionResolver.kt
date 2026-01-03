@@ -3,8 +3,10 @@ package com.jonnyzzz.intellij.mcp.server
 
 import com.intellij.openapi.util.JDOMUtil
 
+//TODO: make IDE service
 object PluginVersionResolver {
     //TODO: inline classloader here to this class, we are not going to use it for other
+    //TODO: move  1 package up, add pluginId resoliution
     fun resolve(classLoader: ClassLoader): String {
         val stream = classLoader.getResourceAsStream("META-INF/plugin.xml") ?: return "unknown"
         val root = stream.use { JDOMUtil.load(it) }

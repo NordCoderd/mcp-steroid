@@ -307,7 +307,7 @@ class SteroidsMcpServer(
                gemini "List all open projects using steroid_list_projects"
 
              $serverUrl
-        """.trimMargin()
+        """.trim().trimIndent()
     }
 
     private fun findFreePort(): Int {
