@@ -149,7 +149,13 @@ object McpHttpTransport {
         val truncatedBody = if (body.length > 500) body.take(500) + "...[truncated]" else body
         log.info("[MCP] Request body: $truncatedBody")
 
-        val response = server.handleMessage(body, session)
+        val response = try {
+            server.handleMessage(body, session)
+        } catch (e: Throwable) {
+            log.error("[MCP] Exception in handleMessage: ${e.message}", e)
+            call.respond(HttpStatusCode.InternalServerError, "Internal error: ${e.message}")
+            return
+        }
 
         // Include session ID in response for new sessions (or when we created a replacement session)
         if (isNewSession) {

@@ -44,6 +44,13 @@ configurations.named("intellijPlatformDependency").configure {
     }
 }
 
+// Libraries provided by IntelliJ platform - exclude from bundling
+configurations.named("implementation") {
+    exclude(group = "org.jetbrains.kotlin")
+    exclude(group = "org.jetbrains.kotlinx")
+    exclude(group = "org.jetbrains", module = "annotations")
+}
+
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.3")
@@ -61,15 +68,9 @@ dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-scripting-jvm:2.2.21")
 
     // Ktor server for MCP HTTP transport
-    implementation("io.ktor:ktor-server-core:$ktorVersion") {
-        exclude(group = "org.jetbrains.kotlinx")
-    }
-    implementation("io.ktor:ktor-server-cio:$ktorVersion") {
-        exclude(group = "org.jetbrains.kotlinx")
-    }
-    implementation("io.ktor:ktor-server-sse:$ktorVersion") {
-        exclude(group = "org.jetbrains.kotlinx")
-    }
+    implementation("io.ktor:ktor-server-core:$ktorVersion")
+    implementation("io.ktor:ktor-server-cio:$ktorVersion")
+    implementation("io.ktor:ktor-server-sse:$ktorVersion")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
@@ -79,18 +80,10 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers")
 
     // Ktor client for MCP SSE transport tests
-    testImplementation("io.ktor:ktor-client-core:$ktorVersion") {
-        exclude(group = "org.jetbrains.kotlinx")
-    }
-    testImplementation("io.ktor:ktor-client-cio:$ktorVersion") {
-        exclude(group = "org.jetbrains.kotlinx")
-    }
-    testImplementation("io.ktor:ktor-client-content-negotiation:$ktorVersion") {
-        exclude(group = "org.jetbrains.kotlinx")
-    }
-    testImplementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion") {
-        exclude(group = "org.jetbrains.kotlinx")
-    }
+    testImplementation("io.ktor:ktor-client-core:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-cio:$ktorVersion")
+    testImplementation("io.ktor:ktor-client-content-negotiation:$ktorVersion")
+    testImplementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 }
 
 kotlin {
@@ -160,11 +153,93 @@ val deployPluginLocallyTo253 by tasks.registering(Sync::class) {
 }
 
 
+// Verify bundled libraries in plugin/lib folder
+val verifyBundledLibraries by tasks.registering {
+    group = "verification"
+    description = "List and verify libraries bundled in plugin lib folder"
+    dependsOn(tasks.buildPlugin)
+    doLast {
+        val zip = tasks.buildPlugin.get().outputs.files.singleFile
+        val pluginName = rootProject.name
+        val libPrefix = "$pluginName/lib/"
+
+        val allFiles = zipTree(zip).files
+
+        // Match only files directly in <plugin-name>/lib/, not in subfolders
+        val libFiles = allFiles
+            .filter {
+                val path = it.path
+                // Find the plugin root in the path and check if file is directly in lib/
+                val pluginRoot = "/$pluginName/"
+                val pluginIdx = path.indexOf(pluginRoot)
+                if (pluginIdx < 0) return@filter false
+
+                val relativePath = path.substring(pluginIdx + pluginRoot.length)
+                relativePath.startsWith("lib/") && !relativePath.substringAfter("lib/").contains("/")
+            }
+            .map { it.name }
+            .sorted()
+
+        println("Libraries in $libPrefix:")
+        libFiles.forEach { println("  $it") }
+
+        // Assert expected libraries - update this list when dependencies change
+        val expectedLibraries = sortedSetOf(
+            "config-1.4.3.jar",
+            "intellij-mcp-steroid-0.84.0-SNAPSHOT.jar",
+            "jansi-2.4.1.jar",
+            "ktor-events-jvm-3.1.0.jar",
+            "ktor-http-cio-jvm-3.1.0.jar",
+            "ktor-http-jvm-3.1.0.jar",
+            "ktor-io-jvm-3.1.0.jar",
+            "ktor-network-jvm-3.1.0.jar",
+            "ktor-serialization-jvm-3.1.0.jar",
+            "ktor-server-cio-jvm-3.1.0.jar",
+            "ktor-server-core-jvm-3.1.0.jar",
+            "ktor-server-sse-jvm-3.1.0.jar",
+            "ktor-sse-jvm-3.1.0.jar",
+            "ktor-utils-jvm-3.1.0.jar",
+            "ktor-websockets-jvm-3.1.0.jar",
+            "ocr-common-0.84.0-SNAPSHOT.jar",
+            "slf4j-api-2.0.16.jar",
+        )
+
+        val actualLibraries = libFiles.map {
+            // Normalize version-timestamped names
+            it.replace(Regex("-\\d{4}-\\d{2}-\\d{2}-\\d{2}-\\d{2}"), "")
+        }.toSortedSet()
+
+        if (actualLibraries != expectedLibraries) {
+            val missing = expectedLibraries - actualLibraries
+            val unexpected = actualLibraries - expectedLibraries
+            throw GradleException(buildString {
+                appendLine("Bundled libraries mismatch!")
+                if (missing.isNotEmpty()) {
+                    appendLine("Missing libraries:")
+                    missing.forEach { appendLine("  - $it") }
+                }
+                if (unexpected.isNotEmpty()) {
+                    appendLine("Unexpected libraries:")
+                    unexpected.forEach { appendLine("  - $it") }
+                }
+                appendLine()
+                appendLine("Update expectedLibraries in build.gradle.kts if this change is intentional.")
+            })
+        }
+
+        println("\nVerification passed!")
+    }
+}
+
+val deployPluginLocallyTo253 by tasks.getting {
+    dependsOn(verifyBundledLibraries)
+}
+
 // Deploy plugin to running IDEs with hot-reload support
 val deployPlugin by tasks.registering {
     group = "intellij platform"
     description = "Deploy plugin to running IDEs"
-    dependsOn(tasks.buildPlugin)
+    dependsOn(verifyBundledLibraries)
     doLast {
         val zip = tasks.buildPlugin.get().outputs.files.singleFile
         val home = File(System.getProperty("user.home"))
