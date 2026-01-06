@@ -38,28 +38,14 @@ class SkillReference {
         append("4. Never use runBlocking - you're in a coroutine")
     }
 
+    // Resource hints are static since SkillReference is accessed early in startup
+    // before McpServerCore is fully initialized. These URIs are stable entrypoints.
     private val resourceHint: String = buildString {
         append("📚 TIP: Browse MCP resources (resources/list). ")
         append("Start with ")
-        //TODO: generate the list of resources dynamically
         append("intellij://skill/intellij-api-poweruser-guide, ")
         append("intellij://ide/overview, ")
         append("intellij://lsp/overview")
-    }
-
-    /**
-     * Returns a tip message with MCP resource hints.
-     */
-    //TODO: it's not used, looks like by mistake
-    fun tipWithUrl(context: String = ""): String {
-        return buildString {
-            if (context.isNotEmpty()) {
-                appendLine(context)
-                appendLine()
-            }
-            appendLine(resourceHint)
-            appendLine("   Use resources/read to fetch patterns on PSI, refactoring, code completion, and more.")
-        }
     }
 
     /**
