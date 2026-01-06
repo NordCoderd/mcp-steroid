@@ -426,8 +426,6 @@ execute {
 ```kotlin
 import com.intellij.openapi.project.*
 import com.intellij.openapi.application.*
-import com.intellij.openapi.application.readAction   // For read actions
-import com.intellij.openapi.application.writeAction  // For write actions
 import com.intellij.openapi.vfs.*
 import com.intellij.openapi.editor.*
 import com.intellij.openapi.fileEditor.*
@@ -436,38 +434,62 @@ import com.intellij.psi.*
 import kotlinx.coroutines.*
 ```
 
+**Note:** `readAction`, `writeAction`, and `smartReadAction` are built into `McpScriptContext` - no imports needed!
+
 ## McpScriptContext API
 
 The `McpScriptContext` is provided inside the `execute { }` block.
 
 **See**: [`src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/McpScriptContext.kt`](src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/McpScriptContext.kt)
 
-Key methods:
+### Core Properties
 - `project` - Access the IntelliJ Project
 - `params` - Original tool execution parameters (JSON)
 - `disposable` - Parent Disposable for resource cleanup
+- `isDisposed` - Check if the context is disposed
+
+### Output Methods
 - `println(vararg values)` - Print space-separated values
 - `printJson(obj)` - Serialize to pretty JSON (Jackson)
 - `printException(msg, throwable)` - Report an error without failing execution
 - `progress(message)` - Report progress (throttled to 1/sec)
-- `takeIdeScreenshot(fileName)` - Capture IDE screenshot and return image content (artifacts saved as `screenshot.png`, `screenshot-tree.md`, `screenshot-meta.json`; fileName ignored)
-- `waitForSmartMode()` - Wait for indexing to complete
+- `takeIdeScreenshot(fileName)` - Capture IDE screenshot (artifacts saved as `screenshot.png`, `screenshot-tree.md`, `screenshot-meta.json`)
 
-**Note**: `readAction` and `writeAction` are NOT part of McpScriptContext. Use IntelliJ's coroutine-aware APIs directly:
+### IDE Utilities
+- `waitForSmartMode()` - Wait for indexing to complete
+- `isDaemonRunning()` - Check if daemon code analyzer is currently running
+- `waitForDaemonAnalysis(file, timeout)` - Wait for highlighting to complete on a file
+- `getHighlightsWhenReady(file, minSeverityValue, timeout)` - Get highlights after analysis completes
+- `doNotCancelOnModalityStateChange()` - Disable automatic cancellation when modal dialogs appear
+
+### Built-in Helpers (NO IMPORTS NEEDED)
+- `readAction { }` - Execute under read lock
+- `writeAction { }` - Execute under write lock
+- `smartReadAction { }` - waitForSmartMode() + readAction in one call
+- `projectScope()` - GlobalSearchScope for project files
+- `allScope()` - GlobalSearchScope for project + libraries
+- `findFile(path)` - Find VirtualFile by absolute path
+- `findPsiFile(path)` - Find PsiFile by absolute path
+- `findProjectFile(relativePath)` - Find file relative to project
+- `findProjectPsiFile(relativePath)` - Find PsiFile relative to project
+
+**Note**: `readAction`, `writeAction`, and `smartReadAction` are built into McpScriptContext - no imports needed! They delegate to IntelliJ's coroutine-aware APIs.
 
 ```kotlin
-import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
-
 execute {
-    // Read PSI data
+    // Read PSI data - no import needed!
     val psiFile = readAction {
         PsiManager.getInstance(project).findFile(virtualFile)
     }
 
-    // Modify documents/PSI
+    // Modify documents/PSI - no import needed!
     writeAction {
         document.setText("new content")
+    }
+
+    // Wait for smart mode + read in one call - no import needed!
+    val classes = smartReadAction {
+        KotlinClassShortNameIndex.get("MyClass", project, projectScope())
     }
 }
 ```
