@@ -9,7 +9,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Handler for open-project workflow resources.
  * Provides examples and guidance for opening projects via MCP.
  *
- * Resources are registered under the URI scheme `intellij://open-project/*`.
+ * Resources are registered under the URI scheme `intellij://open-project/`.
  */
 @Service(Service.Level.APP)
 class OpenProjectResourceHandler : McpRegistrar {
