@@ -346,8 +346,7 @@ Open a project in the IDE. This tool initiates the project opening process and r
 - `project_path` (required): Absolute path to the project directory to open
 - `task_id` (required): Task identifier for logging
 - `reason` (required): Why you are opening the project
-- `trust_project` (optional): If true, trust the project path before opening (skips trust dialog). Default: false
-- `force_new_frame` (optional): If true, always open in a new window. Default: false
+- `trust_project` (optional): If true, trust the project path before opening (skips trust dialog). Default: true
 
 **Workflow**:
 1. Call `steroid_open_project` with the project path

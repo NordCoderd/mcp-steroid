@@ -258,8 +258,12 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 │   ├── ExecuteCodeToolHandler.kt          # steroid_execute_code tool
 │   ├── ExecuteFeedbackToolHandler.kt      # steroid_execute_feedback tool
 │   ├── ListProjectsToolHandler.kt         # steroid_list_projects tool
-│   ├── OpenProjectToolHandler.kt          # steroid_open_project tool (initiates project open)
-│   ├── PluginReloadToolHandler.kt         # Plugin reload tools
+│   ├── ListWindowsToolHandler.kt          # steroid_list_windows tool
+│   ├── OpenProjectToolHandler.kt          # steroid_open_project tool
+│   ├── ActionDiscoveryToolHandler.kt      # steroid_action_discovery tool
+│   ├── CapabilitiesToolHandler.kt         # steroid_capabilities tool
+│   ├── VisionScreenshotToolHandler.kt     # steroid_take_screenshot tool
+│   ├── VisionInputToolHandler.kt          # steroid_input tool
 │   └── McpProgressReporter.kt             # Progress reporting interface
 ├── mcp/
 │   ├── McpServerCore.kt                   # Core MCP server logic
@@ -278,9 +282,12 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 │   ├── McpSteroidScriptDefinition.kt          # @KotlinScript annotation for .kts files
 │   ├── McpSteroidScriptDefinitionsSource.kt   # ScriptDefinitionsSource for K1/K2 modes
 │   └── McpSteroidScriptDefinitionsProvider.kt # ScriptDefinitionsProvider bridge API
-├── reload/
-│   ├── PluginReloadHelper.kt      # Utilities for checking plugin state and reload capability
-│   └── PluginReloader.kt          # Schedules and performs plugin reload operations
+├── vision/
+│   ├── VisionService.kt           # Screenshot capture and input dispatch
+│   ├── InputSequence.kt           # Input sequence parsing and execution
+│   └── WindowIdUtil.kt            # Window identification utilities
+├── ocr/
+│   └── OcrProcessClient.kt        # External OCR process communication
 ├── review/
 │   ├── ReviewManager.kt           # Human review workflow, diff generation
 │   └── McpReviewNotificationProvider.kt  # Editor notification panel
@@ -302,7 +309,7 @@ Run specific test class:
 ```bash
 ./gradlew test --tests "*ExecutionManagerTest*"
 ./gradlew test --tests "*McpServerIntegrationTest*"
-./gradlew test --tests "*ClaudeCliIntegrationTest*"
+./gradlew test --tests "*CliClaudeIntegrationTest*"
 ```
 
 ### Test Files
@@ -314,7 +321,7 @@ Run specific test class:
   - Tests Claude CLI and Codex CLI Accept header compatibility
   - Tests graceful handling of unknown/stale session IDs
 
-- **ClaudeCliIntegrationTest.kt** - Tests Claude Code CLI integration:
+- **CliClaudeIntegrationTest.kt** - Tests Claude Code CLI integration:
   - Uses Docker to run Claude CLI in isolation
   - Requires Docker and ANTHROPIC_API_KEY
   - Tests MCP server registration (`mcp add`, `mcp list`, `mcp remove`)
@@ -322,13 +329,19 @@ Run specific test class:
   - Tests system property reading via MCP execute_code
   - Tests documented command-line workflow
 
-- **CodexCliIntegrationTest.kt** - Tests OpenAI Codex CLI integration:
+- **CliCodexIntegrationTest.kt** - Tests OpenAI Codex CLI integration:
   - Uses Docker to run Codex CLI in isolation
   - Requires Docker and OPENAI_API_KEY
   - Tests MCP server TOML configuration
   - Tests tool discovery and invocation
   - Tests system property reading via MCP execute_code
   - Note: `codex mcp add` only supports stdio servers; HTTP uses TOML config
+
+- **CliGeminiIntegrationTest.kt** - Tests Google Gemini CLI integration:
+  - Uses Docker to run Gemini CLI in isolation
+  - Requires Docker and GOOGLE_API_KEY
+  - Tests MCP server configuration
+  - Tests tool discovery and invocation
 
 - **ScriptExecutorTest.kt** - Tests script execution with fast failure semantics:
   - Verifies errors return quickly (not waiting for timeout)
@@ -339,15 +352,9 @@ Run specific test class:
   - Tests successful execution with output collection
   - Tests error handling and timeout scenarios
 
-- **SteroidsMcpToolsetTest.kt** - Tests the MCP tool execution flow:
-  - Tests code execution via `ExecutionManager.executeWithProgress`
-  - Tests output collection and error handling
-
-- **DynamicPluginsTest.kt** - Tests DynamicPlugins API integration:
-  - Tests plugin discovery via PluginManagerCore
-  - Tests DynamicPlugins.checkCanUnloadWithoutRestart API
-  - Tests PathManager log path accessibility
-  - Tests PluginReloadHelper utility methods
+- **KotlinDaemonManagerTest.kt** - Tests Kotlin daemon management:
+  - Tests daemon recovery after "Service is dying" errors
+  - Tests retry logic with delays
 
 ### Shell Scripts (integration-test/)
 
