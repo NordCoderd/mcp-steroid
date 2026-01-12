@@ -4,7 +4,6 @@ package com.jonnyzzz.intellij.mcp.execution
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
