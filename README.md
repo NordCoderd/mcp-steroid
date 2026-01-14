@@ -10,6 +10,33 @@ This IntelliJ plugin exposes IDE APIs to LLM agents via Kotlin script execution.
 
 **Target Version**: IntelliJ 2025.3+
 
+## Demo Videos
+
+<table>
+  <tr>
+    <td align="center">
+      <a href="https://www.youtube.com/watch?v=6ByedA15n8Q">
+        <img src="https://img.youtube.com/vi/6ByedA15n8Q/maxresdefault.jpg" width="400" alt="Main Demo"/>
+        <br/><b>Main Demo</b>
+      </a>
+    </td>
+    <td align="center">
+      <a href="https://www.youtube.com/watch?v=6p6B5sxgXX8">
+        <img src="https://img.youtube.com/vi/6p6B5sxgXX8/maxresdefault.jpg" width="400" alt="Code Execution"/>
+        <br/><b>Code Execution</b>
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">
+      <a href="https://www.youtube.com/watch?v=dz95tSD9Z-c">
+        <img src="https://img.youtube.com/vi/dz95tSD9Z-c/maxresdefault.jpg" width="400" alt="Advanced Features"/>
+        <br/><b>Advanced Features</b>
+      </a>
+    </td>
+  </tr>
+</table>
+
 ## MCP Server Integration
 
 This plugin runs its own standalone MCP server using the [Kotlin MCP SDK](https://github.com/modelcontextprotocol/kotlin-sdk) with Ktor for HTTP transport:
