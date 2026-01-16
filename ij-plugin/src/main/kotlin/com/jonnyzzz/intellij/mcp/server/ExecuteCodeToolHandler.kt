@@ -53,6 +53,12 @@ class ExecuteCodeToolHandler : McpRegistrar {
              LEARNING NOTE: Writing working code may require several attempts - this is normal! The IntelliJ API
              is vast and powerful. Keep trying - each attempt teaches you more. Use printException() for errors.
 
+             BEST PRACTICE: Consider delegating to a SUB-AGENT for code execution:
+             - Sub-agent can retry multiple times without polluting main agent context
+             - Errors and debugging stay isolated from main conversation
+             - Provide detailed 'reason' so sub-agent understands the intent
+             - Sub-agent can iterate on fixes without context rot in main agent
+
              This is similar to LSP tools but uses IntelliJ's native APIs, offering deeper code understanding
              and more features (refactorings, inspections, full project model).
 
@@ -109,6 +115,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
             - findPsiFile(path) - find PsiFile by absolute path
             - findProjectFile(relativePath) - find file relative to project
             - findProjectPsiFile(relativePath) - find PsiFile relative to project
+            - runInspectionsDirectly(file) - run inspections bypassing daemon (works without window focus)
 
             IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
 

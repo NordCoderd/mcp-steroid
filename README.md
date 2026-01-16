@@ -485,7 +485,8 @@ The `McpScriptContext` is provided inside the `execute { }` block.
 - `waitForSmartMode()` - Wait for indexing to complete
 - `isDaemonRunning()` - Check if daemon code analyzer is currently running
 - `waitForDaemonAnalysis(file, timeout)` - Wait for highlighting to complete on a file
-- `getHighlightsWhenReady(file, minSeverityValue, timeout)` - Get highlights after analysis completes
+- `getHighlightsWhenReady(file, minSeverityValue, timeout)` - Get highlights after analysis completes (note: requires IDE window focus)
+- `runInspectionsDirectly(file, includeInfoSeverity)` - **Recommended**: Run inspections bypassing daemon cache, works regardless of window focus
 - `doNotCancelOnModalityStateChange()` - Disable automatic cancellation when modal dialogs appear
 
 ### Built-in Helpers (NO IMPORTS NEEDED)

@@ -100,9 +100,20 @@ Execute Kotlin code directly in IntelliJ's runtime. This is your primary tool.
 Parameters:
 - `project_name` (required): Target project from `steroid_list_projects`
 - `code` (required): Kotlin code with `execute { }` block
-- `reason` (required): Human-readable explanation of what you're doing
+- `reason` (required): Human-readable explanation of what you're doing - **be detailed so sub-agents can understand the intent**
 - `task_id` (required): Group related executions together
 - `timeout` (optional): Execution timeout in seconds (default: 60)
+
+**Best Practice: Delegate to Sub-Agent**
+
+When working with IntelliJ APIs, consider spawning a **sub-agent** to handle `steroid_execute_code` calls:
+
+1. **Retry capability**: IntelliJ API is vast - sub-agent can try multiple approaches without polluting main context
+2. **Context isolation**: Errors and debugging stay within sub-agent, keeping main agent focused
+3. **Clear intent**: Provide detailed `reason` so sub-agent understands what you're trying to achieve
+4. **Iteration friendly**: Sub-agent can fix errors and retry without main agent tracking each attempt
+
+The sub-agent pattern prevents context rot from failed code attempts and allows specialized focus on making the IntelliJ code work.
 
 ### `steroid_execute_feedback`
 Provide feedback on execution results. Use after `steroid_execute_code` to rate success.
@@ -450,19 +461,29 @@ execute {
 
 ### Run Inspections Programmatically
 
-```kotlin
-import com.intellij.codeInspection.InspectionManager
-import com.intellij.openapi.application.readAction
+Use `runInspectionsDirectly()` for reliable inspection results - it bypasses the daemon's focus-dependent caching:
 
+```kotlin
 execute {
+    val file = requireNotNull(findProjectFile("src/main/kotlin/MyClass.kt")) { "File not found" }
     waitForSmartMode()
 
-    readAction {
-        val inspectionManager = InspectionManager.getInstance(project)
-        // ... run specific inspections
+    // Recommended: bypasses daemon, works regardless of window focus
+    val problems = runInspectionsDirectly(file)
+
+    if (problems.isEmpty()) {
+        println("No problems found!")
+    } else {
+        problems.forEach { (inspectionId, descriptors) ->
+            descriptors.forEach { problem ->
+                println("[$inspectionId] ${problem.descriptionTemplate}")
+            }
+        }
     }
 }
 ```
+
+**Note**: The daemon-based `getHighlightsWhenReady()` may return stale results if the IDE window is not focused. Use `runInspectionsDirectly()` for MCP automation.
 
 ### Execute Actions
 
