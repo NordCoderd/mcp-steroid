@@ -317,6 +317,11 @@ execute {
 
     // === IDE Utilities ===
     waitForSmartMode()  // Wait for indexing to complete
+
+    // === Code Analysis (no window focus required) ===
+    // runInspectionsDirectly returns Map<String, List<ProblemDescriptor>> - empty if no problems
+    val file = requireNotNull(findProjectFile("src/main/App.kt")) { "File not found" }
+    val problems = runInspectionsDirectly(file)
 }
 ```
 
@@ -896,6 +901,10 @@ execute {
 
 ### Get Errors and Warnings
 
+**NOTE:** The daemon code analyzer may return stale results if the IDE window is not focused
+(see [GitHub issue #20](https://github.com/jonnyzzz/intellij-mcp-steroids/issues/20)).
+For reliable results, use `runInspectionsDirectly()` instead.
+
 ```kotlin
 import com.intellij.openapi.application.readAction
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
@@ -924,6 +933,42 @@ execute {
     }
 }
 ```
+
+### Run Inspections Directly (Recommended for MCP)
+
+Use `runInspectionsDirectly()` for reliable inspection results regardless of IDE window focus.
+This bypasses the daemon's caching and runs inspections directly on the file.
+
+```kotlin
+execute {
+    val file = requireNotNull(findProjectFile("src/main/kotlin/MyClass.kt")) { "File not found" }
+    waitForSmartMode()
+
+    // Run inspections directly - works even when IDE is not focused
+    val problems = runInspectionsDirectly(file)
+
+    if (problems.isEmpty()) {
+        println("No problems found!")
+    } else {
+        problems.forEach { (inspectionId, descriptors) ->
+            descriptors.forEach { problem ->
+                val element = problem.psiElement
+                val line = if (element != null) {
+                    val doc = com.intellij.psi.PsiDocumentManager.getInstance(project).getDocument(element.containingFile)
+                    doc?.getLineNumber(element.textOffset)?.plus(1) ?: "?"
+                } else "?"
+                println("[$inspectionId] Line $line: ${problem.descriptionTemplate}")
+            }
+        }
+    }
+}
+```
+
+**Parameters:**
+- `file`: VirtualFile to inspect
+- `includeInfoSeverity`: Include INFO-level problems (default: false, only WEAK_WARNING and above)
+
+**Returns:** `Map<String, List<ProblemDescriptor>>` - inspection tool ID to problems found
 
 ---
 

@@ -6,6 +6,15 @@ import com.fasterxml.jackson.databind.SerializationFeature
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
+import com.intellij.codeInspection.InspectionEngine
+import com.intellij.codeInspection.ProblemDescriptor
+import com.intellij.codeInspection.ex.LocalInspectionToolWrapper
+import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.openapi.progress.EmptyProgressIndicator
+import com.intellij.profile.codeInspection.InspectionProjectProfileManager
+import com.intellij.psi.PsiManager
+import com.intellij.util.PairProcessor
+import com.intellij.codeInsight.daemon.HighlightDisplayKey
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
@@ -246,5 +255,77 @@ class McpScriptContextImpl(
         }
 
         return allHighlights
+    }
+
+    // ============================================================
+    // Direct Inspection Execution (bypasses daemon focus check)
+    // ============================================================
+
+    override suspend fun runInspectionsDirectly(
+        file: VirtualFile,
+        includeInfoSeverity: Boolean
+    ): Map<String, List<ProblemDescriptor>> {
+        checkDisposed()
+        log.info("[$executionId] Running inspections directly on ${file.name}...")
+        resultBuilder.logProgress("Running inspections on ${file.name}...")
+
+        // Wait for smart mode first
+        waitForSmartMode()
+
+        return readAction {
+            val psiFile = PsiManager.getInstance(project).findFile(file)
+            if (psiFile == null) {
+                log.warn("[$executionId] Could not find PSI file for ${file.name}")
+                return@readAction emptyMap()
+            }
+
+            // Get inspection profile and enabled tools
+            val profile = InspectionProjectProfileManager.getInstance(project).currentProfile
+            val toolWrappers = profile.getAllEnabledInspectionTools(project)
+                .mapNotNull { toolState ->
+                    val tool = toolState.tool
+                    if (tool is LocalInspectionToolWrapper) {
+                        // Filter by severity if needed
+                        val key = HighlightDisplayKey.find(tool.shortName)
+                        if (key != null) {
+                            val severity = profile.getErrorLevel(key, psiFile).severity
+                            if (includeInfoSeverity || severity.myVal >= HighlightSeverity.WEAK_WARNING.myVal) {
+                                tool
+                            } else {
+                                null
+                            }
+                        } else {
+                            // Include tool if we can't determine severity
+                            tool
+                        }
+                    } else {
+                        null
+                    }
+                }
+
+            if (toolWrappers.isEmpty()) {
+                log.info("[$executionId] No applicable inspection tools found")
+                return@readAction emptyMap()
+            }
+
+            log.info("[$executionId] Running ${toolWrappers.size} inspections on ${file.name}")
+
+            // Run inspections directly - bypasses daemon focus check
+            val results = InspectionEngine.inspectEx(
+                toolWrappers,
+                psiFile,
+                psiFile.textRange,
+                psiFile.textRange,
+                false,  // isOnTheFly = false (batch mode)
+                false,  // inspectInjectedPsi
+                true,   // ignoreSuppressedElements
+                EmptyProgressIndicator(),
+                PairProcessor.alwaysTrue()
+            )
+
+            // Convert to map of tool ID -> problems
+            results.mapKeys { (wrapper, _) -> wrapper.shortName }
+                .filterValues { it.isNotEmpty() }
+        }
     }
 }

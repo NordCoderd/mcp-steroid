@@ -8,6 +8,7 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
+import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.psi.search.GlobalSearchScope
 import kotlinx.serialization.json.JsonElement
 import kotlin.time.Duration
@@ -188,6 +189,10 @@ interface McpScriptContext {
      * Wait for daemon analysis and return all highlight infos for the file.
      * Returns highlights with severity >= WEAK_WARNING by default.
      *
+     * **NOTE**: This method relies on the daemon code analyzer which may return stale results
+     * if the IDE window is not focused (see GitHub issue #20). For reliable results regardless
+     * of window focus, use [runInspectionsDirectly] instead.
+     *
      * @param file The virtual file to get highlights for
      * @param minSeverityValue Minimum severity value (default: WEAK_WARNING). Use HighlightSeverity.*.myVal
      * @param timeout Maximum time to wait for analysis (default: 30 seconds)
@@ -213,6 +218,40 @@ interface McpScriptContext {
         minSeverityValue: Int = 200, // HighlightSeverity.WEAK_WARNING.myVal
         timeout: Duration = 30.seconds
     ): List<HighlightInfo>
+
+    /**
+     * Run inspections directly on a file without relying on the daemon code analyzer.
+     *
+     * This method bypasses the daemon's focus-dependent caching and runs inspections directly
+     * using InspectionEngine.inspectEx(). It works reliably regardless of whether the IDE
+     * window is focused or active.
+     *
+     * Use this method when you need accurate inspection results in automated/headless scenarios.
+     *
+     * @param file The virtual file to inspect
+     * @param includeInfoSeverity Whether to include INFO-level problems (default: false)
+     * @return Map of inspection tool ID to list of ProblemDescriptors found
+     *
+     * ```kotlin
+     * execute {
+     *     val file = findProjectFile("src/Main.kt") ?: error("File not found")
+     *     waitForSmartMode()
+     *
+     *     val problems = runInspectionsDirectly(file)
+     *     problems.forEach { (toolId, descriptors) ->
+     *         descriptors.forEach { problem ->
+     *             println("[$toolId] ${problem.descriptionTemplate}")
+     *         }
+     *     }
+     * }
+     * ```
+     *
+     * @see getHighlightsWhenReady for daemon-based highlights (requires window focus)
+     */
+    suspend fun runInspectionsDirectly(
+        file: VirtualFile,
+        includeInfoSeverity: Boolean = false
+    ): Map<String, List<ProblemDescriptor>>
 
     // ============================================================
     // Modal Dialog Control
