@@ -16,6 +16,7 @@ import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
 import com.jonnyzzz.intellij.mcp.server.SkillReference
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import com.jonnyzzz.intellij.mcp.demo.executionEventBroadcaster
 import kotlinx.coroutines.*
 
 interface ExecutionResultBuilder {
@@ -47,6 +48,14 @@ class ExecutionManager(
             val executionId = project.executionStorage.writeNewExecution(exec)
             withContext(CoroutineName("mcp-steroid-$executionId")) {
                 log.info("Starting execution $executionId-${exec.taskId}-${exec.reason}...")
+
+                // Broadcast execution started event for Demo Mode
+                executionEventBroadcaster.onExecutionStarted(
+                    executionId = executionId,
+                    taskId = exec.taskId,
+                    reason = exec.reason,
+                    project = project
+                )
 
                 val builder = responseBuilder(this, executionId, mcpProgressReporter)
                 try {
@@ -85,6 +94,13 @@ class ExecutionManager(
                 val skillRef = SkillReference.getInstance()
                 builder.logMessage(skillRef.successFooter)
 
+                // Broadcast execution completed event for Demo Mode
+                executionEventBroadcaster.onCompleted(
+                    executionId = executionId,
+                    success = !builder.isFailed,
+                    errorMessage = if (builder.isFailed) "Execution failed" else null
+                )
+
                 builder.build()
             }
         }
@@ -104,6 +120,8 @@ class ExecutionManager(
             val text = "LOG: $message"
             responseBuilder.addTextContent(text)
             mcpProgress.report(text)
+            // Broadcast output event for Demo Mode
+            executionEventBroadcaster.onOutput(executionId, message)
             innerScope.launch {
                 project.executionStorage.appendExecutionEvent(executionId, text)
             }
@@ -113,6 +131,8 @@ class ExecutionManager(
             val text = "PROGRESS: $message"
             responseBuilder.addTextContent(text)
             mcpProgress.report(text)
+            // Broadcast progress event for Demo Mode
+            executionEventBroadcaster.onProgress(executionId, message)
             innerScope.launch {
                 project.executionStorage.appendExecutionEvent(executionId, text)
             }

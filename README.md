@@ -642,6 +642,44 @@ This allows the LLM to understand user feedback and adjust its approach.
 
 All requests are logged to disk regardless of review mode.
 
+## Demo Mode
+
+Demo Mode provides a visual overlay window that shows real-time progress of MCP command executions. This is ideal for creating demo videos, presentations, or debugging.
+
+### Features
+
+- **Visual overlay**: Positioned centrally over the active IntelliJ project frame
+- **Console log**: Shows the last 15 lines of execution output with JetBrains Mono font
+- **Animated status**: Displays a rotating "Running..." message with 20 synonyms
+- **Warm color theme**: Orange-brown gradient inspired by devrig.dev
+- **Click-through design**: ESC key or X button to dismiss
+- **Multi-monitor support**: Follows the active project frame
+
+### Configuration
+
+Enable via IntelliJ Registry (`Help > Find Action > Registry...`):
+
+| Registry Key | Default | Description |
+|--------------|---------|-------------|
+| `mcp.steroids.demo.enabled` | `false` | Enable Demo Mode overlay |
+| `mcp.steroids.demo.minDisplayTime` | `3000` | Minimum display time in milliseconds |
+| `mcp.steroids.demo.maxLines` | `15` | Maximum log lines to display |
+| `mcp.steroids.demo.opacity` | `85` | Background opacity (0-100) |
+| `mcp.steroids.demo.focusFrame` | `true` | Bring project frame to front when overlay appears |
+
+### Usage
+
+1. Open Registry: `Help > Find Action > Registry...`
+2. Search for `mcp.steroids.demo.enabled`
+3. Check the checkbox to enable
+4. Execute any MCP command - the overlay will appear showing progress
+
+The overlay automatically:
+- Fades in when execution starts
+- Updates with log output and progress messages
+- Shows an animated "Running..." status with spinner
+- Fades out when execution completes (after minimum display time)
+
 ## Runtime Reflection for API Discovery
 
 **LLM agents should use reflection to discover available APIs at runtime:**

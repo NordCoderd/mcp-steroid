@@ -50,6 +50,11 @@
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
+        <!-- Demo Mode overlay service (project-level) -->
+        <projectService
+            serviceImplementation="com.jonnyzzz.intellij.mcp.demo.DemoModeService"
+            preload="true"/>
+
         <!-- Review panel notification -->
         <editorNotificationProvider
             implementation="com.jonnyzzz.intellij.mcp.review.McpReviewNotificationProvider"/>
@@ -69,6 +74,18 @@
 
         <registryKey key="mcp.steroids.server.host" defaultValue="127.0.0.1"
             description="MCP server bind address (use 0.0.0.0 for Docker access)"/>
+
+        <!-- Demo Mode registry keys -->
+        <registryKey key="mcp.steroids.demo.enabled" defaultValue="false"
+            description="Enable Demo Mode overlay for MCP execution"/>
+        <registryKey key="mcp.steroids.demo.minDisplayTime" defaultValue="3000"
+            description="Minimum display time in milliseconds"/>
+        <registryKey key="mcp.steroids.demo.maxLines" defaultValue="15"
+            description="Maximum log lines to show in overlay"/>
+        <registryKey key="mcp.steroids.demo.opacity" defaultValue="85"
+            description="Background opacity (0-100)"/>
+        <registryKey key="mcp.steroids.demo.focusFrame" defaultValue="true"
+            description="Bring project frame to front when showing overlay"/>
 
         <!-- Start MCP server when IDE is ready -->
         <postStartupActivity
