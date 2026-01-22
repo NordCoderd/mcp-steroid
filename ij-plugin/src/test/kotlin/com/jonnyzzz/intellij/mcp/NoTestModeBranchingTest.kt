@@ -7,6 +7,8 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.intellij.mcp.vfs.vfsRefreshService
+import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
 
@@ -14,6 +16,7 @@ class NoTestModeBranchingTest : BasePlatformTestCase() {
     override fun runInDispatchThread(): Boolean = false
 
     fun testNoIsUnitTestModeUsageInProject(): Unit = timeoutRunBlocking(30.seconds) {
+        project.vfsRefreshService.refresh("NoTestModeBranchingTest")
         val repoPath = System.getProperty("user.dir") ?: error("Working directory is missing")
         val srcPath = Paths.get(repoPath, "src").toString()
         val srcRoot = readAction { LocalFileSystem.getInstance().refreshAndFindFileByPath(srcPath) }
@@ -23,6 +26,8 @@ class NoTestModeBranchingTest : BasePlatformTestCase() {
         val matches = mutableListOf<String>()
 
         for (file in kotlinFiles) {
+            if (!file.isValid || !file.exists()) continue
+            if (!Files.exists(Paths.get(file.path))) continue
             val text = readAction { VfsUtilCore.loadText(file) }
             if (!text.contains(forbiddenToken)) continue
             text.lineSequence().forEachIndexed { index, line ->
@@ -41,7 +46,7 @@ class NoTestModeBranchingTest : BasePlatformTestCase() {
     private fun collectKotlinFiles(root: VirtualFile): List<VirtualFile> {
         val files = mutableListOf<VirtualFile>()
         VfsUtilCore.iterateChildrenRecursively(root, null) { file ->
-            if (!file.isDirectory) {
+            if (!file.isDirectory && file.isValid && file.exists()) {
                 val ext = file.extension
                 if (ext == "kt" || ext == "kts") {
                     files.add(file)
