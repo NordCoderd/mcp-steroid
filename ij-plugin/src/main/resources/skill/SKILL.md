@@ -784,6 +784,23 @@ execute {
 }
 ```
 
+### Refresh a Specific File (Optional)
+
+Use this only when you know a file changed outside the IDE or VFS looks stale. Prefer refreshing the exact file or directory you need.
+
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
+
+execute {
+    val path = "/path/to/file.txt"
+    val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(path)
+    if (vf != null) {
+        VfsUtil.markDirtyAndRefresh(false, false, false, vf)
+    }
+}
+```
+
 ### List Directory Contents
 
 ```kotlin
