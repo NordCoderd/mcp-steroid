@@ -11,7 +11,6 @@ import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.mcp.builder
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
-import com.jonnyzzz.intellij.mcp.vfs.vfsRefreshService
 import com.jonnyzzz.intellij.mcp.vision.InputSequenceParser
 import com.jonnyzzz.intellij.mcp.vision.InputStep
 import com.jonnyzzz.intellij.mcp.vision.VisionService
@@ -109,8 +108,6 @@ class VisionInputToolHandler : McpRegistrar {
         val project = readAction {
             ProjectManager.getInstance().openProjects.find { it.name == projectName }
         } ?: return errorResult("Project not found: $projectName")
-
-        project.vfsRefreshService.refresh("input:$taskId")
 
         val executionId = project.executionStorage.writeToolCall(
             toolName = "steroid_input",
