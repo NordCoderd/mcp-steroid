@@ -10,6 +10,7 @@ import com.intellij.util.ui.ImageUtil
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import com.jonnyzzz.intellij.mcp.vfs.vfsRefreshService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -95,6 +96,7 @@ object VisionService {
     }
 
     suspend fun capture(project: Project, executionId: ExecutionId, windowId: String? = null): ScreenshotArtifacts {
+        project.vfsRefreshService.refresh("screenshot:${executionId.executionId}")
         val storage = project.executionStorage
         val executionDir = storage.resolveExecutionDir(executionId)
 

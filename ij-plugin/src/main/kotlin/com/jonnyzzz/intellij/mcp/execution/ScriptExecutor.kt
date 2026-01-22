@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import com.jonnyzzz.intellij.mcp.vfs.vfsRefreshService
 import kotlinx.coroutines.*
 import kotlinx.coroutines.selects.select
 import kotlin.time.Duration.Companion.seconds
@@ -51,6 +52,7 @@ class ScriptExecutor(
         exec: ExecCodeParams,
         resultBuilder: ExecutionResultBuilder,
     ) {
+        project.vfsRefreshService.refresh("execute_code:${exec.taskId}")
         val evalResult = project
             .codeEvalManager
             .evalCode(executionId, exec.code, resultBuilder) ?: return
