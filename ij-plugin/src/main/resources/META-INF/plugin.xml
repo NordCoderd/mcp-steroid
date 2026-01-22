@@ -38,6 +38,7 @@
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionInputToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.SkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.DebuggerSkillResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.LspExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.IdeExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.DebuggerExamplesResourceHandler"/>

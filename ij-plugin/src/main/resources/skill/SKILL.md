@@ -179,10 +179,13 @@ This server exposes built-in resources through the MCP resource APIs. These are 
 
 **Key resources provided by this server:**
 - `intellij://skill/intellij-api-poweruser-guide` - This guide as a resource.
+- `intellij://skill/debugger-guide` - Debugger-focused skill guide (breakpoints, sessions, threads).
 - `intellij://lsp/overview` - Overview of LSP-like examples and how to use them.
 - `intellij://lsp/<id>` - Runnable Kotlin scripts (e.g., `go-to-definition`, `find-references`, `rename`, `code-action`, `signature-help`).
 - `intellij://ide/overview` - Overview of IDE power operation examples (refactorings, inspections, generation).
 - `intellij://ide/<id>` - Runnable Kotlin scripts (e.g., `extract-method`, `introduce-variable`, `change-signature`, `safe-delete`, `optimize-imports`, `pull-up-members`, `push-down-members`, `extract-interface`, `move-class`, `generate-constructor`, `call-hierarchy`, `project-dependencies`, `inspection-summary`, `project-search`, `run-configuration`).
+- `intellij://debugger/overview` - Overview of debugger examples (breakpoints, sessions, threads).
+- `intellij://debugger/<id>` - Runnable Kotlin scripts (e.g., `set-line-breakpoint`, `debug-run-configuration`, `debug-session-control`, `debug-list-threads`, `debug-thread-dump`).
 - `intellij://open-project/overview` - Guide for opening projects via MCP.
 - `intellij://open-project/<id>` - Project opening examples (e.g., `open-trusted`, `open-with-dialogs`, `open-via-code`).
 
@@ -1534,8 +1537,10 @@ Use MCP `resources/list` and `resources/read` instead of HTTP fetching when poss
 
 Recommended resources:
 - `intellij://skill/intellij-api-poweruser-guide` - Full SKILL.md content as a resource
+- `intellij://skill/debugger-guide` - Debugger workflow guide + stateful exec_code notes
 - `intellij://ide/overview` - IDE usage overview and patterns
 - `intellij://lsp/overview` - LSP-style workflows and examples
+- `intellij://debugger/overview` - Debugger workflows and runnable examples
 
 ### Common Issues
 - **"Project not found"** - Run `steroid_list_projects` first to get exact project names
