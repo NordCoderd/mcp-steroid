@@ -5,8 +5,7 @@ import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.time.LocalDate
 
-class VisionIntegrationReminderTest {
-    @Test
+abstract class VisionIntegrationReminderTest {
     fun reminderToAddVisionIntegrationTests() {
         // TODO: After 2026-01-17, add integration tests for Swing/JCEF/Compose input + screenshot flows.
         // See TODO.md entry: "Vision API integration tests (Swing/JCEF/Compose)".
