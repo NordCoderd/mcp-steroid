@@ -42,12 +42,23 @@ Avoid long waits or sleeps inside a single call; prefer multiple short polls.
 - `XSuspendContext.getExecutionStacks()`
 - `XExecutionStack.getTopFrame()` or `computeStackFrames(...)`
 
+## Expression Evaluation
+
+**CRITICAL**: Do NOT write your own evaluation helper! Copy the complete `evaluateExpression()`
+function from `docs/DEBUG_SCRIPT.md` with ALL imports. Common import mistakes:
+
+- ❌ `com.intellij.xdebugger.frame.XValuePresentation` (wrong package)
+- ✅ `com.intellij.xdebugger.frame.presentation.XValuePresentation` (correct)
+
+The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex callback implementations.
+
 ## Common pitfalls
 
 - `currentSession` is null until a debug run starts.
 - Thread/stack info is only available while the session is suspended.
 - `computeStackFrames` is async; use `suspendCancellableCoroutine` to await results.
 - Start run configurations on EDT (use `withContext(Dispatchers.EDT)`).
+- **Import errors**: Use exact imports from docs - `XValuePresentation` is in `presentation` subpackage!
 
 ## Debugger resources
 
