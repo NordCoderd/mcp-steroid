@@ -16,23 +16,28 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 @Service(Service.Level.APP)
 class DebuggerExamplesResourceHandler : McpRegistrar {
 
-    private val resourceDir = "/debugger-examples"
+    companion object {
+        private const val RESOURCE_DIR = "/debugger-examples"
+        private const val OVERVIEW_FILE = "DEBUGGER_OVERVIEW.md"
 
-    /** List of example file names in the debugger-examples directory */
-    private val exampleFiles = listOf(
-        "set-line-breakpoint.kts",
-        "debug-run-configuration.kts",
-        "debug-session-control.kts",
-        "debug-list-threads.kts",
-        "debug-thread-dump.kts",
-    )
+        private val EXAMPLE_FILES = listOf(
+            "set-line-breakpoint.kts",
+            "debug-run-configuration.kts",
+            "debug-session-control.kts",
+            "debug-list-threads.kts",
+            "debug-thread-dump.kts",
+        )
+    }
 
     /** Dynamically loaded examples with metadata parsed from KDoc comments */
     val examples: List<DynamicResource> by lazy {
-        DynamicResourceScanner.loadResources(resourceDir, exampleFiles)
+        DynamicResourceScanner.loadResources(RESOURCE_DIR, EXAMPLE_FILES)
     }
 
     override fun register(server: McpServerCore) {
+        // Validate all resources exist during registration (fail-fast)
+        validateResourcesExist()
+
         server.resourceRegistry.registerResource(
             uri = "intellij://debugger/overview",
             name = "Debugger Examples Overview",
@@ -61,8 +66,8 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
     }
 
     fun loadOverview(): String {
-        return DynamicResourceScanner.loadResourceContent("$resourceDir/DEBUGGER_OVERVIEW.md")
-            ?: error("DEBUGGER_OVERVIEW.md resource is not found")
+        return DynamicResourceScanner.loadResourceContent("$RESOURCE_DIR/$OVERVIEW_FILE")
+            ?: error("Debugger overview resource not found: $RESOURCE_DIR/$OVERVIEW_FILE")
     }
 
     /**
@@ -72,6 +77,27 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
     fun loadExample(resourceFile: String): String {
         return DynamicResourceScanner.loadResourceContent(resourceFile)
             ?: error("Debugger example resource not found: $resourceFile")
+    }
+
+    /**
+     * Validate all debugger example resources exist in the JAR.
+     * Called during registration to fail fast if resources are missing.
+     */
+    private fun validateResourcesExist() {
+        // Validate overview
+        val overviewPath = "$RESOURCE_DIR/$OVERVIEW_FILE"
+        require(javaClass.getResource(overviewPath) != null) {
+            "Debugger overview resource missing from JAR: $overviewPath"
+        }
+
+        // Validate all example files
+        val missingFiles = EXAMPLE_FILES
+            .map { "$RESOURCE_DIR/$it" }
+            .filter { javaClass.getResource(it) == null }
+
+        require(missingFiles.isEmpty()) {
+            "Debugger example resources missing from JAR: ${missingFiles.joinToString()}"
+        }
     }
 }
 

@@ -11,6 +11,10 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 @Service(Service.Level.APP)
 class DebuggerSkillResourceHandler : McpRegistrar {
 
+    companion object {
+        private const val SKILL_RESOURCE_PATH = "/skill/DEBUGGER_SKILL.md"
+    }
+
     private val resourceUri = "intellij://skill/debugger-guide"
     private val resourceName = "IntelliJ Debugger Skill Guide"
     private val resourceDescription = """
@@ -20,7 +24,20 @@ class DebuggerSkillResourceHandler : McpRegistrar {
         and building thread dumps with IntelliJ XDebugger APIs.
     """.trimIndent()
 
+    /** Cached skill content - validated at load time */
+    private val skillContent: String by lazy {
+        javaClass.getResourceAsStream(SKILL_RESOURCE_PATH)
+            ?.bufferedReader()
+            ?.readText()
+            ?: error("Debugger skill resource not found: $SKILL_RESOURCE_PATH")
+    }
+
     override fun register(server: McpServerCore) {
+        // Validate resource exists during registration (fail-fast)
+        require(javaClass.getResource(SKILL_RESOURCE_PATH) != null) {
+            "Debugger skill resource missing from JAR: $SKILL_RESOURCE_PATH"
+        }
+
         server.resourceRegistry.registerResource(
             uri = resourceUri,
             name = resourceName,
@@ -30,12 +47,7 @@ class DebuggerSkillResourceHandler : McpRegistrar {
         )
     }
 
-    fun loadSkillMd(): String {
-        return javaClass.getResourceAsStream("/skill/DEBUGGER_SKILL.md")
-            ?.bufferedReader()
-            ?.readText()
-            ?: error("DEBUGGER_SKILL.md resource is not found")
-    }
+    fun loadSkillMd(): String = skillContent
 }
 
 inline val debuggerSkillResourceHandler: DebuggerSkillResourceHandler get() = service()
