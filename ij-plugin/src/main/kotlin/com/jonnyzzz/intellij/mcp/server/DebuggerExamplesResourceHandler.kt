@@ -1,6 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
@@ -11,6 +13,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Resource metadata (name, description) is dynamically parsed from
  * KDoc comments in the .kts files.
  */
+@Service(Service.Level.APP)
 class DebuggerExamplesResourceHandler : McpRegistrar {
 
     private val resourceDir = "/debugger-examples"
@@ -71,3 +74,5 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
             ?: error("Debugger example resource not found: $resourceFile")
     }
 }
+
+inline val debuggerExamplesResourceHandler: DebuggerExamplesResourceHandler get() = service()

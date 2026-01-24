@@ -1,11 +1,14 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
  * Handler for the IntelliJ Debugger skill guide resource.
  */
+@Service(Service.Level.APP)
 class DebuggerSkillResourceHandler : McpRegistrar {
 
     private val resourceUri = "intellij://skill/debugger-guide"
@@ -34,3 +37,5 @@ class DebuggerSkillResourceHandler : McpRegistrar {
             ?: error("DEBUGGER_SKILL.md resource is not found")
     }
 }
+
+inline val debuggerSkillResourceHandler: DebuggerSkillResourceHandler get() = service()
