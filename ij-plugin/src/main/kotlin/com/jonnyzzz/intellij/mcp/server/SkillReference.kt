@@ -41,11 +41,10 @@ class SkillReference {
     // Resource hints are static since SkillReference is accessed early in startup
     // before McpServerCore is fully initialized. These URIs are stable entrypoints.
     private val resourceHint: String = buildString {
-        append("📚 TIP: Browse MCP resources (resources/list). ")
-        append("Start with ")
-        append("intellij://skill/intellij-api-poweruser-guide, ")
-        append("intellij://ide/overview, ")
-        append("intellij://lsp/overview")
+        appendLine("💡 TIP: Browse MCP resources (resources/list) for examples and guides:")
+        appendLine("   • intellij://debugger/overview - Debugger API guide")
+        appendLine("   • intellij://skill/intellij-api-poweruser-guide - IntelliJ API patterns")
+        append("   • intellij://ide/overview - IDE overview")
     }
 
     /**
@@ -61,6 +60,15 @@ class SkillReference {
 
             errorMessage.contains("Read access") || errorMessage.contains("Write access") ->
                 "TIP: Wrap PSI/VFS access in readAction {} or writeAction {}."
+
+            errorMessage.contains("EDT", ignoreCase = true) ->
+                "TIP: This operation requires EDT. Use: withContext(Dispatchers.EDT) { }"
+
+            errorMessage.contains("JavaLineBreakpointProperties", ignoreCase = true) || errorMessage.contains("\"props\" is null") ->
+                "TIP: Use XDebuggerUtil.toggleLineBreakpoint() instead of breakpointManager.addLineBreakpoint() with null properties. See intellij://debugger/overview"
+
+            errorMessage.contains("breakpoint", ignoreCase = true) || errorMessage.contains("debug", ignoreCase = true) ->
+                "TIP: For debugger help, see intellij://debugger/overview resource (run resources/list)"
 
             errorMessage.contains("runBlocking") ->
                 "TIP: Never use runBlocking - execute {} is already a suspend function."

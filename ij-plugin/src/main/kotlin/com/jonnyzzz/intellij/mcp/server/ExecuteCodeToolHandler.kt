@@ -50,6 +50,12 @@ class ExecuteCodeToolHandler : McpRegistrar {
              which is running exclusively for you. Use the IntelliJ-based IDE to help you looking
              at the project, where you are working. Prioritize using the IDE and this MCP where possible.
 
+             💡 NEW TO INTELLIJ APIS? Start here:
+             - Run 'resources/list' to see available guides and examples
+             - Debugger help: intellij://debugger/overview resource
+             - API patterns: intellij://skill/intellij-api-poweruser-guide resource
+             - IDE overview: intellij://ide/overview resource
+
              LEARNING NOTE: Writing working code may require several attempts - this is normal! The IntelliJ API
              is vast and powerful. Keep trying - each attempt teaches you more. Use printException() for errors.
 

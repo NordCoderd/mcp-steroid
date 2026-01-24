@@ -38,54 +38,50 @@ kotlin {
 }
 
 // Tessdata download configuration
-val tessdataFiles = listOf("eng.traineddata", "osd.traineddata")
 val tessdataDownloadDir = layout.buildDirectory.dir("tessdata-download")
-val tessdataDir = layout.buildDirectory.dir("tessdata")
+val tessdataDir = layout.buildDirectory.dir("tessdata-data")
+
+val tessdataUrls = listOf(
+    "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion/eng.traineddata",
+    "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion/osd.traineddata",
+)
 
 // Download tessdata files
-val downloadTessdata by tasks.registering(Download::class) {
-    description = "Download Tesseract trained data files"
+val downloadTessdata by tasks.registering {
+    inputs.property("downloads", tessdataUrls.joinToString(","))
+    outputs.dir(tessdataDownloadDir)
 
-    val baseUrl = "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion"
-    src(tessdataFiles.map { "$baseUrl/$it" })
-    dest(tessdataDownloadDir)
-    overwrite(true)
-    onlyIfModified(true)
+    doFirst {
+        delete(tessdataDownloadDir)
+        mkdir(tessdataDownloadDir)
+        download {
+            for (url in tessdataUrls) {
+                run {
+                    src(url)
+                    dest(tessdataDownloadDir.map { it.file(url.substringAfterLast("/")) })
+                    onlyIfModified(true)
+                }
+            }
+        }
+    }
 }
 
-// Sync tessdata to clean directory (removes old artifacts)
 val syncTessdata by tasks.registering(Sync::class) {
     description = "Sync tessdata files to distribution directory"
     dependsOn(downloadTessdata)
 
     from(tessdataDownloadDir)
     into(tessdataDir)
-
-    // Inputs for up-to-date checking
-    inputs.property("tessdataVersion", tessdataVersion)
-    inputs.property("tessdataFiles", tessdataFiles.joinToString(","))
 }
 
 // Include tessdata in the distribution
 distributions {
     main {
         contents {
+            //dependeny to the task behind   tessdataDownloadDir
             from(syncTessdata) {
                 into("tessdata")
             }
         }
     }
-}
-
-// Ensure tessdata is synced before building the distribution
-tasks.named("installDist") {
-    dependsOn(syncTessdata)
-}
-
-tasks.named("distZip") {
-    dependsOn(syncTessdata)
-}
-
-tasks.named("distTar") {
-    dependsOn(syncTessdata)
 }
