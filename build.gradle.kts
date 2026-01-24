@@ -15,7 +15,7 @@ plugins {
 }
 
 group = "com.jonnyzzz.intellij"
-version = "0.84.0-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}"
+version = "0.85.0-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}"
 
 repositories {
     mavenCentral()
@@ -186,7 +186,7 @@ val verifyBundledLibraries by tasks.registering {
         // Assert expected libraries - update this list when dependencies change
         val expectedLibraries = sortedSetOf(
             "config-1.4.3.jar",
-            "intellij-mcp-steroid-0.84.0-SNAPSHOT.jar",
+            "intellij-mcp-steroid-0.85.0-SNAPSHOT.jar",
             "jansi-2.4.1.jar",
             "ktor-events-jvm-3.1.0.jar",
             "ktor-http-cio-jvm-3.1.0.jar",
@@ -200,7 +200,7 @@ val verifyBundledLibraries by tasks.registering {
             "ktor-sse-jvm-3.1.0.jar",
             "ktor-utils-jvm-3.1.0.jar",
             "ktor-websockets-jvm-3.1.0.jar",
-            "ocr-common-0.84.0-SNAPSHOT.jar",
+            "ocr-common-0.85.0-SNAPSHOT.jar",
             "slf4j-api-2.0.16.jar",
         )
 
