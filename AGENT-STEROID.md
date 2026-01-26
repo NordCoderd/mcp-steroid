@@ -613,42 +613,42 @@ The MCP server provides comprehensive guides and examples as resources. Load the
 
 ### Skills (High-Level Guides)
 
-- **`intellij://skill/intellij-api-poweruser-guide`** - Essential patterns for PSI, refactoring, code search, inspections
-- **`intellij://skill/debugger-guide`** - Debugger APIs: breakpoints, sessions, thread inspection
-- **`intellij://skill/test-runner-guide`** - Test execution and result inspection APIs
+- **`mcp-steroid://skill/intellij-api-poweruser-guide`** - Essential patterns for PSI, refactoring, code search, inspections
+- **`mcp-steroid://skill/debugger-guide`** - Debugger APIs: breakpoints, sessions, thread inspection
+- **`mcp-steroid://skill/test-runner-guide`** - Test execution and result inspection APIs
 
 ### Example Collections
 
 #### LSP-Like Operations
-- **`intellij://lsp/overview`** - Overview of all LSP operation examples
-- `intellij://lsp/go-to-definition`, `find-references`, `hover`, `completion`, `document-symbols`, `rename`, `formatting`, `code-action`, `signature-help`, `workspace-symbol`
+- **`mcp-steroid://lsp/overview`** - Overview of all LSP operation examples
+- `mcp-steroid://lsp/go-to-definition`, `find-references`, `hover`, `completion`, `document-symbols`, `rename`, `formatting`, `code-action`, `signature-help`, `workspace-symbol`
 
 #### IDE Power Operations
-- **`intellij://ide/overview`** - Overview of refactorings and code generation
-- `intellij://ide/extract-method`, `introduce-variable`, `inline-method`, `change-signature`, `move-file`, `safe-delete`, `optimize-imports`, `generate-override`, `inspect-and-fix`, `hierarchy-search`, `call-hierarchy`, `run-configuration`, `pull-up-members`, `push-down-members`, `extract-interface`, `move-class`, `generate-constructor`, `project-dependencies`, `inspection-summary`, `project-search`
+- **`mcp-steroid://ide/overview`** - Overview of refactorings and code generation
+- `mcp-steroid://ide/extract-method`, `introduce-variable`, `inline-method`, `change-signature`, `move-file`, `safe-delete`, `optimize-imports`, `generate-override`, `inspect-and-fix`, `hierarchy-search`, `call-hierarchy`, `run-configuration`, `pull-up-members`, `push-down-members`, `extract-interface`, `move-class`, `generate-constructor`, `project-dependencies`, `inspection-summary`, `project-search`
 
 #### Debugger Operations
-- **`intellij://debugger/overview`** - Overview of debugger examples
-- `intellij://debugger/set-line-breakpoint`, `debug-run-configuration`, `debug-session-control`, `debug-list-threads`, `debug-thread-dump`
+- **`mcp-steroid://debugger/overview`** - Overview of debugger examples
+- `mcp-steroid://debugger/set-line-breakpoint`, `debug-run-configuration`, `debug-session-control`, `debug-list-threads`, `debug-thread-dump`
 
 #### Test Execution
-- **`intellij://test/overview`** - Overview of test execution and result inspection
-- `intellij://test/list-run-configurations` - List all run configurations
-- `intellij://test/run-tests` - Execute test configuration
-- `intellij://test/wait-for-completion` - Poll for test completion
-- `intellij://test/inspect-test-results` - Access test results and failures
-- `intellij://test/test-tree-navigation` - Navigate test tree hierarchy
-- `intellij://test/test-statistics` - Get test counts and statistics
-- `intellij://test/test-failure-details` - Access detailed failure information
-- `intellij://test/find-recent-test-run` - Find most recent test execution
+- **`mcp-steroid://test/overview`** - Overview of test execution and result inspection
+- `mcp-steroid://test/list-run-configurations` - List all run configurations
+- `mcp-steroid://test/run-tests` - Execute test configuration
+- `mcp-steroid://test/wait-for-completion` - Poll for test completion
+- `mcp-steroid://test/inspect-test-results` - Access test results and failures
+- `mcp-steroid://test/test-tree-navigation` - Navigate test tree hierarchy
+- `mcp-steroid://test/test-statistics` - Get test counts and statistics
+- `mcp-steroid://test/test-failure-details` - Access detailed failure information
+- `mcp-steroid://test/find-recent-test-run` - Find most recent test execution
 
 #### Project Opening
-- **`intellij://open-project/overview`** - How to open projects via MCP
-- `intellij://open-project/open-trusted`, `open-with-dialogs`, `open-via-code`
+- **`mcp-steroid://open-project/overview`** - How to open projects via MCP
+- `mcp-steroid://open-project/open-trusted`, `open-with-dialogs`, `open-via-code`
 
 #### Version Control
-- **`intellij://vcs/overview`** - VCS operation examples
-- `intellij://vcs/git-annotations`, `git-history`
+- **`mcp-steroid://vcs/overview`** - VCS operation examples
+- `mcp-steroid://vcs/git-annotations`, `git-history`
 
 ### How to Use Resources
 
@@ -656,10 +656,10 @@ Load resources to get working code examples:
 
 ```kotlin
 // First, read the overview to understand the workflow
-// Load: intellij://test/overview
+// Load: mcp-steroid://test/overview
 
 // Then load specific examples
-// Load: intellij://test/list-run-configurations
+// Load: mcp-steroid://test/list-run-configurations
 
 // Copy the code and customize it for your use case
 execute {
@@ -675,4 +675,4 @@ execute {
 }
 ```
 
-**Pro Tip**: Always start with the overview resource (e.g., `intellij://test/overview`) to understand the complete workflow, then load specific examples as needed.
+**Pro Tip**: Always start with the overview resource (e.g., `mcp-steroid://test/overview`) to understand the complete workflow, then load specific examples as needed.

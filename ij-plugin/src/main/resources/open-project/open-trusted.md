@@ -93,3 +93,19 @@ Now you can use `steroid_execute_code` with the project:
 ## Alternatives
 
 If you need to review the trust dialog first, use the "open-with-dialogs" workflow instead.
+
+## See Also
+
+Related project opening examples:
+- [Open Project Overview](mcp-steroid://open-project/overview) - Complete opening guide
+- [Open with Dialogs](mcp-steroid://open-project/open-with-dialogs) - Interactive dialog handling
+- [Open via Code](mcp-steroid://open-project/open-via-code) - Programmatic opening
+
+Related MCP tools:
+- `steroid_open_project` - Tool for opening projects via MCP
+- `steroid_list_projects` - List all open projects
+- `steroid_list_windows` - Check project initialization status
+
+Overview resources:
+- [Open Project Examples Overview](mcp-steroid://open-project/overview) - All project opening workflows
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns

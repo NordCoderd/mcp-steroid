@@ -178,16 +178,16 @@ This server exposes built-in resources through the MCP resource APIs. These are 
 2. Call `read_mcp_resource` with the resource URI to load the content.
 
 **Key resources provided by this server:**
-- `intellij://skill/intellij-api-poweruser-guide` - This guide as a resource.
-- `intellij://skill/debugger-guide` - Debugger-focused skill guide (breakpoints, sessions, threads).
-- `intellij://lsp/overview` - Overview of LSP-like examples and how to use them.
-- `intellij://lsp/<id>` - Runnable Kotlin scripts (e.g., `go-to-definition`, `find-references`, `rename`, `code-action`, `signature-help`).
-- `intellij://ide/overview` - Overview of IDE power operation examples (refactorings, inspections, generation).
-- `intellij://ide/<id>` - Runnable Kotlin scripts (e.g., `extract-method`, `introduce-variable`, `change-signature`, `safe-delete`, `optimize-imports`, `pull-up-members`, `push-down-members`, `extract-interface`, `move-class`, `generate-constructor`, `call-hierarchy`, `project-dependencies`, `inspection-summary`, `project-search`, `run-configuration`).
-- `intellij://debugger/overview` - Overview of debugger examples (breakpoints, sessions, threads).
-- `intellij://debugger/<id>` - Runnable Kotlin scripts (e.g., `set-line-breakpoint`, `debug-run-configuration`, `debug-session-control`, `debug-list-threads`, `debug-thread-dump`).
-- `intellij://open-project/overview` - Guide for opening projects via MCP.
-- `intellij://open-project/<id>` - Project opening examples (e.g., `open-trusted`, `open-with-dialogs`, `open-via-code`).
+- `mcp-steroid://skill/intellij-api-poweruser-guide` - This guide as a resource.
+- `mcp-steroid://skill/debugger-guide` - Debugger-focused skill guide (breakpoints, sessions, threads).
+- `mcp-steroid://lsp/overview` - Overview of LSP-like examples and how to use them.
+- `mcp-steroid://lsp/<id>` - Runnable Kotlin scripts (e.g., `go-to-definition`, `find-references`, `rename`, `code-action`, `signature-help`).
+- `mcp-steroid://ide/overview` - Overview of IDE power operation examples (refactorings, inspections, generation).
+- `mcp-steroid://ide/<id>` - Runnable Kotlin scripts (e.g., `extract-method`, `introduce-variable`, `change-signature`, `safe-delete`, `optimize-imports`, `pull-up-members`, `push-down-members`, `extract-interface`, `move-class`, `generate-constructor`, `call-hierarchy`, `project-dependencies`, `inspection-summary`, `project-search`, `run-configuration`).
+- `mcp-steroid://debugger/overview` - Overview of debugger examples (breakpoints, sessions, threads).
+- `mcp-steroid://debugger/<id>` - Runnable Kotlin scripts (e.g., `set-line-breakpoint`, `debug-run-configuration`, `debug-session-control`, `debug-list-threads`, `debug-thread-dump`).
+- `mcp-steroid://open-project/overview` - Guide for opening projects via MCP.
+- `mcp-steroid://open-project/<id>` - Project opening examples (e.g., `open-trusted`, `open-with-dialogs`, `open-via-code`).
 
 These resources are designed to be plugged directly into `steroid_execute_code` after you configure file paths/positions.
 
@@ -1553,17 +1553,41 @@ The MCP server runs inside IntelliJ. To verify:
 Use MCP `resources/list` and `resources/read` instead of HTTP fetching when possible.
 
 Recommended resources:
-- `intellij://skill/intellij-api-poweruser-guide` - Full SKILL.md content as a resource
-- `intellij://skill/debugger-guide` - Debugger workflow guide + stateful exec_code notes
-- `intellij://ide/overview` - IDE usage overview and patterns
-- `intellij://lsp/overview` - LSP-style workflows and examples
-- `intellij://debugger/overview` - Debugger workflows and runnable examples
+- `mcp-steroid://docs/resource-graph` - Complete resource graph with navigation paths
+- `mcp-steroid://skill/intellij-api-poweruser-guide` - Full SKILL.md content as a resource
+- `mcp-steroid://skill/debugger-guide` - Debugger workflow guide + stateful exec_code notes
+- `mcp-steroid://ide/overview` - IDE usage overview and patterns
+- `mcp-steroid://lsp/overview` - LSP-style workflows and examples
+- `mcp-steroid://debugger/overview` - Debugger workflows and runnable examples
 
 ### Common Issues
 - **"Project not found"** - Run `steroid_list_projects` first to get exact project names
 - **No output from execute** - Make sure to call `println()` or `printJson()` to see results
 - **Timeout** - Increase `timeout` parameter (default 60 seconds)
 - **Script errors** - Check imports are outside `execute { }` block
+
+## Related Resources
+
+📊 **[Complete Resource Graph](mcp-steroid://docs/resource-graph)** - Visual map of all resources with navigation paths
+
+### Skill Guides
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - This guide
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug workflows and stateful execution
+- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution patterns
+
+### Example Resources
+- [LSP Examples](mcp-steroid://lsp/overview) - LSP-like operations (navigation, code intelligence, refactoring)
+- [IDE Examples](mcp-steroid://ide/overview) - IDE power operations (refactorings, inspections, generation)
+- [Debugger Examples](mcp-steroid://debugger/overview) - Debugger workflows and API usage
+- [Test Examples](mcp-steroid://test/overview) - Test execution and result inspection
+- [VCS Examples](mcp-steroid://vcs/overview) - Version control operations (git blame, history)
+- [Open Project Examples](mcp-steroid://open-project/overview) - Project opening workflows
+
+### Specific Skill Resources
+- [Debugger Guide](mcp-steroid://skill/debugger-guide) - Setting breakpoints and debugging
+- [Test Runner Guide](mcp-steroid://skill/test-runner-guide) - Running and inspecting tests
+
+---
 
 ## Summary
 

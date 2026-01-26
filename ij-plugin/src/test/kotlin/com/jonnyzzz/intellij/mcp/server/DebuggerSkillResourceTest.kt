@@ -19,6 +19,6 @@ class DebuggerSkillResourceTest : BasePlatformTestCase() {
     fun testSkillMentionsDebuggerResources() {
         val content = handler.loadSkillMd()
         assertTrue("Skill should reference debugger overview resource",
-            content.contains("intellij://debugger/overview"))
+            content.contains("mcp-steroid://debugger/overview"))
     }
 }

@@ -9,14 +9,14 @@ Each example is a complete script for `steroid_execute_code`.
 
 | Resource | Description |
 |----------|-------------|
-| `intellij://vcs/git-annotations` | Get blame/annotations for a file (who changed what, when) |
+| `mcp-steroid://vcs/git-annotations` | Get blame/annotations for a file (who changed what, when) |
 
 ### Git History
 
 | Resource | Description |
 |----------|-------------|
-| `intellij://vcs/git-history` | Get commit history for a file |
-| `intellij://vcs/git-log` | Get detailed commit log with messages and diffs |
+| `mcp-steroid://vcs/git-history` | Get commit history for a file |
+| `mcp-steroid://vcs/git-log` | Get detailed commit log with messages and diffs |
 
 ## Usage
 
@@ -66,3 +66,24 @@ val root = vcsManager.getVcsRootFor(virtualFile)
 - Many VCS operations should NOT be called from EDT
 - Use background threads with `runBackgroundableTask` for long operations
 - Read actions may still be needed for PSI access
+
+---
+
+## Related Resources
+
+### Skill Guides
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
+- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution
+
+### VCS Examples
+- [Git Annotations](mcp-steroid://vcs/git-annotations) - Get blame/annotations for files
+- [Git History](mcp-steroid://vcs/git-history) - Get commit history
+- [Git Log](mcp-steroid://vcs/git-log) - Get detailed commit log with diffs
+
+### Related Example Guides
+- [IDE Examples](mcp-steroid://ide/overview) - IDE power operations
+- [LSP Examples](mcp-steroid://lsp/overview) - Code navigation and intelligence
+- [Debugger Examples](mcp-steroid://debugger/overview) - Debugging workflows
+- [Test Examples](mcp-steroid://test/overview) - Test execution
+- [Open Project Examples](mcp-steroid://open-project/overview) - Project opening

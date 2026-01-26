@@ -9,31 +9,31 @@ using IntelliJ Platform APIs. Each example is a complete script for `steroid_exe
 
 | Resource | LSP Method | Description |
 |----------|-----------|-------------|
-| `intellij://lsp/go-to-definition` | `textDocument/definition` | Navigate to symbol definition |
-| `intellij://lsp/find-references` | `textDocument/references` | Find all references to a symbol |
-| `intellij://lsp/workspace-symbol` | `workspace/symbol` | Search for symbols across workspace |
+| `mcp-steroid://lsp/go-to-definition` | `textDocument/definition` | Navigate to symbol definition |
+| `mcp-steroid://lsp/find-references` | `textDocument/references` | Find all references to a symbol |
+| `mcp-steroid://lsp/workspace-symbol` | `workspace/symbol` | Search for symbols across workspace |
 
 ### Code Intelligence
 
 | Resource | LSP Method | Description |
 |----------|-----------|-------------|
-| `intellij://lsp/hover` | `textDocument/hover` | Get documentation/type info for symbol |
-| `intellij://lsp/completion` | `textDocument/completion` | Code completion suggestions |
-| `intellij://lsp/signature-help` | `textDocument/signatureHelp` | Parameter hints for function calls |
+| `mcp-steroid://lsp/hover` | `textDocument/hover` | Get documentation/type info for symbol |
+| `mcp-steroid://lsp/completion` | `textDocument/completion` | Code completion suggestions |
+| `mcp-steroid://lsp/signature-help` | `textDocument/signatureHelp` | Parameter hints for function calls |
 
 ### Document Operations
 
 | Resource | LSP Method | Description |
 |----------|-----------|-------------|
-| `intellij://lsp/document-symbols` | `textDocument/documentSymbol` | List all symbols in document |
-| `intellij://lsp/formatting` | `textDocument/formatting` | Format entire document |
+| `mcp-steroid://lsp/document-symbols` | `textDocument/documentSymbol` | List all symbols in document |
+| `mcp-steroid://lsp/formatting` | `textDocument/formatting` | Format entire document |
 
 ### Refactoring
 
 | Resource | LSP Method | Description |
 |----------|-----------|-------------|
-| `intellij://lsp/rename` | `textDocument/rename` | Rename symbol across project |
-| `intellij://lsp/code-action` | `textDocument/codeAction` | Quick fixes and refactoring actions |
+| `mcp-steroid://lsp/rename` | `textDocument/rename` | Rename symbol across project |
+| `mcp-steroid://lsp/code-action` | `textDocument/codeAction` | Quick fixes and refactoring actions |
 
 ## Usage
 
@@ -80,3 +80,27 @@ Structure View (`LanguageStructureViewBuilder`), or inspection output.
 - Use `readAction { }` for all PSI read operations
 - Use `writeAction { }` for modifications
 - The `project` variable is available in all scripts
+
+---
+
+## Related Resources
+
+### Skill Guides
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
+- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution
+
+### LSP Examples
+- Navigation: `go-to-definition`, `find-references`, `workspace-symbol`
+- Code Intelligence: `hover`, `completion`, `signature-help`
+- Document Operations: `document-symbols`, `formatting`
+- Refactoring: `rename`, `code-action`
+
+See `mcp-steroid://lsp/<id>` for specific examples (e.g., `mcp-steroid://lsp/go-to-definition`)
+
+### Related Example Guides
+- [IDE Examples](mcp-steroid://ide/overview) - IDE power operations beyond LSP
+- [Debugger Examples](mcp-steroid://debugger/overview) - Debugging workflows
+- [Test Examples](mcp-steroid://test/overview) - Test execution
+- [VCS Examples](mcp-steroid://vcs/overview) - Version control operations
+- [Open Project Examples](mcp-steroid://open-project/overview) - Project opening

@@ -62,7 +62,7 @@ When you trust the project and want to skip dialogs:
 3. steroid_list_projects() to verify project is open
 ```
 
-Resource: `intellij://open-project/open-trusted`
+Resource: `mcp-steroid://open-project/open-trusted`
 
 ### Interactive Open (With Dialog Handling)
 
@@ -78,7 +78,7 @@ When you need to see and interact with dialogs:
 5. steroid_list_projects() to verify
 ```
 
-Resource: `intellij://open-project/open-with-dialogs`
+Resource: `mcp-steroid://open-project/open-with-dialogs`
 
 ### Programmatic Open (Via Code)
 
@@ -92,7 +92,7 @@ execute {
 }
 ```
 
-Resource: `intellij://open-project/open-via-code`
+Resource: `mcp-steroid://open-project/open-via-code`
 
 ## Trust Project Dialog
 
@@ -168,7 +168,29 @@ return immediately with a message indicating the project is already open.
 
 | Resource URI | Description |
 |-------------|-------------|
-| `intellij://open-project/overview` | This overview document |
-| `intellij://open-project/open-trusted` | Example: Open with automatic trust |
-| `intellij://open-project/open-with-dialogs` | Example: Open with dialog handling |
-| `intellij://open-project/open-via-code` | Example: Open via IntelliJ APIs |
+| `mcp-steroid://open-project/overview` | This overview document |
+| `mcp-steroid://open-project/open-trusted` | Example: Open with automatic trust |
+| `mcp-steroid://open-project/open-with-dialogs` | Example: Open with dialog handling |
+| `mcp-steroid://open-project/open-via-code` | Example: Open via IntelliJ APIs |
+
+---
+
+## Related Resources
+
+### Skill Guides
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
+- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution
+
+### Project Opening Examples
+- [Open Project Overview](mcp-steroid://open-project/overview) - This document
+- [Open Trusted](mcp-steroid://open-project/open-trusted) - Auto-trust project opening
+- [Open with Dialogs](mcp-steroid://open-project/open-with-dialogs) - Interactive dialog handling
+- [Open via Code](mcp-steroid://open-project/open-via-code) - Programmatic opening
+
+### Related Example Guides
+- [IDE Examples](mcp-steroid://ide/overview) - IDE power operations
+- [LSP Examples](mcp-steroid://lsp/overview) - Code navigation
+- [Debugger Examples](mcp-steroid://debugger/overview) - Debugging workflows
+- [Test Examples](mcp-steroid://test/overview) - Test execution
+- [VCS Examples](mcp-steroid://vcs/overview) - Version control operations

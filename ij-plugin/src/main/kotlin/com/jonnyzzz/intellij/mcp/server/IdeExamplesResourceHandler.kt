@@ -51,7 +51,7 @@ class IdeExamplesResourceHandler : McpRegistrar {
 
     override fun register(server: McpServerCore) {
         server.resourceRegistry.registerResource(
-            uri = "intellij://ide/overview",
+            uri = "mcp-steroid://ide/overview",
             name = "IDE Examples Overview",
             description = """
                 Overview of IntelliJ IDE power operation examples.
@@ -65,7 +65,7 @@ class IdeExamplesResourceHandler : McpRegistrar {
 
         examples.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "intellij://ide/${example.id}",
+                uri = "mcp-steroid://ide/${example.id}",
                 name = "IDE: ${example.name}",
                 description = example.description,
                 mimeType = example.mimeType,

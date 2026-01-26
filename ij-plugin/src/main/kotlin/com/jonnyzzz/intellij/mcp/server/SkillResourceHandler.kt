@@ -12,7 +12,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 @Service(Service.Level.APP)
 class SkillResourceHandler : McpRegistrar {
 
-    val resourceUri = "intellij://skill/intellij-api-poweruser-guide"
+    val resourceUri = "mcp-steroid://skill/intellij-api-poweruser-guide"
     val resourceName = "IntelliJ API Power User Guide"
 
     val resourceDescription = """

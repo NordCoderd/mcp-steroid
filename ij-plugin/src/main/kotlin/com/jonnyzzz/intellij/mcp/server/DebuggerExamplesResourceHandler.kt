@@ -39,7 +39,7 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
         validateResourcesExist()
 
         server.resourceRegistry.registerResource(
-            uri = "intellij://debugger/overview",
+            uri = "mcp-steroid://debugger/overview",
             name = "Debugger Examples Overview",
             description = """
                 Overview of IntelliJ debugger operation examples.
@@ -53,7 +53,7 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
 
         examples.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "intellij://debugger/${example.id}",
+                uri = "mcp-steroid://debugger/${example.id}",
                 name = "Debugger: ${example.name}",
                 description = example.description,
                 mimeType = example.mimeType,

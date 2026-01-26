@@ -15,7 +15,7 @@ class DebuggerSkillResourceHandler : McpRegistrar {
         private const val SKILL_RESOURCE_PATH = "/skill/DEBUGGER_SKILL.md"
     }
 
-    private val resourceUri = "intellij://skill/debugger-guide"
+    private val resourceUri = "mcp-steroid://skill/debugger-guide"
     private val resourceName = "IntelliJ Debugger Skill Guide"
     private val resourceDescription = """
         Debugger-focused guide for running debug sessions and inspecting threads.

@@ -9,7 +9,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Handler for open-project workflow resources.
  * Provides examples and guidance for opening projects via MCP.
  *
- * Resources are registered under the URI scheme `intellij://open-project/`.
+ * Resources are registered under the URI scheme `mcp-steroid://open-project/`.
  */
 @Service(Service.Level.APP)
 class OpenProjectResourceHandler : McpRegistrar {
@@ -75,7 +75,7 @@ class OpenProjectResourceHandler : McpRegistrar {
     override fun register(server: McpServerCore) {
         // Register overview resource
         server.resourceRegistry.registerResource(
-            uri = "intellij://open-project/overview",
+            uri = "mcp-steroid://open-project/overview",
             name = "Open Project Workflow Overview",
             description = """
                 Overview of how to open projects in IntelliJ via MCP.
@@ -93,7 +93,7 @@ class OpenProjectResourceHandler : McpRegistrar {
         examples.forEach { example ->
             val mimeType = if (example.resourceFile.endsWith(".kts")) "text/x-kotlin" else "text/markdown"
             server.resourceRegistry.registerResource(
-                uri = "intellij://open-project/${example.id}",
+                uri = "mcp-steroid://open-project/${example.id}",
                 name = "Open Project: ${example.name}",
                 description = example.description,
                 mimeType = mimeType,

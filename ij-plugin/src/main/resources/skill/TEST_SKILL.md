@@ -9,11 +9,11 @@ Use IntelliJ test execution APIs from `steroid_execute_code` to run tests and in
 
 ## Quickstart
 
-1) Load `intellij://test/overview` and pick the examples you need.
-2) List available run configurations (example: `intellij://test/list-run-configurations`).
-3) Execute a test configuration (example: `intellij://test/run-tests`).
-4) Poll for completion and access results (example: `intellij://test/inspect-test-results`).
-5) Navigate test tree and check individual test status (example: `intellij://test/test-tree-navigation`).
+1) Load `mcp-steroid://test/overview` and pick the examples you need.
+2) List available run configurations (example: `mcp-steroid://test/list-run-configurations`).
+3) Execute a test configuration (example: `mcp-steroid://test/run-tests`).
+4) Poll for completion and access results (example: `mcp-steroid://test/inspect-test-results`).
+5) Navigate test tree and check individual test status (example: `mcp-steroid://test/test-tree-navigation`).
 
 ## Stateful exec_code workflow
 
@@ -66,11 +66,22 @@ Avoid long waits or sleeps inside a single call; prefer multiple short polls.
 - Execute configurations on EDT (use `withContext(Dispatchers.EDT)`).
 - Wait for smart mode before accessing run configurations.
 
-## Test execution resources
+## Related Resources
 
-- `intellij://test/overview`
-- `intellij://test/list-run-configurations`
-- `intellij://test/run-tests`
-- `intellij://test/inspect-test-results`
-- `intellij://test/test-tree-navigation`
-- `intellij://test/wait-for-completion`
+### Skill Guides
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Essential IntelliJ API patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug session management
+- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - This guide
+
+### Test Execution Resources
+- [Test Overview](mcp-steroid://test/overview) - Complete test execution workflow and patterns
+- [List Run Configurations](mcp-steroid://test/list-run-configurations) - Discover available test configs
+- [Run Tests](mcp-steroid://test/run-tests) - Execute test configurations
+- [Inspect Test Results](mcp-steroid://test/inspect-test-results) - Access and analyze test results
+- [Test Tree Navigation](mcp-steroid://test/test-tree-navigation) - Navigate test hierarchy
+- [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll for test execution status
+
+### Related Example Guides
+- [Debugger Examples](mcp-steroid://debugger/overview) - Debugging and session management
+- [IDE Examples](mcp-steroid://ide/overview) - IDE power operations
+- [Open Project Examples](mcp-steroid://open-project/overview) - Project opening workflows

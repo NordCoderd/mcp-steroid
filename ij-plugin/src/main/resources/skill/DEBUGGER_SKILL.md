@@ -9,10 +9,10 @@ Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions
 
 ## Quickstart
 
-1) Load `intellij://debugger/overview` and pick the examples you need.
-2) Set breakpoints (example: `intellij://debugger/set-line-breakpoint`).
-3) Start a debug run configuration (example: `intellij://debugger/debug-run-configuration`).
-4) Pause/resume and inspect session state (example: `intellij://debugger/debug-session-control`).
+1) Load `mcp-steroid://debugger/overview` and pick the examples you need.
+2) Set breakpoints (example: `mcp-steroid://debugger/set-line-breakpoint`).
+3) Start a debug run configuration (example: `mcp-steroid://debugger/debug-run-configuration`).
+4) Pause/resume and inspect session state (example: `mcp-steroid://debugger/debug-session-control`).
 5) List threads or build a thread dump (examples: `debug-list-threads`, `debug-thread-dump`).
 
 ## Stateful exec_code workflow
@@ -60,11 +60,22 @@ The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex cal
 - Start run configurations on EDT (use `withContext(Dispatchers.EDT)`).
 - **Import errors**: Use exact imports from docs - `XValuePresentation` is in `presentation` subpackage!
 
-## Debugger resources
+## Related Resources
 
-- `intellij://debugger/overview`
-- `intellij://debugger/set-line-breakpoint`
-- `intellij://debugger/debug-run-configuration`
-- `intellij://debugger/debug-session-control`
-- `intellij://debugger/debug-list-threads`
-- `intellij://debugger/debug-thread-dump`
+### Skill Guides
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Essential IntelliJ API patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - This guide
+- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution workflows
+
+### Debugger Resources
+- [Debugger Overview](mcp-steroid://debugger/overview) - Complete debugger examples overview
+- [Set Line Breakpoint](mcp-steroid://debugger/set-line-breakpoint) - Create and manage breakpoints
+- [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging a run config
+- [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause, resume, and stop sessions
+- [List Threads](mcp-steroid://debugger/debug-list-threads) - Inspect execution stacks and threads
+- [Thread Dump](mcp-steroid://debugger/debug-thread-dump) - Generate complete thread dumps
+
+### Related Example Guides
+- [Test Examples](mcp-steroid://test/overview) - Test execution and result inspection
+- [IDE Examples](mcp-steroid://ide/overview) - IDE power operations
+- [Open Project Examples](mcp-steroid://open-project/overview) - Project opening workflows

@@ -43,9 +43,9 @@ class ExecuteCodeToolHandler : McpRegistrar {
              at the project, where you are working. Prioritize using the IDE and this MCP where possible.
 
              NEW TO INTELLIJ APIS? Start here: Run 'resources/list' on this MCP Server to see all possible
-             resources that you need. It includes [Debugger](intellij://debugger/overview), 
-             [API Patterns](intellij://skill/intellij-api-poweruser-guide), [Basics](intellij://ide/overview),
-             [LSP Operations](intellij://lsp/overview), Running, Staring tests, Debugging, and so on.
+             resources that you need. It includes [Debugger](mcp-steroid://debugger/overview), 
+             [API Patterns](mcp-steroid://skill/intellij-api-poweruser-guide), [Basics](mcp-steroid://ide/overview),
+             [LSP Operations](mcp-steroid://lsp/overview), Running, Staring tests, Debugging, and so on.
 
              LEARNING NOTE: Writing working code may require several attempts - this is normal! The IntelliJ API
              is vast and powerful. Keep trying - each attempt teaches you more. Use printException() for errors.
@@ -58,7 +58,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - Sub-agent can iterate on fixes without context rot in main agent
 
              This is similar to LSP tools but uses IntelliJ's native APIs, offering deeper code understanding
-             and more features (refactorings, inspections, full project model). See intellij://
+             and more features (refactorings, inspections, full project model). See mcp-steroid://
 
              You can do everything IntelliJ API allows you to do including, but not limited to
              - code search

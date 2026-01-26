@@ -46,6 +46,7 @@
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.TestExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VcsExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ResourceGraphHandler"/>
 
         <!-- Screenshot metadata providers -->
         <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.ScreenshotImageProvider"/>

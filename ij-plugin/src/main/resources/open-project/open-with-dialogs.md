@@ -121,3 +121,20 @@ The Trust Project dialog has these buttons:
 ## Alternatives
 
 For faster opening without dialogs, use `trust_project=true` in `steroid_open_project`.
+
+## See Also
+
+Related project opening examples:
+- [Open Project Overview](mcp-steroid://open-project/overview) - Complete opening guide
+- [Open Trusted](mcp-steroid://open-project/open-trusted) - Auto-trust project opening
+- [Open via Code](mcp-steroid://open-project/open-via-code) - Programmatic opening
+
+Related MCP tools:
+- `steroid_open_project` - Tool for opening projects via MCP
+- `steroid_take_screenshot` - See dialog state
+- `steroid_input` - Handle dialog interactions
+- `steroid_list_windows` - Check project initialization status
+
+Overview resources:
+- [Open Project Examples Overview](mcp-steroid://open-project/overview) - All project opening workflows
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns

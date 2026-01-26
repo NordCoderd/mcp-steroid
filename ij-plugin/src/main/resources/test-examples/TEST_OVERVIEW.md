@@ -179,3 +179,26 @@ Remember that `execute {}` blocks maintain IDE state between calls:
 3. **Final call**: Inspect results after completion
 
 This pattern avoids timeout issues and provides better feedback to the agent.
+
+---
+
+## Related Resources
+
+### Skill Guides
+- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug workflows and session management
+- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Essential test execution knowledge
+
+### Test Execution Examples
+- [Test Overview](mcp-steroid://test/overview) - This document
+- [List Run Configurations](mcp-steroid://test/list-run-configurations) - Discover available tests
+- [Run Tests](mcp-steroid://test/run-tests) - Execute test configurations
+- [Inspect Test Results](mcp-steroid://test/inspect-test-results) - Access results
+- [Test Tree Navigation](mcp-steroid://test/test-tree-navigation) - Navigate test hierarchy
+- [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll test status
+
+### Related Example Guides
+- [Debugger Examples](mcp-steroid://debugger/overview) - Debugging workflows
+- [IDE Examples](mcp-steroid://ide/overview) - IDE power operations
+- [LSP Examples](mcp-steroid://lsp/overview) - Code navigation
+- [Open Project Examples](mcp-steroid://open-project/overview) - Project opening

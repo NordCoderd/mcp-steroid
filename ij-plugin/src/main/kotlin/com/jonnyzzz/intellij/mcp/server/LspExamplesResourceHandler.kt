@@ -195,7 +195,7 @@ class LspExamplesResourceHandler : McpRegistrar {
     override fun register(server: McpServerCore) {
         // Register overview resource
         server.resourceRegistry.registerResource(
-            uri = "intellij://lsp/overview",
+            uri = "mcp-steroid://lsp/overview",
             name = "LSP Examples Overview",
             description = """
                 Overview of all LSP-like operation examples for IntelliJ Platform.
@@ -213,7 +213,7 @@ class LspExamplesResourceHandler : McpRegistrar {
         // Register each example as a separate resource
         examples.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "intellij://lsp/${example.id}",
+                uri = "mcp-steroid://lsp/${example.id}",
                 name = "LSP: ${example.name}",
                 description = example.description,
                 mimeType = "text/x-kotlin",

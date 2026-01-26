@@ -42,7 +42,7 @@ class TestExamplesResourceHandler : McpRegistrar {
         validateResourcesExist()
 
         server.resourceRegistry.registerResource(
-            uri = "intellij://test/overview",
+            uri = "mcp-steroid://test/overview",
             name = "Test Execution Examples Overview",
             description = """
                 Overview of IntelliJ test execution and result inspection examples.
@@ -56,7 +56,7 @@ class TestExamplesResourceHandler : McpRegistrar {
 
         examples.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "intellij://test/${example.id}",
+                uri = "mcp-steroid://test/${example.id}",
                 name = "Test: ${example.name}",
                 description = example.description,
                 mimeType = example.mimeType,

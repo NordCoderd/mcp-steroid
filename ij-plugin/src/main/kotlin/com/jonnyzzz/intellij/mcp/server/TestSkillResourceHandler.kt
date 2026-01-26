@@ -15,7 +15,7 @@ class TestSkillResourceHandler : McpRegistrar {
         private const val SKILL_RESOURCE_PATH = "/skill/TEST_SKILL.md"
     }
 
-    private val resourceUri = "intellij://skill/test-runner-guide"
+    private val resourceUri = "mcp-steroid://skill/test-runner-guide"
     private val resourceName = "IntelliJ Test Runner Skill Guide"
     private val resourceDescription = """
         Test execution and result inspection guide for running tests and analyzing results.

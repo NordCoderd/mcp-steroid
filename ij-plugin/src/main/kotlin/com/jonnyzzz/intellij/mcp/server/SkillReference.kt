@@ -42,9 +42,9 @@ class SkillReference {
     // before McpServerCore is fully initialized. These URIs are stable entrypoints.
     private val resourceHint: String = buildString {
         appendLine("💡 TIP: Browse MCP resources (resources/list) for examples and guides:")
-        appendLine("   • intellij://debugger/overview - Debugger API guide")
-        appendLine("   • intellij://skill/intellij-api-poweruser-guide - IntelliJ API patterns")
-        append("   • intellij://ide/overview - IDE overview")
+        appendLine("   • mcp-steroid://debugger/overview - Debugger API guide")
+        appendLine("   • mcp-steroid://skill/intellij-api-poweruser-guide - IntelliJ API patterns")
+        append("   • mcp-steroid://ide/overview - IDE overview")
     }
 
     /**
@@ -65,10 +65,10 @@ class SkillReference {
                 "TIP: This operation requires EDT. Use: withContext(Dispatchers.EDT) { }"
 
             errorMessage.contains("JavaLineBreakpointProperties", ignoreCase = true) || errorMessage.contains("\"props\" is null") ->
-                "TIP: Use XDebuggerUtil.toggleLineBreakpoint() instead of breakpointManager.addLineBreakpoint() with null properties. See intellij://debugger/overview"
+                "TIP: Use XDebuggerUtil.toggleLineBreakpoint() instead of breakpointManager.addLineBreakpoint() with null properties. See mcp-steroid://debugger/overview"
 
             errorMessage.contains("breakpoint", ignoreCase = true) || errorMessage.contains("debug", ignoreCase = true) ->
-                "TIP: For debugger help, see intellij://debugger/overview resource (run resources/list)"
+                "TIP: For debugger help, see mcp-steroid://debugger/overview resource (run resources/list)"
 
             errorMessage.contains("runBlocking") ->
                 "TIP: Never use runBlocking - execute {} is already a suspend function."

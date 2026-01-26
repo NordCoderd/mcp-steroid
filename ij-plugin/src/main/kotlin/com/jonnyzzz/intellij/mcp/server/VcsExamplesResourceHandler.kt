@@ -55,7 +55,7 @@ class VcsExamplesResourceHandler : McpRegistrar {
     override fun register(server: McpServerCore) {
         // Register overview resource
         server.resourceRegistry.registerResource(
-            uri = "intellij://vcs/overview",
+            uri = "mcp-steroid://vcs/overview",
             name = "VCS Examples Overview",
             description = """
                 Overview of all VCS operation examples for IntelliJ Platform.
@@ -73,7 +73,7 @@ class VcsExamplesResourceHandler : McpRegistrar {
         // Register each example as a separate resource
         examples.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "intellij://vcs/${example.id}",
+                uri = "mcp-steroid://vcs/${example.id}",
                 name = "VCS: ${example.name}",
                 description = example.description,
                 mimeType = "text/x-kotlin",
