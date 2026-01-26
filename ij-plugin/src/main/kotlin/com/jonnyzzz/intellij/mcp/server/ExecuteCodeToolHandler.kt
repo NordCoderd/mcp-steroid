@@ -4,24 +4,15 @@ package com.jonnyzzz.intellij.mcp.server
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
-import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.project.ProjectManager.getInstance
 import com.intellij.openapi.extensions.PluginId
+import com.intellij.openapi.project.ProjectManager.getInstance
 import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
-import com.jonnyzzz.intellij.mcp.mcp.builder
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
-import com.jonnyzzz.intellij.mcp.storage.executionStorage
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.*
 
 data class ExecCodeParams(
@@ -30,7 +21,7 @@ data class ExecCodeParams(
     val reason: String,
     val timeout: Int,
     //TODO: move that away from here, allow changes only via the McpScriptContext::doNotCancelOnModalityStateChange
-    /** If true, cancel execution when a modal dialog appears and return screenshot. Default true. */
+    /** If true, cancel execution when a modal dialog appears and return a screenshot. Default true. */
     val cancelOnModal: Boolean = true,
 
     val rawParams: JsonObject,
@@ -39,70 +30,68 @@ data class ExecCodeParams(
 /**
  * Handler for the steroid_execute_code MCP tool.
  */
-@Service(Service.Level.APP)
 class ExecuteCodeToolHandler : McpRegistrar {
-    private val log = thisLogger()
-
     private val toolDescription get() = """
              Execute Kotlin code in the IntelliJ-based IDE's runtime context with full access to IntelliJ APIs.
+             
+             IntelliJ IDEA and this MCP tool is a stateful API, consider polling for results instead
+             of waiting for the execution to finish. This allows you to continue working while the code
+             executes, and you can check the results later.
 
              You are working with the stateful API, everything you do here changes the state of the IDE,
              which is running exclusively for you. Use the IntelliJ-based IDE to help you looking
              at the project, where you are working. Prioritize using the IDE and this MCP where possible.
 
-             💡 NEW TO INTELLIJ APIS? Start here:
-             - Run 'resources/list' to see available guides and examples
-             - Debugger help: intellij://debugger/overview resource
-             - API patterns: intellij://skill/intellij-api-poweruser-guide resource
-             - IDE overview: intellij://ide/overview resource
+             NEW TO INTELLIJ APIS? Start here: Run 'resources/list' on this MCP Server to see all possible
+             resources that you need. It includes [Debugger](intellij://debugger/overview), 
+             [API Patterns](intellij://skill/intellij-api-poweruser-guide), [Basics](intellij://ide/overview),
+             [LSP Operations](intellij://lsp/overview), Running, Staring tests, Debugging, and so on.
 
              LEARNING NOTE: Writing working code may require several attempts - this is normal! The IntelliJ API
              is vast and powerful. Keep trying - each attempt teaches you more. Use printException() for errors.
+             Start sub-agent where possible to delegate these iterations.
 
-             BEST PRACTICE: Consider delegating to a SUB-AGENT for code execution:
+             BEST PRACTICE: Delegate to SUB-AGENT for code execution:
              - Sub-agent can retry multiple times without polluting main agent context
              - Errors and debugging stay isolated from main conversation
              - Provide detailed 'reason' so sub-agent understands the intent
              - Sub-agent can iterate on fixes without context rot in main agent
 
              This is similar to LSP tools but uses IntelliJ's native APIs, offering deeper code understanding
-             and more features (refactorings, inspections, full project model).
+             and more features (refactorings, inspections, full project model). See intellij://
 
-            You can do everything IntelliJ API allows you to do including, but not limited to
-            - code search
-            - code completion
-            - code introspection, including methods, API, coroutines, reflection
-            - errors and warnings highlighting
-            - tests execution
-            - automated code refactorings, such as rename or find usages
+             You can do everything IntelliJ API allows you to do including, but not limited to
+             - code search
+             - code completion
+             - code introspection, including methods, API, coroutines, reflection
+             - errors and warnings highlighting
+             - tests execution
+             - automated code refactorings, such as rename or find usages
 
-            Optional: Pass required plugin IDs via required_plugins to fail fast
-            when a capability depends on a plugin (see steroid_capabilities).
+             CRITICAL RULES:
+             1. The execute { } block is a SUSPEND Kotlin function - prefer Kotlin coroutine APIs over blocking Java APIs             
+             2. Never use runBlocking - you're already in a coroutine context
+             3. Use readAction { } for PSI/VFS reads, writeAction { } for modifications
+             4. Call waitForSmartMode() before accessing indices or PSI
 
-            CRITICAL RULES:
-            1. The execute { } block is a SUSPEND function - prefer Kotlin coroutine APIs over blocking Java APIs
-            2. IMPORTS MUST be OUTSIDE execute { } - place imports at the top of the script
-            3. Never use runBlocking - you're already in a coroutine context
-            4. Use readAction { } for PSI/VFS reads, writeAction { } for modifications
-            5. Call waitForSmartMode() before accessing indices or PSI
-
-            Script structure:
-            ```kotlin
-            // Imports go HERE, outside execute block
-            import com.intellij.psi.PsiManager
-
-            execute {
-                // This is a suspend function - use coroutine APIs!
-                waitForSmartMode()
-                // Use built-in readAction helper - no import needed!
-                val psiFile = readAction {
-                    PsiManager.getInstance(project).findFile(virtualFile)
-                }
-                println(psiFile?.name)
-            }
-            ```
+             Script structure:
+             ```kotlin
+             // Imports go HERE, outside execute block
+             import com.intellij.psi.PsiManager
+ 
+             execute {
+                 // This is a suspend function - use coroutine APIs!
+                 waitForSmartMode()
+                 // Use built-in readAction helper - no import needed!
+                 val psiFile = readAction {
+                     PsiManager.getInstance(project).findFile(virtualFile)
+                 }
+                 println(psiFile?.name)
+             }
+             ```
 
             Available in execute { } scope:
+            - just use Java or Kotlin reflection to inspect more
             - project: Project - the IntelliJ Project instance
             - println(vararg values) - output separated by spaces
             - printJson(obj) - pretty-print as JSON
@@ -127,7 +116,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
 
             📚 TIP: Read the "IntelliJ API Power User Guide" resource for patterns and examples!
             After execution, call steroid_execute_feedback to log your feedback.
-         """.trim().trimIndent()
+         """.trim().lines().joinToString("\n") { it.trim() }
 
     override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
