@@ -40,10 +40,6 @@ dependencies {
     // OCR common models shared with ocr-tesseract CLI
     implementation(project(":ocr-common"))
 
-    // Kotlin scripting for script definition provider
-    compileOnly("org.jetbrains.kotlin:kotlin-scripting-common:2.2.21")
-    compileOnly("org.jetbrains.kotlin:kotlin-scripting-jvm:2.2.21")
-
     // Ktor server for MCP HTTP transport
     val ktorVersion = "3.1.0"
     implementation("io.ktor:ktor-server-core:$ktorVersion")
