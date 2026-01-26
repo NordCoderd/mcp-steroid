@@ -37,6 +37,7 @@ configurations.named("implementation") {
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.3")
+        testFramework(TestFrameworkType.Platform)
     }
 
     // OCR common models shared with ocr-tesseract CLI
