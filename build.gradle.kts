@@ -1,10 +1,6 @@
-import org.gradle.api.tasks.Sync
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
-import org.jetbrains.intellij.platform.gradle.extensions.IntelliJPlatformExtension
 import java.net.HttpURLConnection
 import java.net.URI
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipFile
@@ -37,6 +33,7 @@ configurations.named("implementation") {
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.3")
+        bundledPlugin("org.jetbrains.kotlin")
         testFramework(TestFrameworkType.Platform)
     }
 
@@ -107,9 +104,11 @@ dependencies {
     ocrToolDist(project(":ocr-tesseract"))
 }
 
-tasks.prepareSandbox {
-    from(ocrToolDist) {
-        into(intellijPlatform.projectName.map { "$it/ocr-tesseract" })
+listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
+    it.invoke {
+        from(ocrToolDist) {
+            into(intellijPlatform.projectName.map { "$it/ocr-tesseract" })
+        }
     }
 }
 
