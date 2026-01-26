@@ -239,15 +239,6 @@ class SteroidsMcpServer(
         return false
     }
 
-    /**
-     * Write the MCP server URL to a specific project's .idea folder.
-     * Should only be called after startServerIfNeeded() completes.
-     */
-    fun writeServerUrlToProject(project: Project) {
-        check(port > 0) { "Server not started. Call startServerIfNeeded() first." }
-        ServerUrlWriter.getInstance().writeServerUrl(project, mcpUrl)
-    }
-
     private fun findFreePort(): Int {
         return ServerSocket(0).use { it.localPort }
     }

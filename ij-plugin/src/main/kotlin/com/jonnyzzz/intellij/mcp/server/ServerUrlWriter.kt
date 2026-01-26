@@ -33,7 +33,7 @@ class ServerUrlWriter : Disposable {
      * Write the MCP server URL to user home directory.
      * Creates a PID-based marker file that is cleaned up on IDE exit.
      *
-     * @param serverUrl The MCP server URL (e.g., "http://localhost:6315/mcp")
+     * @param serverUrl The MCP server URL (e.g., "http://localhost:<port>/mcp")
      */
     fun writeServerUrlToUserHome(serverUrl: String) {
         val userHome = Path.of(System.getProperty("user.home"))
@@ -44,7 +44,7 @@ class ServerUrlWriter : Disposable {
         val pid = ProcessHandle.current().pid()
         val file = userHome.resolve(".$pid.mcp-steroid")
 
-        val content = buildUserHomeMarkerContent(serverUrl)
+        val content = buildMarkerContent(serverUrl)
 
         try {
             Files.writeString(file, content)
@@ -69,7 +69,7 @@ class ServerUrlWriter : Disposable {
      * Creates the mcp-steroids.txt file with connection instructions.
      *
      * @param project The project to write the URL file to
-     * @param serverUrl The MCP server URL (e.g., "http://localhost:6315/mcp")
+     * @param serverUrl The MCP server URL (e.g., "http://localhost:<port>/mcp")
      */
     fun writeServerUrl(project: Project, serverUrl: String) {
         try {
@@ -77,7 +77,7 @@ class ServerUrlWriter : Disposable {
             val ideaDir = Path.of(basePath, ".idea")
             if (Files.exists(ideaDir)) {
                 val mcpFile = ideaDir.resolve("mcp-steroids.txt")
-                val content = buildMcpSteroidsFileContent(serverUrl)
+                val content = buildMarkerContent(serverUrl)
                 Files.writeString(mcpFile, content)
                 log.info("MCP Steroid server URL written to: $mcpFile")
             }
@@ -86,7 +86,9 @@ class ServerUrlWriter : Disposable {
         }
     }
 
-    private fun buildUserHomeMarkerContent(serverUrl: String): String = buildString {
+    private fun buildMarkerContent(serverUrl: String): String = buildString {
+        appendLine(serverUrl)
+        appendLine()
         appendLine("IntelliJ MCP Steroid Server")
         appendLine("URL: $serverUrl")
         appendLine()
@@ -152,44 +154,6 @@ class ServerUrlWriter : Disposable {
         } catch (e: Exception) {
             log.warn("Failed to cleanup stale marker files", e)
         }
-    }
-
-    private fun buildMcpSteroidsFileContent(serverUrl: String): String {
-        return """
-             IntelliJ MCP Steroid Server
-             URL: $serverUrl
-
-             === Claude Code CLI ===
-
-             Add server:
-               claude mcp add --transport http intellij-steroid $serverUrl
-               claude mcp list
-
-             Recommended:
-               claude mcp add playwright npx @playwright/mcp@latest
-
-             Test:
-               claude -p "List all open projects using steroid_list_projects"
-
-             === Codex CLI (TOML config) ===
-               codex mcp add intellij --url http://localhost:6315/mcp
-               codex mcp list
-
-             Recommended:
-               codex mcp add playwright npx "@playwright/mcp@latest"
-
-             Test:
-               codex exec "List all open projects using steroid_list_projects"
-
-             === Gemini CLI ===
-               gemini mcp add intellij-steroid $serverUrl --transport http --scope user
-               gemini mcp list
-
-             Test:
-               gemini "List all open projects using steroid_list_projects"
-
-             $serverUrl
-        """.trim().trimIndent()
     }
 
     override fun dispose() = Unit
