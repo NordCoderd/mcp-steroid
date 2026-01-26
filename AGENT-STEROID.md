@@ -606,3 +606,73 @@ The MCP Steroid server gives you **direct access to IntelliJ's runtime**. This i
 **Don't settle for file-level operations when you have IDE-level access.**
 
 Be bold. Explore the API. Use reflection to discover. The IDE is your tool - wield it.
+
+## Available MCP Resources
+
+The MCP server provides comprehensive guides and examples as resources. Load these to learn IntelliJ API patterns:
+
+### Skills (High-Level Guides)
+
+- **`intellij://skill/intellij-api-poweruser-guide`** - Essential patterns for PSI, refactoring, code search, inspections
+- **`intellij://skill/debugger-guide`** - Debugger APIs: breakpoints, sessions, thread inspection
+- **`intellij://skill/test-runner-guide`** - Test execution and result inspection APIs
+
+### Example Collections
+
+#### LSP-Like Operations
+- **`intellij://lsp/overview`** - Overview of all LSP operation examples
+- `intellij://lsp/go-to-definition`, `find-references`, `hover`, `completion`, `document-symbols`, `rename`, `formatting`, `code-action`, `signature-help`, `workspace-symbol`
+
+#### IDE Power Operations
+- **`intellij://ide/overview`** - Overview of refactorings and code generation
+- `intellij://ide/extract-method`, `introduce-variable`, `inline-method`, `change-signature`, `move-file`, `safe-delete`, `optimize-imports`, `generate-override`, `inspect-and-fix`, `hierarchy-search`, `call-hierarchy`, `run-configuration`, `pull-up-members`, `push-down-members`, `extract-interface`, `move-class`, `generate-constructor`, `project-dependencies`, `inspection-summary`, `project-search`
+
+#### Debugger Operations
+- **`intellij://debugger/overview`** - Overview of debugger examples
+- `intellij://debugger/set-line-breakpoint`, `debug-run-configuration`, `debug-session-control`, `debug-list-threads`, `debug-thread-dump`
+
+#### Test Execution
+- **`intellij://test/overview`** - Overview of test execution and result inspection
+- `intellij://test/list-run-configurations` - List all run configurations
+- `intellij://test/run-tests` - Execute test configuration
+- `intellij://test/wait-for-completion` - Poll for test completion
+- `intellij://test/inspect-test-results` - Access test results and failures
+- `intellij://test/test-tree-navigation` - Navigate test tree hierarchy
+- `intellij://test/test-statistics` - Get test counts and statistics
+- `intellij://test/test-failure-details` - Access detailed failure information
+- `intellij://test/find-recent-test-run` - Find most recent test execution
+
+#### Project Opening
+- **`intellij://open-project/overview`** - How to open projects via MCP
+- `intellij://open-project/open-trusted`, `open-with-dialogs`, `open-via-code`
+
+#### Version Control
+- **`intellij://vcs/overview`** - VCS operation examples
+- `intellij://vcs/git-annotations`, `git-history`
+
+### How to Use Resources
+
+Load resources to get working code examples:
+
+```kotlin
+// First, read the overview to understand the workflow
+// Load: intellij://test/overview
+
+// Then load specific examples
+// Load: intellij://test/list-run-configurations
+
+// Copy the code and customize it for your use case
+execute {
+    waitForSmartMode()
+
+    val manager = RunManager.getInstance(project)
+    val allSettings = manager.allSettings
+
+    println("Run Configurations (${allSettings.size}):")
+    allSettings.forEach { setting ->
+        println("  • ${setting.name} (${setting.type.displayName})")
+    }
+}
+```
+
+**Pro Tip**: Always start with the overview resource (e.g., `intellij://test/overview`) to understand the complete workflow, then load specific examples as needed.

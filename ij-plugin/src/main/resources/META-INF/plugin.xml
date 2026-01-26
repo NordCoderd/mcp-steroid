@@ -42,6 +42,8 @@
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.LspExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.IdeExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.DebuggerExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.TestSkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.TestExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VcsExamplesResourceHandler"/>
 

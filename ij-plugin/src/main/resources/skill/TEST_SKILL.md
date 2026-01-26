@@ -1,0 +1,76 @@
+---
+name: intellij-mcp-steroid-test-runner
+description: Use IntelliJ test execution APIs via steroid_execute_code to run tests, inspect test results, check test status, and access test output.
+---
+
+# IntelliJ Test Runner Skill
+
+Use IntelliJ test execution APIs from `steroid_execute_code` to run tests and inspect results.
+
+## Quickstart
+
+1) Load `intellij://test/overview` and pick the examples you need.
+2) List available run configurations (example: `intellij://test/list-run-configurations`).
+3) Execute a test configuration (example: `intellij://test/run-tests`).
+4) Poll for completion and access results (example: `intellij://test/inspect-test-results`).
+5) Navigate test tree and check individual test status (example: `intellij://test/test-tree-navigation`).
+
+## Stateful exec_code workflow
+
+`exec_code` is stateful. Split test execution into multiple short calls:
+
+- Call #1: list run configurations
+- Call #2: execute test configuration (returns RunContentDescriptor)
+- Call #3+: poll ProcessHandler.isProcessTerminated() until tests complete
+- Call #4: access test results from SMTRunnerConsoleView
+- Call #5: navigate test tree and inspect failures
+
+Avoid long waits or sleeps inside a single call; prefer multiple short polls.
+
+## Key APIs to use
+
+**Run Configuration Management**
+- `RunManager.getInstance(project)` - access all run configurations
+- `RunManager.allSettings` - list of RunnerAndConfigurationSettings
+- `RunManager.selectedConfiguration` - currently selected config
+
+**Execution**
+- `ProgramRunnerUtil.executeConfiguration(settings, executor)` - execute config
+- `ExecutorRegistry.getExecutorById(DefaultRunExecutor.EXECUTOR_ID)` - get Run executor
+- `ExecutorRegistry.getExecutorById(DefaultDebugExecutor.EXECUTOR_ID)` - get Debug executor
+
+**Accessing Results**
+- `RunContentManager.getInstance(project).getAllDescriptors()` - all run content
+- `RunContentDescriptor.getExecutionConsole()` - get console (may be SMTRunnerConsoleView)
+- `SMTRunnerConsoleView.getResultsViewer()` - get SMTestRunnerResultsForm
+- `SMTestRunnerResultsForm.getTestsRootNode()` - get test tree root (SMRootTestProxy)
+
+**Test Result Inspection**
+- `SMTestProxy.isPassed()`, `isFailed()`, `isIgnored()`, `isInProgress()`
+- `SMTestProxy.getChildren()` - navigate test tree
+- `SMTestProxy.getErrorMessage()`, `getStacktrace()` - failure details
+- `SMTestProxy.getDuration()` - execution time
+- `SMTestProxy.getAllTests()` - flatten test tree
+
+**Process Monitoring**
+- `RunContentDescriptor.getProcessHandler()` - get ProcessHandler
+- `ProcessHandler.isProcessTerminated()` - check if execution finished
+- `ProcessHandler.exitCode` - get exit code (if available)
+
+## Common pitfalls
+
+- Test results are only available after execution starts (descriptor.executionConsole may be null initially).
+- ExecutionConsole must be cast to SMTRunnerConsoleView for test-specific features.
+- Test tree is populated asynchronously as tests run.
+- Always check `isProcessTerminated()` before accessing final results.
+- Execute configurations on EDT (use `withContext(Dispatchers.EDT)`).
+- Wait for smart mode before accessing run configurations.
+
+## Test execution resources
+
+- `intellij://test/overview`
+- `intellij://test/list-run-configurations`
+- `intellij://test/run-tests`
+- `intellij://test/inspect-test-results`
+- `intellij://test/test-tree-navigation`
+- `intellij://test/wait-for-completion`
