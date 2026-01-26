@@ -192,6 +192,11 @@ Run all Gradle tests from the IDE using MCP-run configurations; do not run `./gr
 Example: create/run a Gradle run configuration for the `test` task (and optionally a single test via `--tests`):
 
 ```kotlin
+import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.RunManager
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunConfiguration
+import org.jetbrains.plugins.gradle.service.execution.GradleExternalTaskConfigurationType
 
 execute {
     val runManager = RunManager.getInstance(project)
@@ -208,6 +213,7 @@ execute {
     ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
 }
 ```
+
 
 To run `build`, set `taskNames = listOf("build")` in the same configuration pattern.
 ## Build Notes
