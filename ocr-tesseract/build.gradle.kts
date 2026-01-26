@@ -1,5 +1,3 @@
-import de.undercouch.gradle.tasks.download.Download
-
 plugins {
     application
     kotlin("jvm") version "2.2.21"
@@ -48,8 +46,8 @@ val tessdataUrls = listOf(
 
 // Download tessdata files
 val downloadTessdata by tasks.registering {
-    inputs.property("downloads", tessdataUrls.joinToString(","))
-    outputs.dir(tessdataDownloadDir)
+    inputs.property("downloads", tessdataUrls)
+    outputs.dir { tessdataDownloadDir.get() }
 
     doFirst {
         delete(tessdataDownloadDir)
