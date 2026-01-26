@@ -7,6 +7,7 @@ import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.zip.ZipFile
 
 plugins {
     id("org.jetbrains.intellij.platform") version "2.10.5"
@@ -25,39 +26,17 @@ repositories {
     }
 }
 
-val ktorVersion = "3.1.0"
-val platformPathProvider = providers.provider {
-    extensions.getByType<IntelliJPlatformExtension>().platformPath
-}
-val kotlinPluginPath = platformPathProvider.map { it.resolve("plugins/Kotlin") }
-val javaPluginPath = platformPathProvider.map { it.resolve("plugins/java") }
-
-configurations.named("intellijPlatformDependency").configure {
-    incoming.afterResolve {
-        val platformPath = extensions.getByType<IntelliJPlatformExtension>().platformPath
-        val fullLineDescriptor = platformPath.resolve("plugins/fullLine/lib/modules/intellij.fullLine.yaml.jar")
-        val backup = platformPath.resolve("plugins/fullLine/lib/modules/intellij.fullLine.yaml.jar.bak")
-        if (Files.exists(fullLineDescriptor)) {
-            // Work around a broken module descriptor that breaks plugin structure parsing.
-            Files.move(fullLineDescriptor, backup, StandardCopyOption.REPLACE_EXISTING)
-        }
-    }
-}
-
 // Libraries provided by IntelliJ platform - exclude from bundling
 configurations.named("implementation") {
     exclude(group = "org.jetbrains.kotlin")
     exclude(group = "org.jetbrains.kotlinx")
     exclude(group = "org.jetbrains", module = "annotations")
+    exclude(group = "org.slf4j")
 }
 
 dependencies {
     intellijPlatform {
         intellijIdeaUltimate("2025.3")
-        // Avoid bundled plugin scan warnings by pointing to the local Kotlin plugin path.
-        localPlugin(kotlinPluginPath)
-        localPlugin(javaPluginPath)
-        testFramework(TestFrameworkType.Platform)
     }
 
     // OCR common models shared with ocr-tesseract CLI
@@ -68,6 +47,7 @@ dependencies {
     compileOnly("org.jetbrains.kotlin:kotlin-scripting-jvm:2.2.21")
 
     // Ktor server for MCP HTTP transport
+    val ktorVersion = "3.1.0"
     implementation("io.ktor:ktor-server-core:$ktorVersion")
     implementation("io.ktor:ktor-server-cio:$ktorVersion")
     implementation("io.ktor:ktor-server-sse:$ktorVersion")
@@ -111,47 +91,26 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
-        dependsOn(":ocr-tesseract:installDist")
     }
 }
 
-tasks.named<Sync>("prepareSandbox") {
-    dependsOn(":ocr-tesseract:installDist")
-    from(project(":ocr-tesseract").layout.buildDirectory.dir("install/ocr-tesseract")) {
-        into("${rootProject.name}/ocr-tesseract")
+val ocrToolDist by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "install-dist"))
     }
 }
 
-tasks.named<Sync>("prepareTestSandbox") {
-    dependsOn(":ocr-tesseract:installDist")
-    from(project(":ocr-tesseract").layout.buildDirectory.dir("install/ocr-tesseract")) {
-        into("${rootProject.name}/ocr-tesseract")
-    }
+dependencies {
+    ocrToolDist(project(":ocr-tesseract"))
 }
 
-
-val deployPluginLocallyTo253 by tasks.registering(Sync::class) {
-    dependsOn(tasks.buildPlugin)
-    group = "intellij platform"
-    outputs.upToDateWhen { false }
-
-    val targetName = "" + rootProject.name
-    val targetDir = "${System.getenv("HOME")}/intellij-253/config/plugins/$targetName"
-
-    this.destinationDir = file(targetDir)
-    from(
-        tasks.buildPlugin
-            .map { it.archiveFile }
-            .map { zipTree(it) }
-    ) {
-        includeEmptyDirs = false
-        eachFile {
-            println(this)
-            this.path = this.path.substringAfter("/")
-        }
+tasks.prepareSandbox {
+    from(ocrToolDist) {
+        into(intellijPlatform.projectName.map { "$it/ocr-tesseract" })
     }
 }
-
 
 // Verify bundled libraries in plugin/lib folder
 val verifyBundledLibraries by tasks.registering {
@@ -160,58 +119,113 @@ val verifyBundledLibraries by tasks.registering {
     dependsOn(tasks.buildPlugin)
     doLast {
         val zip = tasks.buildPlugin.get().outputs.files.singleFile
-        val pluginName = rootProject.name
-        val libPrefix = "$pluginName/lib/"
+        var allFiles = ZipFile(zip).use {
+            it.entries()
+                .asSequence()
+                .filter { !it.isDirectory }
+                .map { it.name }
+                .toSortedSet()
+        }
 
-        val allFiles = zipTree(zip).files
+        val pluginPrefix = intellijPlatform.projectName.get() + "/"
 
-        // Match only files directly in <plugin-name>/lib/, not in subfolders
-        val libFiles = allFiles
-            .filter {
-                val path = it.path
-                // Find the plugin root in the path and check if file is directly in lib/
-                val pluginRoot = "/$pluginName/"
-                val pluginIdx = path.indexOf(pluginRoot)
-                if (pluginIdx < 0) return@filter false
+        assert(
+            allFiles.all {
+                it.startsWith(pluginPrefix)
+            }){"files must be under plugin roots: " + allFiles.map { it.substringBefore('/') }.toSortedSet() }
 
-                val relativePath = path.substring(pluginIdx + pluginRoot.length)
-                relativePath.startsWith("lib/") && !relativePath.substringAfter("lib/").contains("/")
-            }
-            .map { it.name }
-            .sorted()
+        allFiles = allFiles.map { it.removePrefix(pluginPrefix) }.toSortedSet()
 
-        println("Libraries in $libPrefix:")
-        libFiles.forEach { println("  $it") }
+        assert(allFiles.isNotEmpty()) { "no libraries found in ${allFiles.joinToString { "\n  - $it" }}" }
 
         // Assert expected libraries - update this list when dependencies change
-        val expectedLibraries = sortedSetOf(
-            "config-1.4.3.jar",
-            "intellij-mcp-steroid-0.85.0-SNAPSHOT.jar",
-            "jansi-2.4.1.jar",
-            "ktor-events-jvm-3.1.0.jar",
-            "ktor-http-cio-jvm-3.1.0.jar",
-            "ktor-http-jvm-3.1.0.jar",
-            "ktor-io-jvm-3.1.0.jar",
-            "ktor-network-jvm-3.1.0.jar",
-            "ktor-serialization-jvm-3.1.0.jar",
-            "ktor-server-cio-jvm-3.1.0.jar",
-            "ktor-server-core-jvm-3.1.0.jar",
-            "ktor-server-sse-jvm-3.1.0.jar",
-            "ktor-sse-jvm-3.1.0.jar",
-            "ktor-utils-jvm-3.1.0.jar",
-            "ktor-websockets-jvm-3.1.0.jar",
-            "ocr-common-0.85.0-SNAPSHOT.jar",
-            "slf4j-api-2.0.16.jar",
-        )
+        val expectedFiles = sortedSetOf(
+            //our binaires
+            "lib/intellij-mcp-steroid-${project.version}.jar",
+            "lib/ocr-common-${project.version}.jar",
+            "ocr-tesseract/lib/ocr-common-${project.version}.jar",
+            "ocr-tesseract/lib/ocr-tesseract-${project.version}.jar",
 
-        val actualLibraries = libFiles.map {
-            // Normalize version-timestamped names
-            it.replace(Regex("-\\d{4}-\\d{2}-\\d{2}-\\d{2}-\\d{2}"), "")
-        }.toSortedSet()
+            //libraries
+            "lib/config-1.4.3.jar",
+            "lib/jansi-2.4.1.jar",
 
-        if (actualLibraries != expectedLibraries) {
-            val missing = expectedLibraries - actualLibraries
-            val unexpected = actualLibraries - expectedLibraries
+            "lib/ktor-events-jvm-3.1.0.jar",
+            "lib/ktor-http-cio-jvm-3.1.0.jar",
+            "lib/ktor-http-jvm-3.1.0.jar",
+            "lib/ktor-io-jvm-3.1.0.jar",
+            "lib/ktor-network-jvm-3.1.0.jar",
+            "lib/ktor-serialization-jvm-3.1.0.jar",
+            "lib/ktor-server-cio-jvm-3.1.0.jar",
+            "lib/ktor-server-core-jvm-3.1.0.jar",
+            "lib/ktor-server-sse-jvm-3.1.0.jar",
+            "lib/ktor-sse-jvm-3.1.0.jar",
+            "lib/ktor-utils-jvm-3.1.0.jar",
+            "lib/ktor-websockets-jvm-3.1.0.jar",
+
+            "ocr-tesseract/bin/ocr-tesseract",
+            "ocr-tesseract/bin/ocr-tesseract.bat",
+            "ocr-tesseract/lib/annotations-13.0.jar",
+            "ocr-tesseract/lib/bcpkix-jdk18on-1.82.jar",
+            "ocr-tesseract/lib/bcprov-jdk18on-1.82.jar",
+            "ocr-tesseract/lib/bcutil-jdk18on-1.82.jar",
+            "ocr-tesseract/lib/commons-io-2.21.0.jar",
+            "ocr-tesseract/lib/commons-logging-1.3.5.jar",
+            "ocr-tesseract/lib/fontbox-3.0.6.jar",
+            "ocr-tesseract/lib/jai-imageio-core-1.4.0.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-android-arm64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-android-x86_64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-ios-arm64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-ios-x86_64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-linux-arm64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-linux-ppc64le.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-linux-riscv64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-linux-x86_64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-macosx-arm64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-macosx-x86_64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12-windows-x86_64.jar",
+            "ocr-tesseract/lib/javacpp-1.5.12.jar",
+            "ocr-tesseract/lib/javacpp-platform-1.5.12.jar",
+            "ocr-tesseract/lib/jbig2-imageio-3.0.4.jar",
+            "ocr-tesseract/lib/jboss-logging-3.1.4.GA.jar",
+            "ocr-tesseract/lib/jboss-vfs-3.2.17.Final.jar",
+            "ocr-tesseract/lib/jna-5.18.1.jar",
+            "ocr-tesseract/lib/kotlin-stdlib-2.2.21.jar",
+            "ocr-tesseract/lib/kotlinx-serialization-core-jvm-1.7.3.jar",
+            "ocr-tesseract/lib/kotlinx-serialization-json-jvm-1.7.3.jar",
+            "ocr-tesseract/lib/lept4j-1.22.0.jar",
+            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-android-arm64.jar",
+            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-android-x86_64.jar",
+            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-linux-arm64.jar",
+            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-linux-x86_64.jar",
+            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-macosx-arm64.jar",
+            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-macosx-x86_64.jar",
+            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-windows-x86_64.jar",
+            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12.jar",
+            "ocr-tesseract/lib/leptonica-platform-1.85.0-1.5.12.jar",
+            "ocr-tesseract/lib/pdfbox-3.0.6.jar",
+            "ocr-tesseract/lib/pdfbox-debugger-3.0.6.jar",
+            "ocr-tesseract/lib/pdfbox-io-3.0.6.jar",
+            "ocr-tesseract/lib/pdfbox-tools-3.0.6.jar",
+            "ocr-tesseract/lib/picocli-4.7.7.jar",
+            "ocr-tesseract/lib/slf4j-api-2.0.17.jar",
+            "ocr-tesseract/lib/tess4j-5.17.0.jar",
+            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-android-arm64.jar",
+            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-android-x86_64.jar",
+            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-linux-arm64.jar",
+            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-linux-x86_64.jar",
+            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-macosx-arm64.jar",
+            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-macosx-x86_64.jar",
+            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-windows-x86_64.jar",
+            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12.jar",
+            "ocr-tesseract/lib/tesseract-platform-5.5.1-1.5.12.jar",
+            "ocr-tesseract/tessdata/eng.traineddata",
+            "ocr-tesseract/tessdata/osd.traineddata",
+        ).toSortedSet()
+
+        if (allFiles != expectedFiles) {
+            val missing = expectedFiles - allFiles
+            val unexpected = allFiles - expectedFiles
             throw GradleException(buildString {
                 appendLine("Bundled libraries mismatch!")
                 if (missing.isNotEmpty()) {
@@ -223,16 +237,13 @@ val verifyBundledLibraries by tasks.registering {
                     unexpected.forEach { appendLine("  - $it") }
                 }
                 appendLine()
+                appendLine("Actual libraries: ")
+                allFiles.forEach { appendLine("  - $it") }
+                appendLine()
                 appendLine("Update expectedLibraries in build.gradle.kts if this change is intentional.")
             })
         }
-
-        println("\nVerification passed!")
     }
-}
-
-val deployPluginLocallyTo253 by tasks.getting {
-    dependsOn(verifyBundledLibraries)
 }
 
 // Deploy plugin to running IDEs with hot-reload support
@@ -267,6 +278,30 @@ val deployPlugin by tasks.registering {
             } else {
                 println("  ✗ HTTP ${conn.responseCode}")
             }
+        }
+    }
+}
+
+
+val deployPluginLocallyTo253 by tasks.registering(Sync::class) {
+    dependsOn(tasks.buildPlugin)
+    dependsOn(verifyBundledLibraries)
+    group = "intellij platform"
+    outputs.upToDateWhen { false }
+
+    val targetName = "" + rootProject.name
+    val targetDir = "${System.getenv("HOME")}/intellij-253/config/plugins/$targetName"
+
+    this.destinationDir = file(targetDir)
+    from(
+        tasks.buildPlugin
+            .map { it.archiveFile }
+            .map { zipTree(it) }
+    ) {
+        includeEmptyDirs = false
+        eachFile {
+            println(this)
+            this.path = this.path.substringAfter("/")
         }
     }
 }

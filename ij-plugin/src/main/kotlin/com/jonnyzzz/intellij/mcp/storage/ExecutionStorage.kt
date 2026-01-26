@@ -20,7 +20,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
-import org.jetbrains.kotlin.idea.gradleTooling.get
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption

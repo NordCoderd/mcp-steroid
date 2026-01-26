@@ -83,3 +83,18 @@ distributions {
         }
     }
 }
+
+// Create a configuration that exposes the installed distribution
+val installDistElements by configurations.creating {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "install-dist"))
+    }
+}
+
+artifacts {
+    add(installDistElements.name, tasks.installDist.map { it.destinationDir }) {
+        builtBy(tasks.installDist)
+    }
+}
