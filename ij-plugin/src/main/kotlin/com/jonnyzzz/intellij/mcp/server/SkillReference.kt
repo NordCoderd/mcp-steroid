@@ -41,10 +41,12 @@ class SkillReference {
     // Resource hints are static since SkillReference is accessed early in startup
     // before McpServerCore is fully initialized. These URIs are stable entrypoints.
     private val resourceHint: String = buildString {
-        appendLine("💡 TIP: Browse MCP resources (resources/list) for examples and guides:")
-        appendLine("   • mcp-steroid://debugger/overview - Debugger API guide")
-        appendLine("   • mcp-steroid://skill/intellij-api-poweruser-guide - IntelliJ API patterns")
-        append("   • mcp-steroid://ide/overview - IDE overview")
+        appendLine("💡 TIP: Browse 58 MCP resources for examples and patterns:")
+        appendLine("   📊 mcp-steroid://docs/resource-graph - Complete navigation guide")
+        appendLine("   🚀 mcp-steroid://skill/intellij-api-poweruser-guide - API patterns")
+        appendLine("   🐛 mcp-steroid://debugger/overview - Debugger workflows")
+        appendLine("   🔧 mcp-steroid://ide/overview - Refactorings & inspections")
+        append("   🔍 mcp-steroid://lsp/overview - Code navigation & completion")
     }
 
     /**

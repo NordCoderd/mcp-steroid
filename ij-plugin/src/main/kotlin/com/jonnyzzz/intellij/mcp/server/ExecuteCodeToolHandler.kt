@@ -42,10 +42,20 @@ class ExecuteCodeToolHandler : McpRegistrar {
              which is running exclusively for you. Use the IntelliJ-based IDE to help you looking
              at the project, where you are working. Prioritize using the IDE and this MCP where possible.
 
-             NEW TO INTELLIJ APIS? Start here: Run 'resources/list' on this MCP Server to see all possible
-             resources that you need. It includes [Debugger](mcp-steroid://debugger/overview), 
-             [API Patterns](mcp-steroid://skill/intellij-api-poweruser-guide), [Basics](mcp-steroid://ide/overview),
-             [LSP Operations](mcp-steroid://lsp/overview), Running, Staring tests, Debugging, and so on.
+             NEW TO INTELLIJ APIS? Explore 58 MCP resources organized into 8 categories:
+
+             📊 [Complete Resource Graph](mcp-steroid://docs/resource-graph) - Start here for navigation paths
+             🚀 [API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Essential patterns
+             🐛 [Debugger Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
+             🧪 [Test Runner Guide](mcp-steroid://skill/test-runner-guide) - Test execution patterns
+
+             Example categories (run 'resources/list' to see all):
+             - [LSP Operations](mcp-steroid://lsp/overview) - Code navigation, completion, refactoring
+             - [IDE Examples](mcp-steroid://ide/overview) - Advanced refactorings, inspections
+             - [Debugger Examples](mcp-steroid://debugger/overview) - Breakpoints, thread inspection
+             - [Test Examples](mcp-steroid://test/overview) - Running tests, analyzing results
+             - [VCS Examples](mcp-steroid://vcs/overview) - Git blame, history
+             - [Open Project](mcp-steroid://open-project/overview) - Project opening workflows
 
              LEARNING NOTE: Writing working code may require several attempts - this is normal! The IntelliJ API
              is vast and powerful. Keep trying - each attempt teaches you more. Use printException() for errors.
@@ -58,7 +68,9 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - Sub-agent can iterate on fixes without context rot in main agent
 
              This is similar to LSP tools but uses IntelliJ's native APIs, offering deeper code understanding
-             and more features (refactorings, inspections, full project model). See mcp-steroid://
+             and more features (refactorings, inspections, full project model).
+
+             Browse all resources: Run 'resources/list' or visit mcp-steroid://docs/resource-graph
 
              You can do everything IntelliJ API allows you to do including, but not limited to
              - code search
@@ -114,8 +126,9 @@ class ExecuteCodeToolHandler : McpRegistrar {
 
             IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
 
-            📚 TIP: Read the "IntelliJ API Power User Guide" resource for patterns and examples!
-            After execution, call steroid_execute_feedback to log your feedback.
+            📚 Resources: Use 'resources/list' to browse all 58 available resources
+            📊 Navigation: Start at mcp-steroid://docs/resource-graph for guided paths
+            💡 Feedback: Call steroid_execute_feedback after execution to track success
          """.trim().lines().joinToString("\n") { it.trim() }
 
     override fun register(server: McpServerCore) {
