@@ -38,7 +38,7 @@ execute {
     // Find all failed tests
     val failedTests = rootProxy.allTests
         .filterIsInstance<SMTestProxy>()
-        .filter { it.isFailed }
+        .filter { it.isDefect }
 
     if (failedTests.isEmpty()) {
         println("✓ No test failures found")

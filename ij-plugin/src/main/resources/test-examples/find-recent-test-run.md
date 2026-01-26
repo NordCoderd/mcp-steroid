@@ -81,7 +81,7 @@ execute {
                     val allTests = rootProxy.allTests
 
                     val passed = allTests.count { it.isPassed }
-                    val failed = allTests.count { (it as? com.intellij.execution.testframework.sm.runner.SMTestProxy)?.isFailed == true }
+                    val failed = allTests.count { it.isDefect }
                     val ignored = allTests.count { it.isIgnored }
 
                     println("   Results: $passed passed, $failed failed, $ignored ignored")

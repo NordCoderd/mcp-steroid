@@ -7,18 +7,33 @@ This directory contains runnable examples for IntelliJ test execution and result
 ```
 1. List run configurations
    ↓
-2. Execute test configuration → RunContentDescriptor
+2. Execute test configuration (ProgramRunnerUtil)
    ↓
-3. Get execution console → descriptor.getExecutionConsole()
+3. Find RunContentDescriptor via RunContentManager
    ↓
-4. Cast to test console → console as? SMTRunnerConsoleView
+4. Get execution console → descriptor.getExecutionConsole()
    ↓
-5. Get results viewer → consoleView.getResultsViewer()
+5. Cast to test console → console as? SMTRunnerConsoleView
    ↓
-6. Access test tree → resultsForm.getTestsRootNode()
+6. Get results viewer → consoleView.getResultsViewer()
    ↓
-7. Inspect results → testProxy.isPassed(), getChildren(), etc.
+7. Access test tree → resultsForm.getTestsRootNode()
+   ↓
+8. Inspect results → testProxy.isPassed(), isDefect(), getChildren(), etc.
 ```
+
+## Demo Sanity Check (This Repo)
+
+Use the demo test `DemoTestByJonnyzzz` in `com.jonnyzzz.intellij.mcp.ocr` to verify the full flow:
+
+1. Create or select a run configuration for `DemoTestByJonnyzzz`
+   - Add VM option: `-Dmcp.demo.by.jonnyzzz=true` (the test is skipped otherwise)
+2. Use [List Run Configurations](mcp-steroid://test/list-run-configurations) to find its name
+3. Start it with [Run Tests](mcp-steroid://test/run-tests) (Run or Debug executor)
+4. Poll with [Wait for Completion](mcp-steroid://test/wait-for-completion)
+5. Inspect results via [Inspect Test Results](mcp-steroid://test/inspect-test-results)
+
+Or run [Demo Debug Test](mcp-steroid://test/demo-debug-test) for a one-call end-to-end debug flow.
 
 ## Available Examples
 
@@ -37,6 +52,7 @@ This directory contains runnable examples for IntelliJ test execution and result
 
 ### Advanced Patterns
 
+- **`demo-debug-test.md`** - End-to-end debug run for the demo test
 - **`listen-execution-events.md`** - Use ExecutionListener for execution lifecycle
 - **`access-test-output.md`** - Read test console output
 - **`find-recent-test-run.md`** - Access most recent test execution
@@ -74,18 +90,17 @@ execute {
     val setting = manager.allSettings.first { it.name == "MyTests" }
     val executor = ExecutorRegistry.getExecutorById(DefaultRunExecutor.EXECUTOR_ID)!!
 
-    var descriptor: RunContentDescriptor? = null
     withContext(Dispatchers.EDT) {
-        descriptor = ProgramRunnerUtil.executeConfiguration(setting, executor)
+        ProgramRunnerUtil.executeConfiguration(setting, executor)
     }
 
-    println("Execution started: ${descriptor?.displayName}")
+    println("Execution started: ${setting.name}")
 }
 
 // Second call - poll for completion
 execute {
     val manager = RunContentManager.getInstance(project)
-    val descriptor = manager.allDescriptors.lastOrNull()
+    val descriptor = manager.allDescriptors.lastOrNull { it.displayName == "MyTests" }
     val handler = descriptor?.processHandler
 
     if (handler?.isProcessTerminated == true) {
@@ -115,15 +130,21 @@ execute {
     val rootProxy = resultsForm.testsRootNode
 
     // Inspect results
+    val allTests = rootProxy.allTests
+    val passed = allTests.count { it.isPassed }
+    val failed = allTests.count { it.isDefect }
+    val ignored = allTests.count { it.isIgnored }
+
     println("Test Results:")
-    println("  Passed: ${rootProxy.children.count { it.isPassed }}")
-    println("  Failed: ${rootProxy.children.count { (it as? SMTestProxy)?.isFailed == true }}")
-    println("  Total: ${rootProxy.children.size}")
+    println("  Passed: $passed")
+    println("  Failed: $failed")
+    println("  Ignored: $ignored")
+    println("  Total: ${allTests.size}")
 
     // Print failures
     rootProxy.children.forEach { test ->
         val smTest = test as? SMTestProxy
-        if (smTest?.isFailed == true) {
+        if (smTest?.isDefect == true) {
             println("\nFailed: ${smTest.name}")
             println("  Error: ${smTest.errorMessage}")
             println("  Stack: ${smTest.stacktrace?.take(200)}...")
@@ -139,7 +160,7 @@ execute {
     fun printTestTree(proxy: AbstractTestProxy, indent: String = "") {
         val status = when {
             proxy.isPassed -> "✓"
-            (proxy as? SMTestProxy)?.isFailed == true -> "✗"
+            proxy.isDefect -> "✗"
             proxy.isIgnored -> "○"
             proxy.isInProgress -> "→"
             else -> "?"
@@ -196,6 +217,7 @@ This pattern avoids timeout issues and provides better feedback to the agent.
 - [Inspect Test Results](mcp-steroid://test/inspect-test-results) - Access results
 - [Test Tree Navigation](mcp-steroid://test/test-tree-navigation) - Navigate test hierarchy
 - [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll test status
+- [Demo Debug Test](mcp-steroid://test/demo-debug-test) - End-to-end debug flow for demo test
 
 ### Related Example Guides
 - [Debugger Examples](mcp-steroid://debugger/overview) - Debugging workflows

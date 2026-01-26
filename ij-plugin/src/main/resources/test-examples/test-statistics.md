@@ -13,7 +13,6 @@
 
 import com.intellij.execution.ui.RunContentManager
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
-import com.intellij.execution.testframework.sm.runner.SMTestProxy
 
 execute {
     val manager = RunContentManager.getInstance(project)
@@ -39,7 +38,7 @@ execute {
     // Calculate statistics
     val total = allTests.size
     val passed = allTests.count { it.isPassed }
-    val failed = allTests.count { (it as? SMTestProxy)?.isFailed == true }
+    val failed = allTests.count { it.isDefect }
     val ignored = allTests.count { it.isIgnored }
     val inProgress = allTests.count { it.isInProgress }
 
@@ -90,7 +89,12 @@ execute {
     if (slowestTests.isNotEmpty()) {
         println("Slowest Tests:")
         slowestTests.forEach { test ->
-            val status = if (test.isPassed) "✓" else "✗"
+            val status = when {
+                test.isPassed -> "✓"
+                test.isIgnored -> "○"
+                test.isDefect -> "✗"
+                else -> "?"
+            }
             println("  $status ${test.name} - ${test.duration}ms")
         }
         println()

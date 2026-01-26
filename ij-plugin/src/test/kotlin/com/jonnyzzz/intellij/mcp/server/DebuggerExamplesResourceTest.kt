@@ -19,7 +19,7 @@ class DebuggerExamplesResourceTest : BasePlatformTestCase() {
 
     fun testAllExamplesAreDefined() {
         val examples = handler.examples
-        assertEquals("Should have 5 debugger examples", 5, examples.size)
+        assertEquals("Should have 6 debugger examples", 6, examples.size)
 
         val expectedIds = listOf(
             "set-line-breakpoint",
@@ -27,6 +27,7 @@ class DebuggerExamplesResourceTest : BasePlatformTestCase() {
             "debug-session-control",
             "debug-list-threads",
             "debug-thread-dump",
+            "demo-debug-test",
         )
 
         expectedIds.forEach { id ->

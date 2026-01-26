@@ -12,12 +12,15 @@ long script with waits.
 
 - `mcp-steroid://debugger/set-line-breakpoint` - create a line breakpoint
 - `mcp-steroid://debugger/debug-run-configuration` - start a run configuration in Debug
+- `mcp-steroid://debugger/demo-debug-test` - end-to-end debug + test results demo
 - `mcp-steroid://debugger/debug-session-control` - pause/resume/stop the current session
 - `mcp-steroid://debugger/debug-list-threads` - list execution stacks (threads)
 - `mcp-steroid://debugger/debug-thread-dump` - build a basic thread dump from stacks
 
 ## Tips
 
+- Stop debug sessions when done: use debug-session-control or
+  withContext(Dispatchers.EDT) { XDebuggerManager.getInstance(project).debugSessions.forEach { it.stop() } }
 - Line numbers are 1-based in these examples (match the editor gutter).
 - `debug-list-threads` and `debug-thread-dump` require a suspended session.
 - Use `DefaultDebugExecutor` and `ProgramRunnerUtil` to start debug configs.
@@ -35,6 +38,7 @@ long script with waits.
 - [Debugger Overview](mcp-steroid://debugger/overview) - This document
 - [Set Line Breakpoint](mcp-steroid://debugger/set-line-breakpoint) - Create and manage breakpoints
 - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging
+- [Demo Debug Test](mcp-steroid://debugger/demo-debug-test) - End-to-end debug + test results demo
 - [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause, resume, stop
 - [List Threads](mcp-steroid://debugger/debug-list-threads) - Inspect execution stacks
 - [Thread Dump](mcp-steroid://debugger/debug-thread-dump) - Generate thread dumps

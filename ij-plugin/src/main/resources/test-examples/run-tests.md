@@ -1,8 +1,8 @@
 /**
  * Test: Run Tests
  *
- * This example executes a test run configuration and returns
- * the RunContentDescriptor for further inspection.
+ * This example executes a test run configuration.
+ * Use RunContentManager afterwards to locate the RunContentDescriptor.
  *
  * IntelliJ API used:
  * - RunManager - Access run configurations
@@ -14,14 +14,13 @@
  * - configurationName: Name of the run configuration to execute
  * - executorId: DefaultRunExecutor.EXECUTOR_ID or DefaultDebugExecutor.EXECUTOR_ID
  *
- * Output: Execution started confirmation with descriptor info
+ * Output: Execution started confirmation
  */
 
 import com.intellij.execution.RunManager
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.executors.DefaultRunExecutor
-import com.intellij.execution.ui.RunContentDescriptor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -51,23 +50,16 @@ execute {
         return@execute
     }
 
-    // Execute on EDT
-    var descriptor: RunContentDescriptor? = null
+    // Execute on EDT (ProgramRunnerUtil returns void)
     withContext(Dispatchers.EDT) {
-        descriptor = ProgramRunnerUtil.executeConfiguration(setting, executor)
-    }
-
-    if (descriptor == null) {
-        println("ERROR: Failed to start execution")
-        return@execute
+        ProgramRunnerUtil.executeConfiguration(setting, executor)
     }
 
     // Print execution info
     println("✓ Test execution started")
     println()
-    println("Configuration: ${descriptor!!.displayName}")
+    println("Configuration: ${setting.name}")
     println("Executor: ${executor.actionName}")
-    println("Process: ${descriptor!!.processHandler?.javaClass?.simpleName}")
     println()
     println("Use 'wait-for-completion' example to poll for completion.")
     println("Use 'inspect-test-results' example to access results after completion.")

@@ -2,15 +2,25 @@
 
 This document provides a complete map of all MCP resources available in the IntelliJ MCP Steroid server, showing their relationships and recommended navigation paths.
 
+## Connect to the MCP Server
+
+1. Open IntelliJ IDEA with the MCP Steroid plugin installed (the server starts automatically).
+2. Read `.idea/mcp-steroids.txt` in your project folder for the full MCP URL.
+3. Use that URL in your MCP client (it already ends with `/mcp`).
+
+Notes:
+- Host and port are configurable via `mcp.steroids.server.host` and `mcp.steroids.server.port`.
+- Discovery is available at `/.well-known/mcp.json`.
+
 ## Resource Overview
 
-The MCP Steroid server provides **58 resources** organized into 8 categories:
+The MCP Steroid server provides **61 resources** organized into 8 categories:
 
 - **3 Skill Guides** - Core documentation for mastering IntelliJ APIs
 - **11 LSP Examples** - Language Server Protocol-like operations
-- **21 IDE Examples** - Advanced IDE operations and refactorings
-- **6 Debugger Examples** - Debug session management and inspection
-- **9 Test Examples** - Test execution and result inspection
+- **22 IDE Examples** - Advanced IDE operations and refactorings
+- **7 Debugger Examples** - Debug session management and inspection
+- **10 Test Examples** - Test execution and result inspection
 - **3 VCS Examples** - Version control operations
 - **4 Open Project Examples** - Project opening workflows
 - **1 Documentation** - Complete resource graph and navigation guide
@@ -66,6 +76,7 @@ graph TD
     IDE_OV --> IDE18[Project Dependencies]
     IDE_OV --> IDE19[Inspection Summary]
     IDE_OV --> IDE20[Project Search]
+    IDE_OV --> IDE21[Demo Debug Test]
 
     DEBUG --> DEBUG_OV[Debugger Overview]
     DEBUG_OV --> DEBUG1[Set Line Breakpoint]
@@ -73,6 +84,7 @@ graph TD
     DEBUG_OV --> DEBUG3[Debug Session Control]
     DEBUG_OV --> DEBUG4[List Debug Threads]
     DEBUG_OV --> DEBUG5[Build Thread Dump]
+    DEBUG_OV --> DEBUG6[Demo Debug Test]
 
     TEST --> TEST_OV[Test Overview]
     TEST_OV --> TEST1[List Run Configurations]
@@ -83,6 +95,7 @@ graph TD
     TEST_OV --> TEST6[Test Statistics]
     TEST_OV --> TEST7[Test Failure Details]
     TEST_OV --> TEST8[Find Recent Test Run]
+    TEST_OV --> TEST9[Demo Debug Test]
 
     VCS --> VCS_OV[VCS Overview]
     VCS_OV --> VCS1[Git Annotations/Blame]
@@ -151,6 +164,7 @@ graph TD
 | Project Dependencies | `mcp-steroid://ide/project-dependencies` |
 | Inspection Summary | `mcp-steroid://ide/inspection-summary` |
 | Project Search | `mcp-steroid://ide/project-search` |
+| Demo Debug Test | `mcp-steroid://ide/demo-debug-test` |
 
 ### Debugger Examples
 | Resource | URI |
@@ -158,6 +172,7 @@ graph TD
 | Debugger Overview | `mcp-steroid://debugger/overview` |
 | Set Line Breakpoint | `mcp-steroid://debugger/set-line-breakpoint` |
 | Debug Run Configuration | `mcp-steroid://debugger/debug-run-configuration` |
+| Demo Debug Test | `mcp-steroid://debugger/demo-debug-test` |
 | Debug Session Control | `mcp-steroid://debugger/debug-session-control` |
 | List Debug Threads | `mcp-steroid://debugger/debug-list-threads` |
 | Build Thread Dump | `mcp-steroid://debugger/debug-thread-dump` |
@@ -174,6 +189,7 @@ graph TD
 | Test Statistics | `mcp-steroid://test/test-statistics` |
 | Test Failure Details | `mcp-steroid://test/test-failure-details` |
 | Find Recent Test Run | `mcp-steroid://test/find-recent-test-run` |
+| Demo Debug Test | `mcp-steroid://test/demo-debug-test` |
 
 ### VCS Examples
 | Resource | URI |
@@ -288,7 +304,7 @@ sequenceDiagram
 
     Agent->>MCP: I need to learn IntelliJ APIs
     MCP->>Server: resources/list
-    Server->>MCP: [58 resources]
+    Server->>MCP: [61 resources]
     MCP->>Agent: Show skill guides
 
     Agent->>MCP: Read Power User Guide
@@ -402,7 +418,7 @@ All resources include:
 ## Summary
 
 The MCP Steroid resource system provides:
-- **Comprehensive Documentation** - 58 resources covering all aspects
+- **Comprehensive Documentation** - 61 resources covering all aspects
 - **Logical Organization** - 8 categories with clear hierarchy
 - **Rich Cross-References** - Every resource links to related content
 - **Runnable Examples** - All examples are ready to execute

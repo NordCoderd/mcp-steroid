@@ -29,7 +29,8 @@ class TestExamplesResourceHandler : McpRegistrar {
             "test-statistics.md",
             "test-failure-details.md",
             "find-recent-test-run.md",
-        )
+                    "demo-debug-test.md",
+)
     }
 
     /** Dynamically loaded examples with metadata parsed from KDoc comments */

@@ -33,7 +33,7 @@ class TestExecutionApiTest : BasePlatformTestCase() {
 
     fun testAllExamplesAreDefined() {
         val examples = handler.examples
-        assertEquals("Should have 8 test examples", 8, examples.size)
+        assertEquals("Should have 9 test examples", 9, examples.size)
 
         val expectedIds = listOf(
             "list-run-configurations",
@@ -44,6 +44,7 @@ class TestExecutionApiTest : BasePlatformTestCase() {
             "test-statistics",
             "test-failure-details",
             "find-recent-test-run",
+            "demo-debug-test",
         )
 
         expectedIds.forEach { id ->
@@ -178,8 +179,8 @@ class TestExecutionApiTest : BasePlatformTestCase() {
         assertTrue("Should execute on EDT", content.contains("withContext(Dispatchers.EDT)"))
         assertTrue("Should call executeConfiguration", content.contains("executeConfiguration"))
 
-        // Verify it returns RunContentDescriptor
-        assertTrue("Should work with descriptor", content.contains("descriptor"))
+        // Verify it references descriptor discovery
+        assertTrue("Should mention RunContentDescriptor", content.contains("RunContentDescriptor"))
     }
 
     fun testWaitForCompletionPattern() {
@@ -204,7 +205,7 @@ class TestExecutionApiTest : BasePlatformTestCase() {
 
         // Verify it accesses test statistics
         assertTrue("Should count passed tests", content.contains("isPassed"))
-        assertTrue("Should count failed tests", content.contains("isFailed"))
+        assertTrue("Should count failed tests", content.contains("isDefect"))
         assertTrue("Should access test properties", content.contains("allTests"))
     }
 
@@ -214,7 +215,7 @@ class TestExecutionApiTest : BasePlatformTestCase() {
         // Verify the pattern: recursive tree traversal
         assertTrue("Should access children", content.contains("children"))
         assertTrue("Should check test status",
-            content.contains("isPassed") || content.contains("isFailed"))
+            content.contains("isPassed") || content.contains("isDefect"))
 
         // Verify it shows tree structure
         assertTrue("Should show hierarchy", content.contains("indent") || content.contains("printTestTree"))

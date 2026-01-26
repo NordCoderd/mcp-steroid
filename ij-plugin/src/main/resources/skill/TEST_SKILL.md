@@ -20,7 +20,8 @@ Use IntelliJ test execution APIs from `steroid_execute_code` to run tests and in
 `exec_code` is stateful. Split test execution into multiple short calls:
 
 - Call #1: list run configurations
-- Call #2: execute test configuration (returns RunContentDescriptor)
+- Call #2: execute test configuration (ProgramRunnerUtil)
+- Call #3: locate RunContentDescriptor via RunContentManager
 - Call #3+: poll ProcessHandler.isProcessTerminated() until tests complete
 - Call #4: access test results from SMTRunnerConsoleView
 - Call #5: navigate test tree and inspect failures
@@ -40,13 +41,13 @@ Avoid long waits or sleeps inside a single call; prefer multiple short polls.
 - `ExecutorRegistry.getExecutorById(DefaultDebugExecutor.EXECUTOR_ID)` - get Debug executor
 
 **Accessing Results**
-- `RunContentManager.getInstance(project).getAllDescriptors()` - all run content
+- `RunContentManager.getInstance(project).allDescriptors` - all run content
 - `RunContentDescriptor.getExecutionConsole()` - get console (may be SMTRunnerConsoleView)
 - `SMTRunnerConsoleView.getResultsViewer()` - get SMTestRunnerResultsForm
 - `SMTestRunnerResultsForm.getTestsRootNode()` - get test tree root (SMRootTestProxy)
 
 **Test Result Inspection**
-- `SMTestProxy.isPassed()`, `isFailed()`, `isIgnored()`, `isInProgress()`
+- `SMTestProxy.isPassed()`, `isDefect()`, `isIgnored()`, `isInProgress()`
 - `SMTestProxy.getChildren()` - navigate test tree
 - `SMTestProxy.getErrorMessage()`, `getStacktrace()` - failure details
 - `SMTestProxy.getDuration()` - execution time

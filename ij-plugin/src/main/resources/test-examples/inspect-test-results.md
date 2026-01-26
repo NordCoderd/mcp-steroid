@@ -52,7 +52,7 @@ execute {
     // Collect statistics
     val allTests = rootProxy.allTests
     val passed = allTests.count { it.isPassed }
-    val failed = allTests.count { (it as? SMTestProxy)?.isFailed == true }
+    val failed = allTests.count { it.isDefect }
     val ignored = allTests.count { it.isIgnored }
     val total = allTests.size
 
@@ -78,7 +78,7 @@ execute {
         println("─────────────")
         allTests.forEach { test ->
             val smTest = test as? SMTestProxy
-            if (smTest?.isFailed == true) {
+            if (smTest?.isDefect == true) {
                 println()
                 println("✗ ${smTest.name}")
 

@@ -44,6 +44,7 @@ that go beyond LSP capabilities. Each example is a complete script for `steroid_
 | `mcp-steroid://ide/project-dependencies` | Project Dependencies | Summarize module dependencies |
 | `mcp-steroid://ide/project-search` | Project Search (Index) | Search files by name or file type |
 | `mcp-steroid://ide/run-configuration` | Run Configuration | List and execute run configs |
+| `mcp-steroid://ide/demo-debug-test` | Demo Debug Test | End-to-end debug run with test results |
 
 ## Usage
 

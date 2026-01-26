@@ -1541,7 +1541,7 @@ The MCP server runs inside IntelliJ. To verify:
 1. Open IntelliJ IDEA with the MCP Steroid plugin installed
 2. Open any project
 3. Check `.idea/mcp-steroids.txt` in the project folder for the server URL
-4. The server binds to port 63150 by default (configurable via `mcp.steroids.server.port` registry key)
+4. The server port is configurable via `mcp.steroids.server.port`; read `.idea/mcp-steroids.txt` for the active URL
 
 ### Endpoints
 - `/` - Returns this SKILL.md content

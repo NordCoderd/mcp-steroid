@@ -52,7 +52,7 @@ All bugs must be fixed using a test-first approach:
 - [ ] Ask clarifying questions if ambiguous
 - [ ] Write tests for new functionality
 - [ ] Implement the feature
-- [ ] Run `./gradlew build` and `./gradlew test`
+- [ ] Run Gradle build/test from the IDE via MCP run configurations (do not run tests from the shell)
 - [ ] Deploy the plugin locally via `./gradlew deployPlugin`
 - [ ] Test your changes with the IntelliJ MCP
 - [ ] Review `./ai-tests/_INSTRUCTIONS.md` and add missing
@@ -108,7 +108,7 @@ When working on this repository, follow this structured workflow:
    - Read and understand the issue description
    - Add a failing test that reproduces the problem
    - Implement the fix/feature
-   - Run `./gradlew build` to verify
+   - Run Gradle `build` in the IDE via MCP to verify
    - Close the issue with `gh issue close <number>`
 
 6. **Create new issues for discovered work**
@@ -138,8 +138,8 @@ Before completing work:
 ### Final Verification
 
 Once all work is done:
-1. Run `./gradlew build` to ensure everything compiles
-2. Run `./gradlew test` to verify all tests pass
+1. Run Gradle `build` in the IDE via MCP to ensure everything compiles
+2. Run Gradle `test` in the IDE via MCP to verify all tests pass
 3. Check `ai-tests/` scenarios and ensure they work correctly
 4. Verify the changes don't break existing functionality
 
@@ -166,6 +166,8 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 
 ## Build Commands
 
+These CLI snippets are task-name references; when acting as an agent, run Gradle tasks from the IDE via MCP (tests must not be run from the shell).
+
 ```bash
 # Build the plugin
 ./gradlew build
@@ -183,6 +185,31 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 ./gradlew verifyPlugin
 ```
 
+## Running Gradle Tasks via IDE (MCP)
+
+Run all Gradle tests from the IDE using MCP-run configurations; do not run `./gradlew test` in a shell.
+
+Example: create/run a Gradle run configuration for the `test` task (and optionally a single test via `--tests`):
+
+```kotlin
+
+execute {
+    val runManager = RunManager.getInstance(project)
+    val factory = GradleExternalTaskConfigurationType.getInstance().configurationFactories.single()
+    val runConfig = factory.createTemplateConfiguration(project) as ExternalSystemRunConfiguration
+    runConfig.name = "Gradle test (MCP)"
+    runConfig.settings.externalProjectPath = project.basePath
+    runConfig.settings.taskNames = listOf("test")
+    // Single test example:
+    // runConfig.settings.scriptParameters = "--tests \"*ExecutionManagerTest*\""
+    val settings = runManager.createConfiguration(runConfig, factory)
+    runManager.addConfiguration(settings)
+    runManager.selectedConfiguration = settings
+    ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
+}
+```
+
+To run `build`, set `taskNames = listOf("build")` in the same configuration pattern.
 ## Build Notes
 
 - IDE distributions are cached under `.intellijPlatform/ides/IU-2025.3` (`intellijPlatform.caching.ides.enabled = true`).
@@ -432,7 +459,7 @@ Context provided inside `execute { }` blocks:
 - `gradle.properties`: Contains `platformVersion` for IntelliJ version
 - `build.gradle.kts`: Plugin configuration using `intellijPlatform` DSL
 - Registry keys:
-  - `mcp.steroids.server.port`: MCP server port (default: 6315, use 0 for dynamic)
+- `mcp.steroids.server.port`: MCP server port (configurable; use `.idea/mcp-steroids.txt` for the active URL)
   - `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
   - `mcp.steroids.review.timeout`: Review timeout in seconds
   - `mcp.steroids.execution.timeout`: Script execution timeout
@@ -736,8 +763,8 @@ EOF
 
 1. **Atomic commits**: Each commit should represent a single logical change
 2. **Descriptive messages**: Explain what and why, not just how
-3. **Test before commit**: Run `./gradlew test` to verify changes
-4. **Build verification**: Run `./gradlew build` to ensure the plugin builds
+3. **Test before commit**: Run Gradle `test` in the IDE via MCP to verify changes
+4. **Build verification**: Run Gradle `build` in the IDE via MCP to ensure the plugin builds
 
 ## Adding New MCP Tools
 
@@ -928,7 +955,7 @@ class MyTest : BasePlatformTestCase() {
    - Research IntelliJ codebase at `../intellij` for patterns
    - Use IntelliJ MCP to explore APIs
    - Implement the fix
-   - Run tests: `./gradlew test`
+   - Run tests in the IDE via MCP (Gradle run configuration)
    - Deploy: `./gradlew deployPlugin`
 
 3. **Close issues with commits**:

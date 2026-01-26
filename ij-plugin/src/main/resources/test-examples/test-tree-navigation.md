@@ -13,7 +13,6 @@
 
 import com.intellij.execution.ui.RunContentManager
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
-import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import com.intellij.execution.testframework.AbstractTestProxy
 
 execute {
@@ -22,7 +21,7 @@ execute {
         // Determine status icon
         val status = when {
             proxy.isPassed -> "✓"
-            (proxy as? SMTestProxy)?.isFailed == true -> "✗"
+            proxy.isDefect -> "✗"
             proxy.isIgnored -> "○"
             proxy.isInProgress -> "→"
             else -> "?"

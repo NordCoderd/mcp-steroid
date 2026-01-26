@@ -26,7 +26,8 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
             "debug-session-control.kts",
             "debug-list-threads.kts",
             "debug-thread-dump.kts",
-        )
+                    "demo-debug-test.kts",
+)
     }
 
     /** Dynamically loaded examples with metadata parsed from KDoc comments */

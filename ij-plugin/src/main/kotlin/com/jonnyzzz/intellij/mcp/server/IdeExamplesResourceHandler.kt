@@ -33,6 +33,7 @@ class IdeExamplesResourceHandler : McpRegistrar {
             "hierarchy-search.kts",
             "call-hierarchy.kts",
             "run-configuration.kts",
+            "demo-debug-test.kts",
             "pull-up-members.kts",
             "push-down-members.kts",
             "extract-interface.kts",
