@@ -22,6 +22,7 @@ import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.codeInsight.intention.IntentionManager
 import com.intellij.codeInspection.*
+import com.intellij.codeInspection.ex.LocalInspectionToolWrapper
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.profile.codeInspection.InspectionProjectProfileManager
 import com.intellij.psi.PsiManager
@@ -115,10 +116,11 @@ execute {
             var problemCount = 0
 
             for (toolWrapper in tools.take(20)) {
-                val tool = toolWrapper.tool
-                if (tool is LocalInspectionTool) {
+                val wrapper = toolWrapper.tool
+                if (wrapper is LocalInspectionToolWrapper) {
                     try {
-                        val problems = tool.checkFile(psiFile, inspectionManager, false)
+                        val localTool = wrapper.tool as LocalInspectionTool
+                        val problems = localTool.checkFile(psiFile, inspectionManager, false)
                         if (problems != null) {
                             for (problem in problems) {
                                 problemCount++
