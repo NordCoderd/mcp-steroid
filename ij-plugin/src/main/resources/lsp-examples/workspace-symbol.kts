@@ -26,6 +26,21 @@ import com.intellij.psi.*
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiShortNamesCache
 
+
+// Helper function for camelCase matching
+fun matchesQuery(name: String, query: String): Boolean {
+    // Simple substring match
+    if (name.contains(query, ignoreCase = true)) return true
+
+    // CamelCase matching (e.g., "MC" matches "MyClass")
+    val queryUpper = query.filter { it.isUpperCase() }
+    val nameUpper = name.filter { it.isUpperCase() }
+    if (queryUpper.isNotEmpty() && nameUpper.contains(queryUpper)) return true
+
+    return false
+}
+
+
 execute {
     // Configuration - modify these for your use case
     val query = "Main"      // TODO: Set your search query
@@ -191,19 +206,6 @@ execute {
     }
 
     println(result)
-}
-
-// Helper function for camelCase matching
-fun matchesQuery(name: String, query: String): Boolean {
-    // Simple substring match
-    if (name.contains(query, ignoreCase = true)) return true
-
-    // CamelCase matching (e.g., "MC" matches "MyClass")
-    val queryUpper = query.filter { it.isUpperCase() }
-    val nameUpper = name.filter { it.isUpperCase() }
-    if (queryUpper.isNotEmpty() && nameUpper.contains(queryUpper)) return true
-
-    return false
 }
 
 /**

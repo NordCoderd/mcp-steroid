@@ -15,8 +15,6 @@
  * Output: Hierarchical list of symbols in the document
  */
 
-import com.intellij.ide.structureView.StructureViewBuilder
-import com.intellij.ide.structureView.StructureViewModel
 import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.lang.LanguageStructureViewBuilder
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -47,7 +45,7 @@ execute {
             appendLine()
 
             // Method 1: Use StructureView
-            val structureViewBuilder = LanguageStructureViewBuilder.INSTANCE
+            val structureViewBuilder = LanguageStructureViewBuilder.getInstance()
                 .getStructureViewBuilder(psiFile)
 
             if (structureViewBuilder is TreeBasedStructureViewBuilder) {

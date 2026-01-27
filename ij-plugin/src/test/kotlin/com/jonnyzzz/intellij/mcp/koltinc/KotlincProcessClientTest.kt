@@ -10,8 +10,7 @@ class KotlincProcessClientTest : BasePlatformTestCase() {
     override fun runInDispatchThread(): Boolean = false
 
     fun testKotlincVersion(): Unit = timeoutRunBlocking(30.seconds) {
-        assertTrue("Expected bundled kotlinc to be available", kotlincProcessClient.isAvailable())
-        val output = kotlincProcessClient.kotlinc("-version")
+        val output = kotlincProcessClient.kotlinc(listOf("-version"))
         val text = (output.stdout + "\n" + output.stderr).trim()
         assertTrue("Expected kotlinc version output, got: $text", text.contains("kotlin", ignoreCase = true))
     }

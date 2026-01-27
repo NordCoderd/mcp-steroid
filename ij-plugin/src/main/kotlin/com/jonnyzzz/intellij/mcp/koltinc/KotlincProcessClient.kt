@@ -18,12 +18,6 @@ inline val kotlincProcessClient: KotlincProcessClient get() = service()
 
 @Service(Service.Level.APP)
 class KotlincProcessClient {
-    private val log = thisLogger()
-
-    fun kotlinc(vararg args: String, workingDir: Path? = null): ProcessOutput {
-        return kotlinc(args.toList(), workingDir)
-    }
-
     fun kotlinc(args: List<String>, workingDir: Path? = null): ProcessOutput {
         val executable = resolveExecutable()
         val commandLine = if (SystemInfoRt.isWindows) {
@@ -39,20 +33,7 @@ class KotlincProcessClient {
         commandLine.withEnvironment("JAVA_HOME", System.getProperty("java.home"))
         commandLine.withEnvironment("KOTLIN_HOME", executable.root.toString())
 
-        val output = runProcess(commandLine)
-        if (output.stderr.isNotBlank()) {
-            log.warn("kotlinc stderr: ${output.stderr.trim()}")
-        }
-        return output
-    }
-
-    fun isAvailable(): Boolean {
-        return try {
-            resolveExecutable()
-            true
-        } catch (_: Exception) {
-            false
-        }
+        return runProcess(commandLine)
     }
 
     private fun runProcess(commandLine: GeneralCommandLine): ProcessOutput {
@@ -64,10 +45,6 @@ class KotlincProcessClient {
 
         if (output.isTimeout || output.isCancelled) {
             throw IllegalStateException("Kotlinc process did not finish before timeout")
-        }
-        if (output.exitCode != 0) {
-            val stderr = output.stderr.trim()
-            throw IllegalStateException("Kotlinc process failed with exit code ${output.exitCode}: $stderr")
         }
         return output
     }

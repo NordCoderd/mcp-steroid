@@ -19,8 +19,6 @@ class KotlincCommandLineBuilderIntegrationTest : BasePlatformTestCase() {
     override fun runInDispatchThread(): Boolean = false
 
     fun testCompilesJarWithDirectoryClasspathAndJvmTarget(): Unit = timeoutRunBlocking(90.seconds) {
-        assertTrue("Expected bundled kotlinc to be available", kotlincProcessClient.isAvailable())
-
         val root = Files.createTempDirectory("kotlinc-builder")
         val outputJar = root.resolve("out/compiled.jar")
         val resourceEntry = classpathEntryFromResource(KotlincCommandLineBuilderIntegrationTest::class.java)
@@ -57,8 +55,6 @@ class KotlincCommandLineBuilderIntegrationTest : BasePlatformTestCase() {
     }
 
     fun testCompilesJarWithNoStdLibClasspathFromIdeClasspath(): Unit = timeoutRunBlocking(90.seconds) {
-        assertTrue("Expected bundled kotlinc to be available", kotlincProcessClient.isAvailable())
-
         val root = Files.createTempDirectory("kotlinc-nostdlib")
         val outputJar = root.resolve("out/nostdlib.jar")
         val ideClasspathEntries = ideClasspathEntries()

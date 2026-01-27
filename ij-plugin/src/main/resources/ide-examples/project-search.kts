@@ -35,7 +35,7 @@ execute {
             appendLine()
 
             if (fileName.isNotBlank()) {
-                val files = FilenameIndex.getVirtualFilesByName(project, fileName, projectScope())
+                val files = FilenameIndex.getVirtualFilesByName(fileName, projectScope())
                 appendLine("By name '$fileName' (${files.size}):")
                 files.take(maxResults).forEach { vf ->
                     appendLine("  - ${vf.path}")

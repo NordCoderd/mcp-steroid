@@ -29,7 +29,7 @@ import com.intellij.refactoring.changeSignature.ParameterInfoImpl
 
 data class MethodData(
     val name: String,
-    val returnType: PsiType,
+    val returnType: PsiType?,
     val parameterInfos: MutableList<ParameterInfoImpl>,
     val newParamType: PsiType
 )
@@ -82,7 +82,7 @@ execute {
         val infos = existingParams.mapIndexed { index, param ->
             ParameterInfoImpl(index, param.name, param.type)
         }.toMutableList()
-        val methodReturnType = method.returnType ?: PsiType.VOID
+        val methodReturnType = method.returnType
         MethodData(method.name, methodReturnType, infos, paramType)
     }
 
