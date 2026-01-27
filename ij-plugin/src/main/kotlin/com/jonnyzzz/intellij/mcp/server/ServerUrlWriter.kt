@@ -105,7 +105,7 @@ class ServerUrlWriter : Disposable {
         appendLine("  codex mcp add intellij --url $serverUrl")
         appendLine()
         appendLine("Gemini CLI:")
-        appendLine("  gemini mcp add intellij-steroid $serverUrl --transport http --scope user")
+        appendLine("  gemini mcp add intellij-steroid --type http $serverUrl")
     }
 
     private fun buildIdeInfo(): String = buildString {
