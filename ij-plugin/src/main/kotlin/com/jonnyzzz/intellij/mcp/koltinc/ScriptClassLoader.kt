@@ -6,6 +6,7 @@ import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.util.text.StringHash
+import com.intellij.util.lang.UrlClassLoader
 import java.io.IOException
 import java.net.URL
 import java.net.URLClassLoader
@@ -34,19 +35,15 @@ class ScriptClassLoaderFactory {
     fun ideClasspath(): List<URL> {
         return orderedPluginDescriptors()
             .asSequence()
-            .mapNotNull { it.pluginClassLoader }
-            .distinct()
-            .mapNotNull {
-                try {
-                    val method = it.javaClass.getMethod("getUrls")
-                    method.trySetAccessible()
-                    val data = method.invoke(it)
-                    data as? List<*>
-                } catch (e: Exception) {
-                    null
-                }
+            .mapNotNull { it.pluginClassLoader as UrlClassLoader? }
+            .distinct().flatMap {
+                it.urls
+                //cast to UrlClassloader from IntelliJ and call getUrls
+                //val method = it.javaClass.getMethod("getUrls")
+                //method.trySetAccessible()
+                //val data = method.invoke(it)
+                //data as? List<*>
             }
-            .flatten()
             .filterIsInstance<URL>()
             .distinct()
             .toList()
