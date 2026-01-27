@@ -22,16 +22,16 @@ class ScriptClassLoaderFactory {
         return PluginManagerCore.loadedPlugins
             .filter {
                 //make sure we are not dealing with removed pluigns
-                !PluginManagerCore.isLoaded(it.pluginId)
+                PluginManagerCore.isLoaded(it.pluginId)
             }
     }
 
-    private fun execCodeClassloader(jar: URL): ClassLoader {
+    fun execCodeClassloader(jar: URL): ClassLoader {
         //we cannot keep the newIdeClassloader to enforce classes GC
         return URLClassLoader(arrayOf(jar), newIdeClassloader())
     }
 
-    private fun ideClasspath(): List<URL> {
+    fun ideClasspath(): List<URL> {
         return orderedPluginDescriptors()
             .asSequence()
             .mapNotNull { it.pluginClassLoader }
