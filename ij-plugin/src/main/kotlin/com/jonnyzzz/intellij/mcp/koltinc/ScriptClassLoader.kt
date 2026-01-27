@@ -10,6 +10,7 @@ import com.intellij.util.lang.UrlClassLoader
 import java.io.IOException
 import java.net.URL
 import java.net.URLClassLoader
+import java.nio.file.Files
 import java.nio.file.Path
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -36,8 +37,10 @@ class ScriptClassLoaderFactory {
         return orderedPluginDescriptors()
             .asSequence()
             .mapNotNull { it.pluginClassLoader as UrlClassLoader? }
-            .distinct().flatMap { it.files }
             .distinct()
+            .flatMap { it.files }
+            .distinct()
+            .filter { Files.exists(it) }
             .toList()
     }
 
