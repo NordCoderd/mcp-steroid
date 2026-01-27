@@ -8,7 +8,11 @@ import java.nio.file.Path
 data class KotlincCommandLine(
     val args: List<String>,
     val outputJar: Path,
-)
+) {
+    companion object
+}
+
+fun KotlincCommandLine.Companion.builder(outputJar: Path) = KotlincCommandLineBuilder(outputJar)
 
 class KotlincCommandLineBuilder(
     private val outputJar: Path,
@@ -21,6 +25,10 @@ class KotlincCommandLineBuilder(
     fun addSource(source: Path) = apply {
         require(Files.exists(source)) { "Source file does not exist: $source" }
         sources.add(source)
+    }
+
+    fun addClasspathEntries(classpath: Collection<Path>) = apply {
+        classpath.forEach { addClasspathEntry(it) }
     }
 
     fun addClasspathEntry(entry: Path) = apply {

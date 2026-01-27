@@ -48,7 +48,7 @@ class KotlincCommandLineBuilderIntegrationTest : BasePlatformTestCase() {
         assertTrue(commandLine.args.contains("-jvm-target"))
         assertTrue(commandLine.args.contains("21"))
 
-        kotlincProcessClient.run(commandLine.args)
+        kotlincProcessClient.kotlinc(commandLine.args)
 
         assertTrue("Expected output jar at ${commandLine.outputJar}", Files.exists(commandLine.outputJar))
         ZipFile(commandLine.outputJar.toFile()).use { zip ->
@@ -93,7 +93,7 @@ class KotlincCommandLineBuilderIntegrationTest : BasePlatformTestCase() {
 
         assertTrue(commandLine.args.contains("-no-stdlib"))
 
-        kotlincProcessClient.run(commandLine.args)
+        kotlincProcessClient.kotlinc(commandLine.args)
 
         assertTrue("Expected output jar at ${commandLine.outputJar}", Files.exists(commandLine.outputJar))
         ZipFile(commandLine.outputJar.toFile()).use { zip ->
@@ -116,7 +116,6 @@ class KotlincCommandLineBuilderIntegrationTest : BasePlatformTestCase() {
 
     private fun ideClasspathEntries(): List<Path> {
         val entries = scriptClassLoaderFactory.ideClasspath()
-            .mapNotNull { url -> if (url.protocol == "file") Paths.get(url.toURI()) else null }
         assertTrue("Expected ideClasspath to contain entries", entries.isNotEmpty())
         return entries
     }

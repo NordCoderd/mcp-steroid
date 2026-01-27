@@ -18,7 +18,6 @@ import com.intellij.openapi.vfs.readText
 import com.intellij.openapi.wm.WindowManager
 import com.jonnyzzz.intellij.mcp.execution.Diff
 import com.jonnyzzz.intellij.mcp.execution.ExecutionResultBuilder
-import com.jonnyzzz.intellij.mcp.execution.codeButcher
 import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
 import com.jonnyzzz.intellij.mcp.storage.ExecutionId
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
@@ -72,7 +71,7 @@ class ReviewManager(private val project: Project) {
         }
 
         log.info("Requesting review for $executionId")
-        val codeForReview = codeButcher.wrapWithImports(execCodeParams.code)
+        val codeForReview = execCodeParams.code
         val reviewFile = project.executionStorage.writeCodeReviewFile(executionId, codeForReview)
         val vFile = withContext(Dispatchers.EDT) {
             writeAction {

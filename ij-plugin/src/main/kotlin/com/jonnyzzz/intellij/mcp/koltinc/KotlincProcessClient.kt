@@ -20,11 +20,11 @@ inline val kotlincProcessClient: KotlincProcessClient get() = service()
 class KotlincProcessClient {
     private val log = thisLogger()
 
-    fun run(vararg args: String, workingDir: Path? = null): ProcessOutput {
-        return run(args.toList(), workingDir)
+    fun kotlinc(vararg args: String, workingDir: Path? = null): ProcessOutput {
+        return kotlinc(args.toList(), workingDir)
     }
 
-    fun run(args: List<String>, workingDir: Path? = null): ProcessOutput {
+    fun kotlinc(args: List<String>, workingDir: Path? = null): ProcessOutput {
         val executable = resolveExecutable()
         val commandLine = if (SystemInfoRt.isWindows) {
             GeneralCommandLine("cmd.exe", "/c", executable.path.toString())

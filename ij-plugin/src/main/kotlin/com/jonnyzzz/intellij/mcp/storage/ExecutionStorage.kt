@@ -310,4 +310,12 @@ class ExecutionStorage(
             }
         }
     }
+
+    suspend fun createCompilerOutputDir(executionId: ExecutionId): Path {
+        return withContext(Dispatchers.IO) {
+            val dir = executionId.dir.resolve("compiled")
+            Files.createDirectories(dir)
+            dir
+        }
+    }
 }

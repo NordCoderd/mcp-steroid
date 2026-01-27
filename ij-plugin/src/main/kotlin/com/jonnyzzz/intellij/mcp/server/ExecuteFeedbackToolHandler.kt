@@ -23,7 +23,6 @@ import kotlinx.serialization.json.*
  * - Explanation of the rating
  * - Association with a task_id
  */
-@Service(Service.Level.APP)
 class ExecuteFeedbackToolHandler : McpRegistrar {
     private val log = thisLogger()
     private val json = Json {
@@ -125,7 +124,7 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
             val executionStorage = project.service<ExecutionStorage>()
             val executionId = executionStorage.writeExecutionFeedback(taskId = taskId, params)
             if (code != null) {
-                executionStorage.writeCodeExecutionData(executionId, "script.kts", codeButcher.wrapWithImports(code))
+                executionStorage.writeCodeExecutionData(executionId, "script.kts", code)
             }
 
             if (explanation != null) {

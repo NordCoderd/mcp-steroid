@@ -17,7 +17,6 @@ class ScriptClassLoaderFactoryTest : BasePlatformTestCase() {
 
     fun testIdeClasspathContainsCurrentClassEntry(): Unit = timeoutRunBlocking(30.seconds) {
         val ideEntries = scriptClassLoaderFactory.ideClasspath()
-            .mapNotNull { url -> if (url.protocol == "file") Paths.get(url.toURI()) else null }
         assertTrue("Expected ideClasspath to contain entries", ideEntries.isNotEmpty())
 
         val resourceEntry = classpathEntryFromResource(javaClass)
@@ -36,7 +35,7 @@ class ScriptClassLoaderFactoryTest : BasePlatformTestCase() {
             createClassJar(root, javaClass)
         }
 
-        val loader = scriptClassLoaderFactory.execCodeClassloader(jar.toUri().toURL())
+        val loader = scriptClassLoaderFactory.execCodeClassloader(jar)
         val loaded = loader.loadClass(javaClass.name)
         assertEquals(javaClass.name, loaded.name)
     }

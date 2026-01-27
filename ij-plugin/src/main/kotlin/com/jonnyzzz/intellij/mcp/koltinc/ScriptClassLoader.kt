@@ -10,10 +10,10 @@ import com.intellij.util.lang.UrlClassLoader
 import java.io.IOException
 import java.net.URL
 import java.net.URLClassLoader
-import java.util.Enumeration
+import java.nio.file.Path
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
-import kotlin.jvm.javaClass
 
 inline val scriptClassLoaderFactory get() : ScriptClassLoaderFactory = service()
 
@@ -22,33 +22,24 @@ class ScriptClassLoaderFactory {
     private fun orderedPluginDescriptors(): List<IdeaPluginDescriptor> {
         return PluginManagerCore.loadedPlugins
             .filter {
-                //make sure we are not dealing with removed pluigns
+                //make sure we are not dealing with removed plugins
                 PluginManagerCore.isLoaded(it.pluginId)
             }
     }
 
-    fun execCodeClassloader(jar: URL): ClassLoader {
+    fun execCodeClassloader(jar: Path): ClassLoader {
         //we cannot keep the newIdeClassloader to enforce classes GC
-        return URLClassLoader(arrayOf(jar), newIdeClassloader())
+        return URLClassLoader(arrayOf(jar.toUri().toURL()), newIdeClassloader())
     }
 
-    fun ideClasspath(): List<URL> {
+    fun ideClasspath(): List<Path> {
         return orderedPluginDescriptors()
             .asSequence()
             .mapNotNull { it.pluginClassLoader as UrlClassLoader? }
-            .distinct().flatMap {
-                it.urls
-                //cast to UrlClassloader from IntelliJ and call getUrls
-                //val method = it.javaClass.getMethod("getUrls")
-                //method.trySetAccessible()
-                //val data = method.invoke(it)
-                //data as? List<*>
-            }
-            .filterIsInstance<URL>()
+            .distinct().flatMap { it.files }
             .distinct()
             .toList()
     }
-
 
     private fun newIdeClassloader(): ClassLoader {
         return object : ClassLoader(null) {
