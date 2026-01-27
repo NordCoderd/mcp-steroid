@@ -1,8 +1,11 @@
+import de.undercouch.gradle.tasks.download.Download
+import org.gradle.kotlin.dsl.register
+
 plugins {
     application
-    kotlin("jvm") version "2.2.21"
-    kotlin("plugin.serialization") version "2.2.21"
-    id("de.undercouch.download") version "5.6.0"
+    kotlin("jvm")
+    kotlin("plugin.serialization")
+    id("de.undercouch.download")
 }
 
 group = "com.jonnyzzz.intellij"
@@ -39,37 +42,21 @@ kotlin {
 val tessdataDownloadDir = layout.buildDirectory.dir("tessdata-download")
 val tessdataDir = layout.buildDirectory.dir("tessdata-data")
 
-val tessdataUrls = listOf(
-    "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion/eng.traineddata",
-    "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion/osd.traineddata",
-)
-
 // Download tessdata files
 val downloadTessdata by tasks.registering {
-    inputs.property("downloads", tessdataUrls)
-    outputs.dir { tessdataDownloadDir.get() }
-
-    doFirst {
-        delete(tessdataDownloadDir)
-        mkdir(tessdataDownloadDir)
-        download {
-            for (url in tessdataUrls) {
-                run {
-                    src(url)
-                    dest(tessdataDownloadDir.map { it.file(url.substringAfterLast("/")) })
-                    onlyIfModified(true)
-                }
-            }
-        }
-    }
+    outputs.dir(tessdataDownloadDir)
 }
 
-val syncTessdata by tasks.registering(Sync::class) {
-    description = "Sync tessdata files to distribution directory"
-    dependsOn(downloadTessdata)
-
-    from(tessdataDownloadDir)
-    into(tessdataDir)
+listOf(
+    "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion/eng.traineddata",
+    "https://github.com/tesseract-ocr/tessdata/raw/$tessdataVersion/osd.traineddata",
+).forEach { url ->
+    val task = tasks.register<Download>("download_" + url.substringAfterLast("/").substringBefore(".")) {
+        src(url)
+        dest(tessdataDownloadDir)
+        onlyIfModified(true)
+    }
+    downloadTessdata.configure { dependsOn(task) }
 }
 
 // Include tessdata in the distribution
@@ -77,7 +64,7 @@ distributions {
     main {
         contents {
             //dependeny to the task behind   tessdataDownloadDir
-            from(syncTessdata) {
+            from(downloadTessdata) {
                 into("tessdata")
             }
         }

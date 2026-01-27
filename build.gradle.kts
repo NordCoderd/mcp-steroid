@@ -1,11 +1,14 @@
+import de.undercouch.gradle.tasks.download.Download
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import java.net.HttpURLConnection
 import java.net.URI
+import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.zip.ZipFile
 
 plugins {
+    id("de.undercouch.download") version "5.6.0"
     id("org.jetbrains.intellij.platform") version "2.10.5"
     kotlin("jvm") version "2.2.21"
     kotlin("plugin.serialization") version "2.2.21"
@@ -88,6 +91,50 @@ tasks {
     }
 }
 
+val kotlincVersion = "2.2.21"
+val kotlincUrl = "https://github.com/JetBrains/kotlin/releases/download/v${kotlincVersion}/kotlin-compiler-${kotlincVersion}.zip"
+val kotlincSha256Url = "$kotlincUrl.sha256"
+val kotlincDownloadDir = layout.buildDirectory.dir("kotlinc-zip")
+val kotlincDir = layout.buildDirectory.dir("kotlinc-unpack")
+
+val downloadKotlinc by tasks.registering {
+    group = "kotlinc"
+    outputs.dir(kotlincDir)
+
+    doLast {
+        val files = fileTree(kotlincDownloadDir).files
+        val sha256 = files
+            .single { it.name.endsWith(".sha256") }
+            .readText()
+
+        val zip = files.single { it.name.endsWith(".zip") }
+
+        val actualSha256 = MessageDigest.getInstance("SHA-256").run {
+            update(zip.readBytes())
+            digest().toHexString()
+        }
+
+        assert(actualSha256 == sha256) {
+            "Actual:\n${actualSha256}\nExpected\n${sha256}"
+        }
+
+        sync {
+            into(kotlincDir)
+            from(zipTree(zip))
+        }
+    }
+}
+
+listOf(kotlincUrl, kotlincSha256Url).forEach { url ->
+    val task = tasks.register<Download>("downloadKotlinc_" + url.substringAfterLast(".")) {
+        group = "kotlinc"
+        src(url)
+        dest(kotlincDownloadDir)
+        onlyIfModified(true)
+    }
+    downloadKotlinc.configure { dependsOn(task) }
+}
+
 val ocrToolDist by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
@@ -104,6 +151,9 @@ listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
     it.invoke {
         from(ocrToolDist) {
             into(intellijPlatform.projectName.map { "$it/ocr-tesseract" })
+        }
+        from(downloadKotlinc) {
+            into(intellijPlatform.projectName)
         }
     }
 }
@@ -131,8 +181,13 @@ val verifyBundledLibraries by tasks.registering {
             }){"files must be under plugin roots: " + allFiles.map { it.substringBefore('/') }.toSortedSet() }
 
         allFiles = allFiles.map { it.removePrefix(pluginPrefix) }.toSortedSet()
-
         assert(allFiles.isNotEmpty()) { "no libraries found in ${allFiles.joinToString { "\n  - $it" }}" }
+
+        val kotlincFiles = allFiles.filter { it.startsWith("kotlinc/") }
+        assert(kotlincFiles.contains("kotlinc/bin/kotlinc")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n -$it" } }
+        assert(kotlincFiles.contains("kotlinc/bin/kotlinc.bat")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n -$it" } }
+
+        allFiles = (allFiles - kotlincFiles).toSortedSet()
 
         // Assert expected libraries - update this list when dependencies change
         val expectedFiles = sortedSetOf(
@@ -240,6 +295,10 @@ val verifyBundledLibraries by tasks.registering {
             })
         }
     }
+}
+
+tasks.verifyPlugin {
+    dependsOn(verifyBundledLibraries)
 }
 
 // Deploy plugin to running IDEs with hot-reload support
