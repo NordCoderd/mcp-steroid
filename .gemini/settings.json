@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "intellij-steroid": {
+      "url": "http://localhost:6315/mcp",
+      "type": "http"
+    }
+  }
+}
