@@ -10,6 +10,7 @@ This document is a concise architecture map. For authoritative details, see `AGE
 - Resources: resource registry with `resources/list` and `resources/read`.
 - Vision tools: screenshot/input tooling with artifact storage.
 - OCR helper: external `ocr-tesseract` app invoked via process client.
+- Kotlinc helper: bundled Kotlin compiler invoked via process client.
 - Storage & review: execution logs/artifacts and review workflow.
 
 ## Request Flow (exec_code)
@@ -37,6 +38,7 @@ This document is a concise architecture map. For authoritative details, see `AGE
 - Execution: `src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/*`
 - Vision: `src/main/kotlin/com/jonnyzzz/intellij/mcp/server/Vision*`
 - OCR: `src/main/kotlin/com/jonnyzzz/intellij/mcp/ocr/*` and `ocr-tesseract/`
+- Kotlinc: `src/main/kotlin/com/jonnyzzz/intellij/mcp/koltinc/*` and bundled `kotlinc/`
 
 ## Related Docs
 - `README.md`: usage, HTTP flow, tool contracts

@@ -321,6 +321,8 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 │   └── WindowIdUtil.kt            # Window identification utilities
 ├── ocr/
 │   └── OcrProcessClient.kt        # External OCR process communication
+├── koltinc/
+│   └── KotlincProcessClient.kt    # External kotlinc process communication
 ├── review/
 │   ├── ReviewManager.kt           # Human review workflow, diff generation
 │   └── McpReviewNotificationProvider.kt  # Editor notification panel
