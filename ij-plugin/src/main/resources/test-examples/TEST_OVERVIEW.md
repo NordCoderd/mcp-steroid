@@ -82,73 +82,66 @@ Or run [Demo Debug Test](mcp-steroid://test/demo-debug-test) for a one-call end-
 ### Pattern 1: Execute and Wait
 
 ```kotlin
-execute {
-    waitForSmartMode()
 
-    // Execute configuration
-    val manager = RunManager.getInstance(project)
-    val setting = manager.allSettings.first { it.name == "MyTests" }
-    val executor = ExecutorRegistry.getExecutorById(DefaultRunExecutor.EXECUTOR_ID)!!
+// Execute configuration
+val manager = RunManager.getInstance(project)
+val setting = manager.allSettings.first { it.name == "MyTests" }
+val executor = ExecutorRegistry.getExecutorById(DefaultRunExecutor.EXECUTOR_ID)!!
 
-    withContext(Dispatchers.EDT) {
-        ProgramRunnerUtil.executeConfiguration(setting, executor)
-    }
-
-    println("Execution started: ${setting.name}")
+withContext(Dispatchers.EDT) {
+    ProgramRunnerUtil.executeConfiguration(setting, executor)
 }
 
-// Second call - poll for completion
-execute {
-    val manager = RunContentManager.getInstance(project)
-    val descriptor = manager.allDescriptors.lastOrNull { it.displayName == "MyTests" }
-    val handler = descriptor?.processHandler
+println("Execution started: ${setting.name}")
 
-    if (handler?.isProcessTerminated == true) {
-        println("Test execution completed with exit code: ${handler.exitCode}")
-    } else {
-        println("Tests still running...")
-    }
+// Second call - poll for completion
+val manager = RunContentManager.getInstance(project)
+val descriptor = manager.allDescriptors.lastOrNull { it.displayName == "MyTests" }
+val handler = descriptor?.processHandler
+
+if (handler?.isProcessTerminated == true) {
+    println("Test execution completed with exit code: ${handler.exitCode}")
+} else {
+    println("Tests still running...")
 }
 ```
 
 ### Pattern 2: Access Test Results
 
 ```kotlin
-execute {
-    val manager = RunContentManager.getInstance(project)
-    val descriptor = manager.allDescriptors.lastOrNull()
+val manager = RunContentManager.getInstance(project)
+val descriptor = manager.allDescriptors.lastOrNull()
 
-    // Get test console
-    val console = descriptor?.executionConsole as? SMTRunnerConsoleView
-    if (console == null) {
-        println("Not a test execution or results not available")
-        return@execute
-    }
+// Get test console
+val console = descriptor?.executionConsole as? SMTRunnerConsoleView
+if (console == null) {
+    println("Not a test execution or results not available")
+    return
+}
 
-    // Get test tree root
-    val resultsForm = console.resultsViewer
-    val rootProxy = resultsForm.testsRootNode
+// Get test tree root
+val resultsForm = console.resultsViewer
+val rootProxy = resultsForm.testsRootNode
 
-    // Inspect results
-    val allTests = rootProxy.allTests
-    val passed = allTests.count { it.isPassed }
-    val failed = allTests.count { it.isDefect }
-    val ignored = allTests.count { it.isIgnored }
+// Inspect results
+val allTests = rootProxy.allTests
+val passed = allTests.count { it.isPassed }
+val failed = allTests.count { it.isDefect }
+val ignored = allTests.count { it.isIgnored }
 
-    println("Test Results:")
-    println("  Passed: $passed")
-    println("  Failed: $failed")
-    println("  Ignored: $ignored")
-    println("  Total: ${allTests.size}")
+println("Test Results:")
+println("  Passed: $passed")
+println("  Failed: $failed")
+println("  Ignored: $ignored")
+println("  Total: ${allTests.size}")
 
-    // Print failures
-    rootProxy.children.forEach { test ->
-        val smTest = test as? SMTestProxy
-        if (smTest?.isDefect == true) {
-            println("\nFailed: ${smTest.name}")
-            println("  Error: ${smTest.errorMessage}")
-            println("  Stack: ${smTest.stacktrace?.take(200)}...")
-        }
+// Print failures
+rootProxy.children.forEach { test ->
+    val smTest = test as? SMTestProxy
+    if (smTest?.isDefect == true) {
+        println("\nFailed: ${smTest.name}")
+        println("  Error: ${smTest.errorMessage}")
+        println("  Stack: ${smTest.stacktrace?.take(200)}...")
     }
 }
 ```
@@ -156,31 +149,29 @@ execute {
 ### Pattern 3: Navigate Test Tree Recursively
 
 ```kotlin
-execute {
-    fun printTestTree(proxy: AbstractTestProxy, indent: String = "") {
-        val status = when {
-            proxy.isPassed -> "✓"
-            proxy.isDefect -> "✗"
-            proxy.isIgnored -> "○"
-            proxy.isInProgress -> "→"
-            else -> "?"
-        }
-
-        println("$indent$status ${proxy.name} (${proxy.duration}ms)")
-
-        proxy.children.forEach { child ->
-            printTestTree(child, "$indent  ")
-        }
+fun printTestTree(proxy: AbstractTestProxy, indent: String = "") {
+    val status = when {
+        proxy.isPassed -> "✓"
+        proxy.isDefect -> "✗"
+        proxy.isIgnored -> "○"
+        proxy.isInProgress -> "→"
+        else -> "?"
     }
 
-    val manager = RunContentManager.getInstance(project)
-    val descriptor = manager.allDescriptors.lastOrNull()
-    val console = descriptor?.executionConsole as? SMTRunnerConsoleView
-    val rootProxy = console?.resultsViewer?.testsRootNode
+    println("$indent$status ${proxy.name} (${proxy.duration}ms)")
 
-    if (rootProxy != null) {
-        printTestTree(rootProxy)
+    proxy.children.forEach { child ->
+        printTestTree(child, "$indent  ")
     }
+}
+
+val manager = RunContentManager.getInstance(project)
+val descriptor = manager.allDescriptors.lastOrNull()
+val console = descriptor?.executionConsole as? SMTRunnerConsoleView
+val rootProxy = console?.resultsViewer?.testsRootNode
+
+if (rootProxy != null) {
+    printTestTree(rootProxy)
 }
 ```
 
@@ -193,7 +184,7 @@ execute {
 
 ## Stateful Execution
 
-Remember that `execute {}` blocks maintain IDE state between calls:
+Remember that each `steroid_execute_code` call runs in the same IDE process; state persists between calls:
 
 1. **Call 1**: Start test execution
 2. **Call 2+**: Poll for completion (quick, non-blocking checks)

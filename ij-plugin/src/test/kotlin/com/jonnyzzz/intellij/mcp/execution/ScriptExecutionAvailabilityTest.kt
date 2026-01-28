@@ -23,9 +23,7 @@ class ScriptExecutionAvailabilityTest : BasePlatformTestCase() {
         val result = manager.executeWithProgress(
             testExecParams(
                 """
-                execute {
-                    println("engine-ok")
-                }
+                println("engine-ok")
                 """.trimIndent()
             ),
             NoOpProgressReporter

@@ -30,9 +30,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         val manager = project.service<ExecutionManager>()
 
         val code = """
-            execute {
-                println("Hello from test")
-            }
+            println("Hello from test")
         """.trimIndent()
 
         val result = manager.executeWithProgress(testExecParams(code), NoOpProgressReporter)
@@ -45,15 +43,13 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         val manager = project.service<ExecutionManager>()
 
         val code = """
-            execute {
-                println("Line 1")
-                println("Line 2")
-            }
+            println("Line 1")
+            println("Line 2")
         """.trimIndent()
 
         val result = manager.executeWithProgress(testExecParams(code), NoOpProgressReporter)
 
-        // If execution succeeded, verify output
+        // If execution succeeded, verify the output
         if (!result.isError) {
             val text = getTextContent(result)
             assertTrue("Should have output", text.isNotEmpty())
@@ -64,15 +60,13 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         val manager = project.service<ExecutionManager>()
 
         val code = """
-            execute {
-                throw RuntimeException("Test error")
-            }
+            throw RuntimeException("Test error")
         """.trimIndent()
 
         val result = manager.executeWithProgress(testExecParams(code), NoOpProgressReporter)
 
-        // Should be error
-        assertTrue("Should be error", result.isError)
+        // Should be an error
+        assertTrue("Should be an error", result.isError)
         val text = getTextContent(result)
         assertTrue("Should have error content", text.isNotEmpty())
     }
@@ -81,16 +75,14 @@ class ExecutionManagerTest : BasePlatformTestCase() {
         val manager = project.service<ExecutionManager>()
 
         val code = """
-            execute {
-                println("Starting")
-                kotlinx.coroutines.delay(10000)
-                println("Should not reach here")
-            }
+            println("Starting")
+            kotlinx.coroutines.delay(10000)
+            println("Should not reach here")
         """.trimIndent()
 
         val result = manager.executeWithProgress(testExecParams(code, timeout = 2), NoOpProgressReporter)
 
-        // Should be error due to timeout (or error if script engine not available)
-        assertTrue("Should be error", result.isError)
+        // Should be an error due to timeout (or an error if the script engine is not available)
+        assertTrue("Should be an error", result.isError)
     }
 }

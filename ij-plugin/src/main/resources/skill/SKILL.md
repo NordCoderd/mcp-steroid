@@ -136,7 +136,7 @@ Execute Kotlin code in IntelliJ's runtime.
 
 **Parameters:**
 - `project_name` (required): Target project from `steroid_list_projects`
-- `code` (required): Kotlin script body (suspend context; `execute { }` wrapper not required)
+- `code` (required): Kotlin suspend function body
 - `reason` (required): Human-readable explanation
 - `task_id` (required): Group related executions
 - `timeout` (optional): Timeout in seconds (default: 60)
@@ -203,7 +203,7 @@ delay(1000)         // coroutine delay - works directly
 
 ### 2. Imports Are Optional
 
-Default imports are provided automatically. If you need extra APIs, add top-level imports (no execute wrapper required). Avoid placing imports after statements.
+Default imports are provided automatically. Add imports only when you need APIs outside the defaults.
 
 ```kotlin
 import com.intellij.psi.PsiManager
@@ -304,88 +304,57 @@ writeAction { /* PSI/VFS writes */ }               // Suspend write action
 val smart = smartReadAction { /* reads in smart mode */ }  // Auto-waits for indexing
 
 // === Search Scopes (NO IMPORTS NEEDED!) ===
-```kotlin
-execute {
-    // === Properties ===
-    project      // IntelliJ Project instance
-    params       // Tool parameters (JsonElement)
-    disposable   // For resource cleanup
-    isDisposed   // Check if disposed
+val scope1 = projectScope()  // Project files only
+val scope2 = allScope()      // Project + libraries
 
-    // === Output Methods ===
-    println("Hello", 42, "world")       // Space-separated output
-    printJson(object { val x = 1 })     // Pretty JSON
-    printException("Failed", exception) // Error with stack trace (recommended!)
-    progress("Step 1 of 3...")          // Progress (throttled 1/sec)
+// === File Access Helpers ===
+val vf = findFile("/absolute/path.kt")           // Find VirtualFile
+val psi = findPsiFile("/absolute/path.kt")       // Find PsiFile (suspend)
+val vf2 = findProjectFile("src/main/App.kt")     // Relative to project
+val psi2 = findProjectPsiFile("src/main/App.kt") // Relative to project (suspend)
 
-    // === Read/Write Actions (NO IMPORTS NEEDED!) ===
-    val data = readAction { /* PSI/VFS reads */ }      // Suspend read action
-    writeAction { /* PSI/VFS writes */ }               // Suspend write action
-    val smart = smartReadAction { /* reads in smart mode */ }  // Auto-waits for indexing
+// === IDE Utilities ===
+// waitForSmartMode() runs automatically before your script starts; call it again if you trigger indexing
 
-    // === Search Scopes (NO IMPORTS NEEDED!) ===
-    val scope1 = projectScope()  // Project files only
-    val scope2 = allScope()      // Project + libraries
-
-    // === File Access Helpers ===
-    val vf = findFile("/absolute/path.kt")           // Find VirtualFile
-    val psi = findPsiFile("/absolute/path.kt")       // Find PsiFile (suspend)
-    val vf2 = findProjectFile("src/main/App.kt")     // Relative to project
-    val psi2 = findProjectPsiFile("src/main/App.kt") // Relative to project (suspend)
-
-    // === IDE Utilities ===
-    waitForSmartMode()  // Wait for indexing to complete
-
-    // === Code Analysis (no window focus required) ===
-    // runInspectionsDirectly returns Map<String, List<ProblemDescriptor>> - empty if no problems
-    val file = requireNotNull(findProjectFile("src/main/App.kt")) { "File not found" }
-    val problems = runInspectionsDirectly(file)
-}
+// === Code Analysis (no window focus required) ===
+// runInspectionsDirectly returns Map<String, List<ProblemDescriptor>> - empty if no problems
+val file = requireNotNull(findProjectFile("src/main/App.kt")) { "File not found" }
+val problems = runInspectionsDirectly(file)
 ```
 
 ## Common Patterns
 
 ### Get Project Info
 ```kotlin
-execute {
-    println("Project: ${project.name}")
-    println("Base path: ${project.basePath}")
-}
+println("Project: ${project.name}")
+println("Base path: ${project.basePath}")
 ```
 
 ### Get IDE Log Path
 ```kotlin
-execute {
-    val logPath = com.intellij.openapi.application.PathManager.getLogPath()
-    println("Log: $logPath/idea.log")
-}
+val logPath = com.intellij.openapi.application.PathManager.getLogPath()
+println("Log: $logPath/idea.log")
 ```
 
 ### List Plugins
 ```kotlin
-execute {
-    com.intellij.ide.plugins.PluginManagerCore.getLoadedPlugins()
-        .filter { it.isEnabled }
-        .forEach { println("${it.name}: ${it.version}") }
-}
+com.intellij.ide.plugins.PluginManagerCore.getLoadedPlugins()
+    .filter { it.isEnabled }
+    .forEach { println("${it.name}: ${it.version}") }
 ```
 
 ### Find Plugin by ID
 ```kotlin
-execute {
-    val plugin = com.intellij.ide.plugins.PluginManagerCore.loadedPlugins
-        .find { it.pluginId.idString == "org.jetbrains.kotlin" }
-    println("Kotlin plugin: ${plugin?.version}")
-}
+val plugin = com.intellij.ide.plugins.PluginManagerCore.loadedPlugins
+    .find { it.pluginId.idString == "org.jetbrains.kotlin" }
+println("Kotlin plugin: ${plugin?.version}")
 ```
 
 ### List Extension Points
 ```kotlin
-execute {
-    project.extensionArea.extensionPoints
-        .filter { it.name.contains("kotlin", ignoreCase = true) }
-        .forEach { println("${it.name}: ${it.extensionList.size} extensions") }
-}
+project.extensionArea.extensionPoints
+    .filter { it.name.contains("kotlin", ignoreCase = true) }
+    .forEach { println("${it.name}: ${it.extensionList.size} extensions") }
 ```
 
 ### Navigate Project Files
@@ -393,13 +362,11 @@ execute {
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.VfsUtil
 
-execute {
-    ProjectRootManager.getInstance(project).contentRoots.forEach { root ->
-        println("Root: ${root.path}")
-        VfsUtil.iterateChildrenRecursively(root, null) { file ->
-            if (file.extension == "kt") println("  ${file.path}")
-            true
-        }
+ProjectRootManager.getInstance(project).contentRoots.forEach { root ->
+    println("Root: ${root.path}")
+    VfsUtil.iterateChildrenRecursively(root, null) { file ->
+        if (file.extension == "kt") println("  ${file.path}")
+        true
     }
 }
 ```
@@ -410,17 +377,13 @@ import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import java.nio.file.Path
 
-execute {
-    val path = Path.of("/path/to/project")
-    ProjectManagerEx.getInstanceEx().openProjectAsync(path, OpenProjectTask { })
-}
+val path = Path.of("/path/to/project")
+ProjectManagerEx.getInstanceEx().openProjectAsync(path, OpenProjectTask { })
 ```
 
 ### Restart IDE (CAUTION: destructive operation)
 ```kotlin
-execute {
-    com.intellij.openapi.application.ApplicationManager.getApplication().restart()
-}
+com.intellij.openapi.application.ApplicationManager.getApplication().restart()
 ```
 
 ## Complete End-to-End PSI Example
@@ -431,29 +394,27 @@ This example finds a Kotlin class, gets its methods, and prints their signatures
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
-execute {
-    // smartReadAction = waitForSmartMode() + readAction { } in one call
-    smartReadAction {
-        // Use built-in projectScope() helper
-        val classes = KotlinClassShortNameIndex.get("MyService", project, projectScope())
+// smartReadAction = waitForSmartMode() + readAction { } in one call
+smartReadAction {
+    // Use built-in projectScope() helper
+    val classes = KotlinClassShortNameIndex.get("MyService", project, projectScope())
 
-        if (classes.isEmpty()) {
-            println("No class named 'MyService' found")
-            return@smartReadAction
-        }
+    if (classes.isEmpty()) {
+        println("No class named 'MyService' found")
+        return@smartReadAction
+    }
 
-        classes.forEach { ktClass ->
-            println("Class: ${ktClass.fqName}")
-            println("File: ${ktClass.containingFile.virtualFile.path}")
+    classes.forEach { ktClass ->
+        println("Class: ${ktClass.fqName}")
+        println("File: ${ktClass.containingFile.virtualFile.path}")
 
-            // List all methods
-            ktClass.declarations.filterIsInstance<org.jetbrains.kotlin.psi.KtNamedFunction>()
-                .forEach { method ->
-                    val params = method.valueParameters.joinToString { "${it.name}: ${it.typeReference?.text}" }
-                    val returnType = method.typeReference?.text ?: "Unit"
-                    println("  fun ${method.name}($params): $returnType")
-                }
-        }
+        // List all methods
+        ktClass.declarations.filterIsInstance<org.jetbrains.kotlin.psi.KtNamedFunction>()
+            .forEach { method ->
+                val params = method.valueParameters.joinToString { "${it.name}: ${it.typeReference?.text}" }
+                val returnType = method.typeReference?.text ?: "Unit"
+                println("  fun ${method.name}($params): $returnType")
+            }
     }
 }
 ```
@@ -464,27 +425,25 @@ execute {
 import com.intellij.psi.search.searches.ReferencesSearch
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
-execute {
-    // smartReadAction = waitForSmartMode() + readAction
-    smartReadAction {
-        // Use built-in projectScope() helper
-        val classes = KotlinClassShortNameIndex.get("MyService", project, projectScope())
-        val targetClass = classes.firstOrNull()
+// smartReadAction = waitForSmartMode() + readAction
+smartReadAction {
+    // Use built-in projectScope() helper
+    val classes = KotlinClassShortNameIndex.get("MyService", project, projectScope())
+    val targetClass = classes.firstOrNull()
 
-        if (targetClass == null) {
-            println("Class not found")
-            return@smartReadAction
-        }
+    if (targetClass == null) {
+        println("Class not found")
+        return@smartReadAction
+    }
 
-        // Find all usages using findAll() (returns a Collection)
-        val usages = ReferencesSearch.search(targetClass, projectScope()).findAll()
+    // Find all usages using findAll() (returns a Collection)
+    val usages = ReferencesSearch.search(targetClass, projectScope()).findAll()
 
-        println("Found ${usages.size} usages of ${targetClass.name}:")
-        usages.forEach { ref ->
-            val file = ref.element.containingFile.virtualFile.path
-            val offset = ref.element.textOffset
-            println("  $file:$offset")
-        }
+    println("Found ${usages.size} usages of ${targetClass.name}:")
+    usages.forEach { ref ->
+        val file = ref.element.containingFile.virtualFile.path
+        val offset = ref.element.textOffset
+        println("  $file:$offset")
     }
 }
 ```
@@ -502,20 +461,17 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.PsiElement
 import com.intellij.openapi.vfs.LocalFileSystem
 
-execute {
-    waitForSmartMode()
 
-    readAction {
-        val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")
-        val psiFile = PsiManager.getInstance(project).findFile(vf!!)
+readAction {
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")
+    val psiFile = PsiManager.getInstance(project).findFile(vf!!)
 
-        // Navigate parent chain
-        val element = psiFile?.findElementAt(100) // element at offset 100
-        var current: PsiElement? = element
-        while (current != null) {
-            println("${current.javaClass.simpleName}: ${current.text.take(50)}")
-            current = current.parent
-        }
+    // Navigate parent chain
+    val element = psiFile?.findElementAt(100) // element at offset 100
+    var current: PsiElement? = element
+    while (current != null) {
+        println("${current.javaClass.simpleName}: ${current.text.take(50)}")
+        current = current.parent
     }
 }
 ```
@@ -529,23 +485,20 @@ import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtClass
 
-execute {
-    waitForSmartMode()
 
-    readAction {
-        val psiFile = // ... get file
+readAction {
+    val psiFile = // ... get file
 
-        // Find all functions in file
-        val functions = PsiTreeUtil.findChildrenOfType(psiFile, KtNamedFunction::class.java)
-        functions.forEach { fn ->
-            println("Function: ${fn.name} at line ${fn.textOffset}")
-        }
+    // Find all functions in file
+    val functions = PsiTreeUtil.findChildrenOfType(psiFile, KtNamedFunction::class.java)
+    functions.forEach { fn ->
+        println("Function: ${fn.name} at line ${fn.textOffset}")
+    }
 
-        // Find all classes
-        val classes = PsiTreeUtil.findChildrenOfType(psiFile, KtClass::class.java)
-        classes.forEach { cls ->
-            println("Class: ${cls.name}")
-        }
+    // Find all classes
+    val classes = PsiTreeUtil.findChildrenOfType(psiFile, KtClass::class.java)
+    classes.forEach { cls ->
+        println("Class: ${cls.name}")
     }
 }
 ```
@@ -557,31 +510,28 @@ import com.intellij.openapi.application.readAction
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 
-execute {
-    waitForSmartMode()
 
-    readAction {
-        val facade = JavaPsiFacade.getInstance(project)
-        val psiClass = facade.findClass(
-            "com.example.MyClass",
-            GlobalSearchScope.allScope(project)
-        )
+readAction {
+    val facade = JavaPsiFacade.getInstance(project)
+    val psiClass = facade.findClass(
+        "com.example.MyClass",
+        GlobalSearchScope.allScope(project)
+    )
 
-        if (psiClass != null) {
-            println("Found class: ${psiClass.qualifiedName}")
-            println("File: ${psiClass.containingFile.virtualFile.path}")
+    if (psiClass != null) {
+        println("Found class: ${psiClass.qualifiedName}")
+        println("File: ${psiClass.containingFile.virtualFile.path}")
 
-            // List methods
-            psiClass.methods.forEach { method ->
-                val params = method.parameterList.parameters
-                    .joinToString { "${it.name}: ${it.type.presentableText}" }
-                println("  ${method.name}($params): ${method.returnType?.presentableText}")
-            }
+        // List methods
+        psiClass.methods.forEach { method ->
+            val params = method.parameterList.parameters
+                .joinToString { "${it.name}: ${it.type.presentableText}" }
+            println("  ${method.name}($params): ${method.returnType?.presentableText}")
+        }
 
-            // List fields
-            psiClass.fields.forEach { field ->
-                println("  field ${field.name}: ${field.type.presentableText}")
-            }
+        // List fields
+        psiClass.fields.forEach { field ->
+            println("  field ${field.name}: ${field.type.presentableText}")
         }
     }
 }
@@ -595,25 +545,22 @@ import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ClassInheritorsSearch
 
-execute {
-    waitForSmartMode()
 
-    readAction {
-        val baseClass = JavaPsiFacade.getInstance(project)
-            .findClass("java.util.List", GlobalSearchScope.allScope(project))
+readAction {
+    val baseClass = JavaPsiFacade.getInstance(project)
+        .findClass("java.util.List", GlobalSearchScope.allScope(project))
 
-        if (baseClass != null) {
-            // Find all implementations
-            val inheritors = ClassInheritorsSearch.search(
-                baseClass,
-                GlobalSearchScope.projectScope(project),
-                true // include anonymous
-            ).findAll()
+    if (baseClass != null) {
+        // Find all implementations
+        val inheritors = ClassInheritorsSearch.search(
+            baseClass,
+            GlobalSearchScope.projectScope(project),
+            true // include anonymous
+        ).findAll()
 
-            println("Found ${inheritors.size} implementations of ${baseClass.name}")
-            inheritors.take(20).forEach { impl ->
-                println("  ${impl.qualifiedName}")
-            }
+        println("Found ${inheritors.size} implementations of ${baseClass.name}")
+        inheritors.take(20).forEach { impl ->
+            println("  ${impl.qualifiedName}")
         }
     }
 }
@@ -628,15 +575,13 @@ execute {
 ```kotlin
 import com.intellij.psi.search.FilenameIndex
 
-execute {
-    // smartReadAction = waitForSmartMode() + readAction
-    smartReadAction {
-        // Find files by exact name using built-in projectScope()
-        val files = FilenameIndex.getFilesByName(project, "build.gradle.kts", projectScope())
+// smartReadAction = waitForSmartMode() + readAction
+smartReadAction {
+    // Find files by exact name using built-in projectScope()
+    val files = FilenameIndex.getFilesByName(project, "build.gradle.kts", projectScope())
 
-        files.forEach { file ->
-            println("Found: ${file.virtualFile.path}")
-        }
+    files.forEach { file ->
+        println("Found: ${file.virtualFile.path}")
     }
 }
 ```
@@ -647,15 +592,13 @@ execute {
 import com.intellij.psi.search.FileTypeIndex
 import org.jetbrains.kotlin.idea.KotlinFileType
 
-execute {
-    smartReadAction {
-        // Find all Kotlin files using built-in projectScope()
-        val kotlinFiles = FileTypeIndex.getFiles(KotlinFileType.INSTANCE, projectScope())
+smartReadAction {
+    // Find all Kotlin files using built-in projectScope()
+    val kotlinFiles = FileTypeIndex.getFiles(KotlinFileType.INSTANCE, projectScope())
 
-        println("Found ${kotlinFiles.size} Kotlin files")
-        kotlinFiles.take(20).forEach { vf ->
-            println("  ${vf.path}")
-        }
+    println("Found ${kotlinFiles.size} Kotlin files")
+    kotlinFiles.take(20).forEach { vf ->
+        println("  ${vf.path}")
     }
 }
 ```
@@ -669,22 +612,19 @@ import com.intellij.psi.stubs.StubIndex
 import com.intellij.psi.impl.java.stubs.index.JavaMethodNameIndex
 import com.intellij.psi.PsiMethod
 
-execute {
-    waitForSmartMode()
 
-    readAction {
-        val methods = StubIndex.getElements(
-            JavaMethodNameIndex.getInstance().key,
-            "toString",
-            project,
-            GlobalSearchScope.projectScope(project),
-            PsiMethod::class.java
-        )
+readAction {
+    val methods = StubIndex.getElements(
+        JavaMethodNameIndex.getInstance().key,
+        "toString",
+        project,
+        GlobalSearchScope.projectScope(project),
+        PsiMethod::class.java
+    )
 
-        println("Found ${methods.size} methods named 'toString'")
-        methods.take(10).forEach { method ->
-            println("  ${method.containingClass?.qualifiedName}.${method.name}")
-        }
+    println("Found ${methods.size} methods named 'toString'")
+    methods.take(10).forEach { method ->
+        println("  ${method.containingClass?.qualifiedName}.${method.name}")
     }
 }
 ```
@@ -700,22 +640,20 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
 
-execute {
-    readAction {
-        val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
-        val document = FileDocumentManager.getInstance().getDocument(vf!!)
+readAction {
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+    val document = FileDocumentManager.getInstance().getDocument(vf!!)
 
-        if (document != null) {
-            println("Lines: ${document.lineCount}")
-            println("Length: ${document.textLength}")
+    if (document != null) {
+        println("Lines: ${document.lineCount}")
+        println("Length: ${document.textLength}")
 
-            // Get specific line
-            val lineNum = 5
-            if (lineNum < document.lineCount) {
-                val startOffset = document.getLineStartOffset(lineNum)
-                val endOffset = document.getLineEndOffset(lineNum)
-                println("Line $lineNum: ${document.getText().substring(startOffset, endOffset)}")
-            }
+        // Get specific line
+        val lineNum = 5
+        if (lineNum < document.lineCount) {
+            val startOffset = document.getLineStartOffset(lineNum)
+            val endOffset = document.getLineEndOffset(lineNum)
+            println("Line $lineNum: ${document.getText().substring(startOffset, endOffset)}")
         }
     }
 }
@@ -729,23 +667,21 @@ import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
 
-execute {
-    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
-    val document = FileDocumentManager.getInstance().getDocument(vf!!)
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+val document = FileDocumentManager.getInstance().getDocument(vf!!)
 
-    if (document != null) {
-        WriteCommandAction.runWriteCommandAction(project) {
-            // Insert at position
-            document.insertString(0, "// Added comment\n")
+if (document != null) {
+    WriteCommandAction.runWriteCommandAction(project) {
+        // Insert at position
+        document.insertString(0, "// Added comment\n")
 
-            // Or replace text
-            // document.replaceString(startOffset, endOffset, "new text")
+        // Or replace text
+        // document.replaceString(startOffset, endOffset, "new text")
 
-            // Or delete
-            // document.deleteString(startOffset, endOffset)
-        }
-        println("Document modified")
+        // Or delete
+        // document.deleteString(startOffset, endOffset)
     }
+    println("Document modified")
 }
 ```
 
@@ -755,25 +691,23 @@ execute {
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 
-execute {
-    readAction {
-        val editor = FileEditorManager.getInstance(project).selectedTextEditor
+readAction {
+    val editor = FileEditorManager.getInstance(project).selectedTextEditor
 
-        if (editor != null) {
-            val document = editor.document
-            val caretModel = editor.caretModel
-            val selectionModel = editor.selectionModel
+    if (editor != null) {
+        val document = editor.document
+        val caretModel = editor.caretModel
+        val selectionModel = editor.selectionModel
 
-            println("Current file: ${editor.virtualFile?.name}")
-            println("Caret offset: ${caretModel.offset}")
-            println("Caret line: ${caretModel.logicalPosition.line}")
+        println("Current file: ${editor.virtualFile?.name}")
+        println("Caret offset: ${caretModel.offset}")
+        println("Caret line: ${caretModel.logicalPosition.line}")
 
-            if (selectionModel.hasSelection()) {
-                println("Selected: ${selectionModel.selectedText}")
-            }
-        } else {
-            println("No editor open")
+        if (selectionModel.hasSelection()) {
+            println("Selected: ${selectionModel.selectedText}")
         }
+    } else {
+        println("No editor open")
     }
 }
 ```
@@ -788,14 +722,12 @@ execute {
 import com.intellij.openapi.vfs.LocalFileSystem
 import java.nio.charset.StandardCharsets
 
-execute {
-    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.txt")
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.txt")
 
-    if (vf != null && !vf.isDirectory) {
-        val content = String(vf.contentsToByteArray(), StandardCharsets.UTF_8)
-        println("File content (${content.length} chars):")
-        println(content.take(500))
-    }
+if (vf != null && !vf.isDirectory) {
+    val content = String(vf.contentsToByteArray(), StandardCharsets.UTF_8)
+    println("File content (${content.length} chars):")
+    println(content.take(500))
 }
 ```
 
@@ -807,12 +739,10 @@ Use this only when you know a file changed outside the IDE or VFS looks stale. P
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 
-execute {
-    val path = "/path/to/file.txt"
-    val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(path)
-    if (vf != null) {
-        VfsUtil.markDirtyAndRefresh(false, false, false, vf)
-    }
+val path = "/path/to/file.txt"
+val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(path)
+if (vf != null) {
+    VfsUtil.markDirtyAndRefresh(false, false, false, vf)
 }
 ```
 
@@ -821,14 +751,12 @@ execute {
 ```kotlin
 import com.intellij.openapi.vfs.LocalFileSystem
 
-execute {
-    val dir = LocalFileSystem.getInstance().findFileByPath("/path/to/directory")
+val dir = LocalFileSystem.getInstance().findFileByPath("/path/to/directory")
 
-    if (dir != null && dir.isDirectory) {
-        dir.children.forEach { child ->
-            val type = if (child.isDirectory) "DIR" else "FILE"
-            println("[$type] ${child.name}")
-        }
+if (dir != null && dir.isDirectory) {
+    dir.children.forEach { child ->
+        val type = if (child.isDirectory) "DIR" else "FILE"
+        println("[$type] ${child.name}")
     }
 }
 ```
@@ -839,14 +767,12 @@ execute {
 import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.vfs.LocalFileSystem
 
-execute {
-    writeAction {
-        val parentDir = LocalFileSystem.getInstance().findFileByPath("/path/to/dir")
-        if (parentDir != null) {
-            val newFile = parentDir.createChildData(this, "newfile.txt")
-            newFile.setBinaryContent("Hello, World!".toByteArray())
-            println("Created: ${newFile.path}")
-        }
+writeAction {
+    val parentDir = LocalFileSystem.getInstance().findFileByPath("/path/to/dir")
+    if (parentDir != null) {
+        val newFile = parentDir.createChildData(this, "newfile.txt")
+        newFile.setBinaryContent("Hello, World!".toByteArray())
+        println("Created: ${newFile.path}")
     }
 }
 ```
@@ -862,20 +788,17 @@ import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.PsiNamedElement
 
-execute {
-    waitForSmartMode()
 
-    // First find the element to rename in a read action
-    val element = readAction {
-        // ... find your PsiElement
-    }
+// First find the element to rename in a read action
+val element = readAction {
+    // ... find your PsiElement
+}
 
-    if (element is PsiNamedElement) {
-        WriteCommandAction.runWriteCommandAction(project) {
-            element.setName("newName")
-        }
-        println("Renamed to: newName")
+if (element is PsiNamedElement) {
+    WriteCommandAction.runWriteCommandAction(project) {
+        element.setName("newName")
     }
+    println("Renamed to: newName")
 }
 ```
 
@@ -887,20 +810,17 @@ import com.intellij.refactoring.RefactoringFactory
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 
-execute {
-    waitForSmartMode()
 
-    val psiClass = readAction {
-        JavaPsiFacade.getInstance(project)
-            .findClass("com.example.OldName", GlobalSearchScope.projectScope(project))
-    }
+val psiClass = readAction {
+    JavaPsiFacade.getInstance(project)
+        .findClass("com.example.OldName", GlobalSearchScope.projectScope(project))
+}
 
-    if (psiClass != null) {
-        val factory = RefactoringFactory.getInstance(project)
-        val rename = factory.createRename(psiClass, "NewName")
-        rename.run()
-        println("Refactoring completed")
-    }
+if (psiClass != null) {
+    val factory = RefactoringFactory.getInstance(project)
+    val rename = factory.createRename(psiClass, "NewName")
+    rename.run()
+    println("Refactoring completed")
 }
 ```
 
@@ -917,19 +837,16 @@ import com.intellij.codeInspection.ProblemsHolder
 import com.intellij.psi.PsiManager
 import com.intellij.openapi.vfs.LocalFileSystem
 
-execute {
-    waitForSmartMode()
 
-    readAction {
-        val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
-        val psiFile = PsiManager.getInstance(project).findFile(vf!!)
+readAction {
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+    val psiFile = PsiManager.getInstance(project).findFile(vf!!)
 
-        if (psiFile != null) {
-            val inspectionManager = InspectionManager.getInstance(project)
-            // Note: Getting specific inspections requires more setup
-            // This shows the basic pattern
-            println("File analyzed: ${psiFile.name}")
-        }
+    if (psiFile != null) {
+        val inspectionManager = InspectionManager.getInstance(project)
+        // Note: Getting specific inspections requires more setup
+        // This shows the basic pattern
+        println("File analyzed: ${psiFile.name}")
     }
 }
 ```
@@ -948,22 +865,19 @@ import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.psi.PsiManager
 import com.intellij.openapi.vfs.LocalFileSystem
 
-execute {
-    waitForSmartMode()
 
-    readAction {
-        val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
-        val psiFile = PsiManager.getInstance(project).findFile(vf!!)
-        val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)
+readAction {
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+    val psiFile = PsiManager.getInstance(project).findFile(vf!!)
+    val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)
 
-        if (psiFile != null && document != null) {
-            val highlights = DaemonCodeAnalyzerEx.getInstanceEx(project)
-                .getFileLevelHighlights(project, psiFile)
+    if (psiFile != null && document != null) {
+        val highlights = DaemonCodeAnalyzerEx.getInstanceEx(project)
+            .getFileLevelHighlights(project, psiFile)
 
-            highlights.forEach { info ->
-                val severity = info.severity
-                println("[$severity] ${info.description} at ${info.startOffset}")
-            }
+        highlights.forEach { info ->
+            val severity = info.severity
+            println("[$severity] ${info.description} at ${info.startOffset}")
         }
     }
 }
@@ -975,25 +889,22 @@ Use `runInspectionsDirectly()` for reliable inspection results regardless of IDE
 This bypasses the daemon's caching and runs inspections directly on the file.
 
 ```kotlin
-execute {
-    val file = requireNotNull(findProjectFile("src/main/kotlin/MyClass.kt")) { "File not found" }
-    waitForSmartMode()
+val file = requireNotNull(findProjectFile("src/main/kotlin/MyClass.kt")) { "File not found" }
 
-    // Run inspections directly - works even when IDE is not focused
-    val problems = runInspectionsDirectly(file)
+// Run inspections directly - works even when IDE is not focused
+val problems = runInspectionsDirectly(file)
 
-    if (problems.isEmpty()) {
-        println("No problems found!")
-    } else {
-        problems.forEach { (inspectionId, descriptors) ->
-            descriptors.forEach { problem ->
-                val element = problem.psiElement
-                val line = if (element != null) {
-                    val doc = com.intellij.psi.PsiDocumentManager.getInstance(project).getDocument(element.containingFile)
-                    doc?.getLineNumber(element.textOffset)?.plus(1) ?: "?"
-                } else "?"
-                println("[$inspectionId] Line $line: ${problem.descriptionTemplate}")
-            }
+if (problems.isEmpty()) {
+    println("No problems found!")
+} else {
+    problems.forEach { (inspectionId, descriptors) ->
+        descriptors.forEach { problem ->
+            val element = problem.psiElement
+            val line = if (element != null) {
+                val doc = com.intellij.psi.PsiDocumentManager.getInstance(project).getDocument(element.containingFile)
+                doc?.getLineNumber(element.textOffset)?.plus(1) ?: "?"
+            } else "?"
+            println("[$inspectionId] Line $line: ${problem.descriptionTemplate}")
         }
     }
 }
@@ -1021,35 +932,32 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiManager
 import com.intellij.codeInsight.lookup.LookupElement
 
-execute {
-    waitForSmartMode()
 
-    val filePath = "/path/to/YourFile.kt"
-    val offset = 150  // Position where you want completions
+val filePath = "/path/to/YourFile.kt"
+val offset = 150  // Position where you want completions
 
-    val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
-    if (vf == null) {
-        println("File not found")
-        return@execute
-    }
+val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
+if (vf == null) {
+    println("File not found")
+    return
+}
 
-    val completions = readAction {
-        val psiFile = PsiManager.getInstance(project).findFile(vf)
-        if (psiFile == null) return@readAction emptyArray<Any>()
+val completions = readAction {
+    val psiFile = PsiManager.getInstance(project).findFile(vf)
+    if (psiFile == null) return@readAction emptyArray<Any>()
 
-        val element = psiFile.findElementAt(offset)
-        val reference = element?.reference
+    val element = psiFile.findElementAt(offset)
+    val reference = element?.reference
 
-        reference?.getVariants() ?: emptyArray()
-    }
+    reference?.getVariants() ?: emptyArray()
+}
 
-    println("Found ${completions.size} completions:")
-    completions.forEach { variant ->
-        when (variant) {
-            is LookupElement -> println("  - ${variant.lookupString}")
-            is String -> println("  - $variant")
-            else -> println("  - ${variant.javaClass.simpleName}: $variant")
-        }
+println("Found ${completions.size} completions:")
+completions.forEach { variant ->
+    when (variant) {
+        is LookupElement -> println("  - ${variant.lookupString}")
+        is String -> println("  - $variant")
+        else -> println("  - ${variant.javaClass.simpleName}: $variant")
     }
 }
 ```
@@ -1062,42 +970,39 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.psi.PsiManager
 import com.intellij.codeInsight.lookup.LookupElement
 
-execute {
-    waitForSmartMode()
 
-    val editor = FileEditorManager.getInstance(project).selectedTextEditor
-    if (editor == null) {
-        println("No editor open")
-        return@execute
-    }
+val editor = FileEditorManager.getInstance(project).selectedTextEditor
+if (editor == null) {
+    println("No editor open")
+    return
+}
 
-    val offset = editor.caretModel.offset
-    val virtualFile = editor.virtualFile
+val offset = editor.caretModel.offset
+val virtualFile = editor.virtualFile
 
-    val completions = readAction {
-        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-        if (psiFile == null) return@readAction emptyArray<Any>()
+val completions = readAction {
+    val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
+    if (psiFile == null) return@readAction emptyArray<Any>()
 
-        val element = psiFile.findElementAt(offset)
-        val reference = element?.reference
+    val element = psiFile.findElementAt(offset)
+    val reference = element?.reference
 
-        reference?.getVariants() ?: emptyArray()
-    }
+    reference?.getVariants() ?: emptyArray()
+}
 
-    println("Completions at offset $offset:")
-    completions.take(20).forEach { variant ->
-        when (variant) {
-            is LookupElement -> {
-                val psi = variant.psiElement
-                val type = psi?.javaClass?.simpleName ?: "unknown"
-                println("  - ${variant.lookupString} ($type)")
-            }
-            else -> println("  - $variant")
+println("Completions at offset $offset:")
+completions.take(20).forEach { variant ->
+    when (variant) {
+        is LookupElement -> {
+            val psi = variant.psiElement
+            val type = psi?.javaClass?.simpleName ?: "unknown"
+            println("  - ${variant.lookupString} ($type)")
         }
+        else -> println("  - $variant")
     }
-    if (completions.size > 20) {
-        println("  ... and ${completions.size - 20} more")
-    }
+}
+if (completions.size > 20) {
+    println("  ... and ${completions.size - 20} more")
 }
 ```
 
@@ -1114,48 +1019,45 @@ import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.scope.PsiScopeProcessor
 import com.intellij.psi.ResolveState
 
-execute {
-    waitForSmartMode()
 
-    val filePath = "/path/to/YourFile.kt"
-    val offset = 150
+val filePath = "/path/to/YourFile.kt"
+val offset = 150
 
-    val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
-    if (vf == null) {
-        println("File not found")
-        return@execute
-    }
+val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
+if (vf == null) {
+    println("File not found")
+    return
+}
 
-    val symbols = readAction {
-        val psiFile = PsiManager.getInstance(project).findFile(vf) ?: return@readAction emptyList<Pair<String, String>>()
-        val context = psiFile.findElementAt(offset) ?: return@readAction emptyList<Pair<String, String>>()
+val symbols = readAction {
+    val psiFile = PsiManager.getInstance(project).findFile(vf) ?: return@readAction emptyList<Pair<String, String>>()
+    val context = psiFile.findElementAt(offset) ?: return@readAction emptyList<Pair<String, String>>()
 
-        val declarations = mutableListOf<Pair<String, String>>()
+    val declarations = mutableListOf<Pair<String, String>>()
 
-        val processor = object : PsiScopeProcessor {
-            override fun execute(element: PsiElement, state: ResolveState): Boolean {
-                if (element is PsiNamedElement) {
-                    val name = element.name ?: return true
-                    val kind = element.javaClass.simpleName
-                    declarations.add(name to kind)
-                }
-                return true  // Continue processing
+    val processor = object : PsiScopeProcessor {
+        override fun execute(element: PsiElement, state: ResolveState): Boolean {
+            if (element is PsiNamedElement) {
+                val name = element.name ?: return true
+                val kind = element.javaClass.simpleName
+                declarations.add(name to kind)
             }
+            return true  // Continue processing
         }
-
-        context.processDeclarations(processor, ResolveState.initial(), null, context)
-        declarations
     }
 
-    println("Visible symbols at offset $offset:")
-    symbols.groupBy { it.second }.forEach { (kind, items) ->
-        println("\n$kind:")
-        items.take(10).forEach { (name, _) ->
-            println("  - $name")
-        }
-        if (items.size > 10) {
-            println("  ... and ${items.size - 10} more")
-        }
+    context.processDeclarations(processor, ResolveState.initial(), null, context)
+    declarations
+}
+
+println("Visible symbols at offset $offset:")
+symbols.groupBy { it.second }.forEach { (kind, items) ->
+    println("\n$kind:")
+    items.take(10).forEach { (name, _) ->
+        println("  - $name")
+    }
+    if (items.size > 10) {
+        println("  ... and ${items.size - 10} more")
     }
 }
 ```
@@ -1169,42 +1071,39 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiField
 
-execute {
-    waitForSmartMode()
 
-    val className = "com.intellij.openapi.project.Project"
+val className = "com.intellij.openapi.project.Project"
 
-    readAction {
-        val psiClass = JavaPsiFacade.getInstance(project)
-            .findClass(className, GlobalSearchScope.allScope(project))
+readAction {
+    val psiClass = JavaPsiFacade.getInstance(project)
+        .findClass(className, GlobalSearchScope.allScope(project))
 
-        if (psiClass == null) {
-            println("Class not found: $className")
-            return@readAction
+    if (psiClass == null) {
+        println("Class not found: $className")
+        return@readAction
+    }
+
+    println("=== Class: ${psiClass.qualifiedName} ===\n")
+
+    // Get all methods (including inherited)
+    val methods = psiClass.allMethods
+    println("Methods (${methods.size}):")
+    methods
+        .filter { !it.isConstructor }
+        .sortedBy { it.name }
+        .take(30)
+        .forEach { method ->
+            val params = method.parameterList.parameters
+                .joinToString(", ") { "${it.name}: ${it.type.presentableText}" }
+            val returnType = method.returnType?.presentableText ?: "void"
+            println("  ${method.name}($params): $returnType")
         }
 
-        println("=== Class: ${psiClass.qualifiedName} ===\n")
-
-        // Get all methods (including inherited)
-        val methods = psiClass.allMethods
-        println("Methods (${methods.size}):")
-        methods
-            .filter { !it.isConstructor }
-            .sortedBy { it.name }
-            .take(30)
-            .forEach { method ->
-                val params = method.parameterList.parameters
-                    .joinToString(", ") { "${it.name}: ${it.type.presentableText}" }
-                val returnType = method.returnType?.presentableText ?: "void"
-                println("  ${method.name}($params): $returnType")
-            }
-
-        // Get all fields
-        val fields = psiClass.allFields
-        println("\nFields (${fields.size}):")
-        fields.sortedBy { it.name }.forEach { field ->
-            println("  ${field.name}: ${field.type.presentableText}")
-        }
+    // Get all fields
+    val fields = psiClass.allFields
+    println("\nFields (${fields.size}):")
+    fields.sortedBy { it.name }.forEach { field ->
+        println("  ${field.name}: ${field.type.presentableText}")
     }
 }
 ```
@@ -1216,41 +1115,38 @@ import com.intellij.openapi.application.readAction
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 
-execute {
-    waitForSmartMode()
 
-    // Discover methods available on common interfaces
-    val interfaces = listOf(
-        "com.intellij.openapi.project.Project",
-        "com.intellij.psi.PsiFile",
-        "com.intellij.psi.PsiElement",
-        "com.intellij.openapi.editor.Editor"
-    )
+// Discover methods available on common interfaces
+val interfaces = listOf(
+    "com.intellij.openapi.project.Project",
+    "com.intellij.psi.PsiFile",
+    "com.intellij.psi.PsiElement",
+    "com.intellij.openapi.editor.Editor"
+)
 
-    readAction {
-        interfaces.forEach { className ->
-            val psiClass = JavaPsiFacade.getInstance(project)
-                .findClass(className, GlobalSearchScope.allScope(project))
+readAction {
+    interfaces.forEach { className ->
+        val psiClass = JavaPsiFacade.getInstance(project)
+            .findClass(className, GlobalSearchScope.allScope(project))
 
-            if (psiClass == null) {
-                println("Not found: $className")
-                return@forEach
-            }
-
-            val simpleName = className.substringAfterLast('.')
-            println("\n=== $simpleName ===")
-
-            // Show key methods (non-deprecated, public)
-            psiClass.methods
-                .filter { !it.isDeprecated && it.hasModifierProperty("public") }
-                .sortedBy { it.name }
-                .take(15)
-                .forEach { method ->
-                    val params = method.parameterList.parameters.size
-                    val returnType = method.returnType?.presentableText ?: "void"
-                    println("  ${method.name}($params params): $returnType")
-                }
+        if (psiClass == null) {
+            println("Not found: $className")
+            return@forEach
         }
+
+        val simpleName = className.substringAfterLast('.')
+        println("\n=== $simpleName ===")
+
+        // Show key methods (non-deprecated, public)
+        psiClass.methods
+            .filter { !it.isDeprecated && it.hasModifierProperty("public") }
+            .sortedBy { it.name }
+            .take(15)
+            .forEach { method ->
+                val params = method.parameterList.parameters.size
+                val returnType = method.returnType?.presentableText ?: "void"
+                println("  ${method.name}($params params): $returnType")
+            }
     }
 }
 ```
@@ -1267,55 +1163,52 @@ import com.intellij.psi.PsiVariable
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.PsiClass
 
-execute {
-    waitForSmartMode()
 
-    val filePath = "/path/to/YourFile.java"
-    val offset = 200
+val filePath = "/path/to/YourFile.java"
+val offset = 200
 
-    val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
-    if (vf == null) {
-        println("File not found")
-        return@execute
+val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
+if (vf == null) {
+    println("File not found")
+    return
+}
+
+readAction {
+    val psiFile = PsiManager.getInstance(project).findFile(vf)
+    if (psiFile == null) {
+        println("Cannot parse file")
+        return@readAction
     }
 
-    readAction {
-        val psiFile = PsiManager.getInstance(project).findFile(vf)
-        if (psiFile == null) {
-            println("Cannot parse file")
-            return@readAction
-        }
+    val element = psiFile.findElementAt(offset)
+    println("Element at offset $offset: ${element?.text}")
+    println("Element type: ${element?.javaClass?.simpleName}")
 
-        val element = psiFile.findElementAt(offset)
-        println("Element at offset $offset: ${element?.text}")
-        println("Element type: ${element?.javaClass?.simpleName}")
+    // Find containing expression
+    val expr = PsiTreeUtil.getParentOfType(element, PsiExpression::class.java)
+    if (expr != null) {
+        println("Expression: ${expr.text}")
+        println("Expression type: ${expr.type?.presentableText}")
+    }
 
-        // Find containing expression
-        val expr = PsiTreeUtil.getParentOfType(element, PsiExpression::class.java)
-        if (expr != null) {
-            println("Expression: ${expr.text}")
-            println("Expression type: ${expr.type?.presentableText}")
-        }
+    // Find containing variable declaration
+    val variable = PsiTreeUtil.getParentOfType(element, PsiVariable::class.java)
+    if (variable != null) {
+        println("Variable: ${variable.name}")
+        println("Variable type: ${variable.type.presentableText}")
+    }
 
-        // Find containing variable declaration
-        val variable = PsiTreeUtil.getParentOfType(element, PsiVariable::class.java)
-        if (variable != null) {
-            println("Variable: ${variable.name}")
-            println("Variable type: ${variable.type.presentableText}")
-        }
+    // Find containing method
+    val method = PsiTreeUtil.getParentOfType(element, PsiMethod::class.java)
+    if (method != null) {
+        println("In method: ${method.name}")
+        println("Return type: ${method.returnType?.presentableText}")
+    }
 
-        // Find containing method
-        val method = PsiTreeUtil.getParentOfType(element, PsiMethod::class.java)
-        if (method != null) {
-            println("In method: ${method.name}")
-            println("Return type: ${method.returnType?.presentableText}")
-        }
-
-        // Find containing class
-        val psiClass = PsiTreeUtil.getParentOfType(element, PsiClass::class.java)
-        if (psiClass != null) {
-            println("In class: ${psiClass.qualifiedName}")
-        }
+    // Find containing class
+    val psiClass = PsiTreeUtil.getParentOfType(element, PsiClass::class.java)
+    if (psiClass != null) {
+        println("In class: ${psiClass.qualifiedName}")
     }
 }
 ```
@@ -1331,64 +1224,61 @@ import com.intellij.psi.PsiField
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiVariable
 
-execute {
-    waitForSmartMode()
 
-    val filePath = "/path/to/YourFile.kt"
-    val offset = 150  // Put caret on a symbol you want to resolve
+val filePath = "/path/to/YourFile.kt"
+val offset = 150  // Put caret on a symbol you want to resolve
 
-    val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
-    if (vf == null) {
-        println("File not found")
-        return@execute
+val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
+if (vf == null) {
+    println("File not found")
+    return
+}
+
+readAction {
+    val psiFile = PsiManager.getInstance(project).findFile(vf)
+    val element = psiFile?.findElementAt(offset)
+    val reference = element?.parent?.reference ?: element?.reference
+
+    if (reference == null) {
+        println("No reference at offset $offset")
+        return@readAction
     }
 
-    readAction {
-        val psiFile = PsiManager.getInstance(project).findFile(vf)
-        val element = psiFile?.findElementAt(offset)
-        val reference = element?.parent?.reference ?: element?.reference
+    println("Reference text: ${reference.element.text}")
 
-        if (reference == null) {
-            println("No reference at offset $offset")
-            return@readAction
+    val resolved = reference.resolve()
+    if (resolved == null) {
+        println("Could not resolve reference")
+        return@readAction
+    }
+
+    println("Resolved to: ${resolved.javaClass.simpleName}")
+
+    when (resolved) {
+        is PsiMethod -> {
+            println("Method: ${resolved.name}")
+            println("Containing class: ${resolved.containingClass?.qualifiedName}")
+            println("Return type: ${resolved.returnType?.presentableText}")
+            println("Parameters:")
+            resolved.parameterList.parameters.forEach { param ->
+                println("  ${param.name}: ${param.type.presentableText}")
+            }
         }
-
-        println("Reference text: ${reference.element.text}")
-
-        val resolved = reference.resolve()
-        if (resolved == null) {
-            println("Could not resolve reference")
-            return@readAction
+        is PsiField -> {
+            println("Field: ${resolved.name}")
+            println("Type: ${resolved.type.presentableText}")
+            println("Containing class: ${resolved.containingClass?.qualifiedName}")
         }
-
-        println("Resolved to: ${resolved.javaClass.simpleName}")
-
-        when (resolved) {
-            is PsiMethod -> {
-                println("Method: ${resolved.name}")
-                println("Containing class: ${resolved.containingClass?.qualifiedName}")
-                println("Return type: ${resolved.returnType?.presentableText}")
-                println("Parameters:")
-                resolved.parameterList.parameters.forEach { param ->
-                    println("  ${param.name}: ${param.type.presentableText}")
-                }
-            }
-            is PsiField -> {
-                println("Field: ${resolved.name}")
-                println("Type: ${resolved.type.presentableText}")
-                println("Containing class: ${resolved.containingClass?.qualifiedName}")
-            }
-            is PsiClass -> {
-                println("Class: ${resolved.qualifiedName}")
-                println("Is interface: ${resolved.isInterface}")
-            }
-            is PsiVariable -> {
-                println("Variable: ${resolved.name}")
-                println("Type: ${resolved.type.presentableText}")
-            }
-            else -> {
-                println("Resolved element: ${resolved.text?.take(100)}")
-            }
+        is PsiClass -> {
+            println("Class: ${resolved.qualifiedName}")
+            println("Is interface: ${resolved.isInterface}")
+        }
+        is PsiVariable -> {
+            println("Variable: ${resolved.name}")
+            println("Type: ${resolved.type.presentableText}")
+        }
+        else -> {
+            println("Resolved element: ${resolved.text?.take(100)}")
         }
     }
 }
@@ -1405,26 +1295,24 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.module.ModuleManager
 
-execute {
-    // Project root manager
-    val rootManager = ProjectRootManager.getInstance(project)
-    println("SDK: ${rootManager.projectSdk?.name}")
+// Project root manager
+val rootManager = ProjectRootManager.getInstance(project)
+println("SDK: ${rootManager.projectSdk?.name}")
 
-    // Module manager
-    val moduleManager = ModuleManager.getInstance(project)
-    moduleManager.modules.forEach { module ->
-        println("Module: ${module.name}")
-    }
+// Module manager
+val moduleManager = ModuleManager.getInstance(project)
+moduleManager.modules.forEach { module ->
+    println("Module: ${module.name}")
+}
 
-    // Content roots
-    rootManager.contentRoots.forEach { root ->
-        println("Content root: ${root.path}")
-    }
+// Content roots
+rootManager.contentRoots.forEach { root ->
+    println("Content root: ${root.path}")
+}
 
-    // Source roots
-    rootManager.contentSourceRoots.forEach { src ->
-        println("Source root: ${src.path}")
-    }
+// Source roots
+rootManager.contentSourceRoots.forEach { src ->
+    println("Source root: ${src.path}")
 }
 ```
 
@@ -1434,20 +1322,18 @@ execute {
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.LocalFileSystem
 
-execute {
-    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
 
-    if (vf != null) {
-        val fileIndex = ProjectFileIndex.getInstance(project)
+if (vf != null) {
+    val fileIndex = ProjectFileIndex.getInstance(project)
 
-        println("Is in project: ${fileIndex.isInProject(vf)}")
-        println("Is in source: ${fileIndex.isInSource(vf)}")
-        println("Is in test source: ${fileIndex.isInTestSourceContent(vf)}")
-        println("Is in library: ${fileIndex.isInLibraryClasses(vf)}")
+    println("Is in project: ${fileIndex.isInProject(vf)}")
+    println("Is in source: ${fileIndex.isInSource(vf)}")
+    println("Is in test source: ${fileIndex.isInTestSourceContent(vf)}")
+    println("Is in library: ${fileIndex.isInLibraryClasses(vf)}")
 
-        val module = fileIndex.getModuleForFile(vf)
-        println("Module: ${module?.name}")
-    }
+    val module = fileIndex.getModuleForFile(vf)
+    println("Module: ${module?.name}")
 }
 ```
 
@@ -1459,27 +1345,25 @@ execute {
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.openapi.module.ModuleManager
 
-execute {
-    // Project scope (all project files)
-    val projectScope = GlobalSearchScope.projectScope(project)
+// Project scope (all project files)
+val projectScope = GlobalSearchScope.projectScope(project)
 
-    // All scope (project + libraries)
-    val allScope = GlobalSearchScope.allScope(project)
+// All scope (project + libraries)
+val allScope = GlobalSearchScope.allScope(project)
 
-    // Module scope
-    val module = ModuleManager.getInstance(project).modules.firstOrNull()
-    if (module != null) {
-        val moduleScope = GlobalSearchScope.moduleScope(module)
-        println("Module scope: ${module.name}")
-    }
-
-    // File scope
-    val vf = // ... get virtual file
-    val fileScope = GlobalSearchScope.fileScope(project, vf)
-
-    // Multiple files scope
-    val filesScope = GlobalSearchScope.filesScope(project, listOf(vf1, vf2))
+// Module scope
+val module = ModuleManager.getInstance(project).modules.firstOrNull()
+if (module != null) {
+    val moduleScope = GlobalSearchScope.moduleScope(module)
+    println("Module scope: ${module.name}")
 }
+
+// File scope
+val vf = // ... get virtual file
+val fileScope = GlobalSearchScope.fileScope(project, vf)
+
+// Multiple files scope
+val filesScope = GlobalSearchScope.filesScope(project, listOf(vf1, vf2))
 ```
 
 ## Actions
@@ -1488,37 +1372,31 @@ execute {
 ```kotlin
 import com.intellij.openapi.actionSystem.ActionManager
 
-execute {
-    val action = ActionManager.getInstance().getAction("GotoFile")
-    println("Action: ${action?.templatePresentation?.text}")
-}
+val action = ActionManager.getInstance().getAction("GotoFile")
+println("Action: ${action?.templatePresentation?.text}")
 ```
 
 ### List All Actions
 ```kotlin
 import com.intellij.openapi.actionSystem.ActionManager
 
-execute {
-    ActionManager.getInstance().getActionIdList("")
-        .filter { it.contains("Goto", ignoreCase = true) }
-        .take(20)
-        .forEach { println(it) }
-}
+ActionManager.getInstance().getActionIdList("")
+    .filter { it.contains("Goto", ignoreCase = true) }
+    .take(20)
+    .forEach { println(it) }
 ```
 
 ## Reflection for API Discovery
 
 ```kotlin
-execute {
-    try {
-        val clazz = Class.forName("com.intellij.openapi.project.Project")
-        clazz.methods
-            .filter { it.parameterCount == 0 }
-            .take(20)
-            .forEach { println("${it.name}(): ${it.returnType.simpleName}") }
-    } catch (e: ClassNotFoundException) {
-        println("Class not found")
-    }
+try {
+    val clazz = Class.forName("com.intellij.openapi.project.Project")
+    clazz.methods
+        .filter { it.parameterCount == 0 }
+        .take(20)
+        .forEach { println("${it.name}(): ${it.returnType.simpleName}") }
+} catch (e: ClassNotFoundException) {
+    println("Class not found")
 }
 ```
 
@@ -1527,12 +1405,10 @@ execute {
 Use `printException` for errors - it includes the stack trace in the output:
 
 ```kotlin
-execute {
-    try {
-        // risky operation
-    } catch (e: Exception) {
-        printException("Operation failed", e)  // Recommended - includes stack trace in output
-    }
+try {
+    // risky operation
+} catch (e: Exception) {
+    printException("Operation failed", e)  // Recommended - includes stack trace in output
 }
 ```
 

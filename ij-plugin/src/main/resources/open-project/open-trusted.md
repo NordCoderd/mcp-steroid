@@ -62,7 +62,7 @@ Now you can use `steroid_execute_code` with the project:
   "tool": "steroid_execute_code",
   "arguments": {
     "project_name": "your-project",
-    "code": "execute { println(\"Project: ${project.name}\") }",
+    "code": "println(\"Project: ${project.name}\")",
     "task_id": "verify-project",
     "reason": "Verifying project is accessible"
   }
@@ -80,7 +80,7 @@ Now you can use `steroid_execute_code` with the project:
 → steroid_list_projects()
 ← {"projects":[{"name":"my-app","path":"/Users/me/projects/my-app"}]}
 
-→ steroid_execute_code(project_name="my-app", code="execute { println(project.basePath) }", ...)
+→ steroid_execute_code(project_name="my-app", code="println(project.basePath)", ...)
 ← /Users/me/projects/my-app
 ```
 

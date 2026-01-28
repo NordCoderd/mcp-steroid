@@ -28,82 +28,79 @@ import com.intellij.refactoring.extractMethod.ExtractMethodProcessor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-execute {
-    // Configuration - modify these for your use case
-    val filePath = "/path/to/your/File.java" // TODO: Set your file path
-    val startLine = 10 // 1-based start line of selection
-    val endLine = 12   // 1-based end line of selection
-    val newMethodName = "extractedMethod"
-    val dryRun = true
+// Configuration - modify these for your use case
+val filePath = "/path/to/your/File.java" // TODO: Set your file path
+val startLine = 10 // 1-based start line of selection
+val endLine = 12   // 1-based end line of selection
+val newMethodName = "extractedMethod"
+val dryRun = true
 
-    waitForSmartMode()
 
-    val (psiFile, document) = readAction {
-        val virtualFile = findFile(filePath) ?: return@readAction null to null
-        val psi = PsiManager.getInstance(project).findFile(virtualFile)
-        val doc = FileDocumentManager.getInstance().getDocument(virtualFile)
-        psi to doc
+val (psiFile, document) = readAction {
+    val virtualFile = findFile(filePath) ?: return@readAction null to null
+    val psi = PsiManager.getInstance(project).findFile(virtualFile)
+    val doc = FileDocumentManager.getInstance().getDocument(virtualFile)
+    psi to doc
+}
+
+if (psiFile == null || document == null) {
+    println("File not found or no document: $filePath")
+    return
+}
+
+val editor = withContext(Dispatchers.EDT) {
+    EditorFactory.getInstance().createEditor(document, project)
+}
+try {
+    val startOffset = document.getLineStartOffset(startLine - 1)
+    val endOffset = document.getLineEndOffset(endLine - 1)
+
+    val statements = readAction {
+        PsiTreeUtil.collectElements(psiFile) { element ->
+            element is PsiStatement &&
+                element.textRange.startOffset >= startOffset &&
+                element.textRange.endOffset <= endOffset
+        }.filterIsInstance<PsiStatement>().toTypedArray()
     }
 
-    if (psiFile == null || document == null) {
-        println("File not found or no document: $filePath")
-        return@execute
+    if (statements.isEmpty()) {
+        println("No statements found in the specified line range.")
+        return
     }
 
-    val editor = withContext(Dispatchers.EDT) {
-        EditorFactory.getInstance().createEditor(document, project)
+    val processor = ExtractMethodProcessor(
+        project,
+        editor,
+        statements,
+        null,
+        "Extract Method",
+        newMethodName,
+        null
+    )
+    processor.setShowErrorDialogs(false)
+    val prepared = readAction { processor.prepare() }
+    if (!prepared) {
+        println("Extract method preparation failed.")
+        return
     }
-    try {
-        val startOffset = document.getLineStartOffset(startLine - 1)
-        val endOffset = document.getLineEndOffset(endLine - 1)
+    processor.setMethodName(newMethodName)
+    readAction {
+        processor.prepareVariablesAndName()
+        processor.prepareNullability()
+    }
 
-        val statements = readAction {
-            PsiTreeUtil.collectElements(psiFile) { element ->
-                element is PsiStatement &&
-                    element.textRange.startOffset >= startOffset &&
-                    element.textRange.endOffset <= endOffset
-            }.filterIsInstance<PsiStatement>().toTypedArray()
-        }
+    if (dryRun) {
+        println("Extract method prepared for $filePath ($startLine-$endLine).")
+        println("Set dryRun=false to apply changes.")
+        return
+    }
 
-        if (statements.isEmpty()) {
-            println("No statements found in the specified line range.")
-            return@execute
-        }
+    writeIntentReadAction { ExtractMethodHandler.extractMethod(project, processor) }
 
-        val processor = ExtractMethodProcessor(
-            project,
-            editor,
-            statements,
-            null,
-            "Extract Method",
-            newMethodName,
-            null
-        )
-        processor.setShowErrorDialogs(false)
-        val prepared = readAction { processor.prepare() }
-        if (!prepared) {
-            println("Extract method preparation failed.")
-            return@execute
-        }
-        processor.setMethodName(newMethodName)
-        readAction {
-            processor.prepareVariablesAndName()
-            processor.prepareNullability()
-        }
-
-        if (dryRun) {
-            println("Extract method prepared for $filePath ($startLine-$endLine).")
-            println("Set dryRun=false to apply changes.")
-            return@execute
-        }
-
-        writeIntentReadAction { ExtractMethodHandler.extractMethod(project, processor) }
-
-        println("Extracted method: $newMethodName")
-    } finally {
-        withContext(Dispatchers.EDT) {
-            EditorFactory.getInstance().releaseEditor(editor)
-        }
+    println("Extracted method: $newMethodName")
+} finally {
+    withContext(Dispatchers.EDT) {
+        EditorFactory.getInstance().releaseEditor(editor)
     }
 }
 

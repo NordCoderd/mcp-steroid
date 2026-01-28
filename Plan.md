@@ -56,20 +56,17 @@ Key files:
 
 ### Script Execution Model
 
-**Two-layer API**:
+**Script body API**:
 
-1. `McpScriptScope` - Bound to script engine, single method `execute { }`
-2. `McpScriptContext` - Full API, passed to execute block
+1. Script body (suspend function) - user submits plain Kotlin statements
+2. `McpScriptContext` - full API, available as the receiver
 
 ```kotlin
 // User writes:
-execute {
-    waitForSmartMode()
-    println("Hello!")
-}
+println("Hello!")
 ```
 
-This ensures we control the execution context and coroutine setup.
+The script body is wrapped into a single runnable block. `execute { }` remains available for backward compatibility but is not required.
 
 ### Classloader
 
@@ -216,7 +213,6 @@ The implementation splits execution into two components:
 - **See**: [`src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/CodeEvalManager.kt`](src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/CodeEvalManager.kt)
 - Uses `IdeScriptEngineManager` to get Kotlin script engine
 - Wraps code with predefined imports
-- Captures `execute { }` blocks via DisposableScope
 
 **ScriptExecutor** - Runs captured blocks with timeout:
 - **See**: [`src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/ScriptExecutor.kt`](src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/ScriptExecutor.kt)
@@ -318,7 +314,7 @@ Test utilities:
 |-------|----------|
 | MCP Integration | Standalone Kotlin MCP SDK with Ktor HTTP transport |
 | Target Version | IntelliJ 2025.3+ (sinceBuild: 252.1) |
-| Entry Point | `execute { }` (McpScriptContext is the receiver) |
+| Entry Point | Script body |
 | Script Engine | IdeScriptEngineManager + AllPluginsLoader |
 | Execution Architecture | Two-phase: CodeEvalManager (compile) + ScriptExecutor (run) |
 | CoroutineScope | Service-injected, Dispatchers.IO + withTimeout |

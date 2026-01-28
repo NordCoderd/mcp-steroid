@@ -16,10 +16,10 @@ import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Tests for runInspectionsDirectly() method in McpScriptContext.
+ * Tests for the runInspectionsDirectly() method in McpScriptContext.
  *
- * This tests the workaround for GitHub issue #20 where daemon code analyzer
- * returns stale results when IDE window is not focused.
+ * This tests the workaround for GitHub issue #20 where the daemon code analyzer
+ * returns stale results when the IDE window is not focused.
  */
 class RunInspectionsDirectlyTest : BasePlatformTestCase() {
 
@@ -71,21 +71,18 @@ class RunInspectionsDirectlyTest : BasePlatformTestCase() {
     fun testRunInspectionsDirectlyFindsProblems(): Unit = timeoutRunBlocking(60.seconds) {
         val manager = project.service<ExecutionManager>()
 
-        val code = """
-            execute {
-                val file = findFile("$testFilePath") ?: error("File not found")
-                waitForSmartMode()
+        val code = $$"""
+            val file = findFile("$$testFilePath") ?: error("File not found")
 
-                val problems = runInspectionsDirectly(file)
+            val problems = runInspectionsDirectly(file)
 
-                if (problems.isEmpty()) {
-                    println("No problems found")
-                } else {
-                    println("Found ${'$'}{problems.values.sumOf { it.size }} problems:")
-                    problems.forEach { (inspectionId, descriptors) ->
-                        descriptors.forEach { problem ->
-                            println("  [${'$'}inspectionId] ${'$'}{problem.descriptionTemplate}")
-                        }
+            if (problems.isEmpty()) {
+                println("No problems found")
+            } else {
+                println("Found ${problems.values.sumOf { it.size }} problems:")
+                problems.forEach { (inspectionId, descriptors) ->
+                    descriptors.forEach { problem ->
+                        println("  [$inspectionId] ${problem.descriptionTemplate}")
                     }
                 }
             }
@@ -113,18 +110,15 @@ class RunInspectionsDirectlyTest : BasePlatformTestCase() {
     fun testRunInspectionsDirectlyWithIncludeInfo(): Unit = timeoutRunBlocking(60.seconds) {
         val manager = project.service<ExecutionManager>()
 
-        val code = """
-            execute {
-                val file = findFile("$testFilePath") ?: error("File not found")
-                waitForSmartMode()
+        val code = $$"""
+            val file = findFile("$$testFilePath") ?: error("File not found")
 
-                // Include INFO severity problems
-                val problems = runInspectionsDirectly(file, includeInfoSeverity = true)
+            // Include INFO severity problems
+            val problems = runInspectionsDirectly(file, includeInfoSeverity = true)
 
-                println("Found ${'$'}{problems.values.sumOf { it.size }} problems (including INFO)")
-                problems.forEach { (inspectionId, descriptors) ->
-                    println("  ${'$'}inspectionId: ${'$'}{descriptors.size} issues")
-                }
+            println("Found ${problems.values.sumOf { it.size }} problems (including INFO)")
+            problems.forEach { (inspectionId, descriptors) ->
+                println("  $inspectionId: ${descriptors.size} issues")
             }
         """.trimIndent()
 
@@ -143,15 +137,13 @@ class RunInspectionsDirectlyTest : BasePlatformTestCase() {
     fun testRunInspectionsDirectlyOnNonExistentFile(): Unit = timeoutRunBlocking(60.seconds) {
         val manager = project.service<ExecutionManager>()
 
-        val code = """
-            execute {
-                val file = findFile("/non/existent/file.kt")
-                if (file == null) {
-                    println("File not found as expected")
-                } else {
-                    val problems = runInspectionsDirectly(file)
-                    println("Problems: ${'$'}{problems.size}")
-                }
+        val code = $$"""
+            val file = findFile("/non/existent/file.kt")
+            if (file == null) {
+                println("File not found as expected")
+            } else {
+                val problems = runInspectionsDirectly(file)
+                println("Problems: ${problems.size}")
             }
         """.trimIndent()
 
@@ -171,18 +163,15 @@ class RunInspectionsDirectlyTest : BasePlatformTestCase() {
     fun testRunInspectionsDirectlyReturnsMapStructure(): Unit = timeoutRunBlocking(60.seconds) {
         val manager = project.service<ExecutionManager>()
 
-        val code = """
-            execute {
-                val file = findFile("$testFilePath") ?: error("File not found")
-                waitForSmartMode()
+        val code = $$"""
+            val file = findFile("$$testFilePath") ?: error("File not found")
 
-                val problems = runInspectionsDirectly(file)
+            val problems = runInspectionsDirectly(file)
 
-                // Verify the return type is Map<String, List<ProblemDescriptor>>
-                println("Result type: Map with ${'$'}{problems.size} entries")
-                problems.forEach { (key, value) ->
-                    println("Key type: ${'$'}{key::class.simpleName}, Value type: List of ${'$'}{value.firstOrNull()?.let { it::class.simpleName } ?: "empty"}")
-                }
+            // Verify the return type is Map<String, List<ProblemDescriptor>>
+            println("Result type: Map with ${problems.size} entries")
+            problems.forEach { (key, value) ->
+                println("Key type: ${key::class.simpleName}, Value type: List of ${value.firstOrNull()?.let { it::class.simpleName } ?: "empty"}")
             }
         """.trimIndent()
 

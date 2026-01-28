@@ -40,11 +40,9 @@ class DaemonRecoveryStressTest : BasePlatformTestCase() {
 
     fun testSequentialCompilationSimple(): Unit = timeoutRunBlocking(2.minutes) {
         val simpleCode = $$"""
-            execute {
-                println("Iteration$${System.currentTimeMillis()}")
-                val result = (1..100).sum()
-                println("Sum: $result")
-            }
+            println("Iteration$${System.currentTimeMillis()}")
+            val result = (1..100).sum()
+            println("Sum: $result")
         """.trimIndent()
 
         // Run 20 sequential compilations
@@ -60,12 +58,10 @@ class DaemonRecoveryStressTest : BasePlatformTestCase() {
     fun testSequentialCompilationWithImport(): Unit = timeoutRunBlocking(2.minutes) {
         val simpleCode = """
             ; import java.util.UUID;
-            
-            execute {
-                println(java.util.UUID.randomUUID().toString())
-                println(UUID.randomUUID().toString())
-                println("Iteration${System.currentTimeMillis()}")
-            }
+
+            println(java.util.UUID.randomUUID().toString())
+            println(UUID.randomUUID().toString())
+            println("Iteration${System.currentTimeMillis()}")
         """.trimIndent()
 
         // Run 20 sequential compilations

@@ -15,66 +15,64 @@ import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.vcsUtil.VcsUtil
 
-execute {
-    // Configure: path to the file you want history for
-    val filePath = project.basePath + "/src/main/kotlin/com/example/MyClass.kt"
+// Configure: path to the file you want history for
+val filePath = project.basePath + "/src/main/kotlin/com/example/MyClass.kt"
 
-    val virtualFile = LocalFileSystem.getInstance().findFileByPath(filePath)
-    if (virtualFile == null) {
-        println("ERROR: File not found: $filePath")
-        return@execute
-    }
+val virtualFile = LocalFileSystem.getInstance().findFileByPath(filePath)
+if (virtualFile == null) {
+    println("ERROR: File not found: $filePath")
+    return
+}
 
-    val vcsManager = ProjectLevelVcsManager.getInstance(project)
-    val vcs = vcsManager.getVcsFor(virtualFile)
+val vcsManager = ProjectLevelVcsManager.getInstance(project)
+val vcs = vcsManager.getVcsFor(virtualFile)
 
-    if (vcs == null) {
-        println("ERROR: File is not under version control: $filePath")
-        return@execute
-    }
+if (vcs == null) {
+    println("ERROR: File is not under version control: $filePath")
+    return
+}
 
-    println("VCS: ${vcs.name}")
-    println("File: ${virtualFile.name}")
-    println()
+println("VCS: ${vcs.name}")
+println("File: ${virtualFile.name}")
+println()
 
-    val historyProvider = vcs.vcsHistoryProvider
-    if (historyProvider == null) {
-        println("ERROR: VCS does not support history")
-        return@execute
-    }
+val historyProvider = vcs.vcsHistoryProvider
+if (historyProvider == null) {
+    println("ERROR: VCS does not support history")
+    return
+}
 
-    // Create FilePath from VirtualFile
-    val vcsFilePath = VcsUtil.getFilePath(virtualFile)
+// Create FilePath from VirtualFile
+val vcsFilePath = VcsUtil.getFilePath(virtualFile)
 
-    // Get history session
-    println("Fetching history...")
-    val session = historyProvider.createSessionFor(vcsFilePath)
+// Get history session
+println("Fetching history...")
+val session = historyProvider.createSessionFor(vcsFilePath)
 
-    if (session == null) {
-        println("ERROR: Could not create history session")
-        return@execute
-    }
+if (session == null) {
+    println("ERROR: Could not create history session")
+    return
+}
 
-    val revisions = session.revisionList
-    println("Found ${revisions.size} revisions")
-    println()
+val revisions = session.revisionList
+println("Found ${revisions.size} revisions")
+println()
 
-    // Print revision history
-    println("Revision | Author | Date | Message")
-    println("---------|--------|------|--------")
+// Print revision history
+println("Revision | Author | Date | Message")
+println("---------|--------|------|--------")
 
-    for ((index, revision) in revisions.take(20).withIndex()) {
-        val revNum = revision.revisionNumber.asString().take(8)
-        val author = revision.author ?: "?"
-        val date = revision.revisionDate?.toString() ?: "?"
-        val message = revision.commitMessage?.lines()?.firstOrNull()?.take(60) ?: ""
+for ((index, revision) in revisions.take(20).withIndex()) {
+    val revNum = revision.revisionNumber.asString().take(8)
+    val author = revision.author ?: "?"
+    val date = revision.revisionDate?.toString() ?: "?"
+    val message = revision.commitMessage?.lines()?.firstOrNull()?.take(60) ?: ""
 
-        println("$revNum | $author | $date | $message")
-    }
+    println("$revNum | $author | $date | $message")
+}
 
-    if (revisions.size > 20) {
-        println("... (${revisions.size - 20} more revisions)")
-    }
+if (revisions.size > 20) {
+    println("... (${revisions.size - 20} more revisions)")
 }
 
 /**

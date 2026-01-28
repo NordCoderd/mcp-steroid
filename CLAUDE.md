@@ -198,20 +198,18 @@ import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunConfiguration
 import org.jetbrains.plugins.gradle.service.execution.GradleExternalTaskConfigurationType
 
-execute {
-    val runManager = RunManager.getInstance(project)
-    val factory = GradleExternalTaskConfigurationType.getInstance().configurationFactories.single()
-    val runConfig = factory.createTemplateConfiguration(project) as ExternalSystemRunConfiguration
-    runConfig.name = "Gradle test (MCP)"
-    runConfig.settings.externalProjectPath = project.basePath
-    runConfig.settings.taskNames = listOf("test")
-    // Single test example:
-    // runConfig.settings.scriptParameters = "--tests \"*ExecutionManagerTest*\""
-    val settings = runManager.createConfiguration(runConfig, factory)
-    runManager.addConfiguration(settings)
-    runManager.selectedConfiguration = settings
-    ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
-}
+val runManager = RunManager.getInstance(project)
+val factory = GradleExternalTaskConfigurationType.getInstance().configurationFactories.single()
+val runConfig = factory.createTemplateConfiguration(project) as ExternalSystemRunConfiguration
+runConfig.name = "Gradle test (MCP)"
+runConfig.settings.externalProjectPath = project.basePath
+runConfig.settings.taskNames = listOf("test")
+// Single test example:
+// runConfig.settings.scriptParameters = "--tests \"*ExecutionManagerTest*\""
+val settings = runManager.createConfiguration(runConfig, factory)
+runManager.addConfiguration(settings)
+runManager.selectedConfiguration = settings
+ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
 ```
 
 
@@ -242,10 +240,9 @@ This is an IntelliJ Platform plugin with a standalone MCP server using Kotlin MC
 - **MCP Server**: `server/SteroidsMcpServer.kt` - Ktor-based MCP server with SSE transport
 - **Progress Reporting**: `server/ThrottledProgressReporter.kt` - Flow-based 1-second throttled progress
 - **Execution**: `ExecutionManager.kt` - manages script execution lifecycle
-- **Code Evaluation**: `CodeEvalManager.kt` - handles script compilation and lambda capture
-- **Script Execution**: `ScriptExecutor.kt` - runs captured execute blocks with timeout
+- **Code Evaluation**: `CodeEvalManager.kt` - handles script compilation and captures the script body as a runnable block
+- **Script Execution**: `ScriptExecutor.kt` - runs the captured script body block with timeout
 - **Script Context**: `McpScriptContext.kt` / `McpScriptContextImpl.kt` - runtime context for scripts
-- **Script Scope**: `McpScriptScope.kt` - bound to script engine, provides `execute { }` entry point
 - **Storage**: `ExecutionStorage.kt` - append-only file-based storage (for logging/debugging)
 - **Review**: `ReviewManager.kt` - human review workflow
 
@@ -257,13 +254,9 @@ This is an IntelliJ Platform plugin with a standalone MCP server using Kotlin MC
 
 3. **Throttled progress**: Progress messages sampled at 1-second intervals using Flow to avoid overloading MCP connections.
 
-4. **Coroutines over blocking**: All code in `execute {}` block runs as suspend functions. Never use `runBlocking` in production code. Use `coroutineScope` for script execution.
+4. **Coroutines over blocking**: All code in the script body runs as suspend functions. Never use `runBlocking` in production code. Use `coroutineScope` for script execution.
 
-5. **Read/Write Actions**: Not part of McpScriptContext. LLM-generated code should use IntelliJ's coroutine-aware APIs directly:
-   ```kotlin
-   import com.intellij.openapi.application.readAction
-   import com.intellij.openapi.application.writeAction
-   ```
+5. **Read/Write Actions**: Built into McpScriptContext as suspend helpers (`readAction`, `writeAction`, `smartReadAction`). You can still import IntelliJ APIs directly when needed.
 
 6. **Append-only storage**: Files in `.idea/mcp-run/` are never deleted, only appended to (used for logging/debugging).
 
@@ -271,13 +264,13 @@ This is an IntelliJ Platform plugin with a standalone MCP server using Kotlin MC
 
 8. **Fast failure**: Compilation errors and script engine unavailability are reported immediately (no waiting for timeout).
 
-9. **FIFO execution**: Multiple `execute {}` blocks are collected and run in order. Any failure marks the entire job complete.
+9. **Single-body execution**: The submitted script body is captured as a single block and executed with timeout handling.
 
 10. **Disposable lifecycle**: Context has a `disposable` property for resource cleanup. The coroutine completion triggers `Disposer.dispose()`.
 
-11. **Scope disposal**: After script evaluation, the scope is marked disposed to prevent nested `execute { execute { } }` patterns.
+11. **Scope disposal**: After script evaluation, the scope is marked disposed to prevent nested execution patterns.
 
-12. **Two-phase execution**: First phase compiles script and captures execute blocks (`CodeEvalManager`), second phase runs them with timeout (`ScriptExecutor`).
+12. **Two-phase execution**: First phase compiles script and captures the script body (`CodeEvalManager`), second phase runs it with timeout (`ScriptExecutor`).
 
 13. **Script definitions for IDE highlighting**: Uses `ScriptDefinitionsSource` extension point (K1/K2 compatible) to provide proper code highlighting for `.kts` files in the IDE.
 
@@ -305,9 +298,8 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 │   └── McpProtocol.kt                     # MCP protocol types
 ├── execution/
 │   ├── ExecutionManager.kt        # Orchestrates execution, returns ToolCallResult
-│   ├── CodeEvalManager.kt         # Compiles scripts, captures execute {} lambdas
+│   ├── CodeEvalManager.kt         # Compiles scripts, captures script body block
 │   ├── ScriptExecutor.kt          # Runs captured blocks with timeout
-│   ├── McpScriptScope.kt          # Interface bound to script engine (execute {} entry point)
 │   ├── McpScriptContext.kt        # Interface for script context (project, output, utilities)
 │   ├── McpScriptContextImpl.kt    # Implementation with output methods, waitForSmartMode
 │   └── Diff.kt                    # Unified diff generation for review feedback
@@ -455,7 +447,7 @@ Interface for collecting output during execution:
 - `reportFailed(message)` - Mark execution as failed
 
 ### McpScriptContext
-Context provided inside `execute { }` blocks:
+Context provided in the script body:
 - `project` - IntelliJ Project
 - `params` - Original tool parameters (JsonElement)
 - `disposable` - Parent Disposable for cleanup
@@ -476,12 +468,12 @@ Context provided inside `execute { }` blocks:
 
 User-submitted scripts are preprocessed by `CodeButcher.wrapWithImports()` before compilation:
 
-1. **Import extraction**: User imports (including `; import ...` patterns) are extracted from code
+1. **Import extraction**: User imports (including `; import ...` patterns) are extracted if present
 2. **Default imports**: Standard IntelliJ/Kotlin imports are added
-3. **Import merging**: User imports are placed after default imports, before the `execute` binding
-4. **Code assembly**: The rest of user code follows
+3. **Import merging**: User imports are placed after default imports
+4. **Code assembly**: The script body is wrapped into a single suspend method
 
-This preprocessing is critical - imports MUST appear at the top of Kotlin scripts. Placing imports after code statements causes "incomplete code" errors.
+Imports are optional; if provided, CodeButcher hoists them to the top so the script compiles cleanly.
 
 ### Kotlin Daemon Management
 
@@ -832,24 +824,22 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 
-execute {
-    val actionManager = ActionManager.getInstance()
-    val restartAction = actionManager.getAction("RestartIde")
+val actionManager = ActionManager.getInstance()
+val restartAction = actionManager.getAction("RestartIde")
 
-    if (restartAction == null) {
-        println("RestartIde action not found")
-        return@execute
-    }
-
-    // Create data context with project
-    val dataContext = SimpleDataContext.builder()
-        .add(CommonDataKeys.PROJECT, project)
-        .build()
-
-    // Invoke the action
-    println("Restarting IDE...")
-    ActionUtil.invokeAction(restartAction, dataContext, "mcp", null, null)
+if (restartAction == null) {
+    println("RestartIde action not found")
+    return
 }
+
+// Create data context with project
+val dataContext = SimpleDataContext.builder()
+    .add(CommonDataKeys.PROJECT, project)
+    .build()
+
+// Invoke the action
+println("Restarting IDE...")
+ActionUtil.invokeAction(restartAction, dataContext, "mcp", null, null)
 ```
 
 ### Checking if an Action is Available
@@ -860,22 +850,20 @@ Before invoking an action, you can check if it's enabled:
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 
-execute {
-    val actionManager = ActionManager.getInstance()
-    val action = actionManager.getAction("RestartIde")
+val actionManager = ActionManager.getInstance()
+val action = actionManager.getAction("RestartIde")
 
-    val dataContext = SimpleDataContext.builder()
-        .add(CommonDataKeys.PROJECT, project)
-        .build()
+val dataContext = SimpleDataContext.builder()
+    .add(CommonDataKeys.PROJECT, project)
+    .build()
 
-    val presentation = action?.templatePresentation?.clone() ?: Presentation()
-    val event = AnActionEvent.createFromDataContext("mcp", presentation, dataContext)
+val presentation = action?.templatePresentation?.clone() ?: Presentation()
+val event = AnActionEvent.createFromDataContext("mcp", presentation, dataContext)
 
-    action?.update(event)
+action?.update(event)
 
-    println("Action enabled: ${presentation.isEnabled}")
-    println("Action visible: ${presentation.isVisible}")
-}
+println("Action enabled: ${presentation.isEnabled}")
+println("Action visible: ${presentation.isVisible}")
 ```
 
 ### Listing All Actions
@@ -885,20 +873,18 @@ To discover available actions:
 ```kotlin
 import com.intellij.openapi.actionSystem.ActionManager
 
-execute {
-    val actionManager = ActionManager.getInstance()
-    val allActionIds = actionManager.getActionIds("")
+val actionManager = ActionManager.getInstance()
+val allActionIds = actionManager.getActionIds("")
 
-    // Filter for specific actions
-    val restartActions = allActionIds.filter {
-        it.contains("restart", ignoreCase = true)
-    }
+// Filter for specific actions
+val restartActions = allActionIds.filter {
+    it.contains("restart", ignoreCase = true)
+}
 
-    restartActions.forEach { actionId ->
-        val action = actionManager.getAction(actionId)
-        val text = action?.templatePresentation?.text ?: "N/A"
-        println("$actionId -> $text")
-    }
+restartActions.forEach { actionId ->
+    val action = actionManager.getAction(actionId)
+    val text = action?.templatePresentation?.text ?: "N/A"
+    println("$actionId -> $text")
 }
 ```
 
@@ -918,7 +904,7 @@ class MyTest : BasePlatformTestCase() {
         val result = manager.executeWithProgress(
             ExecCodeParams(
                 taskId = "test",
-                code = "execute { println(\"hello\") }",
+                code = "println(\"hello\")",
                 reason = "test",
                 timeout = 30,
                 rawParams = buildJsonObject { }
@@ -936,7 +922,7 @@ class MyTest : BasePlatformTestCase() {
 
 1. **Review source files using IntelliJ MCP**:
    - Open files in the editor via `steroid_execute_code`
-   - Wait for IDE to highlight the file (wait for smart mode)
+   - Wait for IDE to highlight the file (smart mode is automatic; call waitForSmartMode() only if you trigger indexing)
    - Review warnings, errors, and suggestions from the IDE
    - Check TODO/FIXME comments in code
 
@@ -1001,22 +987,18 @@ When reviewing code quality:
 
 1. **Open file in editor**:
    ```kotlin
-   execute {
-       val file = findProjectFile("src/main/kotlin/path/to/File.kt")
-       if (file != null) {
-           com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
-               .openFile(file, true)
-       }
+   val file = findProjectFile("src/main/kotlin/path/to/File.kt")
+   if (file != null) {
+       com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project)
+           .openFile(file, true)
    }
    ```
 
 2. **Wait for analysis**:
    ```kotlin
-   execute {
-       waitForSmartMode()
-       // Wait additional time for daemon to complete
-       delay(2000)
-   }
+   // waitForSmartMode() is automatic before your script starts
+   // Wait additional time for daemon to complete if needed
+   delay(2000)
    ```
 
 3. **Get warnings and errors**:
@@ -1025,15 +1007,13 @@ When reviewing code quality:
    import com.intellij.codeInsight.daemon.impl.HighlightInfo
    import com.intellij.lang.annotation.HighlightSeverity
 
-   execute {
-       val file = findProjectPsiFile("src/main/kotlin/path/to/File.kt")
-       if (file != null) {
-           val highlights = readAction {
-               DaemonCodeAnalyzerEx.getInstanceEx(project)
-                   .getFileLevelHighlights(project, file)
-           }
-           highlights.forEach { println(it) }
+   val file = findProjectPsiFile("src/main/kotlin/path/to/File.kt")
+   if (file != null) {
+       val highlights = readAction {
+           DaemonCodeAnalyzerEx.getInstanceEx(project)
+               .getFileLevelHighlights(project, file)
        }
+       highlights.forEach { println(it) }
    }
    ```
 

@@ -38,9 +38,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
         val result = manager.executeWithProgress(
             testExecParams("""
-                execute {
-                    println("Hello from toolset test")
-                }
+                println("Hello from toolset test")
             """.trimIndent()),
             NoOpProgressReporter
         )
@@ -55,10 +53,8 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
         val result = manager.executeWithProgress(
             testExecParams("""
-                execute {
-                    println("Test output line 1")
-                    println("Test output line 2")
-                }
+                println("Test output line 1")
+                println("Test output line 2")
             """.trimIndent()),
             NoOpProgressReporter
         )
@@ -74,15 +70,13 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
         val result = manager.executeWithProgress(
             testExecParams("""
-                execute {
-                    throw RuntimeException("Test error")
-                }
+                throw RuntimeException("Test error")
             """.trimIndent()),
             NoOpProgressReporter
         )
 
-        // Should be marked as error
-        assertTrue("Should be error", result.isError)
+        // Should be marked as an error
+        assertTrue("Should be an error", result.isError)
         val text = getTextContent(result)
         assertTrue("Should have error message", text.contains("error") || text.contains("Error") || text.contains("RuntimeException"))
     }
@@ -92,17 +86,15 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
 
         val result = manager.executeWithProgress(
             testExecParams("""
-                execute {
-                    println("Starting")
-                    kotlinx.coroutines.delay(10000) // 10 seconds
-                    println("Should not reach here")
-                }
-            """.trimIndent(), timeout = 2), // 2 second timeout
+                println("Starting")
+                kotlinx.coroutines.delay(10000) // 10 seconds
+                println("Should not reach here")
+            """.trimIndent(), timeout = 2), // 2-second timeout
             NoOpProgressReporter
         )
 
-        // Should be error due to timeout (or error if script engine not available)
-        assertTrue("Should be error", result.isError)
+        // Should be an error due to a timeout (or an error if the script engine is not available)
+        assertTrue("Should be an error", result.isError)
     }
 
     fun testExecuteCodeWithInvalidSyntax(): Unit = timeoutRunBlocking(30.seconds) {
@@ -120,9 +112,9 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         val text = getTextContent(result)
         assertTrue("Should have content", text.isNotEmpty() || result.content.isNotEmpty())
 
-        // If marked as error, it should have error message
-        assertTrue("Should be error", result.isError)
-        assertTrue("Error should have message", text.isNotEmpty())
+        // If marked as an error, it should have an error message
+        assertTrue("Should be an error", result.isError)
+        assertTrue("Error should have a message", text.isNotEmpty())
     }
 
     fun testExecuteCodeWithScreenshot(): Unit = timeoutRunBlocking(60.seconds) {
@@ -132,9 +124,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         val result = manager.executeWithProgress(
             testExecParams(
                 """
-                execute {
-                    takeIdeScreenshot()
-                }
+                takeIdeScreenshot()
                 """.trimIndent()
             ),
             NoOpProgressReporter

@@ -5,11 +5,8 @@ import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.getExecutionIdFromResult
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.setServerPortProperties
 import com.jonnyzzz.intellij.mcp.testExecParams
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -35,7 +32,7 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
     }
 
     fun testSuccessFileAndWrappedScriptCreated(): Unit = timeoutRunBlocking(30.seconds) {
-        val code = "execute { println(\"Success Test\") }"
+        val code = "println(\"Success Test\")"
         val result = manager.executeWithProgress(testExecParams(code))
 
         assertFalse("Execution should not fail", result.isError)

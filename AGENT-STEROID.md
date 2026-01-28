@@ -99,7 +99,7 @@ Execute Kotlin code directly in IntelliJ's runtime. This is your primary tool.
 
 Parameters:
 - `project_name` (required): Target project from `steroid_list_projects`
-- `code` (required): Kotlin script body (suspend context; `execute { }` wrapper not required)
+- `code` (required): Kotlin suspend function body
 - `reason` (required): Human-readable explanation of what you're doing - **be detailed so sub-agents can understand the intent**
 - `task_id` (required): Group related executions together
 - `timeout` (optional): Execution timeout in seconds (default: 60)
@@ -153,7 +153,7 @@ The script body runs in a **coroutine context**. This means:
 
 ### 2. Imports Are Optional
 
-Default imports are provided automatically. If you need extra APIs, add top-level imports (no execute wrapper required). Avoid placing imports after statements.
+Default imports are provided automatically. Add imports only when you need APIs outside the defaults.
 
 ```kotlin
 import com.intellij.psi.PsiManager
@@ -175,11 +175,6 @@ Both are suspend functions that work naturally in the script body.
 ## Script Structure Template
 
 ```kotlin
-// Optional imports at top-level (default imports are provided)
-import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
-import com.intellij.psi.PsiManager
-
 // Script body is a suspend function; execute wrapper not required.
 // waitForSmartMode() is called automatically before your script starts.
 
@@ -230,18 +225,16 @@ By default, if a modal dialog appears during script execution, the code is autom
 If your script intentionally shows dialogs (like refactoring confirmations), call `doNotCancelOnModalityStateChange()` before the action:
 
 ```kotlin
-execute {
-    // Disable modal cancellation - we expect a dialog
-    doNotCancelOnModalityStateChange()
+// Disable modal cancellation - we expect a dialog
+doNotCancelOnModalityStateChange()
 
-    // Now invoke action that shows a dialog
-    val actionManager = ActionManager.getInstance()
-    val action = actionManager.getAction("RestartIde")
-    val dataContext = SimpleDataContext.builder()
-        .add(CommonDataKeys.PROJECT, project)
-        .build()
-    ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
-}
+// Now invoke action that shows a dialog
+val actionManager = ActionManager.getInstance()
+val action = actionManager.getAction("RestartIde")
+val dataContext = SimpleDataContext.builder()
+    .add(CommonDataKeys.PROJECT, project)
+    .build()
+ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
 ```
 
 ## Common Patterns
@@ -249,46 +242,40 @@ execute {
 ### 1. Get Project Information
 
 ```kotlin
-execute {
-    println("Project: ${project.name}")
-    println("Base path: ${project.basePath}")
-    println("Is open: ${project.isOpen}")
-}
+println("Project: ${project.name}")
+println("Base path: ${project.basePath}")
+println("Is open: ${project.isOpen}")
 ```
 
 ### 2. Access System/IDE Information
 
 ```kotlin
-execute {
-    // Java version
-    println("Java: ${System.getProperty("java.version")}")
+// Java version
+println("Java: ${System.getProperty("java.version")}")
 
-    // IDE log path
-    val logPath = com.intellij.openapi.application.PathManager.getLogPath()
-    println("Log: $logPath/idea.log")
+// IDE log path
+val logPath = com.intellij.openapi.application.PathManager.getLogPath()
+println("Log: $logPath/idea.log")
 
-    // Plugin info
-    val plugins = com.intellij.ide.plugins.PluginManagerCore.getLoadedPlugins()
-    plugins.filter { it.isEnabled }.take(10).forEach {
-        println("  ${it.name}: ${it.version}")
-    }
+// Plugin info
+val plugins = com.intellij.ide.plugins.PluginManagerCore.getLoadedPlugins()
+plugins.filter { it.isEnabled }.take(10).forEach {
+    println("  ${it.name}: ${it.version}")
 }
 ```
 
 ### 3. Find and Inspect Plugins
 
 ```kotlin
-execute {
-    val plugin = com.intellij.ide.plugins.PluginManagerCore.loadedPlugins
-        .find { it.pluginId.idString == "com.example.myplugin" }
+val plugin = com.intellij.ide.plugins.PluginManagerCore.loadedPlugins
+    .find { it.pluginId.idString == "com.example.myplugin" }
 
-    if (plugin != null) {
-        println("Found: ${plugin.name}")
-        println("Version: ${plugin.version}")
-        println("Enabled: ${plugin.isEnabled}")
-        plugin.dependencies.forEach { dep ->
-            println("  Depends on: ${dep.pluginId} (optional: ${dep.isOptional})")
-        }
+if (plugin != null) {
+    println("Found: ${plugin.name}")
+    println("Version: ${plugin.version}")
+    println("Enabled: ${plugin.isEnabled}")
+    plugin.dependencies.forEach { dep ->
+        println("  Depends on: ${dep.pluginId} (optional: ${dep.isOptional})")
     }
 }
 ```
@@ -296,14 +283,12 @@ execute {
 ### 4. Query Extension Points
 
 ```kotlin
-execute {
-    // List all extension points containing "kotlin" or "script"
-    project.extensionArea.extensionPoints
-        .filter { it.name.contains("kotlin", ignoreCase = true) }
-        .forEach { ep ->
-            println("${ep.name}: ${ep.extensionList.size} extensions")
-        }
-}
+// List all extension points containing "kotlin" or "script"
+project.extensionArea.extensionPoints
+    .filter { it.name.contains("kotlin", ignoreCase = true) }
+    .forEach { ep ->
+        println("${ep.name}: ${ep.extensionList.size} extensions")
+    }
 ```
 
 ### 5. Open Another Project
@@ -313,12 +298,10 @@ import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.openapi.project.ex.ProjectManagerEx
 import java.nio.file.Path
 
-execute {
-    val projectPath = Path.of("/path/to/project")
-    val projectManager = ProjectManagerEx.getInstanceEx()
-    val result = projectManager.openProjectAsync(projectPath, OpenProjectTask { })
-    println("Open result: $result")
-}
+val projectPath = Path.of("/path/to/project")
+val projectManager = ProjectManagerEx.getInstanceEx()
+val result = projectManager.openProjectAsync(projectPath, OpenProjectTask { })
+println("Open result: $result")
 ```
 
 ### 6. Invoke IDE Actions (Including Restart)
@@ -331,24 +314,22 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 
-execute {
-    val actionManager = ActionManager.getInstance()
-    val action = actionManager.getAction("RestartIde")  // Or any action ID
+val actionManager = ActionManager.getInstance()
+val action = actionManager.getAction("RestartIde")  // Or any action ID
 
-    if (action == null) {
-        println("Action not found")
-        return@execute
-    }
-
-    // Create data context with project
-    val dataContext = SimpleDataContext.builder()
-        .add(CommonDataKeys.PROJECT, project)
-        .build()
-
-    // Invoke the action
-    println("Invoking action...")
-    ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
+if (action == null) {
+    println("Action not found")
+    return
 }
+
+// Create data context with project
+val dataContext = SimpleDataContext.builder()
+    .add(CommonDataKeys.PROJECT, project)
+    .build()
+
+// Invoke the action
+println("Invoking action...")
+ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
 ```
 
 **Common action IDs:**
@@ -370,29 +351,25 @@ execute {
 import java.util.jar.JarFile
 import java.io.File
 
-execute {
-    val jarFile = JarFile(File("/path/to/plugin.jar"))
-    jarFile.entries().toList()
-        .filter { it.name.endsWith(".class") }
-        .forEach { println(it.name) }
-    jarFile.close()
-}
+val jarFile = JarFile(File("/path/to/plugin.jar"))
+jarFile.entries().toList()
+    .filter { it.name.endsWith(".class") }
+    .forEach { println(it.name) }
+jarFile.close()
 ```
 
 ### 8. Use Reflection for Exploration
 
 ```kotlin
-execute {
-    try {
-        val clazz = Class.forName("org.jetbrains.kotlin.idea.SomeClass")
-        println("Found class: ${clazz.name}")
+try {
+    val clazz = Class.forName("org.jetbrains.kotlin.idea.SomeClass")
+    println("Found class: ${clazz.name}")
 
-        clazz.methods.filter { it.parameterCount == 0 }.take(10).forEach { m ->
-            println("  ${m.name}(): ${m.returnType.simpleName}")
-        }
-    } catch (e: ClassNotFoundException) {
-        println("Class not found")
+    clazz.methods.filter { it.parameterCount == 0 }.take(10).forEach { m ->
+        println("  ${m.name}(): ${m.returnType.simpleName}")
     }
+} catch (e: ClassNotFoundException) {
+    println("Class not found")
 }
 ```
 
@@ -405,15 +382,12 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.openapi.application.readAction
 
-execute {
-    waitForSmartMode()
 
-    readAction {
-        val psiElement = // ... get your element
-        val usages = ReferencesSearch.search(psiElement, GlobalSearchScope.projectScope(project))
-        usages.forEach { ref ->
-            println("Usage at: ${ref.element.containingFile?.virtualFile?.path}:${ref.element.textOffset}")
-        }
+readAction {
+    val psiElement = // ... get your element
+    val usages = ReferencesSearch.search(psiElement, GlobalSearchScope.projectScope(project))
+    usages.forEach { ref ->
+        println("Usage at: ${ref.element.containingFile?.virtualFile?.path}:${ref.element.textOffset}")
     }
 }
 ```
@@ -424,16 +398,14 @@ execute {
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.VfsUtil
 
-execute {
-    val contentRoots = ProjectRootManager.getInstance(project).contentRoots
-    contentRoots.forEach { root ->
-        println("Content root: ${root.path}")
-        VfsUtil.iterateChildrenRecursively(root, null) { file ->
-            if (file.extension == "kt") {
-                println("  Kotlin file: ${file.path}")
-            }
-            true
+val contentRoots = ProjectRootManager.getInstance(project).contentRoots
+contentRoots.forEach { root ->
+    println("Content root: ${root.path}")
+    VfsUtil.iterateChildrenRecursively(root, null) { file ->
+        if (file.extension == "kt") {
+            println("  Kotlin file: ${file.path}")
         }
+        true
     }
 }
 ```
@@ -443,20 +415,17 @@ execute {
 Use `runInspectionsDirectly()` for reliable inspection results - it bypasses the daemon's focus-dependent caching:
 
 ```kotlin
-execute {
-    val file = requireNotNull(findProjectFile("src/main/kotlin/MyClass.kt")) { "File not found" }
-    waitForSmartMode()
+val file = requireNotNull(findProjectFile("src/main/kotlin/MyClass.kt")) { "File not found" }
 
-    // Recommended: bypasses daemon, works regardless of window focus
-    val problems = runInspectionsDirectly(file)
+// Recommended: bypasses daemon, works regardless of window focus
+val problems = runInspectionsDirectly(file)
 
-    if (problems.isEmpty()) {
-        println("No problems found!")
-    } else {
-        problems.forEach { (inspectionId, descriptors) ->
-            descriptors.forEach { problem ->
-                println("[$inspectionId] ${problem.descriptionTemplate}")
-            }
+if (problems.isEmpty()) {
+    println("No problems found!")
+} else {
+    problems.forEach { (inspectionId, descriptors) ->
+        descriptors.forEach { problem ->
+            println("[$inspectionId] ${problem.descriptionTemplate}")
         }
     }
 }
@@ -472,19 +441,17 @@ import com.intellij.openapi.actionSystem.CommonDataKeys
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 
-execute {
-    val actionManager = ActionManager.getInstance()
-    val action = actionManager.getAction("GotoFile")
+val actionManager = ActionManager.getInstance()
+val action = actionManager.getAction("GotoFile")
 
-    if (action != null) {
-        println("Found action: ${action.templatePresentation.text}")
+if (action != null) {
+    println("Found action: ${action.templatePresentation.text}")
 
-        // To invoke it:
-        val dataContext = SimpleDataContext.builder()
-            .add(CommonDataKeys.PROJECT, project)
-            .build()
-        ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
-    }
+    // To invoke it:
+    val dataContext = SimpleDataContext.builder()
+        .add(CommonDataKeys.PROJECT, project)
+        .build()
+    ActionUtil.invokeAction(action, dataContext, "mcp", null, null)
 }
 ```
 
@@ -493,23 +460,21 @@ execute {
 ```kotlin
 import com.intellij.openapi.actionSystem.ActionManager
 
-execute {
-    val actionManager = ActionManager.getInstance()
-    val allActionIds = actionManager.getActionIds("")
+val actionManager = ActionManager.getInstance()
+val allActionIds = actionManager.getActionIds("")
 
-    // Find actions by keyword
-    val matchingActions = allActionIds.filter {
-        it.contains("refactor", ignoreCase = true)
-    }
-
-    matchingActions.take(20).forEach { actionId ->
-        val action = actionManager.getAction(actionId)
-        val text = action?.templatePresentation?.text ?: "N/A"
-        println("$actionId -> $text")
-    }
-
-    println("Total matching actions: ${matchingActions.size}")
+// Find actions by keyword
+val matchingActions = allActionIds.filter {
+    it.contains("refactor", ignoreCase = true)
 }
+
+matchingActions.take(20).forEach { actionId ->
+    val action = actionManager.getAction(actionId)
+    val text = action?.templatePresentation?.text ?: "N/A"
+    println("$actionId -> $text")
+}
+
+println("Total matching actions: ${matchingActions.size}")
 ```
 
 ## Error Handling
@@ -517,19 +482,17 @@ execute {
 Always handle errors gracefully:
 
 ```kotlin
-execute {
-    try {
-        // risky operation
-    } catch (e: Exception) {
-        println("Error: ${e.javaClass.simpleName} - ${e.message}")
-        e.printStackTrace() // goes to IDE log
-    }
+try {
+    // risky operation
+} catch (e: Exception) {
+    println("Error: ${e.javaClass.simpleName} - ${e.message}")
+    e.printStackTrace() // goes to IDE log
 }
 ```
 
 ## Best Practices
 
-1. **Always call `waitForSmartMode()` before PSI operations** - during indexing, many APIs return incomplete data
+1. **waitForSmartMode() is automatic** - call it again only after you trigger indexing mid-script
 
 2. **Use `readAction { }` for any PSI/VFS read** - even simple property access
 
@@ -553,9 +516,7 @@ execute {
 
 1. **Check IDE logs**: Use `steroid_execute_code` to get the log path:
    ```kotlin
-   execute {
-       println(com.intellij.openapi.application.PathManager.getLogPath() + "/idea.log")
-   }
+   println(com.intellij.openapi.application.PathManager.getLogPath() + "/idea.log")
    ```
 
 2. **Print class info**: When unsure about an object:
@@ -641,16 +602,13 @@ Load resources to get working code examples:
 // Load: mcp-steroid://test/list-run-configurations
 
 // Copy the code and customize it for your use case
-execute {
-    waitForSmartMode()
 
-    val manager = RunManager.getInstance(project)
-    val allSettings = manager.allSettings
+val manager = RunManager.getInstance(project)
+val allSettings = manager.allSettings
 
-    println("Run Configurations (${allSettings.size}):")
-    allSettings.forEach { setting ->
-        println("  • ${setting.name} (${setting.type.displayName})")
-    }
+println("Run Configurations (${allSettings.size}):")
+allSettings.forEach { setting ->
+    println("  • ${setting.name} (${setting.type.displayName})")
 }
 ```
 

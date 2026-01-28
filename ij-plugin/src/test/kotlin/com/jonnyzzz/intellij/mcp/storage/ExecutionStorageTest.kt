@@ -28,7 +28,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testWriteNewExecution(): Unit = timeoutRunBlocking(10.seconds) {
-        val code = "execute { println(\"Hello\") }"
+        val code = "println(\"Hello\")"
         val params = testExecParams(code)
 
         val executionId = storage.writeNewExecution(params)
@@ -39,7 +39,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testWriteNewExecutionWritesToolMetadata(): Unit = timeoutRunBlocking(10.seconds) {
-        val code = "execute { println(\"Hello\") }"
+        val code = "println(\"Hello\")"
         val params = testExecParams(code)
 
         val executionId = storage.writeNewExecution(params)
@@ -77,7 +77,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testDifferentTaskIdsProduceDifferentExecutionIds(): Unit = timeoutRunBlocking(10.seconds) {
-        val code = "execute { println(\"Hello\") }"
+        val code = "println(\"Hello\")"
 
         val id1 = storage.writeNewExecution(testExecParams(code, taskId = "task-1"))
         val id2 = storage.writeNewExecution(testExecParams(code, taskId = "task-2"))
@@ -87,7 +87,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testFindExecutionId(): Unit = timeoutRunBlocking(10.seconds) {
-        val code = "execute { println(\"Hello\") }"
+        val code = "println(\"Hello\")"
         val executionId = storage.writeNewExecution(testExecParams(code))
 
         // Should find the execution
@@ -101,7 +101,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testFindExecutionIdRejectsInvalidPaths(): Unit = timeoutRunBlocking(10.seconds) {
-        // Should reject paths with ".." or "/"
+        // Should reject paths with parent traversal markers or separators
         assertNull(storage.findExecutionId("../etc/passwd"))
         assertNull(storage.findExecutionId("foo/bar"))
         assertNull(storage.findExecutionId(".."))
@@ -120,7 +120,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
         val code = "test"
         val executionId = storage.writeNewExecution(testExecParams(code))
 
-        // Write custom data file
+        // Write a custom data file
         val path = storage.writeCodeExecutionData(executionId, "custom.txt", "Custom content")
         assertTrue("File should exist", java.nio.file.Files.exists(path))
 
@@ -129,7 +129,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testWriteCodeReviewFile(): Unit = timeoutRunBlocking(10.seconds) {
-        val code = "execute { println(\"Review me\") }"
+        val code = "println(\"Review me\")"
         val params = testExecParams(code)
         val executionId = storage.writeNewExecution(params)
 
@@ -141,7 +141,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
     }
 
     fun testRemoveCodeReviewFile(): Unit = timeoutRunBlocking(10.seconds) {
-        val code = "execute { println(\"Review me\") }"
+        val code = "println(\"Review me\")"
         val params = testExecParams(code)
         val executionId = storage.writeNewExecution(params)
 

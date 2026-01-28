@@ -29,71 +29,68 @@ data class HierarchyData(
     val overridesCount: Int
 )
 
-execute {
-    // Configuration - modify these for your use case
-    val classFqn = "com.example.BaseType" // TODO: Set base class/interface FQN
-    val methodName = "doWork" // TODO: Set method name or leave as-is
+// Configuration - modify these for your use case
+val classFqn = "com.example.BaseType" // TODO: Set base class/interface FQN
+val methodName = "doWork" // TODO: Set method name or leave as-is
 
-    waitForSmartMode()
 
-    val hierarchyData = readAction {
-        val baseClass = JavaPsiFacade.getInstance(project)
-            .findClass(classFqn, GlobalSearchScope.projectScope(project))
-            ?: return@readAction null
-        val inheritors = ClassInheritorsSearch.search(
-            baseClass,
+val hierarchyData = readAction {
+    val baseClass = JavaPsiFacade.getInstance(project)
+        .findClass(classFqn, GlobalSearchScope.projectScope(project))
+        ?: return@readAction null
+    val inheritors = ClassInheritorsSearch.search(
+        baseClass,
+        GlobalSearchScope.projectScope(project),
+        true
+    ).findAll()
+    val inheritorNames = inheritors.mapNotNull { it.qualifiedName ?: it.name }
+    val method = baseClass.findMethodsByName(methodName, false).firstOrNull()
+    val overrides = if (method == null) {
+        emptyList()
+    } else {
+        OverridingMethodsSearch.search(
+            method,
             GlobalSearchScope.projectScope(project),
             true
         ).findAll()
-        val inheritorNames = inheritors.mapNotNull { it.qualifiedName ?: it.name }
-        val method = baseClass.findMethodsByName(methodName, false).firstOrNull()
-        val overrides = if (method == null) {
-            emptyList()
-        } else {
-            OverridingMethodsSearch.search(
-                method,
-                GlobalSearchScope.projectScope(project),
-                true
-            ).findAll()
-        }
-        val overrideNames = overrides.mapNotNull { it.containingClass?.qualifiedName ?: it.containingClass?.name }
-        HierarchyData(
-            baseClass.qualifiedName ?: baseClass.name ?: classFqn,
-            inheritorNames,
-            inheritors.size,
-            method?.name,
-            overrideNames,
-            overrides.size
-        )
     }
+    val overrideNames = overrides.mapNotNull { it.containingClass?.qualifiedName ?: it.containingClass?.name }
+    HierarchyData(
+        baseClass.qualifiedName ?: baseClass.name ?: classFqn,
+        inheritorNames,
+        inheritors.size,
+        method?.name,
+        overrideNames,
+        overrides.size
+    )
+}
 
-    if (hierarchyData == null) {
-        println("Base class not found: $classFqn")
-        return@execute
-    }
+if (hierarchyData == null) {
+    println("Base class not found: $classFqn")
+    return
+}
 
-    println("Inheritors of ${hierarchyData.baseName}: ${hierarchyData.inheritorsCount}")
-    hierarchyData.inheritors.take(20).forEach { inheritor ->
-        println(" - $inheritor")
-    }
-    if (hierarchyData.inheritorsCount > 20) {
-        println("... and ${hierarchyData.inheritorsCount - 20} more")
-    }
+println("Inheritors of ${hierarchyData.baseName}: ${hierarchyData.inheritorsCount}")
+hierarchyData.inheritors.take(20).forEach { inheritor ->
+    println(" - $inheritor")
+}
+if (hierarchyData.inheritorsCount > 20) {
+    println("... and ${hierarchyData.inheritorsCount - 20} more")
+}
 
-    val resolvedMethodName = hierarchyData.methodName
-    if (resolvedMethodName == null) {
-        println("Method not found: $methodName")
-        return@execute
-    }
+val resolvedMethodName = hierarchyData.methodName
+if (resolvedMethodName == null) {
+    println("Method not found: $methodName")
+    return
+}
 
-    println()
-    println("Overrides of $resolvedMethodName: ${hierarchyData.overridesCount}")
-    hierarchyData.overrides.take(20).forEach { overrideName ->
-        println(" - $overrideName")
-    }
-    if (hierarchyData.overridesCount > 20) {
-        println("... and ${hierarchyData.overridesCount - 20} more")
-    }
+println()
+println("Overrides of $resolvedMethodName: ${hierarchyData.overridesCount}")
+hierarchyData.overrides.take(20).forEach { overrideName ->
+    println(" - $overrideName")
+}
+if (hierarchyData.overridesCount > 20) {
+    println("... and ${hierarchyData.overridesCount - 20} more")
 }
 
 /**

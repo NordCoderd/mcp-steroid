@@ -63,12 +63,10 @@ You can probe what is available at runtime:
 import com.intellij.openapi.actionSystem.ActionManager
 import com.intellij.lang.Language
 
-execute {
-    val actionIds = ActionManager.getInstance().getActionIdList("").toSet()
-    println("Has Java actions: " + actionIds.contains("NewJavaSpecialFile"))
-    println("Has Kotlin actions: " + actionIds.contains("Kotlin.NewFile"))
-    println("Languages: " + Language.getRegisteredLanguages().map { it.id }.sorted())
-}
+val actionIds = ActionManager.getInstance().getActionIdList("").toSet()
+println("Has Java actions: " + actionIds.contains("NewJavaSpecialFile"))
+println("Has Kotlin actions: " + actionIds.contains("Kotlin.NewFile"))
+println("Languages: " + Language.getRegisteredLanguages().map { it.id }.sorted())
 ```
 
 If a language lacks reference providers, fall back to PSI traversal (`PsiNamedElement`),
@@ -76,7 +74,7 @@ Structure View (`LanguageStructureViewBuilder`), or inspection output.
 
 ## Important Notes
 
-- Always call `waitForSmartMode()` before accessing indices
+- `waitForSmartMode()` runs automatically before your script starts; call it again only after triggering indexing
 - Use `readAction { }` for all PSI read operations
 - Use `writeAction { }` for modifications
 - The `project` variable is available in all scripts

@@ -10,7 +10,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
@@ -23,10 +22,10 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
     protected abstract fun newAiSession(): AiAgentSession
 
     /**
-     * Tests that Code can discover and use our steroid_ tools.
-     * Uses Docker to run CLI in isolation.
+     * This test validates the discovery of tools and the use of the CLI.
+     * Uses Docker to run the CLI in isolation.
      *
-     * Note: This test requires ANTHROPIC_API_KEY and uses print mode (-p)
+     * Note: This test requires ANTHROPIC_API_KEY and uses print mode (-p),
      * which runs without user interaction.
      *
      * ============================================================================
@@ -35,7 +34,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
      *
      * Success criteria (ALL must be met):
      * 1. No ERROR patterns in AI's output
-     * 2. AI must list tools with "TOOL:" prefix (actual tool discovery)
+     * 2. AI must list tools with a "TOOL:" prefix (actual tool discovery)
      * 3. AI must call steroid_list_projects and show "PROJECTS:" output
      * 4. The PROJECTS output must contain actual project data (not an error)
      *
@@ -51,6 +50,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             .runPrompt(
                 """
             You are testing an MCP server integration. You MUST use the MCP tools.
+            Use only the MCP server named "intellij" for tool calls. Do not call list_mcp_resources.
             Steps:
             1) List all MCP tools starting with "steroid_" and print each as: TOOL: <name> - <description>
             2) Call steroid_list_projects EXACTLY once and print the raw result on a single line prefixed with PROJECTS:
@@ -111,8 +111,8 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
     }
 
     /**
-     * Tests that AI can read a system property set in the IDE JVM via MCP execute_code.
-     * This verifies the MCP server runs in the same JVM and can access system properties.
+     * This test verifies that the MCP execute_code tool can read a system property. The IDE JVM sets it.
+     * This verifies the MCP server uses the same JVM and can access system properties.
      *
      * The test:
      * 1. Sets a system property with a random UUID value
@@ -131,14 +131,13 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
         session.runPrompt(
             """
                 You are testing MCP integration. You MUST use steroid_execute_code to run Kotlin code.
+                Use only the MCP server named "intellij" for tool calls. Do not call list_mcp_resources.
                 Execute the following code and print the result:
 
                 Call steroid_execute_code with this code:
                 ```
-                execute {
-                    val value = System.getProperty("$propertyKey")
-                    println("SYSPROP_VALUE: " + value)
-                }
+                val value = System.getProperty("$propertyKey")
+                println("SYSPROP_VALUE: " + value)
                 ```
 
                 After execution, extract the SYSPROP_VALUE line from the output and print it as:
@@ -187,26 +186,19 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
         session.runPrompt(
             """
             You are testing MCP integration. You MUST call steroid_execute_code exactly three times, in order.
+            Use only the MCP server named "intellij" for tool calls. Do not call list_mcp_resources.
             Reason: cli session reset test, and distinct task_id values.
 
             Call #1 code:
-            execute {
-                println("EXEC1_OK")
-            }
+            println("EXEC1_OK")
 
             Call #2 code:
-            import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
-
-            execute {
-                val server = SteroidsMcpServer.getInstance().getServer()
-                val forgotten = server.sessionManager.forgetAllSessionsForTest()
-                println("SESSIONS_FORGOTTEN: " + forgotten)
-            }
+            val server = com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer.getInstance().getServer()
+            val forgotten = server.sessionManager.forgetAllSessionsForTest()
+            println("SESSIONS_FORGOTTEN: " + forgotten)
 
             Call #3 code:
-            execute {
-                println("EXEC2_OK")
-            }
+            println("EXEC2_OK")
 
             After each call, extract the output line containing the marker and print:
             RESULT1: <line with EXEC1_OK>

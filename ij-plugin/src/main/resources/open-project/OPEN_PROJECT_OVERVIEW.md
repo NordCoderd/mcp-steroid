@@ -85,11 +85,9 @@ Resource: `mcp-steroid://open-project/open-with-dialogs`
 For advanced scenarios using IntelliJ APIs directly:
 
 ```kotlin
-execute {
-    // Trust and open via APIs
-    TrustedProjects.setProjectTrusted(path, true)
-    ProjectManagerEx.getInstanceEx().openProjectAsync(path, OpenProjectTask { })
-}
+// Trust and open via APIs
+TrustedProjects.setProjectTrusted(path, true)
+ProjectManagerEx.getInstanceEx().openProjectAsync(path, OpenProjectTask { })
 ```
 
 Resource: `mcp-steroid://open-project/open-via-code`

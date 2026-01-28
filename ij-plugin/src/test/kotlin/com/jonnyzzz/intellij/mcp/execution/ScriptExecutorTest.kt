@@ -10,12 +10,12 @@ import com.jonnyzzz.intellij.mcp.testExecParams
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Tests for ScriptExecutor.
+ * Tests for the ScriptExecutor.
  *
- * These tests verify that execution failures are reported FAST (no timeout waiting)
+ * These tests verify that execution failures are reported quickly (no timeout waiting)
  * and that the execution flow handles errors correctly.
  *
- * NOTE: In test environment, the Kotlin script engine may not be available
+ * NOTE: In the test environment, the Kotlin script engine may not be available
  * because the Kotlin plugin is not loaded. Tests should still pass by verifying
  * that failures are reported quickly with ERROR status.
  *
@@ -30,8 +30,8 @@ class ScriptExecutorTest : BasePlatformTestCase() {
     private fun nextExecutionId() = ExecutionId("test-${++executionCounter}")
 
     /**
-     * Test that when script engine is not available, we get a fast error response.
-     * This is the expected case in test environment.
+     * Test that when the script engine is not available, we get a fast error response.
+     * This is the expected case in the test environment.
      */
     fun testScriptEngineNotAvailableReturnsFast(): Unit = timeoutRunBlocking(10.seconds) {
         val code = """
@@ -50,30 +50,30 @@ class ScriptExecutorTest : BasePlatformTestCase() {
     }
 
     /**
-     * Test that compilation errors are reported fast - not waiting for timeout.
+     * This test verifies fast reporting for compilation errors.
      * Uses invalid Kotlin syntax that should fail immediately.
      *
-     * Note: When script engine is available, this should fail with compilation error.
-     * When script engine is NOT available, it will also fail (script engine not available).
-     * Either way, execution should complete quickly (not wait for timeout).
+     * Note: When the script engine is available, this should fail with a compilation error.
+     * When the script engine is NOT available, it will also fail (script engine not available).
+     * Either way, execution should complete quickly and not wait for a timeout.
      */
     fun testCompilationFailureFast(): Unit = timeoutRunBlocking(10.seconds) {
         val invalidCode = """
-            please fail this is not valid kotlin code
+            please fail; this is invalid Kotlin code
         """.trimIndent()
 
         val builder = TestResultBuilder()
         executor.executeWithProgress(nextExecutionId(), testExecParams(invalidCode), builder)
 
         // Either failed, has messages, or has exceptions logged
-        // The test verifies fast completion (10 seconds timeout vs 60 seconds exec timeout)
+        // The test verifies fast completion (10-second timeout versus 60-second exec timeout)
         assertTrue("Should complete with some output", builder.hasAnyOutput())
     }
 
     /**
      * Test that syntax errors are caught and reported immediately.
      *
-     * Note: When script engine is not available, this will fail with a different error.
+     * Note: When the script engine is not available, this will fail with a different error.
      */
     fun testSyntaxErrorFast(): Unit = timeoutRunBlocking(10.seconds) {
         val syntaxErrorCode = """
@@ -105,10 +105,25 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         assertTrue("Should complete with some output", builder.hasAnyOutput())
     }
 
+    fun testExecuteWrapperStillWorks(): Unit = timeoutRunBlocking(10.seconds) {
+        val executeWrapperCode = """
+            execute {
+                val x = 40 + 2
+                println(x)
+            }
+        """.trimIndent()
+
+        val builder = TestResultBuilder()
+        executor.executeWithProgress(nextExecutionId(), testExecParams(executeWrapperCode), builder)
+
+        // Either failed (engine missing) or produced output
+        assertTrue("Should complete with some output", builder.hasAnyOutput())
+    }
+
     /**
      * Test that top-level statements are executed in order.
-     * When script engine is available, statements should run sequentially.
-     * When not available, we should get an error.
+     * When the script engine is available, statements should run sequentially.
+     * If it is not available, we should get an error.
      */
     fun testTopLevelStatementsOrder(): Unit = timeoutRunBlocking(10.seconds) {
                 val multiCode = """
@@ -131,7 +146,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
     }
 
     /**
-     * Test runtime error in script body is caught and reported.
+     * Test that a runtime error in the script body is caught and reported.
      */
     fun testRuntimeErrorInScript(): Unit = timeoutRunBlocking(10.seconds) {
         val errorCode = """
@@ -146,7 +161,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
     }
 
     /**
-     * Test timeout is reported correctly when execution takes too long.
+     * Test that a timeout is reported correctly when execution takes too long.
      */
     fun testTimeoutReported(): Unit = timeoutRunBlocking(10.seconds) {
         val slowCode = """

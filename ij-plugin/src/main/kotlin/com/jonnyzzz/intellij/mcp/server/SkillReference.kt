@@ -33,7 +33,7 @@ class SkillReference {
      */
     val criticalRules = buildString {
         appendLine("CRITICAL RULES:")
-        appendLine("1. Code runs as a suspend script body (no execute {} wrapper required)")
+        appendLine("1. Code runs as a suspend script body")
         appendLine("2. waitForSmartMode() runs automatically before your script; call it again only if you trigger indexing")
         appendLine("3. Use readAction {} for PSI/VFS reads")
         append("4. Never use runBlocking - you're already in a coroutine context")

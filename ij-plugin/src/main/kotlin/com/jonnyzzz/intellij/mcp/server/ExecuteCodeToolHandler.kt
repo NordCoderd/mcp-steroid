@@ -81,7 +81,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - automated code refactorings, such as rename or find usages
 
              CRITICAL RULES:
-             1. Your code is the suspend script body - no execute { } wrapper required
+             1. Your code is the suspend script body
              2. Never use runBlocking - you're already in a coroutine context
              3. Use readAction { } for PSI/VFS reads, writeAction { } for modifications
              4. waitForSmartMode() runs automatically before your script starts; call it again only if you trigger indexing
@@ -140,7 +140,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
                     }
                     putJsonObject("code") {
                         put("type", "string")
-                        put("description", "Kotlin script body (suspend context; execute { } wrapper is optional but not required)")
+                        put("description", "Kotlin suspend method body")
                     }
                     putJsonObject("task_id") {
                         put("type", "string")

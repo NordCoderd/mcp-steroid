@@ -12,38 +12,35 @@ import com.intellij.xdebugger.frame.XStackFrame
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
 
-execute {
-    waitForSmartMode()
 
-    val session = XDebuggerManager.getInstance(project).currentSession
-        ?: error("No debug session. Start one first.")
+val session = XDebuggerManager.getInstance(project).currentSession
+    ?: error("No debug session. Start one first.")
 
-    if (!session.isSuspended) {
-        error("Session is running. Pause it before building a thread dump.")
+if (!session.isSuspended) {
+    error("Session is running. Pause it before building a thread dump.")
+}
+
+val suspendContext = session.suspendContext
+    ?: error("No suspend context available.")
+
+val stacks = suspendContext.executionStacks
+println("Thread dump for", stacks.size, "stacks")
+
+stacks.forEach { stack ->
+    println("Thread:", stack.displayName)
+    val frames = collectFrames(stack)
+    if (frames.isEmpty()) {
+        println("  <no frames>")
+        return@forEach
     }
-
-    val suspendContext = session.suspendContext
-        ?: error("No suspend context available.")
-
-    val stacks = suspendContext.executionStacks
-    println("Thread dump for", stacks.size, "stacks")
-
-    stacks.forEach { stack ->
-        println("Thread:", stack.displayName)
-        val frames = collectFrames(stack)
-        if (frames.isEmpty()) {
-            println("  <no frames>")
-            return@forEach
+    frames.forEachIndexed { index, frame ->
+        val position = frame.sourcePosition
+        val location = if (position != null) {
+            "${position.file.name}:${position.line + 1}"
+        } else {
+            "<no position>"
         }
-        frames.forEachIndexed { index, frame ->
-            val position = frame.sourcePosition
-            val location = if (position != null) {
-                "${position.file.name}:${position.line + 1}"
-            } else {
-                "<no position>"
-            }
-            println("  #$index $location")
-        }
+        println("  #$index $location")
     }
 }
 

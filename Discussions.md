@@ -456,23 +456,20 @@ IntelliJ Community includes a full MCP server plugin (`com.intellij.mcpServer`) 
 
 **Decision**: Investigate both. If MCP server plugin is bundled in target IntelliJ versions, prefer Option A.
 
-**2. Entry Point → McpScriptScope with execute { }**
+**2. Entry Point → Script Body
 
-New architecture:
-- Bind `McpScriptScope` to script engine (not `McpScriptContext`)
-- `McpScriptScope` has single method: `execute { ... }` (context is the receiver)
-- Script MUST call `execute { }` to do anything useful
-- The lambda receives `McpScriptContext` with full API
+Updated architecture:
+- The script body is the entry point (McpScriptContext is the receiver)
+- `execute { }` remains as a backward-compatible shim
+- The body runs in a suspend context with full API access
 
 ```kotlin
 // What user writes:
-execute {
-    println("Hello")
-    val projectRef = project
-    // ... actual work
-}
+println("Hello")
+val projectRef = project
+// ... actual work
 
-// McpScriptScope interface:
+// Legacy shim (kept for compatibility):
 interface McpScriptScope {
     fun execute(block: suspend McpScriptContext.() -> Unit)
 }
@@ -625,7 +622,7 @@ Groovy support deferred. Focus on Kotlin scripting only for v1.
 |-------|----------|
 | **MCP Integration** | McpToolset only (no REST fallback) |
 | **Target Version** | IntelliJ 2025.3+ |
-| **Entry Point** | `execute { ... }` via McpScriptScope (McpScriptContext is receiver) |
+| **Entry Point** | Script body (McpScriptContext receiver; execute { } optional) |
 | **Plugins param** | REMOVED - AllPluginsLoader used internally |
 | **Review mode** | ALWAYS by default, TRUSTED = trust all callers |
 | **Registry keys** | review.mode, review.timeout, execution.timeout |

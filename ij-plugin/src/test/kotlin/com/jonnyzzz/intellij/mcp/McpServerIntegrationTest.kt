@@ -188,9 +188,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 put(
                     "code",
                     """
-                    execute {
                         println("Integration test execution from MCP")
-                    }
                     """.trimIndent()
                 )
                 put("reason", "Verify MCP agent can execute code inside IntelliJ")
@@ -320,9 +318,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                             put(
                                 "code",
                                 """
-                                execute {
                                     println("should not run")
-                                }
                                 """.trimIndent()
                             )
                             put("reason", "Verify required_plugins gating")
@@ -447,12 +443,11 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     /**
      * Tests with the EXACT request format Claude CLI sends (from debug logs).
      *
-     * Log shows:
-     * {"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.67"}},"jsonrpc":"2.0","id":0}
+     * Log entry example (JSON payload omitted; see debug logs for the exact request)
      *
      * Key differences from our test:
      * - "id" is numeric 0, not string "1"
-     * - "capabilities" has "roots":{} (empty object)
+     * - "capabilities" includes an empty "roots" object
      * - Field order: method, params, jsonrpc, id (not jsonrpc first)
      */
     fun testExactClaudeCliInitializeRequest(): Unit = timeoutRunBlocking(30.seconds) {
@@ -525,7 +520,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
-     * Tests that subsequent requests with session ID work correctly.
+     * Tests that later requests with a session ID work correctly.
      * This verifies the full session management flow.
      */
     fun testSessionManagementFlow(): Unit = timeoutRunBlocking(30.seconds) {
@@ -584,8 +579,8 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
-     * Tests that the server handles IDE restart gracefully.
-     * When a client sends an unknown session ID (e.g., after IDE restart),
+     * This test verifies server behavior after restarting IntelliJ IDEA.
+     * When a client sends an unknown session ID (e.g., after an IDE restart),
      * the server should create a new session instead of rejecting the request.
      */
     fun testServerRestartHandling(): Unit = timeoutRunBlocking(30.seconds) {
@@ -618,7 +613,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             newSessionId == staleSessionId
         )
 
-        // Step 2: Verify the new session works for subsequent requests
+        // Step 2: Verify the new session works for later requests
         val followUpResponse = client.post(server.mcpUrl) {
             contentType(ContentType.Application.Json)
             accept(ContentType.Application.Json)
@@ -663,10 +658,10 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
         val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
 
-        // Verify execution is not marked as error
+        // Verify execution is not marked as an error
         assertFalse("Execution should succeed, got: $execOutput", execResult.isError)
 
-        // Verify output contains our marker text
+        // Verify the output contains our marker text
         assertTrue(
             "Output should contain marker text, got: $execOutput",
             execOutput.contains("Integration test execution from MCP")
@@ -700,10 +695,10 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val server = SteroidsMcpServer.getInstance()
         server.startServerIfNeeded()
 
-        // Verify server is running
+        // Verify the server is running
         assertTrue("Server should be running on a valid port", server.port > 0)
 
-        // Verify server is accessible
+        // Verify the server is accessible
         val response = client.get(server.mcpUrl) {
             header("Accept", "application/json, text/event-stream")
         }
@@ -736,11 +731,9 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 putJsonObject("arguments") {
                     put("project_name", project.name)
                     put("code", """
-                        execute {
                             val x = 42
                             // Missing closing brace - syntax error!
                             println("This won't compile"
-                        }
                     """.trimIndent())
                     put("reason", "Test compilation error handling")
                     put("task_id", "compile-error-test")
@@ -772,7 +765,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         println(execOutput)
         println("=== END RESPONSE ===")
 
-        // Execution should be marked as error
+        // Execution should be marked as an error
         assertTrue("Execution should be marked as error for compilation failure", execResult.isError)
 
         // Output should contain compilation error information
@@ -810,10 +803,8 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 putJsonObject("arguments") {
                     put("project_name", project.name)
                     put("code", """
-                        execute {
                             val number: Int = "this is not a number"
                             println(number)
-                        }
                     """.trimIndent())
                     put("reason", "Test type error handling")
                     put("task_id", "type-error-test")
@@ -842,10 +833,10 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         println(execOutput)
         println("=== END RESPONSE ===")
 
-        // Execution should be marked as error
+        // Execution should be marked as an error
         assertTrue("Execution should be marked as error for type mismatch", execResult.isError)
 
-        // Output should mention type-related error
+        // Output should mention a type-related error
         assertTrue(
             "Output should mention type error, got: $execOutput",
             execOutput.contains("type", ignoreCase = true) ||
@@ -886,12 +877,10 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 putJsonObject("arguments") {
                     put("project_name", project.name)
                     put("code", """
-                        execute {
                             progress("Step 1: Initializing...")
                             progress("Step 2: Processing data...")
                             progress("Step 3: Completing task...")
                             println("DONE: All steps completed")
-                        }
                     """.trimIndent())
                     put("reason", "Test progress reporting")
                     put("task_id", "progress-test")
@@ -966,12 +955,10 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 putJsonObject("arguments") {
                     put("project_name", project.name)
                     put("code", """
-                        execute {
                             progress("Starting with progress token...")
                             progress("Middle step...")
                             progress("Final step...")
                             println("COMPLETED: Task with progress token")
-                        }
                     """.trimIndent())
                     put("reason", "Test progress with token")
                     put("task_id", "progress-token-test")
@@ -1034,17 +1021,15 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         // Execute code that simulates a longer operation with multiple progress updates
         // Note: Using Thread.sleep for simulation since delay() may not be in classpath
         val code = """
-            execute {
                 val items = listOf("Alpha", "Beta", "Gamma", "Delta", "Epsilon")
-            
+
                 for (i in items.indices) {
                     val item = items[i]
                     progress("Processing item " + (i + 1) + "/" + items.size + ": " + item)
                     Thread.sleep(100)
                 }
-            
+
                 println("FINISHED: Processed " + items.size + " items")
-            }
         """.trim()
 
         val execRequest = buildJsonObject {
@@ -1117,7 +1102,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
 
-        // Execute code with unresolved reference
+        // Execute code with an unresolved reference
         val execRequest = buildJsonObject {
             put("jsonrpc", "2.0")
             put("id", "exec-unresolved")
@@ -1127,11 +1112,9 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 putJsonObject("arguments") {
                     put("project_name", project.name)
                     put("code", """
-                        execute {
                             // This class doesn't exist
                             val x = NonExistentClass.doSomething()
                             println(x)
-                        }
                     """.trimIndent())
                     put("reason", "Test unresolved reference handling")
                     put("task_id", "unresolved-ref-test")
@@ -1160,10 +1143,10 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         println(execOutput)
         println("=== END RESPONSE ===")
 
-        // Execution should be marked as error
+        // Execution should be marked as an error
         assertTrue("Execution should be marked as error for unresolved reference", execResult.isError)
 
-        // Output should mention unresolved reference
+        // Output should mention an unresolved reference
         assertTrue(
             "Output should mention unresolved reference, got: $execOutput",
             execOutput.contains("unresolved", ignoreCase = true) ||
@@ -1173,7 +1156,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
-     * Tests that a system property set in the test JVM can be read via MCP execute_code.
+     * This test verifies that MCP execute_code can read a system property from the test JVM.
      * This verifies the MCP server runs in the same JVM and can access system properties.
      */
     fun testSystemPropertyCanBeReadViaMcp(): Unit = timeoutRunBlocking(30.seconds) {
@@ -1203,11 +1186,9 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                     put("name", "steroid_execute_code")
                     putJsonObject("arguments") {
                         put("project_name", project.name)
-                        put("code", """
-                            execute {
-                                val value = System.getProperty("$propertyKey")
-                                println("SYSPROP_VALUE: ${'$'}value")
-                            }
+                        put("code", $$"""
+                                val value = System.getProperty("$$propertyKey")
+                                println("SYSPROP_VALUE: $value")
                         """.trimIndent())
                         put("reason", "Test reading system property via MCP")
                         put("task_id", "sysprop-test")
