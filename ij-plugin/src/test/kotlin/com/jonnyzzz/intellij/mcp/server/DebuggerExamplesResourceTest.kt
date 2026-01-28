@@ -38,7 +38,6 @@ class DebuggerExamplesResourceTest : BasePlatformTestCase() {
     fun testSetLineBreakpointLoads() {
         val content = handler.loadExample("/debugger-examples/set-line-breakpoint.kts")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use XDebuggerUtil", content.contains("XDebuggerUtil"))
         assertTrue("Should add line breakpoint", content.contains("addLineBreakpoint"))
     }
@@ -46,7 +45,6 @@ class DebuggerExamplesResourceTest : BasePlatformTestCase() {
     fun testThreadDumpLoads() {
         val content = handler.loadExample("/debugger-examples/debug-thread-dump.kts")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should compute stack frames", content.contains("computeStackFrames"))
     }
 
@@ -55,11 +53,7 @@ class DebuggerExamplesResourceTest : BasePlatformTestCase() {
             val content = handler.loadExample(example.resourcePath)
             assertNotNull("${example.id} should load", content)
 
-            assertTrue("${example.id} should have execute block",
-                content.contains("execute {"))
 
-            assertTrue("${example.id} should call waitForSmartMode",
-                content.contains("waitForSmartMode()"))
         }
     }
 

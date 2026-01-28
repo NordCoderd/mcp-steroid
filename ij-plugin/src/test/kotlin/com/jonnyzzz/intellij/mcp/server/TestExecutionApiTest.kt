@@ -55,7 +55,6 @@ class TestExecutionApiTest : BasePlatformTestCase() {
     fun testListRunConfigurationsLoads() {
         val content = handler.loadExample("/test-examples/list-run-configurations.md")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use RunManager", content.contains("RunManager"))
         assertTrue("Should list configurations", content.contains("allSettings"))
     }
@@ -63,7 +62,6 @@ class TestExecutionApiTest : BasePlatformTestCase() {
     fun testRunTestsLoads() {
         val content = handler.loadExample("/test-examples/run-tests.md")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use ProgramRunnerUtil", content.contains("ProgramRunnerUtil"))
         assertTrue("Should execute configuration", content.contains("executeConfiguration"))
     }
@@ -71,7 +69,6 @@ class TestExecutionApiTest : BasePlatformTestCase() {
     fun testWaitForCompletionLoads() {
         val content = handler.loadExample("/test-examples/wait-for-completion.md")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use RunContentManager", content.contains("RunContentManager"))
         assertTrue("Should check termination", content.contains("isProcessTerminated"))
     }
@@ -79,7 +76,6 @@ class TestExecutionApiTest : BasePlatformTestCase() {
     fun testInspectTestResultsLoads() {
         val content = handler.loadExample("/test-examples/inspect-test-results.md")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use SMTRunnerConsoleView", content.contains("SMTRunnerConsoleView"))
         assertTrue("Should access test results", content.contains("resultsViewer"))
     }
@@ -87,21 +83,18 @@ class TestExecutionApiTest : BasePlatformTestCase() {
     fun testTestTreeNavigationLoads() {
         val content = handler.loadExample("/test-examples/test-tree-navigation.md")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should navigate test tree", content.contains("children"))
     }
 
     fun testTestStatisticsLoads() {
         val content = handler.loadExample("/test-examples/test-statistics.md")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should compute statistics", content.contains("count") || content.contains("size"))
     }
 
     fun testTestFailureDetailsLoads() {
         val content = handler.loadExample("/test-examples/test-failure-details.md")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should access failure details",
             content.contains("errorMessage") || content.contains("stacktrace"))
     }
@@ -109,7 +102,6 @@ class TestExecutionApiTest : BasePlatformTestCase() {
     fun testFindRecentTestRunLoads() {
         val content = handler.loadExample("/test-examples/find-recent-test-run.md")
         assertNotNull("Content should not be null", content)
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should find recent runs", content.contains("allDescriptors"))
     }
 
@@ -122,20 +114,7 @@ class TestExecutionApiTest : BasePlatformTestCase() {
             val content = handler.loadExample(example.resourcePath)
             assertNotNull("${example.id} should load", content)
 
-            assertTrue("${example.id} should have execute block",
-                content.contains("execute {"))
 
-            // Only examples that need smart mode should call waitForSmartMode
-            // Lightweight polling examples (wait-for-completion, find-recent-test-run, etc.) don't need it
-            val needsSmartMode = example.id in listOf(
-                "list-run-configurations",
-                "run-tests"
-            )
-
-            if (needsSmartMode) {
-                assertTrue("${example.id} should call waitForSmartMode",
-                    content.contains("waitForSmartMode()"))
-            }
         }
     }
 

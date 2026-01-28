@@ -3,13 +3,13 @@ package com.jonnyzzz.intellij.mcp.execution
 
 class McpScriptBuilder {
     /**
-     * List of execute blocks registered by the script.
+     * List of script blocks registered by the script.
      * Populated during script initialization (top-level code execution).
      */
     val executeBlocks = mutableListOf<suspend McpScriptContext.() -> Unit>()
 
     /**
-     * Register an execute block to be run later.
+     * Register a script block to be run later.
      * Called by user script during initialization.
      *
      * @param block The suspend lambda to be executed later with McpScriptContext

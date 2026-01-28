@@ -40,7 +40,7 @@ Execute Kotlin code directly in IntelliJ IDEA's runtime with full access to the 
 → steroid_list_projects
 ← {"projects":[{"name":"my-app","path":"/path/to/my-app"}]}
 
-→ steroid_execute_code(project_name="my-app", code="execute { println(project.name) }", ...)
+→ steroid_execute_code(project_name="my-app", code="println(project.name)", ...)
 ← "my-app"
 
 → steroid_execute_feedback(project_name="my-app", task_id="...", execution_id="...", success_rating=1.0, explanation="Got project name")
@@ -136,14 +136,14 @@ Execute Kotlin code in IntelliJ's runtime.
 
 **Parameters:**
 - `project_name` (required): Target project from `steroid_list_projects`
-- `code` (required): Kotlin code with `execute { }` block
+- `code` (required): Kotlin script body (suspend context; `execute { }` wrapper not required)
 - `reason` (required): Human-readable explanation
 - `task_id` (required): Group related executions
 - `timeout` (optional): Timeout in seconds (default: 60)
 - `required_plugins` (optional): List of required plugin IDs (example: `com.intellij.database`)
 
 **Extras:**
-- Inside `execute { }`, call `takeIdeScreenshot()` to attach an `image/png` payload to the response.
+- Inside the script body, call `takeIdeScreenshot()` to attach an `image/png` payload to the response.
 - Artifacts are saved as `screenshot.png`, `screenshot-tree.md`, and `screenshot-meta.json`.
 - The `fileName` argument is ignored to keep filenames stable.
 
@@ -193,54 +193,58 @@ These resources are designed to be plugged directly into `steroid_execute_code` 
 
 ## Critical Rules
 
-### 1. Execute Block is a SUSPEND Function
+### 1. Script Body is a SUSPEND Function
 ```kotlin
-execute {
-    // This is a coroutine - use suspend APIs!
-    waitForSmartMode()  // suspend function - works directly
-    delay(1000)         // coroutine delay - works directly
-}
+// This is a coroutine - use suspend APIs!
+// waitForSmartMode() is called automatically before your script starts.
+delay(1000)         // coroutine delay - works directly
 ```
 **NEVER use `runBlocking`** - it causes deadlocks.
 
-### 2. IMPORTS Must Be OUTSIDE Execute Block
+### 2. Imports Are Optional
+
+Default imports are provided automatically. If you need extra APIs, add top-level imports (no execute wrapper required). Avoid placing imports after statements.
+
+```kotlin
+import com.intellij.psi.PsiManager
+import com.intellij.openapi.application.readAction
+
+val psiFile = readAction {
+    PsiManager.getInstance(project).findFile(virtualFile)
+}
+```
 
 **WRONG:**
 ```kotlin
-execute {
-    import com.intellij.psi.PsiManager  // ERROR!
-}
+val filePath = "src/Main.kt"
+import com.intellij.psi.PsiManager  // ERROR!
 ```
 
 **CORRECT:**
 ```kotlin
 import com.intellij.psi.PsiManager
 
-execute {
-    // Use built-in readAction helper - no import needed!
-    val file = readAction { PsiManager.getInstance(project).findFile(vf) }
-}
+// Use built-in readAction helper - no import needed!
+val file = readAction { PsiManager.getInstance(project).findFile(vf) }
 ```
 
 ### 3. Read/Write Actions for PSI/VFS
 
 **Built-in helpers (no imports needed):**
 ```kotlin
-execute {
-    // Reading PSI/VFS/indices - use built-in readAction
-    val psiFile = readAction {
-        PsiManager.getInstance(project).findFile(virtualFile)
-    }
+// Reading PSI/VFS/indices - use built-in readAction
+val psiFile = readAction {
+    PsiManager.getInstance(project).findFile(virtualFile)
+}
 
-    // Or use smartReadAction to auto-wait for indexing
-    val classes = smartReadAction {
-        JavaPsiFacade.getInstance(project).findClass("MyClass", projectScope())
-    }
+// Or use smartReadAction to auto-wait for indexing
+val classes = smartReadAction {
+    JavaPsiFacade.getInstance(project).findClass("MyClass", projectScope())
+}
 
-    // Modifying PSI/VFS/documents
-    writeAction {
-        document.setText("new content")
-    }
+// Modifying PSI/VFS/documents
+writeAction {
+    document.setText("new content")
 }
 ```
 
@@ -249,46 +253,57 @@ execute {
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.writeAction
 
-execute {
-    val data = readAction { /* ... */ }
-    writeAction { /* ... */ }
-}
+val data = readAction { /* ... */ }
+writeAction { /* ... */ }
 ```
 
 ## Script Template
 
 **Minimal template (uses built-in helpers):**
 ```kotlin
-execute {
-    // Wait for indexing if needed
-    waitForSmartMode()
+// waitForSmartMode() is called automatically before your script starts
 
-    // Use IntelliJ APIs with built-in helpers
-    val result = readAction {
-        // PSI/VFS operations here
-    }
-
-    // Output results
-    println(result)
+// Use IntelliJ APIs with built-in helpers
+val result = readAction {
+    // PSI/VFS operations here
 }
+
+// Output results
+println(result)
 ```
 
-**With imports (for specialized APIs):**
+**With optional imports (for specialized APIs):**
 ```kotlin
-// IMPORTS - Always outside execute block
 import com.intellij.psi.JavaPsiFacade
 
-execute {
-    // Use smartReadAction - combines wait + read
-    val psiClass = smartReadAction {
-        JavaPsiFacade.getInstance(project).findClass("MyClass", allScope())
-    }
-    println(psiClass?.qualifiedName)
+// Use smartReadAction - combines wait + read
+val psiClass = smartReadAction {
+    JavaPsiFacade.getInstance(project).findClass("MyClass", allScope())
 }
+println(psiClass?.qualifiedName)
 ```
 
-## Context Available in Execute Block
+## Context Available in the Script Body
 
+```kotlin
+// === Properties ===
+project      // IntelliJ Project instance
+params       // Tool parameters (JsonElement)
+disposable   // For resource cleanup
+isDisposed   // Check if disposed
+
+// === Output Methods ===
+println("Hello", 42, "world")       // Space-separated output
+printJson(object { val x = 1 })     // Pretty JSON
+printException("Failed", exception) // Error with stack trace (recommended!)
+progress("Step 1 of 3...")          // Progress (throttled 1/sec)
+
+// === Read/Write Actions (NO IMPORTS NEEDED!) ===
+val data = readAction { /* PSI/VFS reads */ }      // Suspend read action
+writeAction { /* PSI/VFS writes */ }               // Suspend write action
+val smart = smartReadAction { /* reads in smart mode */ }  // Auto-waits for indexing
+
+// === Search Scopes (NO IMPORTS NEEDED!) ===
 ```kotlin
 execute {
     // === Properties ===
@@ -1526,7 +1541,7 @@ execute {
 1. **Use `smartReadAction { }` for PSI operations** - combines wait + read in one call
 2. **Use built-in helpers** - `readAction`, `writeAction`, `projectScope()`, `allScope()` need no imports
 3. **Use file helpers** - `findPsiFile()`, `findProjectFile()` simplify file access
-4. **Keep imports outside `execute { }`** - imports inside won't compile
+4. **Imports are optional** - add top-level imports only when needed
 5. **Prefer Kotlin coroutine APIs** - you're in a suspend context
 6. **Use meaningful `task_id`** - groups related executions
 7. **Report progress** - `progress("Step 1 of 5...")`
@@ -1564,7 +1579,7 @@ Recommended resources:
 - **"Project not found"** - Run `steroid_list_projects` first to get exact project names
 - **No output from execute** - Make sure to call `println()` or `printJson()` to see results
 - **Timeout** - Increase `timeout` parameter (default 60 seconds)
-- **Script errors** - Check imports are outside `execute { }` block
+- **Script errors** - Check Kotlin syntax; imports are optional
 
 ## Related Resources
 
@@ -1601,7 +1616,7 @@ The MCP Steroid server gives you **direct access to IntelliJ's runtime**:
 - Access PSI (parsed code)
 
 **Key points:**
-- The execute block is a suspend function - use coroutine APIs directly
+- The script body is a suspend function - use coroutine APIs directly
 - Built-in helpers (`readAction`, `writeAction`, `projectScope()`, etc.) require no imports
 - Use `smartReadAction { }` for most PSI operations
 - Use `findPsiFile()` and `findProjectFile()` for easy file access

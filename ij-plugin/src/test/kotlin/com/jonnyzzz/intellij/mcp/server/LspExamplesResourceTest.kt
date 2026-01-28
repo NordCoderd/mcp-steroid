@@ -45,7 +45,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/go-to-definition.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/definition"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use PsiManager", content.contains("PsiManager"))
     }
 
@@ -53,7 +52,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/find-references.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/references"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use ReferencesSearch", content.contains("ReferencesSearch"))
     }
 
@@ -61,7 +59,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/hover.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/hover"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should mention DocumentationProvider", content.contains("DocumentationProvider"))
     }
 
@@ -69,7 +66,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/completion.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/completion"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should mention CompletionContributor", content.contains("CompletionContributor"))
     }
 
@@ -77,7 +73,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/document-symbols.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/documentSymbol"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use StructureViewBuilder", content.contains("StructureViewBuilder"))
     }
 
@@ -85,7 +80,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/rename.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/rename"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use RefactoringFactory", content.contains("RefactoringFactory"))
         assertTrue("Should have dryRun option", content.contains("dryRun"))
     }
@@ -94,7 +88,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/formatting.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/formatting"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use CodeStyleManager", content.contains("CodeStyleManager"))
         assertTrue("Should have dryRun option", content.contains("dryRun"))
     }
@@ -103,7 +96,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/code-action.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/codeAction"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use IntentionManager", content.contains("IntentionManager"))
     }
 
@@ -111,7 +103,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/signature-help.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("textDocument/signatureHelp"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should mention ParameterInfoHandler", content.contains("ParameterInfoHandler"))
     }
 
@@ -119,7 +110,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
         val content = handler.loadExample("/lsp-examples/workspace-symbol.kts")
         assertNotNull("Content should not be null", content)
         assertTrue("Should have LSP method comment", content.contains("workspace/symbol"))
-        assertTrue("Should have execute block", content.contains("execute {"))
         assertTrue("Should use PsiShortNamesCache", content.contains("PsiShortNamesCache"))
     }
 
@@ -132,13 +122,6 @@ class LspExamplesResourceTest : BasePlatformTestCase() {
             assertTrue("${example.id} should have LSP method in header",
                 content.contains(example.lspMethod))
 
-            // All examples should have execute block
-            assertTrue("${example.id} should have execute block",
-                content.contains("execute {"))
-
-            // All examples should have waitForSmartMode
-            assertTrue("${example.id} should call waitForSmartMode",
-                content.contains("waitForSmartMode()"))
 
             // All examples should use readAction or writeAction
             assertTrue("${example.id} should have read/write action",

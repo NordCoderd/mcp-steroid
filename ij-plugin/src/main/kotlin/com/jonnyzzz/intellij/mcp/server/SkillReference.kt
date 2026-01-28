@@ -24,6 +24,7 @@ class SkillReference {
     /**
      * Returns the SKILL.md URL from the MCP server.
      */
+    @Suppress("unused")
     val skillUrl: String
         get() = mcpServer.skillUrl
 
@@ -32,10 +33,10 @@ class SkillReference {
      */
     val criticalRules = buildString {
         appendLine("CRITICAL RULES:")
-        appendLine("1. Imports MUST be OUTSIDE execute {} block")
-        appendLine("2. Call waitForSmartMode() before PSI operations")
+        appendLine("1. Code runs as a suspend script body (no execute {} wrapper required)")
+        appendLine("2. waitForSmartMode() runs automatically before your script; call it again only if you trigger indexing")
         appendLine("3. Use readAction {} for PSI/VFS reads")
-        append("4. Never use runBlocking - you're in a coroutine")
+        append("4. Never use runBlocking - you're already in a coroutine context")
     }
 
     // Resource hints are static since SkillReference is accessed early in startup
@@ -55,10 +56,10 @@ class SkillReference {
     fun errorHint(errorMessage: String): String {
         val hint = when {
             errorMessage.contains("Unresolved reference") ->
-                "TIP: Add imports OUTSIDE the execute {} block, not inside."
+                "TIP: Add missing top-level imports if needed. Imports are optional but must appear before code statements."
 
             errorMessage.contains("Dumb mode") || errorMessage.contains("smart mode") ->
-                "TIP: Call waitForSmartMode() before accessing PSI or indices."
+                "TIP: waitForSmartMode() runs before the script, but call it again after triggering indexing."
 
             errorMessage.contains("Read access") || errorMessage.contains("Write access") ->
                 "TIP: Wrap PSI/VFS access in readAction {} or writeAction {}."
@@ -73,7 +74,7 @@ class SkillReference {
                 "TIP: For debugger help, see mcp-steroid://debugger/overview resource (run resources/list)"
 
             errorMessage.contains("runBlocking") ->
-                "TIP: Never use runBlocking - execute {} is already a suspend function."
+                "TIP: Never use runBlocking - the script body already runs in a coroutine context."
 
             // Note: "Service is dying" errors are now handled automatically with retry logic
             // in CodeEvalManager.kt. If this error reaches here, it means all retries failed.
@@ -89,7 +90,7 @@ class SkillReference {
     }
 
     /**
-     * Success message with documentation link.
+     * Success message with a documentation link.
      */
     val successFooter: String
         get() = resourceHint

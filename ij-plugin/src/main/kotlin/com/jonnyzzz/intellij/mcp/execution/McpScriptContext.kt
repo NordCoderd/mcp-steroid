@@ -18,34 +18,31 @@ import com.intellij.openapi.application.writeAction as intellijWriteAction
 import com.intellij.openapi.application.smartReadAction as intellijSmartReadAction
 
 /**
- * Context provided to scripts inside the execute { } block.
+ * Context provided to exec_code scripts.
  *
- * IMPORTANT: All code inside execute { } runs in a suspend context.
+ * IMPORTANT: Script code runs in a suspend context; exec_code executes the script body directly.
+ * waitForSmartMode() is called automatically before your script starts.
  * This context provides helper functions for common IntelliJ operations.
  *
  * ## Quick Reference
  *
  * ```kotlin
- * execute {
- *     // Wait for indexing
- *     waitForSmartMode()
- *
- *     // Read PSI/VFS data (use helpers - no imports needed!):
- *     val psiFile = readAction {
- *         PsiManager.getInstance(project).findFile(virtualFile)
- *     }
- *
- *     // Or use even simpler helpers:
- *     val psiFile = findPsiFile("/path/to/file.kt")
- *
- *     // Modify PSI/VFS:
- *     writeAction {
- *         document.setText("new content")
- *     }
- *
- *     // Get search scopes easily:
- *     val scope = projectScope()  // or allScope()
+ * // waitForSmartMode() is called automatically before your script starts
+ * // Read PSI/VFS data (use helpers - no imports needed!):
+ * val psiFile = readAction {
+ *     PsiManager.getInstance(project).findFile(virtualFile)
  * }
+ *
+ * // Or use even simpler helpers:
+ * val psiFile = findPsiFile("/path/to/file.kt")
+ *
+ * // Modify PSI/VFS:
+ * writeAction {
+ *     document.setText("new content")
+ * }
+ *
+ * // Get search scopes easily:
+ * val scope = projectScope()  // or allScope()
  * ```
  *
  * NEVER use runBlocking - it causes deadlocks.
@@ -57,7 +54,7 @@ interface McpScriptContext {
     /** Original tool execution parameters */
     val params: JsonElement
 
-    /** Allows to bind a disposable to the execution context, use coroutineScope {} for coroutine API */
+    /** Allows binding a disposable to the execution context; use coroutineScope {} for coroutine API */
     val disposable: Disposable
 
     /** Allows to check if the context is disposed */
@@ -68,8 +65,8 @@ interface McpScriptContext {
     // ============================================================
 
     /**
-     * Print values to output, separated by spaces, followed by newline.
-     * Each argument is converted to string via toString().
+     * Print values to the output, separated by spaces, followed by a newline.
+     * Each argument is converted to a string via toString().
      *
      * ```kotlin
      * println("Hello", "World", 42)  // prints: "Hello World 42"
@@ -101,13 +98,11 @@ interface McpScriptContext {
      * Messages are throttled to at most once per second to avoid overwhelming the connection.
      *
      * ```kotlin
-     * execute {
-     *     progress("Starting analysis...")
-     *     // do work
-     *     progress("Processing file 1 of 10")
-     *     // more work
-     *     progress("Analysis complete")
-     * }
+     * progress("Starting analysis...")
+     * // do work
+     * progress("Processing file 1 of 10")
+     * // more work
+     * progress("Analysis complete")
      * ```
      */
     fun progress(message: String)
@@ -132,13 +127,13 @@ interface McpScriptContext {
 
     /**
      * Wait for indexing to complete (smart mode).
-     * Use this before accessing indices or PSI that requires smart mode.
+     * The exec_code call invokes waitForSmartMode() automatically before your script runs.
+     * Call this only if you need to wait again after triggering indexing.
      *
      * ```kotlin
-     * execute {
-     *     waitForSmartMode()
-     *     // Now safe to use indices and PSI
-     * }
+     * // If you trigger indexing mid-script:
+     * waitForSmartMode()
+     * // Now safe to use indices and PSI
      * ```
      */
     suspend fun waitForSmartMode()
@@ -148,20 +143,18 @@ interface McpScriptContext {
     // ============================================================
 
     /**
-     * Check if daemon code analyzer is currently running.
+     * Check whether the daemon code analyzer is currently running.
      *
      * ```kotlin
-     * execute {
-     *     if (isDaemonRunning()) {
-     *         println("Analysis in progress...")
-     *     }
+     * if (isDaemonRunning()) {
+     *     println("Analysis in progress...")
      * }
      * ```
      */
     suspend fun isDaemonRunning(): Boolean
 
     /**
-     * Wait for daemon code analyzer to complete highlighting on the given file.
+     * Wait for the daemon code analyzer to complete highlighting on the given file.
      * The file must be open in the editor for highlighting to work.
      *
      * @param file The virtual file to wait for analysis completion
@@ -169,50 +162,47 @@ interface McpScriptContext {
      * @return true if highlighting completed, false if timeout occurred
      *
      * ```kotlin
-     * execute {
-     *     val file = findProjectFile("src/Main.kt") ?: error("File not found")
-     *     // Open file in editor first
-     *     withContext(Dispatchers.EDT) {
-     *         FileEditorManager.getInstance(project).openFile(file, true)
-     *     }
-     *     // Wait for analysis
-     *     val completed = waitForDaemonAnalysis(file)
-     *     if (completed) {
-     *         println("Analysis complete!")
-     *     }
+     * val file = findProjectFile("src/Main.kt") ?: error("File not found")
+     * // Open file in editor first
+     * withContext(Dispatchers.EDT) {
+     *     FileEditorManager.getInstance(project).openFile(file, true)
+     * }
+     * // Wait for analysis
+     * val completed = waitForDaemonAnalysis(file)
+     * if (completed) {
+     *     println("Analysis complete!")
      * }
      * ```
      */
     suspend fun waitForDaemonAnalysis(file: VirtualFile, timeout: Duration = 30.seconds): Boolean
 
     /**
-     * Wait for daemon analysis and return all highlight infos for the file.
-     * Returns highlights with severity >= WEAK_WARNING by default.
+     * Waits for the daemon analysis to complete and then returns highlights for the file.
+     * Returns highlights with severity of at least WEAK_WARNING by default.
      *
      * **NOTE**: This method relies on the daemon code analyzer which may return stale results
      * if the IDE window is not focused (see GitHub issue #20). For reliable results regardless
      * of window focus, use [runInspectionsDirectly] instead.
      *
-     * @param file The virtual file to get highlights for
-     * @param minSeverityValue Minimum severity value (default: WEAK_WARNING). Use HighlightSeverity.*.myVal
-     * @param timeout Maximum time to wait for analysis (default: 30 seconds)
-     * @return List of HighlightInfo for the file, or empty list if timeout
+     * @param file The virtual file to get highlights for.
+     * @param minSeverityValue Minimum severity value (default: WEAK_WARNING). Use HighlightSeverity.*.myVal.
+     * @param timeout Maximum time to wait for analysis (default: 30 seconds).
+     * @return List of HighlightInfo for the file, or empty list if timeout.
      *
      * ```kotlin
-     * execute {
-     *     val file = findProjectFile("src/Main.kt") ?: error("File not found")
-     *     // Open file in editor
-     *     withContext(Dispatchers.EDT) {
-     *         FileEditorManager.getInstance(project).openFile(file, true)
-     *     }
-     *     // Get all warnings and errors
-     *     val highlights = getHighlightsWhenReady(file)
-     *     highlights.forEach { info ->
-     *         println("${info.severity}: ${info.description}")
-     *     }
+     * val file = findProjectFile("src/Main.kt") ?: error("File not found")
+     * // Open file in editor
+     * withContext(Dispatchers.EDT) {
+     *     FileEditorManager.getInstance(project).openFile(file, true)
+     * }
+     * // Get all warnings and errors
+     * val highlights = getHighlightsWhenReady(file)
+     * highlights.forEach { info ->
+     *     println("${info.severity}: ${info.description}")
      * }
      * ```
      */
+    @Suppress("GrazieInspection", "GrazieInspectionRunner")
     suspend fun getHighlightsWhenReady(
         file: VirtualFile,
         minSeverityValue: Int = 200, // HighlightSeverity.WEAK_WARNING.myVal
@@ -230,18 +220,15 @@ interface McpScriptContext {
      *
      * @param file The virtual file to inspect
      * @param includeInfoSeverity Whether to include INFO-level problems (default: false)
-     * @return Map of inspection tool ID to list of ProblemDescriptors found
+     * @return Map of inspection tool ID to a list of ProblemDescriptors found
      *
      * ```kotlin
-     * execute {
-     *     val file = findProjectFile("src/Main.kt") ?: error("File not found")
-     *     waitForSmartMode()
+     * val file = findProjectFile("src/Main.kt") ?: error("File not found")
      *
-     *     val problems = runInspectionsDirectly(file)
-     *     problems.forEach { (toolId, descriptors) ->
-     *         descriptors.forEach { problem ->
-     *             println("[$toolId] ${problem.descriptionTemplate}")
-     *         }
+     * val problems = runInspectionsDirectly(file)
+     * problems.forEach { (toolId, descriptors) ->
+     *     descriptors.forEach { problem ->
+     *         println("[$toolId] ${problem.descriptionTemplate}")
      *     }
      * }
      * ```
@@ -258,22 +245,20 @@ interface McpScriptContext {
     // ============================================================
 
     /**
-     * Disable automatic cancellation when a modal dialog appears.
+     * Disable automatic cancelation when a modal dialog appears.
      *
      * By default, if a modal dialog appears during code execution, the execution
-     * is cancelled and a screenshot of the dialog is returned. Call this method
+     * is canceled and a screenshot of the dialog is returned. Call this method
      * to disable this behavior - useful when your code intentionally shows dialogs
      * (like refactoring confirmations).
      *
      * ```kotlin
-     * execute {
-     *     // Disable modal dialog cancellation before invoking refactoring
-     *     doNotCancelOnModalityStateChange()
+     * // Disable modal dialog cancellation before invoking refactoring
+     * doNotCancelOnModalityStateChange()
      *
-     *     // Now refactoring dialogs won't cancel execution
-     *     ActionManager.getInstance().getAction("ExtractMethod")
-     *         // ...
-     * }
+     * // Now refactoring dialogs won't cancel execution
+     * ActionManager.getInstance().getAction("ExtractMethod")
+     *     // ...
      * ```
      */
     fun doNotCancelOnModalityStateChange()
@@ -309,6 +294,7 @@ interface McpScriptContext {
      *
      * @see com.intellij.openapi.application.writeAction
      */
+    @Suppress("UnstableApiUsage")
     suspend fun <T> writeAction(action: () -> T): T = intellijWriteAction(action)
 
     /**
@@ -323,6 +309,7 @@ interface McpScriptContext {
      *
      * @see com.intellij.openapi.application.smartReadAction
      */
+    @Suppress("unused")
     suspend fun <T> smartReadAction(action: () -> T): T = intellijSmartReadAction(project, action)
 
     // ============================================================
@@ -347,6 +334,7 @@ interface McpScriptContext {
      * JavaPsiFacade.getInstance(project).findClass("java.util.List", scope)
      * ```
      */
+    @Suppress("unused")
     fun allScope(): GlobalSearchScope = GlobalSearchScope.allScope(project)
 
     // ============================================================
@@ -354,8 +342,8 @@ interface McpScriptContext {
     // ============================================================
 
     /**
-     * Find a VirtualFile by absolute path.
-     * Returns null if file doesn't exist.
+     * Find a VirtualFile by an absolute path.
+     * Returns null if the file doesn't exist.
      *
      * ```kotlin
      * val vf = findFile("/path/to/file.kt")
@@ -368,9 +356,9 @@ interface McpScriptContext {
         LocalFileSystem.getInstance().findFileByPath(absolutePath)
 
     /**
-     * Find a PsiFile by absolute path.
-     * Requires read action context or uses one internally.
-     * Returns null if file doesn't exist or can't be parsed.
+     * Find a PsiFile by an absolute path.
+     * Requires a read action context or uses one internally.
+     * Returns null if the file doesn't exist or can't be parsed.
      *
      * ```kotlin
      * val psiFile = findPsiFile("/path/to/file.kt")
@@ -383,26 +371,28 @@ interface McpScriptContext {
     }
 
     /**
-     * Find a VirtualFile relative to project base path.
-     * Returns null if file doesn't exist.
+     * Find a VirtualFile relative to the project base path.
+     * Returns null if the file doesn't exist.
      *
      * ```kotlin
      * val vf = findProjectFile("src/main/kotlin/MyClass.kt")
      * ```
      */
+    @Suppress("unused")
     fun findProjectFile(relativePath: String): VirtualFile? {
         val basePath = project.basePath ?: return null
         return findFile("$basePath/$relativePath")
     }
 
     /**
-     * Find a PsiFile relative to project base path.
-     * Returns null if file doesn't exist or can't be parsed.
+     * Find a PsiFile relative to the project base path.
+     * Returns null if the file doesn't exist or can't be parsed.
      *
      * ```kotlin
      * val psiFile = findProjectPsiFile("src/main/kotlin/MyClass.kt")
      * ```
      */
+    @Suppress("unused")
     suspend fun findProjectPsiFile(relativePath: String): PsiFile? {
         val basePath = project.basePath ?: return null
         return findPsiFile("$basePath/$relativePath")

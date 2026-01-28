@@ -35,9 +35,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
      */
     fun testScriptEngineNotAvailableReturnsFast(): Unit = timeoutRunBlocking(10.seconds) {
         val code = """
-            execute {
-                println("Hello")
-            }
+            println("Hello")
         """.trimIndent()
 
         val builder = TestResultBuilder()
@@ -79,9 +77,7 @@ class ScriptExecutorTest : BasePlatformTestCase() {
      */
     fun testSyntaxErrorFast(): Unit = timeoutRunBlocking(10.seconds) {
         val syntaxErrorCode = """
-            execute {
-                val x = // incomplete statement
-            }
+            val x = // incomplete statement
         """.trimIndent()
 
         val builder = TestResultBuilder()
@@ -92,11 +88,11 @@ class ScriptExecutorTest : BasePlatformTestCase() {
     }
 
     /**
-     * Test that missing execute {} block is reported (if script engine is available).
+     * Test that top-level script body executes without execute {} wrapper.
      */
-    fun testMissingExecuteBlock(): Unit = timeoutRunBlocking(10.seconds) {
+    fun testTopLevelScriptBody(): Unit = timeoutRunBlocking(10.seconds) {
         val noExecuteCode = """
-            // No execute block
+            // Top-level script body
             val x = 1 + 2
             println(x)
         """.trimIndent()
@@ -104,27 +100,21 @@ class ScriptExecutorTest : BasePlatformTestCase() {
         val builder = TestResultBuilder()
         executor.executeWithProgress(nextExecutionId(), testExecParams(noExecuteCode), builder)
 
-        // Should fail (either script engine not available or missing execute block)
+        // Either failed (engine missing) or produced output
         // Either way, should complete quickly
         assertTrue("Should complete with some output", builder.hasAnyOutput())
     }
 
     /**
-     * Test that multiple top-level execute blocks are handled correctly.
-     * When script engine is available, multiple blocks should be collected and run in FIFO order.
+     * Test that top-level statements are executed in order.
+     * When script engine is available, statements should run sequentially.
      * When not available, we should get an error.
      */
-    fun testMultipleExecuteBlocks(): Unit = timeoutRunBlocking(10.seconds) {
-        val multiCode = """
-            execute {
-                println("First")
-            }
-            execute {
-                println("Second")
-            }
-            execute {
-                println("Third")
-            }
+    fun testTopLevelStatementsOrder(): Unit = timeoutRunBlocking(10.seconds) {
+                val multiCode = """
+            println("First")
+            println("Second")
+            println("Third")
         """.trimIndent()
 
         val builder = TestResultBuilder()
@@ -141,13 +131,11 @@ class ScriptExecutorTest : BasePlatformTestCase() {
     }
 
     /**
-     * Test runtime error in execute block is caught and reported.
+     * Test runtime error in script body is caught and reported.
      */
-    fun testRuntimeErrorInBlock(): Unit = timeoutRunBlocking(10.seconds) {
+    fun testRuntimeErrorInScript(): Unit = timeoutRunBlocking(10.seconds) {
         val errorCode = """
-            execute {
-                throw RuntimeException("Test runtime error")
-            }
+            throw RuntimeException("Test runtime error")
         """.trimIndent()
 
         val builder = TestResultBuilder()
@@ -162,11 +150,9 @@ class ScriptExecutorTest : BasePlatformTestCase() {
      */
     fun testTimeoutReported(): Unit = timeoutRunBlocking(10.seconds) {
         val slowCode = """
-            execute {
-                println("Starting")
-                kotlinx.coroutines.delay(5000) // 5 seconds
-                println("Done")
-            }
+            println("Starting")
+            kotlinx.coroutines.delay(5000) // 5 seconds
+            println("Done")
         """.trimIndent()
 
         val builder = TestResultBuilder()

@@ -99,7 +99,7 @@ Execute Kotlin code directly in IntelliJ's runtime. This is your primary tool.
 
 Parameters:
 - `project_name` (required): Target project from `steroid_list_projects`
-- `code` (required): Kotlin code with `execute { }` block
+- `code` (required): Kotlin script body (suspend context; `execute { }` wrapper not required)
 - `reason` (required): Human-readable explanation of what you're doing - **be detailed so sub-agents can understand the intent**
 - `task_id` (required): Group related executions together
 - `timeout` (optional): Execution timeout in seconds (default: 60)
@@ -144,32 +144,23 @@ Parameters:
 
 ## Critical Rules
 
-### 1. The `execute { }` Block is a SUSPEND Function
+### 1. The Script Body is a SUSPEND Function
 
-The code inside `execute { }` runs in a **coroutine context**. This means:
+The script body runs in a **coroutine context**. This means:
 - **Prefer Kotlin coroutine APIs** over blocking Java APIs
 - You can call any `suspend` function directly
 - **NEVER use `runBlocking`** - it will cause deadlocks
 
-### 2. IMPORTS MUST Be OUTSIDE `execute { }`
+### 2. Imports Are Optional
 
-**WRONG:**
-```kotlin
-execute {
-    import com.intellij.psi.PsiManager  // ERROR: imports don't work here!
-    // ...
-}
-```
+Default imports are provided automatically. If you need extra APIs, add top-level imports (no execute wrapper required). Avoid placing imports after statements.
 
-**CORRECT:**
 ```kotlin
 import com.intellij.psi.PsiManager
 import com.intellij.openapi.application.readAction
 
-execute {
-    val psiFile = readAction {
-        PsiManager.getInstance(project).findFile(virtualFile)
-    }
+val psiFile = readAction {
+    PsiManager.getInstance(project).findFile(virtualFile)
 }
 ```
 
@@ -179,62 +170,50 @@ IntelliJ requires proper threading:
 - **`readAction { }`** - for reading PSI, VFS, indices
 - **`writeAction { }`** - for modifying PSI, VFS, documents
 
-Both are suspend functions that work naturally in the execute block.
+Both are suspend functions that work naturally in the script body.
 
 ## Script Structure Template
 
 ```kotlin
-// 1. IMPORTS - Always at the top, outside execute
+// Optional imports at top-level (default imports are provided)
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.writeAction
 import com.intellij.psi.PsiManager
 
-// 2. EXECUTE BLOCK - Your suspend function
-execute {
-    // 3. Wait for indexing if needed
-    waitForSmartMode()
+// Script body is a suspend function; execute wrapper not required.
+// waitForSmartMode() is called automatically before your script starts.
 
-    // 4. Use IntelliJ APIs with proper read/write actions
-    val result = readAction {
-        // PSI/VFS reads here
-    }
-
-    // 5. Output results
-    println(result)
+val result = readAction {
+    // PSI/VFS reads here
 }
+
+// Output results
+println(result)
 ```
 
-## Context Available in `execute { }`
+## Context Available in the Script Body
 
 ```kotlin
-execute {
-    // Available properties:
-    project      // The IntelliJ Project instance
-    params       // Original tool parameters (JsonElement)
-    disposable   // For resource cleanup
-    isDisposed   // Check if context is disposed
+// Available properties:
+project      // The IntelliJ Project instance
+params       // Original tool parameters (JsonElement)
+disposable   // For resource cleanup
+isDisposed   // Check if context is disposed
 
-    // Output methods:
-    println("Values", "separated", "by spaces")
-    // Pretty-print as JSON
-    printJson(object {
-       val foo = 42
-       val bar = "cool"
-    })
-    printJson(anyOtherObject)
-    progress("Working on step 1...")  // Throttled to 1/sec
+// Output methods:
+println("Values", "separated", "by spaces")
+// Pretty-print as JSON
+printJson(mapOf("hello" to "world"))
 
-    // IDE utilities (suspend functions):
-    waitForSmartMode()  // Wait for indexing before PSI operations
+// Report progress
+progress("Processing...")
 
-    // Modal dialog control:
-    doNotCancelOnModalityStateChange()  // Disable automatic cancellation on modal dialogs
-}
+// waitForSmartMode() is called automatically before your script starts
 ```
 
 ## Modal Dialog Handling
 
-By default, if a modal dialog appears during `execute {}` execution, the code is automatically cancelled and a screenshot of the dialog is returned. This is useful because:
+By default, if a modal dialog appears during script execution, the code is automatically cancelled and a screenshot of the dialog is returned. This is useful because:
 
 1. Modal dialogs (like "Restart IDE?") block the IDE and require user interaction
 2. The LLM agent can see the dialog screenshot and decide how to proceed (use `steroid_input`)
@@ -556,7 +535,7 @@ execute {
 
 3. **Use `writeAction { }` for any PSI/VFS modification** - always
 
-4. **Keep imports outside `execute { }`** - imports inside won't work
+4. **Imports are optional** - add top-level imports only when needed
 
 5. **Leverage suspend context** - prefer Kotlin coroutine APIs (`delay`, `async`, `withContext`)
 
@@ -601,7 +580,7 @@ The MCP Steroid server gives you **direct access to IntelliJ's runtime**. This i
 - You can inspect plugins
 - You can access PSI (the parsed code model)
 
-**The execute block is a suspend function.** Use this to your advantage - call suspend APIs directly, use coroutine primitives, and never block.
+**The script body is a suspend function.** Use this to your advantage - call suspend APIs directly, use coroutine primitives, and never block.
 
 **Don't settle for file-level operations when you have IDE-level access.**
 

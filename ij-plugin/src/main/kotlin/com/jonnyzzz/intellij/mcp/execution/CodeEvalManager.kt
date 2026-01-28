@@ -82,7 +82,7 @@ class CodeEvalManager(
                 }
 
                 if (compilerError.isNotEmpty()) {
-                    // If there's compiler error, it's a failure
+                    // If there's a compiler error, it's a failure
                     resultBuilder.reportFailed("Compiler Errors/Warnings:\n$compilerError")
                 }
 
@@ -117,14 +117,7 @@ class CodeEvalManager(
                 return null
             }
 
-            log.info("Script evaluation complete for $executionId. Captured ${capturedBlocks.size} execute block(s)")
-
-            if (capturedBlocks.isEmpty()) {
-                val message = "Script must call execute { ... } to interact with the IDE. No execute {} block found."
-                resultBuilder.reportFailed(message)
-                log.warn(message)
-                return null
-            }
+            log.info("Script evaluation complete for $executionId. Captured ${capturedBlocks.size} script block(s)")
 
             project.executionStorage.writeCodeExecutionData(executionId, "compilation-success.txt", "Compiled")
             return EvalResult(capturedBlocks.toList())
@@ -151,7 +144,7 @@ class CodeEvalManager(
             ) {
 
                 log.warn("Kotlin incomplete code error detected: ${e.message}", e)
-                resultBuilder.logMessage("WARN: Script compilation/evaluation failed: Incomplete code error. It usually means you put 'import' incorrectly or break Kotlin syntax")
+                resultBuilder.logMessage("WARN: Script compilation/evaluation failed: Incomplete code error. It usually means the Kotlin syntax is invalid or incomplete")
 
                 project.executionStorage.writeCodeExecutionData(
                     executionId,

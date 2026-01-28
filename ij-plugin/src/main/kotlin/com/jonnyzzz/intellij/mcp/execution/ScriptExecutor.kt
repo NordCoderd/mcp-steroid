@@ -19,18 +19,18 @@ inline val Project.scriptExecutor: ScriptExecutor get() = service()
  * Executes Kotlin scripts using IntelliJ's script engine.
  *
  * Execution flow:
- * 1. Script is compiled and evaluated to capture execute { } lambdas
+ * 1. Script is compiled and evaluated to capture runnable script blocks
  * 2. Lambdas are executed in FIFO order inside a supervisorScope
  * 3. Any failure marks the whole execution as complete
- * 4. On timeout or cancellation, the Disposable is disposed and coroutine cancelled
+ * 4. On timeout or cancellation, the Disposable is disposed and coroutine canceled
  *
  * Modal dialog handling:
- * - If a modal dialog appears during execution, execution is cancelled
+ * - If a modal dialog appears during execution, execution is canceled
  * - A screenshot of the dialog is captured and returned
  * - Use steroid_input to interact with the dialog
  *
  * IMPORTANT: This executor runs the captured suspend block inside a supervisorScope.
- * The script code gets coroutine context implicitly - no runBlocking needed.
+ * The script code gets the coroutine context implicitly - no runBlocking needed.
  */
 @Service(Service.Level.PROJECT)
 class ScriptExecutor(
@@ -40,11 +40,11 @@ class ScriptExecutor(
     override fun dispose() = Unit
 
     /**
-     * Execute a script with progress reporting and return the result with output.
-     * This is a suspend function - it runs inside the caller's coroutine context.
+     * Executes a script with progress reporting and returns its output.
+     * It is a suspending function that runs inside the caller's coroutine context.
      *
      * Fast failure: If the script engine is not available or compilation fails,
-     * returns immediately with an error - no waiting.
+     * it returns immediately with an error - no waiting.
      */
     suspend fun executeWithProgress(
         executionId: ExecutionId,
@@ -57,7 +57,7 @@ class ScriptExecutor(
 
         log.info("Starting execution $executionId")
 
-        // Create parent Disposable for this execution
+        // Create the parent Disposable for this execution
         val executionDisposable = Disposer.newDisposable(this, "mcp-execution-$executionId")
 
         // Create modality monitor to detect modal dialogs during execution
@@ -80,7 +80,7 @@ class ScriptExecutor(
             val capturedBlocks = evalResult.result
 
             // Run captured blocks in FIFO order with timeout
-            log.info("Running ${capturedBlocks.size} execute block(s) for $executionId with timeout ${exec.timeout}s")
+            log.info("Running ${capturedBlocks.size} script block(s) for $executionId with timeout ${exec.timeout}s")
 
             coroutineScope {
                 withContext(Dispatchers.IO) {
@@ -102,6 +102,7 @@ class ScriptExecutor(
                         withTimeout(exec.timeout.seconds) {
                             // Use select to race between execution and modal dialog detection
                             val executionDeferred = async {
+                                context.waitForSmartMode()
                                 for ((index, block) in capturedBlocks.withIndex()) {
                                     yield()
                                     if (capturedBlocks.size > 1) {

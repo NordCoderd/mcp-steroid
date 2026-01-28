@@ -81,28 +81,24 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - automated code refactorings, such as rename or find usages
 
              CRITICAL RULES:
-             1. The execute { } block is a SUSPEND Kotlin function - prefer Kotlin coroutine APIs over blocking Java APIs             
+             1. Your code is the suspend script body - no execute { } wrapper required
              2. Never use runBlocking - you're already in a coroutine context
              3. Use readAction { } for PSI/VFS reads, writeAction { } for modifications
-             4. Call waitForSmartMode() before accessing indices or PSI
+             4. waitForSmartMode() runs automatically before your script starts; call it again only if you trigger indexing
 
              Script structure:
              ```kotlin
-             // Imports go HERE, outside execute block
+             // Optional imports go at the top
              import com.intellij.psi.PsiManager
- 
-             execute {
-                 // This is a suspend function - use coroutine APIs!
-                 waitForSmartMode()
-                 // Use built-in readAction helper - no import needed!
-                 val psiFile = readAction {
-                     PsiManager.getInstance(project).findFile(virtualFile)
-                 }
-                 println(psiFile?.name)
+
+             // Script body (suspend context)
+             val psiFile = readAction {
+                 PsiManager.getInstance(project).findFile(virtualFile)
              }
+             println(psiFile?.name)
              ```
 
-            Available in execute { } scope:
+            Available in the script body:
             - just use Java or Kotlin reflection to inspect more
             - project: Project - the IntelliJ Project instance
             - println(vararg values) - output separated by spaces
@@ -144,7 +140,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
                     }
                     putJsonObject("code") {
                         put("type", "string")
-                        put("description", "Kotlin code to execute - must use execute { } with McpScriptContext as the receiver")
+                        put("description", "Kotlin script body (suspend context; execute { } wrapper is optional but not required)")
                     }
                     putJsonObject("task_id") {
                         put("type", "string")
