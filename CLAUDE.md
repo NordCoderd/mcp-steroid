@@ -4,6 +4,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **IMPORTANT: Re-read this file often as it changes frequently. Instructions here override default behavior.**
 
+Make sure you never include AI as co-author for commits. You must never mention AI in the commit mesasges too.
+
 ## MUST DO
 Use IntelliJ MCP for everything where you can, it makes you 100x professional!
 
