@@ -54,6 +54,10 @@ MCP_URL=$(cat .idea/mcp-steroid.md)
 MCP_BASE_URL=${MCP_URL%/mcp}
 ```
 
+## NPX Proxy (Experimental)
+
+This repository includes an NPX-based MCP proxy that aggregates multiple running IntelliJ MCP Steroid servers into a single MCP endpoint. See `npx/README.md` for usage and `npx/specs.md` for the validated specification.
+
 ## Agent Skills Support
 
 This plugin implements the [Agent Skills](https://agentskills.io) protocol, making its capabilities discoverable by AI agents. The skill documentation is served at the server root and `/skill.md` endpoints.

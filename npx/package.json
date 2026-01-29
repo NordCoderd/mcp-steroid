@@ -1,0 +1,16 @@
+{
+  "name": "mcp-steroid-proxy",
+  "version": "0.1.0",
+  "description": "NPX proxy that aggregates multiple IntelliJ MCP Steroid servers",
+  "type": "commonjs",
+  "bin": {
+    "mcp-steroid-proxy": "src/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "license": "UNLICENSED"
+}
