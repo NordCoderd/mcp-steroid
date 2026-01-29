@@ -395,7 +395,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             "id": "1",
             "method": "initialize",
             "params": {
-                "protocolVersion": "2025-06-18",
+                "protocolVersion": "2025-11-25",
                 "clientInfo": {
                     "name": "claude-code",
                     "version": "2.0.67"
@@ -435,7 +435,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertNotNull("Response should have result", rpcResponse.result)
 
         val initResult = McpJson.decodeFromJsonElement<InitializeResult>(rpcResponse.result!!)
-        assertEquals("2025-06-18", initResult.protocolVersion)
+        assertEquals(MCP_PROTOCOL_VERSION, initResult.protocolVersion)
         assertEquals("intellij-mcp-steroid", initResult.serverInfo.name)
         assertNotNull("Server should have tools capability", initResult.capabilities.tools)
     }
@@ -455,7 +455,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         server.startServerIfNeeded()
 
         // EXACT request from Claude CLI debug logs
-        val exactClaudeRequest = """{"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.67"}},"jsonrpc":"2.0","id":0}"""
+        val exactClaudeRequest = """{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.67"}},"jsonrpc":"2.0","id":0}"""
 
         val response = client.post(server.mcpUrl) {
             contentType(ContentType.Application.Json)
@@ -495,7 +495,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         )
 
         val initResult = McpJson.decodeFromJsonElement<InitializeResult>(rpcResponse.result!!)
-        assertEquals("2025-06-18", initResult.protocolVersion)
+        assertEquals(MCP_PROTOCOL_VERSION, initResult.protocolVersion)
         assertEquals("intellij-mcp-steroid", initResult.serverInfo.name)
     }
 
@@ -850,7 +850,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
      * Tests that progress reporting works correctly over the MCP protocol.
      * When code calls progress(), the messages should be included in the response.
      *
-     * Per MCP 2025-06-18 spec:
+     * Per MCP 2025-11-25 spec:
      * - Client can pass _meta.progressToken in tool call arguments
      * - Server sends notifications/progress with that token
      * - Progress messages are also accumulated in the final response
@@ -927,7 +927,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
 
     /**
      * Tests that progress reporting works with _meta.progressToken in the request.
-     * The MCP 2025-06-18 spec allows clients to provide a progressToken to receive
+     * The MCP 2025-11-25 spec allows clients to provide a progressToken to receive
      * notifications/progress messages during execution.
      */
     fun testProgressReportingWithProgressToken(): Unit = timeoutRunBlocking(60.seconds) {

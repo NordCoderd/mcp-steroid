@@ -7,11 +7,11 @@ import kotlinx.serialization.Transient
 import kotlinx.serialization.json.*
 
 /**
- * MCP Protocol implementation following the 2025-06-18 specification.
- * https://modelcontextprotocol.io/specification/2025-06-18
+ * MCP Protocol implementation following the 2025-11-25 specification.
+ * https://modelcontextprotocol.io/specification/2025-11-25
  */
 
-const val MCP_PROTOCOL_VERSION = "2025-06-18"
+const val MCP_PROTOCOL_VERSION = "2025-11-25"
 const val JSONRPC_VERSION = "2.0"
 
 // ==================== JSON-RPC Base Types ====================
@@ -211,7 +211,7 @@ data class ProgressParams(
 /**
  * Parameters for sampling/createMessage request.
  * Server sends this to client to request LLM completion.
- * Per MCP 2025-06-18 specification.
+ * Per MCP 2025-11-25 specification.
  */
 @Serializable
 data class CreateMessageParams(

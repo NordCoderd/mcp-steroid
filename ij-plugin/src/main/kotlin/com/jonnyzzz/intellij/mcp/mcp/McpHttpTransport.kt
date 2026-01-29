@@ -13,7 +13,7 @@ import kotlinx.serialization.json.buildJsonObject
 
 /**
  * MCP Streamable HTTP Transport implementation for Ktor.
- * Follows the MCP 2025-06-18 specification.
+ * Follows the MCP 2025-11-25 specification.
  *
  * The transport supports:
  * - POST requests for sending messages (requests and notifications)

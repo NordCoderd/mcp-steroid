@@ -27,7 +27,7 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
             "-H", "Content-Type: application/json",
             "-H", "Accept: application/json",
             "-d",
-            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
+            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
 
             resolveDockerUrl()
         )
@@ -35,7 +35,7 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
             .assertNoErrorsInOutput("curl to MCP")
             .assertOutputContains(
                 "jsonrpc",
-                "\"protocolVersion\":\"2025-06-18\"",
+                "\"protocolVersion\":\"2025-11-25\"",
                 message = "curl to MCP")
     }
 }
