@@ -953,4 +953,72 @@ class McpHttpTransportTest {
 
         assertEquals(HttpStatusCode.OK, response.status)
     }
+
+    // ==================== MCP-Protocol-Version Header Tests ====================
+
+    @Test
+    fun `test response includes MCP-Protocol-Version header`() = runBlocking {
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", MCP_PROTOCOL_VERSION)
+                putJsonObject("capabilities") {}
+                putJsonObject("clientInfo") {
+                    put("name", "test-client")
+                    put("version", "1.0.0")
+                }
+            }
+        }
+
+        val response = client.post("http://localhost:$port/mcp") {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(request.toString())
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        // Per MCP 2025-11-25 spec: Server MUST include MCP-Protocol-Version header in responses
+        val protocolVersionHeader = response.headers[McpHttpTransport.PROTOCOL_VERSION_HEADER]
+        assertNotNull("Response should include MCP-Protocol-Version header", protocolVersionHeader)
+        assertEquals(MCP_PROTOCOL_VERSION, protocolVersionHeader)
+    }
+
+    @Test
+    fun `test GET response includes MCP-Protocol-Version header`() = runBlocking {
+        val response = client.get("http://localhost:$port/mcp") {
+            header(HttpHeaders.Accept, "application/json")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+
+        // Per MCP 2025-11-25 spec: Server MUST include MCP-Protocol-Version header in responses
+        val protocolVersionHeader = response.headers[McpHttpTransport.PROTOCOL_VERSION_HEADER]
+        assertNotNull("GET response should include MCP-Protocol-Version header", protocolVersionHeader)
+        assertEquals(MCP_PROTOCOL_VERSION, protocolVersionHeader)
+    }
+
+    @Test
+    fun `test CORS headers include MCP-Protocol-Version`() = runBlocking {
+        val response = client.options("http://localhost:$port/mcp")
+
+        assertEquals(HttpStatusCode.NoContent, response.status)
+
+        // Check CORS headers expose MCP-Protocol-Version
+        val exposeHeaders = response.headers["Access-Control-Expose-Headers"]
+        assertNotNull("Should have Access-Control-Expose-Headers", exposeHeaders)
+        assertTrue(
+            "CORS should expose MCP-Protocol-Version header",
+            exposeHeaders!!.contains(McpHttpTransport.PROTOCOL_VERSION_HEADER)
+        )
+
+        val allowHeaders = response.headers["Access-Control-Allow-Headers"]
+        assertNotNull("Should have Access-Control-Allow-Headers", allowHeaders)
+        assertTrue(
+            "CORS should allow MCP-Protocol-Version header",
+            allowHeaders!!.contains(McpHttpTransport.PROTOCOL_VERSION_HEADER)
+        )
+    }
 }

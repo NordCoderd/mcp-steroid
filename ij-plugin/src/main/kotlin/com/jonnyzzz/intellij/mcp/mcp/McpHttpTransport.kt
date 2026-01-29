@@ -31,6 +31,7 @@ object McpHttpTransport {
 
     const val SESSION_HEADER = "Mcp-Session-Id"
     const val SESSION_NOTICE_HEADER = "Mcp-Session-Notice"
+    const val PROTOCOL_VERSION_HEADER = "MCP-Protocol-Version"
     private const val CONTENT_TYPE_JSON = "application/json"
     private const val CONTENT_TYPE_SSE = "text/event-stream"
     private const val UNKNOWN_SESSION_NOTICE =
@@ -88,9 +89,11 @@ object McpHttpTransport {
         call.response.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         call.response.header(
             "Access-Control-Allow-Headers",
-            "Content-Type, Accept, $SESSION_HEADER, $SESSION_NOTICE_HEADER"
+            "Content-Type, Accept, $SESSION_HEADER, $SESSION_NOTICE_HEADER, $PROTOCOL_VERSION_HEADER"
         )
-        call.response.header("Access-Control-Expose-Headers", "$SESSION_HEADER, $SESSION_NOTICE_HEADER")
+        call.response.header("Access-Control-Expose-Headers", "$SESSION_HEADER, $SESSION_NOTICE_HEADER, $PROTOCOL_VERSION_HEADER")
+        // Per MCP 2025-11-25 spec: Include protocol version in all responses
+        call.response.header(PROTOCOL_VERSION_HEADER, MCP_PROTOCOL_VERSION)
     }
 
     private suspend fun handlePost(call: ApplicationCall, server: McpServerCore) {
