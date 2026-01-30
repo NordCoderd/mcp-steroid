@@ -104,16 +104,13 @@
             width: 100%;
             max-width: 600px;
             margin-bottom: 3rem;
+            text-align: center;
         }
         .whatsnew-banner {
             background: linear-gradient(135deg, rgba(107, 87, 255, 0.2) 0%, rgba(254, 40, 87, 0.2) 100%);
             border: 1px solid rgba(107, 87, 255, 0.3);
             border-radius: 12px;
             padding: 1.25rem 1.5rem;
-        }
-        .whatsnew-header {
-            text-align: center;
-            margin-bottom: 1rem;
         }
         .whatsnew-label {
             display: inline-block;
@@ -125,33 +122,12 @@
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
-        }
-        .whatsnew-list {
-            list-style: none;
-        }
-        .whatsnew-item {
-            display: flex;
-            gap: 1rem;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-        .whatsnew-item:last-child {
-            border-bottom: none;
-            padding-bottom: 0;
-        }
-        .whatsnew-item:first-child {
-            padding-top: 0;
-        }
-        .whatsnew-date {
-            color: #808090;
-            font-size: 0.85rem;
-            white-space: nowrap;
-            min-width: 90px;
+            margin-bottom: 0.75rem;
         }
         .whatsnew-text {
             color: #c0c0d0;
-            font-size: 0.95rem;
-            line-height: 1.4;
+            font-size: 1rem;
+            line-height: 1.5;
         }
         .about-section {
             width: 100%;
@@ -375,17 +351,8 @@
 
     <section class="whatsnew-section">
         <div class="whatsnew-banner">
-            <div class="whatsnew-header">
-                <span class="whatsnew-label">What's New</span>
-            </div>
-            <ul class="whatsnew-list">
-                {{ range .Site.Params.whatsnew }}
-                <li class="whatsnew-item">
-                    <span class="whatsnew-date">{{ .date }}</span>
-                    <span class="whatsnew-text">{{ .text }}</span>
-                </li>
-                {{ end }}
-            </ul>
+            <span class="whatsnew-label">What's New</span>
+            <p class="whatsnew-text">{{ .Site.Params.whatsnew }}</p>
         </div>
     </section>
 

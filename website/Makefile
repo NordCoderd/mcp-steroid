@@ -15,15 +15,18 @@
 .PHONY: dev build clean setup update-config
 
 VERSION := $(shell cat ../VERSION 2>/dev/null || echo "0.0.0")
+WHATSNEW := $(shell cat whatsnew.txt 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g' | sed 's/ $$//')
 
 # First time setup - clone the public repository
 setup:
 	git clone git@github.com:jonnyzzz/mcp-steroid.git mcp-steroid-public
 
-# Update version in hugo.toml, generate version.json
+# Update version and whatsnew in hugo.toml, generate version.json
 update-config:
 	@echo "Updating version to $(VERSION)"
 	@sed -i.bak 's/version = ".*"/version = "$(VERSION)"/' hugo.toml && rm -f hugo.toml.bak
+	@echo "Updating whatsnew"
+	@sed -i.bak 's/whatsnew = ".*"/whatsnew = "$(WHATSNEW)"/' hugo.toml && rm -f hugo.toml.bak
 	@echo "Generating version.json"
 	@echo '{"version-base": "$(VERSION)"}' > static/version.json
 
