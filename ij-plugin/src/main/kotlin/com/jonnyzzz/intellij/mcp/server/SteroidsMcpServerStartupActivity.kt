@@ -18,7 +18,8 @@ class SteroidsMcpServerStartupActivity : ProjectActivity {
         server.startServerIfNeeded()
 
         // Write the server URL to this project's .idea folder
-        ServerUrlWriter.getInstance().writeServerUrl(project, server.mcpUrl)
+        ServerUrlWriter.getInstance()
+        IdeaDescriptionWriter.getInstance().writeDescriptionFile(project, server.mcpUrl)
 
         // Write the description file to .idea/mcp-steroid.md
         IdeaDescriptionWriter.getInstance().writeDescriptionFile(project, server.mcpUrl)

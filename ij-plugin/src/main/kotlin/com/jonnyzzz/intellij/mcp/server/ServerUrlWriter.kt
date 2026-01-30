@@ -7,7 +7,6 @@ import com.intellij.openapi.application.ApplicationNamesInfo
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import java.nio.file.Files
 import java.nio.file.Path
@@ -64,16 +63,6 @@ class ServerUrlWriter : Disposable {
         }
     }
 
-    /**
-     * Write the MCP server description file to a project's .idea folder.
-     *
-     * @param project The project to write the description file to
-     * @param serverUrl The MCP server URL (e.g., "http://localhost:<port>/mcp")
-     */
-    fun writeServerUrl(project: Project, serverUrl: String) {
-        IdeaDescriptionWriter.getInstance().writeDescriptionFile(project, serverUrl)
-    }
-
     private fun buildMarkerContent(serverUrl: String): String = buildString {
         appendLine(serverUrl)
         appendLine()
@@ -84,10 +73,10 @@ class ServerUrlWriter : Disposable {
         appendLine()
         appendLine(IdeaDescriptionWriter.getInstance().buildDescriptionContent(serverUrl))
         appendLine()
-        append(buildIdeInfo())
+        buildIdeInfo()
     }
 
-    private fun buildIdeInfo(): String = buildString {
+    private fun StringBuilder.buildIdeInfo() {
         val appInfo = ApplicationInfo.getInstance()
         val namesInfo = ApplicationNamesInfo.getInstance()
 
@@ -103,6 +92,7 @@ class ServerUrlWriter : Disposable {
         appendLine()
         appendLine("Runtime: ${System.getProperty("java.runtime.version", "unknown")}")
         appendLine("OS: ${System.getProperty("os.name")} ${System.getProperty("os.version")} (${System.getProperty("os.arch")})")
+        appendLine()
     }
 
     /**
