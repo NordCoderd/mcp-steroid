@@ -104,7 +104,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
                     }
                     putJsonObject("timeout") {
                         put("type", "integer")
-                        put("description", "Execution timeout in seconds (default: 60)")
+                        put("description", "Execution timeout in seconds (default: 600, configurable via mcp.steroid.execution.timeout registry key)")
                     }
                     putJsonObject("required_plugins") {
                         put("type", "array")
