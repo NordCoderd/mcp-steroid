@@ -311,6 +311,23 @@ data class ResourceContent(
     val blob: String? = null,
 )
 
+// ==================== MCP Roots ====================
+
+/**
+ * MCP Root - represents a filesystem boundary the client exposes to the server.
+ * Per MCP 2025-11-25 specification.
+ */
+@Serializable
+data class Root(
+    val uri: String, // MUST be a file:// URI
+    val name: String? = null, // Optional human-readable name
+)
+
+@Serializable
+data class RootsListResult(
+    val roots: List<Root>,
+)
+
 // ==================== MCP Methods ====================
 
 object McpMethods {
@@ -322,6 +339,8 @@ object McpMethods {
     const val RESOURCES_READ = "resources/read"
     const val PROGRESS = "notifications/progress"
     const val TOOLS_LIST_CHANGED = "notifications/tools/list_changed"
+    const val ROOTS_LIST = "roots/list"
+    const val ROOTS_LIST_CHANGED = "notifications/roots/list_changed"
     const val PING = "ping"
     const val SAMPLING_CREATE_MESSAGE = "sampling/createMessage"
 }

@@ -61,6 +61,20 @@ class McpSession(
     }
 
     /**
+     * Check if client supports roots capability.
+     */
+    fun supportsRoots(): Boolean {
+        return clientCapabilities?.roots != null
+    }
+
+    /**
+     * Check if client supports roots list changed notifications.
+     */
+    fun supportsRootsListChanged(): Boolean {
+        return clientCapabilities?.roots?.listChanged == true
+    }
+
+    /**
      * Send a notification to this session's SSE stream.
      */
     fun sendNotification(notification: JsonRpcNotification) {
