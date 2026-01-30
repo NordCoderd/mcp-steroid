@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-.PHONY: dev build clean setup update-config
+.PHONY: dev build clean setup update-config ensure-public-repo
 
 VERSION := $(shell cat ../VERSION 2>/dev/null || echo "0.0.0")
 
@@ -20,8 +20,15 @@ VERSION := $(shell cat ../VERSION 2>/dev/null || echo "0.0.0")
 setup:
 	git clone git@github.com:jonnyzzz/mcp-steroid.git mcp-steroid-public
 
+# Ensure the public repository is cloned (auto-setup)
+ensure-public-repo:
+	@if [ ! -d "mcp-steroid-public/.git" ]; then \
+		echo "Public repository not found, cloning..."; \
+		git clone git@github.com:jonnyzzz/mcp-steroid.git mcp-steroid-public; \
+	fi
+
 # Update version in hugo.toml, generate version.json
-update-config:
+update-config: ensure-public-repo
 	@echo "Updating version to $(VERSION)"
 	@sed -i.bak 's/version = ".*"/version = "$(VERSION)"/' hugo.toml && rm -f hugo.toml.bak
 	@echo "Generating version.json"
