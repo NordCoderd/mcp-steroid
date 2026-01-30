@@ -137,10 +137,12 @@ Send input events (keyboard + mouse) using a sequence string.
 Give your AI agent a senior developer's toolkit: semantic code understanding, automated refactorings, and IDE intelligence that LSP can't provide.
 
 **Why use this over file operations:**
-- **See relationships**, not just text: Find all usages in milliseconds, traverse class hierarchies, query the semantic model
-- **Refactor correctly**: Rename functions across 47 files, extract methods that maintain types, move classes that update imports
+- **See relationships**, not just text: Find all usages instantly, traverse class hierarchies, query the semantic model
+- **Refactor correctly**: Rename functions project-wide, extract methods that maintain types, move classes that update imports
 - **Catch errors early**: Run the same inspections IntelliJ runs, see type mismatches, detect code smells
 - **Understand structure**: Access project model, module dependencies, source roots - the IDE has indexed everything
+
+**Performance note**: Operations complete in sub-second time for typical projects. Large codebases may take longer.
 
 **Quick example:**
 ```kotlin
