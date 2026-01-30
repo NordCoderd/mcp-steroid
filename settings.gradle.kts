@@ -1,3 +1,3 @@
-rootProject.name = "intellij-mcp-steroid"
+rootProject.name = "mcp-steroid"
 include(":ocr-common")
 include(":ocr-tesseract")

@@ -4,9 +4,15 @@
     <vendor>jonnyzzz.com</vendor>
 
     <description><![CDATA[
-    MCP Server plugin for IntelliJ IDEA that allows LLM agents to execute Kotlin code
-    in the IDE's runtime environment with full access to IDE APIs.
-    Runs its own MCP server using Kotlin MCP SDK with SSE transport.
+    MCP Steroid is an MCP Server that brings all IntelliJ-based IDE
+    features to AI Agents, just the same way what IntelliJ brings
+    to developers.
+    <br />
+    The plugin uses an alternative approach and allows your AI Agent to
+    interact with IntelliJ-based IDE via IntelliJ API directly.
+    <br />
+    Follow <a href="https://mcp-steroid.jonnyzzz.com">https://mcp-steroid.jonnyzzz.com</a>
+    for more information and documentation.
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
