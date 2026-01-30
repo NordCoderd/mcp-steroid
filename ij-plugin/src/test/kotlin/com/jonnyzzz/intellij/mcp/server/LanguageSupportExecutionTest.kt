@@ -26,7 +26,7 @@ class LanguageSupportExecutionTest : BasePlatformTestCase() {
 
     override fun setUp() {
         super.setUp()
-        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
+        setRegistryPropertyForTest("mcp.steroid.review.mode", "NEVER")
 
         val basePath = project.basePath ?: error("Project base path is not available")
         val srcVf = WriteAction.computeAndWait<VirtualFile, RuntimeException> {

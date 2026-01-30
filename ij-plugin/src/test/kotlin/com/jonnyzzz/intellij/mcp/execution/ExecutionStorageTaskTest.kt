@@ -7,6 +7,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.getExecutionIdFromResult
 import com.jonnyzzz.intellij.mcp.setServerPortProperties
 import com.jonnyzzz.intellij.mcp.testExecParams
+import com.jonnyzzz.intellij.mcp.storage.storagePaths
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readText
@@ -24,11 +25,7 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
      * Gets the execution directory path for a given execution ID.
      */
     private fun getExecutionDir(executionId: String): Path {
-        val mcpRunDir = project.basePath
-            ?.let { Path.of(it, ".idea", "mcp-run") }
-            ?: error("No project path found")
-
-        return mcpRunDir.resolve(executionId)
+        return project.storagePaths.baseDir.resolve(executionId)
     }
 
     fun testSuccessFileAndWrappedScriptCreated(): Unit = timeoutRunBlocking(30.seconds) {

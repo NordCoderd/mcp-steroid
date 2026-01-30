@@ -95,36 +95,42 @@
             implementation="com.jonnyzzz.intellij.mcp.review.McpReviewNotificationProvider"/>
 
         <!-- Registry keys for configuration -->
-        <registryKey key="mcp.steroids.review.mode" defaultValue="ALWAYS"
+        <registryKey key="mcp.steroid.review.mode" defaultValue="ALWAYS"
             description="Code review mode: ALWAYS (default), TRUSTED, NEVER"/>
 
-        <registryKey key="mcp.steroids.review.timeout" defaultValue="600"
+        <registryKey key="mcp.steroid.review.timeout" defaultValue="600"
             description="Review timeout in seconds"/>
 
-        <registryKey key="mcp.steroids.execution.timeout" defaultValue="600"
+        <registryKey key="mcp.steroid.execution.timeout" defaultValue="600"
             description="Script execution timeout in seconds"/>
 
-        <registryKey key="mcp.steroids.server.port" defaultValue="6315"
+        <registryKey key="mcp.steroid.server.port" defaultValue="6315"
             description="MCP server port (0 for auto-assign)"/>
 
-        <registryKey key="mcp.steroids.server.host" defaultValue="127.0.0.1"
+        <registryKey key="mcp.steroid.server.host" defaultValue="127.0.0.1"
             description="MCP server bind address (use 0.0.0.0 for Docker access)"/>
 
         <!-- Demo Mode registry keys -->
-        <registryKey key="mcp.steroids.demo.enabled" defaultValue="false"
+        <registryKey key="mcp.steroid.demo.enabled" defaultValue="false"
             description="Enable Demo Mode overlay for MCP execution"/>
-        <registryKey key="mcp.steroids.demo.minDisplayTime" defaultValue="3000"
+        <registryKey key="mcp.steroid.demo.minDisplayTime" defaultValue="3000"
             description="Minimum display time in milliseconds"/>
-        <registryKey key="mcp.steroids.demo.maxLines" defaultValue="15"
+        <registryKey key="mcp.steroid.demo.maxLines" defaultValue="15"
             description="Maximum log lines to show in overlay"/>
-        <registryKey key="mcp.steroids.demo.opacity" defaultValue="85"
+        <registryKey key="mcp.steroid.demo.opacity" defaultValue="85"
             description="Background opacity (0-100)"/>
-        <registryKey key="mcp.steroids.demo.focusFrame" defaultValue="true"
+        <registryKey key="mcp.steroid.demo.focusFrame" defaultValue="true"
             description="Bring project frame to front when showing overlay"/>
 
         <!-- Update checker registry keys -->
-        <registryKey key="mcp.steroids.updates.enabled" defaultValue="true"
+        <registryKey key="mcp.steroid.updates.enabled" defaultValue="true"
             description="Enable automatic update checks"/>
+
+        <!-- Storage folder configuration -->
+        <registryKey key="mcp.steroid.storage.path" defaultValue=""
+            description="Custom path for MCP execution storage. Empty (default) uses ~/.mcp-steroid"/>
+        <registryKey key="mcp.steroid.idea.description.enabled" defaultValue="true"
+            description="Generate .idea/mcp-steroid.md description file in projects"/>
 
         <!-- Start MCP server when IDE is ready -->
         <postStartupActivity

@@ -20,6 +20,9 @@ class SteroidsMcpServerStartupActivity : ProjectActivity {
         // Write the server URL to this project's .idea folder
         ServerUrlWriter.getInstance().writeServerUrl(project, server.mcpUrl)
 
+        // Write the description file to .idea/mcp-steroid.md
+        IdeaDescriptionWriter.getInstance().writeDescriptionFile(project, server.mcpUrl)
+
         // Initialize update checker (runs periodic checks for new versions)
         UpdateChecker.getInstance().startUpdates()
     }

@@ -188,7 +188,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
         val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: task_id")
         val reason = args["reason"]?.jsonPrimitive?.contentOrNull
-        val timeout = args["timeout"]?.jsonPrimitive?.intOrNull ?: Registry.intValue("mcp.steroids.execution.timeout", 60)
+        val timeout = args["timeout"]?.jsonPrimitive?.intOrNull ?: Registry.intValue("mcp.steroid.execution.timeout", 600)
         val requiredPlugins = args["required_plugins"]
             ?.jsonArray
             ?.mapNotNull { it.jsonPrimitive.contentOrNull }

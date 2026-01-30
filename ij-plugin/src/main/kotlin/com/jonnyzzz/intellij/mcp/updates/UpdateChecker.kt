@@ -144,7 +144,7 @@ class UpdateChecker(
                 yield()
 
                 // Check if updates are enabled
-                if (Registry.`is`("mcp.steroids.updates.enabled", true)) {
+                if (Registry.`is`("mcp.steroid.updates.enabled", true)) {
                     try {
                         checkForUpdates()
                     } catch (e: Exception) {

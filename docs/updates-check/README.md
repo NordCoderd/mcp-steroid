@@ -59,13 +59,13 @@ The update checker can be configured via IntelliJ Registry keys:
 
 | Registry Key | Default | Description |
 |--------------|---------|-------------|
-| `mcp.steroids.updates.enabled` | `true` | Enable/disable automatic update checks |
-| `mcp.steroids.updates.checkIntervalHours` | `1` | Hours between update checks |
+| `mcp.steroid.updates.enabled` | `true` | Enable/disable automatic update checks |
+| `mcp.steroid.updates.checkIntervalHours` | `1` | Hours between update checks |
 
 To access Registry settings:
 1. Open `Help > Find Action` (Cmd+Shift+A / Ctrl+Shift+A)
 2. Type "Registry" and select it
-3. Search for `mcp.steroids.updates`
+3. Search for `mcp.steroid.updates`
 
 ## Implementation Details
 

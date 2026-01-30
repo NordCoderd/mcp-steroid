@@ -5,11 +5,11 @@ This document provides a complete map of all MCP resources available in the Inte
 ## Connect to the MCP Server
 
 1. Open IntelliJ IDEA with the MCP Steroid plugin installed (the server starts automatically).
-2. Read `.idea/mcp-steroids.txt` in your project folder for the full MCP URL.
+2. Read `.idea/mcp-steroid.md` in your project folder for the full MCP URL.
 3. Use that URL in your MCP client (it already ends with `/mcp`).
 
 Notes:
-- Host and port are configurable via `mcp.steroids.server.host` and `mcp.steroids.server.port`.
+- Host and port are configurable via `mcp.steroid.server.host` and `mcp.steroid.server.port`.
 - Discovery is available at `/.well-known/mcp.json`.
 
 ## Resource Overview

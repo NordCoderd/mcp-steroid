@@ -42,15 +42,15 @@ This IntelliJ plugin exposes IDE APIs to LLM agents via Kotlin script execution.
 This plugin runs its own standalone MCP server using the [Kotlin MCP SDK](https://github.com/modelcontextprotocol/kotlin-sdk) with Ktor for HTTP transport:
 
 - **Transport**: HTTP at `<server-url>/mcp` with CORS support
-- **Host/port**: Configurable via `mcp.steroids.server.host` and `mcp.steroids.server.port`
-- **Server URL file**: Written to `.idea/mcp-steroids.txt` in each open project folder
+- **Host/port**: Configurable via `mcp.steroid.server.host` and `mcp.steroid.server.port`
+- **Server URL file**: Written to `.idea/mcp-steroid.md` in each open project folder
 
 The server starts automatically when IntelliJ launches and writes its URL to project folders for easy discovery by MCP clients.
 
 Use this in the examples below:
 
 ```bash
-MCP_URL=$(cat .idea/mcp-steroids.txt)
+MCP_URL=$(cat .idea/mcp-steroid.md)
 MCP_BASE_URL=${MCP_URL%/mcp}
 ```
 
@@ -81,7 +81,7 @@ ln -s /path/to/intellij-mcp-steroids/SKILL.md SKILL.md
 
 ```bash
 # Download the skill documentation from the running MCP server
-MCP_URL=$(cat .idea/mcp-steroids.txt)
+MCP_URL=$(cat .idea/mcp-steroid.md)
 MCP_BASE_URL=${MCP_URL%/mcp}
 curl -s "$MCP_BASE_URL/skill.md" > SKILL.md
 ```
@@ -97,10 +97,10 @@ Create a setup script `setup-intellij-skill.sh`:
 set -e
 
 # Resolve server URL from argument or project file
-MCP_URL=${1:-$(cat .idea/mcp-steroids.txt 2>/dev/null)}
+MCP_URL=${1:-$(cat .idea/mcp-steroid.md 2>/dev/null)}
 if [ -z "$MCP_URL" ]; then
-    echo "Error: MCP_URL not provided and .idea/mcp-steroids.txt not found"
-    echo "Open IntelliJ with MCP Steroid and use the URL from .idea/mcp-steroids.txt"
+    echo "Error: MCP_URL not provided and .idea/mcp-steroid.md not found"
+    echo "Open IntelliJ with MCP Steroid and use the URL from .idea/mcp-steroid.md"
     exit 1
 fi
 MCP_BASE_URL="${MCP_URL%/mcp}"
@@ -128,7 +128,7 @@ echo "Done! IntelliJ MCP Steroid skill is now available in this project."
 Usage:
 ```bash
 chmod +x setup-intellij-skill.sh
-./setup-intellij-skill.sh                  # Uses .idea/mcp-steroids.txt
+./setup-intellij-skill.sh                  # Uses .idea/mcp-steroid.md
 ./setup-intellij-skill.sh "$MCP_URL"       # Pass explicit MCP URL
 ```
 
@@ -139,7 +139,7 @@ chmod +x setup-intellij-skill.sh
 cat SKILL.md | head -20
 
 # Verify server is running and responding
-MCP_URL=$(cat .idea/mcp-steroids.txt)
+MCP_URL=$(cat .idea/mcp-steroid.md)
 MCP_BASE_URL=${MCP_URL%/mcp}
 curl -s "$MCP_BASE_URL/" | head -20
 ```
@@ -165,7 +165,7 @@ The skill documentation includes:
 Add the MCP server using the command line (no config files needed):
 
 ```bash
-MCP_URL=$(cat .idea/mcp-steroids.txt)
+MCP_URL=$(cat .idea/mcp-steroid.md)
 claude mcp add --transport http intellij-steroid "$MCP_URL"
 
 # Verify connection
@@ -197,7 +197,7 @@ url = "<mcp-url>"
 Or create it with a single command:
 
 ```bash
-MCP_URL=$(cat .idea/mcp-steroids.txt)
+MCP_URL=$(cat .idea/mcp-steroid.md)
 mkdir -p ~/.codex && cat > ~/.codex/config.toml << EOF
 [features]
 rmcp_client = true
@@ -217,7 +217,7 @@ To remove the server, delete the `[mcp_servers.intellij-steroid]` section from t
 Add the MCP server using the command line:
 
 ```bash
-MCP_URL=$(cat .idea/mcp-steroids.txt)
+MCP_URL=$(cat .idea/mcp-steroid.md)
 gemini mcp add intellij-steroid "$MCP_URL" --transport http --scope user
 
 # Verify connection
@@ -238,7 +238,7 @@ gemini mcp remove intellij-steroid
 You can also interact with the server directly via HTTP:
 
 ```bash
-MCP_URL=$(cat .idea/mcp-steroids.txt)
+MCP_URL=$(cat .idea/mcp-steroid.md)
 
 # Initialize session
 curl -X POST "$MCP_URL" \
@@ -581,7 +581,7 @@ After script execution completes:
 
 **Server URL file**:
 ```
-.idea/mcp-steroids.txt                     # Contains MCP server URL (read this file; do not assume a port)
+.idea/mcp-steroid.md                     # Contains MCP server URL (read this file; do not assume a port)
 ```
 
 **Execution ID Format**: `{YYYYMMDD}T{HHMMSS}-{task-id}`
@@ -593,12 +593,12 @@ After script execution completes:
 By default, all submitted code is opened in the IDE editor for human review before execution.
 
 **Configuration** (IntelliJ Registry):
-- `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
+- `mcp.steroid.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
   - `ALWAYS`: Every script requires human approval
   - `TRUSTED`: Auto-approve all (trust MCP callers)
   - `NEVER`: Auto-execute all (development only)
-- `mcp.steroids.review.timeout`: Seconds to wait for review (default: 300)
-- `mcp.steroids.execution.timeout`: Script execution timeout (default: 60)
+- `mcp.steroid.review.timeout`: Seconds to wait for review (default: 300)
+- `mcp.steroid.execution.timeout`: Script execution timeout (default: 60)
 
 **Workflow**:
 1. Code submitted → opened in editor with review panel
@@ -636,16 +636,16 @@ Enable via IntelliJ Registry (`Help > Find Action > Registry...`):
 
 | Registry Key | Default | Description |
 |--------------|---------|-------------|
-| `mcp.steroids.demo.enabled` | `false` | Enable Demo Mode overlay |
-| `mcp.steroids.demo.minDisplayTime` | `3000` | Minimum display time in milliseconds |
-| `mcp.steroids.demo.maxLines` | `15` | Maximum log lines to display |
-| `mcp.steroids.demo.opacity` | `85` | Background opacity (0-100) |
-| `mcp.steroids.demo.focusFrame` | `true` | Bring project frame to front when overlay appears |
+| `mcp.steroid.demo.enabled` | `false` | Enable Demo Mode overlay |
+| `mcp.steroid.demo.minDisplayTime` | `3000` | Minimum display time in milliseconds |
+| `mcp.steroid.demo.maxLines` | `15` | Maximum log lines to display |
+| `mcp.steroid.demo.opacity` | `85` | Background opacity (0-100) |
+| `mcp.steroid.demo.focusFrame` | `true` | Bring project frame to front when overlay appears |
 
 ### Usage
 
 1. Open Registry: `Help > Find Action > Registry...`
-2. Search for `mcp.steroids.demo.enabled`
+2. Search for `mcp.steroid.demo.enabled`
 3. Check the checkbox to enable
 4. Execute any MCP command - the overlay will appear showing progress
 

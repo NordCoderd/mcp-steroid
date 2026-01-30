@@ -59,7 +59,7 @@ class ReviewManager(private val project: Project) {
     ): Boolean = coroutineScope {
         // Check review mode
         val reviewMode = try {
-            Registry.stringValue("mcp.steroids.review.mode")
+            Registry.stringValue("mcp.steroid.review.mode")
         } catch (_: Exception) {
             "ALWAYS"
         }
@@ -101,7 +101,7 @@ class ReviewManager(private val project: Project) {
         try {
             // Get timeout
             val timeoutSeconds = try {
-                Registry.intValue("mcp.steroids.review.timeout")
+                Registry.intValue("mcp.steroid.review.timeout")
             } catch (_: Exception) {
                 300
             }

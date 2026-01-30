@@ -17,11 +17,11 @@ import java.time.format.DateTimeFormatter
 import java.util.*
 
 /**
- * Writes the MCP server URL to project .idea folders and user home directory.
+ * Writes the MCP server URL to user home directory and project description files.
  *
  * This service is responsible for creating marker files that provide
  * connection instructions to users and AI agents:
- * - Per-project: .idea/mcp-steroids.txt
+ * - Per-project: .idea/mcp-steroid.md (via IdeaDescriptionWriter)
  * - User home: .<pid>.mcp-steroid (PID-based marker file)
  */
 @Service(Service.Level.APP)
@@ -65,25 +65,13 @@ class ServerUrlWriter : Disposable {
     }
 
     /**
-     * Write the MCP server URL to a project's .idea folder.
-     * Creates the mcp-steroids.txt file with connection instructions.
+     * Write the MCP server description file to a project's .idea folder.
      *
-     * @param project The project to write the URL file to
+     * @param project The project to write the description file to
      * @param serverUrl The MCP server URL (e.g., "http://localhost:<port>/mcp")
      */
     fun writeServerUrl(project: Project, serverUrl: String) {
-        try {
-            val basePath = project.basePath ?: return
-            val ideaDir = Path.of(basePath, ".idea")
-            if (Files.exists(ideaDir)) {
-                val mcpFile = ideaDir.resolve("mcp-steroids.txt")
-                val content = buildMarkerContent(serverUrl)
-                Files.writeString(mcpFile, content)
-                log.info("MCP Steroid server URL written to: $mcpFile")
-            }
-        } catch (e: Exception) {
-            log.error("Failed to write server URL to project folder: ${project.name}", e)
-        }
+        IdeaDescriptionWriter.getInstance().writeDescriptionFile(project, serverUrl)
     }
 
     private fun buildMarkerContent(serverUrl: String): String = buildString {
@@ -94,18 +82,9 @@ class ServerUrlWriter : Disposable {
         appendLine()
         appendLine("Created: ${ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)}")
         appendLine()
+        appendLine(IdeaDescriptionWriter.getInstance().buildDescriptionContent(serverUrl))
+        appendLine()
         append(buildIdeInfo())
-        appendLine()
-        appendLine("=== Quick Start ===")
-        appendLine()
-        appendLine("Claude Code CLI:")
-        appendLine("  claude mcp add --transport http intellij-steroid $serverUrl")
-        appendLine()
-        appendLine("Codex CLI:")
-        appendLine("  codex mcp add intellij --url $serverUrl")
-        appendLine()
-        appendLine("Gemini CLI:")
-        appendLine("  gemini mcp add intellij-steroid --type http $serverUrl")
     }
 
     private fun buildIdeInfo(): String = buildString {

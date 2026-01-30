@@ -44,7 +44,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
 
         val executionId = storage.writeNewExecution(params)
 
-        val toolPath = Path.of(project.basePath!!, ".idea", "mcp-run", executionId.executionId, "tool.json")
+        val toolPath = project.storagePaths.baseDir.resolve(executionId.executionId).resolve("tool.json")
         assertTrue("tool.json should exist", java.nio.file.Files.exists(toolPath))
 
         val metadata = storage.json.decodeFromString(ToolCallMetadata.serializer(), java.nio.file.Files.readString(toolPath))
@@ -63,7 +63,7 @@ class ExecutionStorageTest : BasePlatformTestCase() {
             arguments = args
         )
 
-        val baseDir = Path.of(project.basePath!!, ".idea", "mcp-run", executionId.executionId)
+        val baseDir = project.storagePaths.baseDir.resolve(executionId.executionId)
         val toolPath = baseDir.resolve("tool.json")
         val paramsPath = baseDir.resolve("params.json")
 

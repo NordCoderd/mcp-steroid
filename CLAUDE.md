@@ -250,7 +250,7 @@ This is an IntelliJ Platform plugin with a standalone MCP server using Kotlin MC
 
 ### Key Design Decisions
 
-1. **Standalone MCP server**: Uses Kotlin MCP SDK with Ktor for SSE transport. No dependency on IntelliJ's built-in MCP plugin. Server URL written to `.idea/mcp-steroids.txt` for discovery.
+1. **Standalone MCP server**: Uses Kotlin MCP SDK with Ktor for SSE transport. No dependency on IntelliJ's built-in MCP plugin. Description file written to `.idea/mcp-steroid.md`.
 
 2. **Synchronous request-response**: Execution happens within MCP request scope. No polling - output returned directly in response.
 
@@ -260,7 +260,7 @@ This is an IntelliJ Platform plugin with a standalone MCP server using Kotlin MC
 
 5. **Read/Write Actions**: Built into McpScriptContext as suspend helpers (`readAction`, `writeAction`, `smartReadAction`). You can still import IntelliJ APIs directly when needed.
 
-6. **Append-only storage**: Files in `.idea/mcp-run/` are never deleted, only appended to (used for logging/debugging).
+6. **Append-only storage**: Files in `.idea/mcp-steroid/` are never deleted, only appended to (used for logging/debugging).
 
 7. **Review with feedback**: When user rejects code, they can edit it first. The edited code and unified diff are returned to help LLM understand the feedback.
 
@@ -463,12 +463,14 @@ Context provided in the script body:
 - `gradle.properties`: Contains `platformVersion` for IntelliJ version
 - `build.gradle.kts`: Plugin configuration using `intellijPlatform` DSL
 - Registry keys:
-  - `mcp.steroids.server.port`: MCP server port (configurable; use `.idea/mcp-steroids.txt` for the active URL)
-  - `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
-  - `mcp.steroids.review.timeout`: Review timeout in seconds
-  - `mcp.steroids.execution.timeout`: Script execution timeout
-  - `mcp.steroids.updates.enabled`: Enable automatic update checks (default: `true`)
-  - `mcp.steroids.updates.checkIntervalHours`: Hours between update checks (default: `1`)
+  - `mcp.steroid.server.port`: MCP server port
+  - `mcp.steroid.server.host`: MCP server bind address (default: `127.0.0.1`)
+  - `mcp.steroid.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
+  - `mcp.steroid.review.timeout`: Review timeout in seconds
+  - `mcp.steroid.execution.timeout`: Script execution timeout
+  - `mcp.steroid.updates.enabled`: Enable automatic update checks (default: `true`)
+  - `mcp.steroid.storage.path`: Override storage path (empty = `.idea/mcp-steroid`)
+  - `mcp.steroid.idea.description.enabled`: Generate `.idea/mcp-steroid.md` (default: `true`)
 
 ### Script Preprocessing (CodeButcher)
 
@@ -902,7 +904,7 @@ For execution tests:
 class MyTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
-        setRegistryPropertyForTest("mcp.steroids.review.mode", "NEVER")
+        setRegistryPropertyForTest("mcp.steroid.review.mode", "NEVER")
     }
 
     fun testSomething(): Unit = timeoutRunBlocking(30.seconds) {

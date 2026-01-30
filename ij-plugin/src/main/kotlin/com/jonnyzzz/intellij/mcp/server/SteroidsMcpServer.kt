@@ -76,11 +76,11 @@ class SteroidsMcpServer(
                 registrar.register(mcpServer)
             }
 
-            val configuredPort = Registry.intValue("mcp.steroids.server.port")
+            val configuredPort = Registry.intValue("mcp.steroid.server.port")
 
             // By default, bind to localhost only per MCP security requirements.
-            // For Docker testing, set mcp.steroids.server.host to "0.0.0.0"
-            val bindHost = Registry.stringValue("mcp.steroids.server.host").takeIf { it.isNotBlank() } ?: "127.0.0.1"
+            // For Docker testing, set mcp.steroid.server.host to "0.0.0.0"
+            val bindHost = Registry.stringValue("mcp.steroid.server.host").takeIf { it.isNotBlank() } ?: "127.0.0.1"
 
             // Try to start on configured port, fall back to next ports if busy
             val actualPort = startServerOnAvailablePort(bindHost, configuredPort)
