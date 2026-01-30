@@ -6,6 +6,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import com.jonnyzzz.intellij.mcp.storage.storagePaths
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.ZonedDateTime
@@ -24,20 +25,10 @@ class IdeaDescriptionWriter {
      * Write the mcp-steroid.md description file to project's .idea folder.
      */
     fun writeDescriptionFile(project: Project, serverUrl: String) {
-        if (!Registry.`is`("mcp.steroid.idea.description.enabled", true)) {
-            return
-        }
-
         try {
-            val basePath = project.basePath ?: return
-            val ideaDir = Path.of(basePath, ".idea")
-            if (!Files.exists(ideaDir)) return
-
-            val descriptionFile = ideaDir.resolve("mcp-steroid.md")
+            val markerFilePath = project.storagePaths.getMarkerFilePath() ?: return
             val content = buildDescriptionContent(serverUrl)
-
-            Files.writeString(descriptionFile, content)
-            log.info("MCP description file written to: $descriptionFile")
+            Files.writeString(markerFilePath, content)
         } catch (e: Exception) {
             log.warn("Failed to write MCP description file: ${project.name}", e)
         }

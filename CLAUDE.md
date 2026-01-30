@@ -904,7 +904,7 @@ For execution tests:
 class MyTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
-        setRegistryPropertyForTest("mcp.steroid.review.mode", "NEVER")
+        setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
     }
 
     fun testSomething(): Unit = timeoutRunBlocking(30.seconds) {

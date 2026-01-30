@@ -81,7 +81,7 @@ class ExecutionStorage(
     }
 
     private val baseDir: Path
-        get() = project.storagePaths.baseDir
+        get() = project.storagePaths.getGetMcpRunDir()
 
 
     private val ExecutionId.dir: Path

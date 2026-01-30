@@ -6,6 +6,7 @@ import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
+import com.jonnyzzz.intellij.mcp.setSystemPropertyForTest
 import com.jonnyzzz.intellij.mcp.testExecParams
 import kotlin.time.Duration.Companion.seconds
 
@@ -15,7 +16,7 @@ class ScriptExecutionAvailabilityTest : BasePlatformTestCase() {
 
     override fun setUp() {
         super.setUp()
-        setRegistryPropertyForTest("mcp.steroid.review.mode", "NEVER")
+        setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
     }
 
     fun testScriptExecutionCompiles(): Unit = timeoutRunBlocking(30.seconds) {

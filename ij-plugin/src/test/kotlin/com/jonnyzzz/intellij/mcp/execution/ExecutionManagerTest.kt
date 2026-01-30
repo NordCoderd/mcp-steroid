@@ -7,6 +7,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
+import com.jonnyzzz.intellij.mcp.setSystemPropertyForTest
 import com.jonnyzzz.intellij.mcp.testExecParams
 import kotlin.time.Duration.Companion.seconds
 
@@ -19,7 +20,7 @@ class ExecutionManagerTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         // Disable review mode for tests
-        setRegistryPropertyForTest("mcp.steroid.review.mode", "NEVER")
+        setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
     }
 
     private fun getTextContent(result: ToolCallResult): String {

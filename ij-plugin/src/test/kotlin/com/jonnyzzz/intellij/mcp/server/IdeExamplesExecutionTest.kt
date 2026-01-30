@@ -15,7 +15,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
-import com.jonnyzzz.intellij.mcp.setRegistryPropertyForTest
+import com.jonnyzzz.intellij.mcp.setSystemPropertyForTest
 import com.jonnyzzz.intellij.mcp.testExecParams
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -49,7 +49,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
 
     override fun setUp() {
         super.setUp()
-        setRegistryPropertyForTest("mcp.steroid.review.mode", "NEVER")
+        setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
 
         val basePath = project.basePath ?: error("Project base path is not available")
         val srcVf = WriteAction.computeAndWait<VirtualFile, RuntimeException> {

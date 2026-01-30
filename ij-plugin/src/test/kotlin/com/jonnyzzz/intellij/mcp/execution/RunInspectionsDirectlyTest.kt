@@ -11,6 +11,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
+import com.jonnyzzz.intellij.mcp.setSystemPropertyForTest
 import com.jonnyzzz.intellij.mcp.testExecParams
 import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
@@ -29,7 +30,7 @@ class RunInspectionsDirectlyTest : BasePlatformTestCase() {
 
     override fun setUp() {
         super.setUp()
-        setRegistryPropertyForTest("mcp.steroid.review.mode", "NEVER")
+        setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
 
         // Create a Kotlin file with known issues:
         // - Unused variable (warning)

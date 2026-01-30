@@ -25,7 +25,7 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
      * Gets the execution directory path for a given execution ID.
      */
     private fun getExecutionDir(executionId: String): Path {
-        return project.storagePaths.baseDir.resolve(executionId)
+        return project.storagePaths.getGetMcpRunDir().resolve(executionId)
     }
 
     fun testSuccessFileAndWrappedScriptCreated(): Unit = timeoutRunBlocking(30.seconds) {

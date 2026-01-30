@@ -18,11 +18,11 @@ fun BasePlatformTestCase.setSystemPropertyForTest(name: String, value: String) {
 
 fun BasePlatformTestCase.setServerPortProperties() {
     // Bind MCP server to 0.0.0.0 so Docker containers can reach it via host.docker.internal
-    setRegistryPropertyForTest("mcp.steroid.server.host", "0.0.0.0")
+    setSystemPropertyForTest("mcp.steroid.server.host", "0.0.0.0")
     // Use fixed port for tests
-    setRegistryPropertyForTest("mcp.steroid.server.port", "17820")
+    setSystemPropertyForTest("mcp.steroid.server.port", "17820")
     // Disable review mode for tests
-    setRegistryPropertyForTest("mcp.steroid.review.mode", "NEVER")
+    setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
 }
 
 @Suppress("UnusedReceiverParameter")
