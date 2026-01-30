@@ -14,25 +14,18 @@
 
 baseURL = 'https://mcp-steroid.jonnyzzz.com/'
 languageCode = 'en-us'
-title = 'MCP Steroid - MCP Server for IntelliJ-based IDEs'
-disableKinds = ['taxonomy', 'term']
+title = 'MCP Steroid - IntelliJ Plugin for AI Agents'
 
 [params]
-  description = "An MCP Server for IntelliJ-based IDEs. Works with ANY AI agent via the open MCP protocol."
+  description = "An MCP Server that brings all IntelliJ-based IDE features to AI Agents"
   playlistUrl = "https://www.youtube.com/playlist?list=PLitZWClhc4Qgz3w8qrtctMR_lpIc81n0f"
   githubUrl = "https://github.com/jonnyzzz/mcp-steroid"
   githubIssuesUrl = "https://github.com/jonnyzzz/mcp-steroid/issues"
   youtubeChannel = "https://youtube.com/@jonnyzzz"
   # Version is read from ../VERSION file during build (see Makefile)
   version = "0.86.0"
-
-[[params.whatsnew]]
-  date = "2026-01-30"
-  text = "Website launched at mcp-steroid.jonnyzzz.com"
-
-[[params.whatsnew]]
-  date = "2026-01-29"
-  text = "Supported all IntelliJ-based IDEs, including Rider, Android Studio, and GoLand"
+  # What's new is read from whatsnew.txt during build (see Makefile)
+  whatsnew = "Supported all IntelliJ-based IDEs, including Rider, Android Studio, and GoLand"
 
 [[params.featuredVideos]]
   id = "6ByedA15n8Q"
