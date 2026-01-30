@@ -189,75 +189,6 @@
             left: 0;
             color: #6B57FF;
         }
-        .config-section {
-            width: 100%;
-            max-width: 900px;
-            margin-bottom: 3rem;
-        }
-        .config-content {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 2rem;
-        }
-        .config-content p {
-            color: #b0b0c0;
-            line-height: 1.7;
-            margin-bottom: 1rem;
-        }
-        .config-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-            font-size: 0.9rem;
-        }
-        .config-table th {
-            text-align: left;
-            padding: 0.75rem;
-            border-bottom: 2px solid rgba(107, 87, 255, 0.3);
-            color: #d0d0e0;
-            font-weight: 600;
-        }
-        .config-table td {
-            padding: 0.75rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            color: #a0a0b0;
-            vertical-align: top;
-        }
-        .config-table tr:hover td {
-            background: rgba(255, 255, 255, 0.02);
-        }
-        .config-key {
-            font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-            color: #a0a0ff;
-            font-size: 0.85rem;
-            word-break: break-all;
-        }
-        .config-default {
-            font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-            color: #80c080;
-            font-size: 0.85rem;
-        }
-        .config-category {
-            color: #6B57FF;
-            font-weight: 600;
-            padding-top: 1.5rem !important;
-        }
-        .config-note {
-            font-size: 0.85rem;
-            color: #808090;
-            margin-top: 1rem;
-            padding: 1rem;
-            background: rgba(107, 87, 255, 0.1);
-            border-radius: 8px;
-            border-left: 3px solid #6B57FF;
-        }
-        .config-note code {
-            font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-            background: rgba(0, 0, 0, 0.3);
-            padding: 0.1rem 0.4rem;
-            border-radius: 4px;
-            color: #c0c0ff;
-        }
         .agents-list {
             display: flex;
             flex-wrap: wrap;
@@ -416,7 +347,6 @@
             height: 24px;
         }
     </style>
-    <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "dd1a589b6e154b0a985f8f14ca8c4a4a"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
 <body>
     <div class="hero">
@@ -494,112 +424,6 @@
                 <span class="agent-badge">Junie</span>
                 <span class="agent-badge">OpenCode</span>
                 <span class="agent-badge">Any MCP Client</span>
-            </div>
-        </div>
-    </section>
-
-    <section class="config-section">
-        <h2>Configuration Options</h2>
-        <div class="config-content">
-            <p>
-                MCP Steroid can be configured via IntelliJ's Registry (<code>Help → Find Action → Registry</code>) or via JVM system properties (<code>-D</code> flags). All settings use the <code>mcp.steroid.*</code> prefix.
-            </p>
-            <table class="config-table">
-                <thead>
-                    <tr>
-                        <th>Registry Key</th>
-                        <th>Default</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td colspan="3" class="config-category">Server Settings</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.server.port</td>
-                        <td class="config-default">6315</td>
-                        <td>MCP server port. Use <code>0</code> for auto-assign. The actual URL is written to <code>.idea/mcp-steroid.md</code>.</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.server.host</td>
-                        <td class="config-default">127.0.0.1</td>
-                        <td>MCP server bind address. Use <code>0.0.0.0</code> for Docker/remote access.</td>
-                    </tr>
-                    <tr>
-                        <td colspan="3" class="config-category">Review & Execution</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.review.mode</td>
-                        <td class="config-default">ALWAYS</td>
-                        <td>Code review mode: <code>ALWAYS</code> (default), <code>TRUSTED</code>, or <code>NEVER</code>.</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.review.timeout</td>
-                        <td class="config-default">600</td>
-                        <td>Review timeout in seconds.</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.execution.timeout</td>
-                        <td class="config-default">600</td>
-                        <td>Script execution timeout in seconds.</td>
-                    </tr>
-                    <tr>
-                        <td colspan="3" class="config-category">Storage</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.storage.path</td>
-                        <td class="config-default">(empty)</td>
-                        <td>Custom path for MCP execution storage. Empty uses <code>.idea/mcp-steroid/</code>.</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.idea.description.enabled</td>
-                        <td class="config-default">true</td>
-                        <td>Generate <code>.idea/mcp-steroid.md</code> description file in projects.</td>
-                    </tr>
-                    <tr>
-                        <td colspan="3" class="config-category">Demo Mode</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.demo.enabled</td>
-                        <td class="config-default">false</td>
-                        <td>Enable Demo Mode overlay during MCP execution.</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.demo.minDisplayTime</td>
-                        <td class="config-default">3000</td>
-                        <td>Minimum display time in milliseconds.</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.demo.maxLines</td>
-                        <td class="config-default">15</td>
-                        <td>Maximum log lines to show in overlay.</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.demo.opacity</td>
-                        <td class="config-default">85</td>
-                        <td>Background opacity (0-100).</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.demo.focusFrame</td>
-                        <td class="config-default">true</td>
-                        <td>Bring project frame to front when showing overlay.</td>
-                    </tr>
-                    <tr>
-                        <td colspan="3" class="config-category">Updates</td>
-                    </tr>
-                    <tr>
-                        <td class="config-key">mcp.steroid.updates.enabled</td>
-                        <td class="config-default">true</td>
-                        <td>Enable automatic update checks.</td>
-                    </tr>
-                </tbody>
-            </table>
-            <div class="config-note">
-                <strong>Finding the MCP Server URL:</strong> When the plugin starts, it writes the server URL to <code>.idea/mcp-steroid.md</code> in each open project. The first line contains the URL (e.g., <code>http://127.0.0.1:6315/mcp</code>). This file is your MCP client's connection target.
-            </div>
-            <div class="config-note">
-                <strong>Tip:</strong> You can also set these as JVM system properties by using <code>-Dmcp.steroid.server.port=8080</code> in your IDE's VM options. System properties take precedence over Registry values.
             </div>
         </div>
     </section>
