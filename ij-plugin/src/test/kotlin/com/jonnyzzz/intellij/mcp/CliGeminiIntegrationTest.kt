@@ -19,8 +19,7 @@ import kotlin.time.Duration.Companion.seconds
  * The tests that require MCP are disabled until this is fixed upstream.
  * See: https://github.com/google-gemini/gemini-cli/issues/15449
  */
-@Ignore("Disabled: Gemini CLI has a bug with HTTP MCP transport - https://github.com/google-gemini/gemini-cli/issues/15449")
-abstract class CliGeminiIntegrationTest : CliIntegrationTestBase() {
+class CliGeminiIntegrationTest : CliIntegrationTestBase() {
     private fun geminiSession() = DockerGeminiSession.create(testRootDisposable)
 
     override fun newAiSession(): AiAgentSession = geminiSession().registerMcp(resolveDockerUrl(), "intellij")
@@ -36,7 +35,6 @@ abstract class CliGeminiIntegrationTest : CliIntegrationTestBase() {
         timeoutRunBlocking(180.seconds) {
             val session = geminiSession()
             session.registerMcp(resolveDockerUrl(), mcpName)
-            session.session.runInContainer("cat", "/home/gemini/work/.gemini/settings.json")
             session.runInContainer("mcp", "list", )
                 .assertExitCode(0, "mcp list should succeed")
                 .assertOutputContains(mcpName, message = "mcp list should contain registered server")

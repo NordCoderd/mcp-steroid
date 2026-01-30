@@ -17,9 +17,9 @@ class DockerGeminiSession(
         runInContainer(
             "mcp",
             "add",
-            "--transport", "http",
-            "--trust",
             mcpName,
+            "--type", "http",
+            "--trust",
             mcpUrl,
         )
             .assertExitCode(0, message = "MCP server registration")
