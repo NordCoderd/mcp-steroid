@@ -132,34 +132,31 @@ Send input events (keyboard + mouse) using a sequence string.
 - Input focuses the screenshot window before dispatching events.
 
 ### `steroid_execute_code`
-Executes Kotlin code in the IntelliJ IDE's runtime context.
+**Execute code with IntelliJ's brain, not just text files.**
 
-**Parameters:**
-- `project_name` (required): Target project name from `steroid_list_projects`
-- `code` (required): Kotlin suspend function body to execute
-- `task_id` (required): Identifier to group related executions
-- `reason` (required): Human-readable execution reason
-- `timeout` (optional): Timeout in seconds (default: 60)
-- `required_plugins` (optional): List of required plugin IDs (e.g., `["com.intellij.database"]`)
+Give your AI agent a senior developer's toolkit: semantic code understanding, automated refactorings, and IDE intelligence that LSP can't provide.
 
-**Execution Model:**
-- Synchronous request-response - blocks until completion
-- Progress notifications sent via MCP progress protocol
-- No polling required - output returned in response
-- Returns `execution_id` for use with `steroid_execute_feedback`
+**Why use this over file operations:**
+- **See relationships**, not just text: Find all usages in milliseconds, traverse class hierarchies, query the semantic model
+- **Refactor correctly**: Rename functions across 47 files, extract methods that maintain types, move classes that update imports
+- **Catch errors early**: Run the same inspections IntelliJ runs, see type mismatches, detect code smells
+- **Understand structure**: Access project model, module dependencies, source roots - the IDE has indexed everything
 
-**Response:**
-- Text content with script output (stdout, progress messages)
-- Error message on failure
+**Quick example:**
+```kotlin
+// Find a class and all its usages - indexed, accurate, fast
+smartReadAction {
+    val classes = KotlinClassShortNameIndex.get("UserService", project, projectScope())
+    val usages = ReferencesSearch.search(classes.first(), projectScope()).findAll()
+    println("Found ${usages.size} usages")
+}
+```
 
-**Runtime Context:**
-- Code runs in IDE's JVM with full IntelliJ Platform API access
-- `McpScriptContext` is the receiver (`this`)
-- `waitForSmartMode()` called automatically before execution
-- Use `readAction`/`writeAction` for PSI/VFS access
-- Call `takeIdeScreenshot()` to attach IDE screenshot to response
+**Parameters:** `project_name`, `code` (Kotlin suspend function body), `task_id`, `reason`, `timeout` (optional)
 
-**For detailed coding guide, see:** `mcp-steroid://coding-with-intellij`
+**Returns:** Execution output with `execution_id` for feedback
+
+**📚 Complete guide:** `mcp-steroid://coding-with-intellij` (API reference, patterns, examples, best practices)
 
 ### `steroid_execute_feedback`
 Rate execution results. Use after `steroid_execute_code`.
