@@ -7,10 +7,14 @@
     MCP Steroid is an MCP Server that brings all IntelliJ-based IDE
     features to AI Agents, just the same way what IntelliJ brings
     to developers.
-    <br />
+    <br /><br />
     The plugin uses an alternative approach and allows your AI Agent to
     interact with IntelliJ-based IDE via IntelliJ API directly.
+    <br /><br />
+    <b>Demo: CodeDozer & IntelliJ Debugger</b>
     <br />
+    <iframe width="560" height="315" src="https://www.youtube.com/embed/8MjogrpfXLU" frameborder="0" allowfullscreen></iframe>
+    <br /><br />
     Follow <a href="https://mcp-steroid.jonnyzzz.com">https://mcp-steroid.jonnyzzz.com</a>
     for more information and documentation.
     ]]></description>
