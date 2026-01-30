@@ -32,99 +32,50 @@ data class ExecCodeParams(
  */
 class ExecuteCodeToolHandler : McpRegistrar {
     private val toolDescription get() = """
-             Execute Kotlin code in the IntelliJ-based IDE's runtime context with full access to IntelliJ APIs.
-             
-             IntelliJ IDEA and this MCP tool is a stateful API, consider polling for results instead
-             of waiting for the execution to finish. This allows you to continue working while the code
-             executes, and you can check the results later.
+             Execute Kotlin code directly in IntelliJ's runtime with full API access.
 
-             You are working with the stateful API, everything you do here changes the state of the IDE,
-             which is running exclusively for you. Use the IntelliJ-based IDE to help you looking
-             at the project, where you are working. Prioritize using the IDE and this MCP where possible.
+             📖 **COMPLETE GUIDE**: [Coding with IntelliJ APIs](mcp-steroid://coding-with-intellij)
 
-             NEW TO INTELLIJ APIS? Explore 58 MCP resources organized into 8 categories:
+             This is a stateful API - everything you do changes the IDE state. The IDE is running
+             exclusively for you. Use it aggressively instead of manual file operations.
 
-             📊 [Complete Resource Graph](mcp-steroid://docs/resource-graph) - Start here for navigation paths
-             🚀 [API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Essential patterns
-             🐛 [Debugger Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
-             🧪 [Test Runner Guide](mcp-steroid://skill/test-runner-guide) - Test execution patterns
+             **Quick Start:**
+             - Your code is a suspend function body (never use runBlocking)
+             - Use readAction { } for PSI/VFS reads, writeAction { } for modifications
+             - waitForSmartMode() runs automatically before your script
+             - Available: project, println(), printJson(), printException(), progress()
 
-             Example categories (run 'resources/list' to see all):
-             - [LSP Operations](mcp-steroid://lsp/overview) - Code navigation, completion, refactoring
-             - [IDE Examples](mcp-steroid://ide/overview) - Advanced refactorings, inspections
-             - [Debugger Examples](mcp-steroid://debugger/overview) - Breakpoints, thread inspection
-             - [Test Examples](mcp-steroid://test/overview) - Running tests, analyzing results
-             - [VCS Examples](mcp-steroid://vcs/overview) - Git blame, history
-             - [Open Project](mcp-steroid://open-project/overview) - Project opening workflows
+             **Common Operations:**
+             - Code navigation: Find usages, go to definition, symbol search
+             - Refactoring: Rename, extract method, move files
+             - Inspections: Run code analysis, get warnings/errors
+             - Tests: Execute tests, inspect results
+             - Actions: Trigger any IDE action programmatically
 
-             LEARNING NOTE: Writing working code may require several attempts - this is normal! The IntelliJ API
-             is vast and powerful. Keep trying - each attempt teaches you more. Use printException() for errors.
-             Start sub-agent where possible to delegate these iterations.
-
-             BEST PRACTICE: Delegate to SUB-AGENT for code execution:
-             - Sub-agent can retry multiple times without polluting main agent context
-             - Errors and debugging stay isolated from main conversation
-             - Provide detailed 'reason' so sub-agent understands the intent
-             - Sub-agent can iterate on fixes without context rot in main agent
-
-             This is similar to LSP tools but uses IntelliJ's native APIs, offering deeper code understanding
-             and more features (refactorings, inspections, full project model).
-
-             Browse all resources: Run 'resources/list' or visit mcp-steroid://docs/resource-graph
-
-             You can do everything IntelliJ API allows you to do including, but not limited to
-             - code search
-             - code completion
-             - code introspection, including methods, API, coroutines, reflection
-             - errors and warnings highlighting
-             - tests execution
-             - automated code refactorings, such as rename or find usages
-
-             CRITICAL RULES:
-             1. Your code is the suspend script body
-             2. Never use runBlocking - you're already in a coroutine context
-             3. Use readAction { } for PSI/VFS reads, writeAction { } for modifications
-             4. waitForSmartMode() runs automatically before your script starts; call it again only if you trigger indexing
-
-             Script structure:
+             **Example:**
              ```kotlin
-             // Optional imports go at the top
-             import com.intellij.psi.PsiManager
-
-             // Script body (suspend context)
-             val psiFile = readAction {
-                 PsiManager.getInstance(project).findFile(virtualFile)
+             val file = findProjectFile("src/Main.kt")
+             val text = readAction {
+                 PsiManager.getInstance(project).findFile(file!!)?.text
              }
-             println(psiFile?.name)
+             println("File length: " + text?.length)
              ```
 
-            Available in the script body:
-            - just use Java or Kotlin reflection to inspect more
-            - project: Project - the IntelliJ Project instance
-            - println(vararg values) - output separated by spaces
-            - printJson(obj) - pretty-print as JSON
-            - printException(msg, throwable) - error with stack trace (recommended!)
-            - progress(message) - report progress (throttled to 1/sec)
-            - waitForSmartMode() - suspend until indexing completes
-            - disposable - for resource cleanup
+             **Best Practice: Use Sub-Agents**
+             For complex IntelliJ API work, delegate to a sub-agent:
+             - Sub-agent can retry without polluting your context
+             - Errors stay isolated
+             - Provide detailed 'reason' parameter
 
-            Built-in helpers (NO IMPORTS NEEDED):
-            - readAction { } - execute under read lock
-            - writeAction { } - execute under write lock
-            - smartReadAction { } - waitForSmartMode() + readAction in one call
-            - projectScope() - GlobalSearchScope for project files
-            - allScope() - GlobalSearchScope for project + libraries
-            - findFile(path) - find VirtualFile by absolute path
-            - findPsiFile(path) - find PsiFile by absolute path
-            - findProjectFile(relativePath) - find file relative to project
-            - findProjectPsiFile(relativePath) - find PsiFile relative to project
-            - runInspectionsDirectly(file) - run inspections bypassing daemon (works without window focus)
+             **Resources:**
+             - 📖 [Complete Coding Guide](mcp-steroid://coding-with-intellij) - Patterns, examples, best practices
+             - 📊 [Resource Graph](mcp-steroid://docs/resource-graph) - All 58 resources organized
+             - 🚀 [API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Essential patterns
+             - 🐛 [Debugger Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
+             - 🧪 [Test Runner Guide](mcp-steroid://skill/test-runner-guide) - Test execution
 
-            IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
-
-            📚 Resources: Use 'resources/list' to browse all 58 available resources
-            📊 Navigation: Start at mcp-steroid://docs/resource-graph for guided paths
-            💡 Feedback: Call steroid_execute_feedback after execution to track success
+             IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
+             💡 Call steroid_execute_feedback after execution to rate success
          """.trim().lines().joinToString("\n") { it.trim() }
 
     override fun register(server: McpServerCore) {
