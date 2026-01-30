@@ -22,28 +22,6 @@
     <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
     <link rel="icon" type="image/svg+xml" href="{{ "pluginIcon.svg" | relURL }}">
     <style>
-        :root {
-            /* Color System - Semantic Tokens */
-            --color-primary: #ffffff;
-            --color-secondary: #d0d0e0;
-            --color-tertiary: #b0b0c0;
-            --color-quaternary: #909090;
-
-            /* Brand Colors */
-            --gradient-brand: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
-            --color-brand-purple: #6B57FF;
-            --color-brand-pink: #FE2857;
-
-            /* Background */
-            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            --bg-overlay: rgba(255, 255, 255, 0.05);
-            --bg-code: rgba(0, 0, 0, 0.3);
-
-            /* Accent Colors */
-            --color-link: #a0a0ff;
-            --color-code: #c0c0ff;
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -54,11 +32,11 @@
             display: flex;
             flex-direction: column;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg-gradient);
-            color: var(--color-primary);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
         }
         a {
-            color: var(--color-link);
+            color: #a0a0ff;
             text-decoration: none;
         }
         a:hover {
@@ -76,7 +54,7 @@
         .nav-container {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 0.75rem 2rem;
+            padding: 0.75rem 1.5rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -86,7 +64,7 @@
             align-items: center;
             gap: 0.75rem;
             text-decoration: none;
-            color: var(--color-primary);
+            color: #fff;
         }
         .nav-brand:hover {
             text-decoration: none;
@@ -95,17 +73,10 @@
             width: 32px;
             height: 32px;
         }
-        /* Ensure minimum touch target size (44x44px) */
-        .nav-brand {
-            padding: 6px 0;
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-        }
         .nav-title {
             font-weight: 700;
             font-size: 1.1rem;
-            background: var(--gradient-brand);
+            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -116,7 +87,7 @@
             gap: 2rem;
         }
         .nav-link {
-            color: var(--color-tertiary);
+            color: #a0a0b0;
             text-decoration: none;
             font-size: 0.95rem;
             font-weight: 500;
@@ -124,15 +95,13 @@
             display: flex;
             align-items: center;
             gap: 0.25rem;
-            min-height: 44px;
-            padding: 8px 0;
         }
         .nav-link:hover {
-            color: var(--color-primary);
+            color: #fff;
             text-decoration: none;
         }
         .nav-link.active {
-            color: var(--color-primary);
+            color: #fff;
         }
         .nav-link svg {
             width: 16px;
@@ -142,11 +111,9 @@
             display: none;
             background: none;
             border: none;
-            color: var(--color-primary);
+            color: #fff;
             cursor: pointer;
             padding: 0.5rem;
-            min-width: 44px;
-            min-height: 44px;
         }
         .nav-toggle svg {
             width: 24px;
@@ -183,10 +150,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            padding: 3rem 2rem;
-            max-width: 1200px;
-            margin: 0 auto;
-            width: 100%;
+            padding: 2rem;
         }
         /* Footer */
         footer {
@@ -202,11 +166,11 @@
             align-items: center;
         }
         .social-links a {
-            color: var(--color-quaternary);
+            color: #606070;
             transition: color 0.2s;
         }
         .social-links a:hover {
-            color: var(--color-tertiary);
+            color: #a0a0b0;
             text-decoration: none;
         }
         .social-links svg {
@@ -219,14 +183,12 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.875rem 1.5rem;
-            color: var(--color-primary);
+            color: #fff;
             text-decoration: none;
             border-radius: 8px;
             font-weight: 600;
             font-size: 1rem;
             transition: transform 0.2s, box-shadow 0.2s;
-            min-height: 44px;
-            min-width: 44px;
         }
         .btn:hover {
             text-decoration: none;
@@ -234,7 +196,7 @@
             box-shadow: 0 10px 30px rgba(107, 87, 255, 0.3);
         }
         .btn-primary {
-            background: var(--gradient-brand);
+            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
         }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.1);
@@ -247,49 +209,21 @@
         /* Code styling */
         code {
             font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-            background: var(--bg-code);
+            background: rgba(0, 0, 0, 0.3);
             padding: 0.1rem 0.4rem;
             border-radius: 4px;
-            color: var(--color-code);
+            color: #c0c0ff;
             font-size: 0.9em;
         }
         pre {
-            background: var(--bg-code);
+            background: rgba(0, 0, 0, 0.3);
             border-radius: 8px;
             padding: 1rem;
             overflow-x: auto;
-            max-width: 100%;
         }
         pre code {
             background: none;
             padding: 0;
-        }
-        /* Focus indicators for accessibility (WCAG 2.4.7) */
-        a:focus-visible,
-        button:focus-visible,
-        input:focus-visible,
-        textarea:focus-visible {
-            outline: 2px solid var(--color-brand-purple);
-            outline-offset: 2px;
-            border-radius: 4px;
-        }
-        a:focus-visible {
-            background: rgba(107, 87, 255, 0.1);
-        }
-        /* Skip link for keyboard users (WCAG 2.4.1) */
-        .skip-link {
-            position: absolute;
-            top: -40px;
-            left: 0;
-            background: var(--color-brand-purple);
-            color: var(--color-primary);
-            padding: 8px 16px;
-            z-index: 100;
-            text-decoration: none;
-            border-radius: 0 0 4px 0;
-        }
-        .skip-link:focus {
-            top: 0;
         }
         /* Page-specific styles will be in block */
         {{ block "styles" . }}{{ end }}
@@ -297,10 +231,9 @@
     <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "dd1a589b6e154b0a985f8f14ca8c4a4a"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
 <body>
-    <a href="#main-content" class="skip-link">Skip to main content</a>
     {{ partial "nav.html" . }}
 
-    <main class="main-content" id="main-content">
+    <main class="main-content">
         {{ block "main" . }}{{ end }}
     </main>
 
@@ -309,19 +242,7 @@
     <script>
         // Mobile nav toggle
         document.querySelector('.nav-toggle')?.addEventListener('click', function() {
-            const navLinks = document.querySelector('.nav-links');
-            const isOpen = navLinks.classList.toggle('open');
-            this.setAttribute('aria-expanded', isOpen);
-        });
-
-        // Close mobile menu on Escape key (WCAG 2.1.2)
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && document.querySelector('.nav-links.open')) {
-                document.querySelector('.nav-links').classList.remove('open');
-                const toggle = document.querySelector('.nav-toggle');
-                toggle?.setAttribute('aria-expanded', 'false');
-                toggle?.focus();
-            }
+            document.querySelector('.nav-links').classList.toggle('open');
         });
     </script>
 </body>
