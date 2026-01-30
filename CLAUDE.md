@@ -320,6 +320,8 @@ src/main/kotlin/com/jonnyzzz/intellij/mcp/
 ├── review/
 │   ├── ReviewManager.kt           # Human review workflow, diff generation
 │   └── McpReviewNotificationProvider.kt  # Editor notification panel
+├── updates/
+│   └── UpdateChecker.kt           # Periodic update checker service
 └── storage/
     └── ExecutionStorage.kt        # Append-only file storage (no status tracking)
 ```
@@ -461,10 +463,12 @@ Context provided in the script body:
 - `gradle.properties`: Contains `platformVersion` for IntelliJ version
 - `build.gradle.kts`: Plugin configuration using `intellijPlatform` DSL
 - Registry keys:
-- `mcp.steroids.server.port`: MCP server port (configurable; use `.idea/mcp-steroids.txt` for the active URL)
+  - `mcp.steroids.server.port`: MCP server port (configurable; use `.idea/mcp-steroids.txt` for the active URL)
   - `mcp.steroids.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
   - `mcp.steroids.review.timeout`: Review timeout in seconds
   - `mcp.steroids.execution.timeout`: Script execution timeout
+  - `mcp.steroids.updates.enabled`: Enable automatic update checks (default: `true`)
+  - `mcp.steroids.updates.checkIntervalHours`: Hours between update checks (default: `1`)
 
 ### Script Preprocessing (CodeButcher)
 

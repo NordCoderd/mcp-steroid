@@ -16,7 +16,10 @@ plugins {
 
 group = "com.jonnyzzz.intellij"
 val baseVersion = file("VERSION").readText().trim()
-version = "$baseVersion-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}"
+val gitHash = providers.exec {
+    commandLine("git", "rev-parse", "--short", "HEAD")
+}.standardOutput.asText.get().trim()
+version = "$baseVersion-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}-$gitHash"
 
 repositories {
     mavenCentral()

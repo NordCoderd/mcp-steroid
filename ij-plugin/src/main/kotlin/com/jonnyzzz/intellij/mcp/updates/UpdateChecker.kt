@@ -1,0 +1,172 @@
+/* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+package com.jonnyzzz.intellij.mcp.updates
+
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationInfo
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.util.registry.Registry
+import com.intellij.util.io.HttpRequests
+import com.jonnyzzz.intellij.mcp.PluginDescriptorProvider
+import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.time.Duration.Companion.minutes
+import kotlin.time.Duration.Companion.seconds
+
+/**
+ * Application-level service that periodically checks for plugin updates.
+ *
+ * Fetches version info from https://mcp-steroid.jonnyzzz.com/version.json
+ * and notifies the user ONCE per IDE session when a newer version is available.
+ *
+ * The check continues running even after an update is detected, but the notification
+ * is shown only once per IDE run.
+ */
+@Service(Service.Level.APP)
+class UpdateChecker(
+    parentScope: CoroutineScope
+) : Disposable {
+    private val log = thisLogger()
+    private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob() + Dispatchers.IO)
+
+    /** Whether we've already shown the update notification in this IDE session */
+    private val notificationShown = AtomicBoolean(false)
+
+    /** For testing: the last fetched remote version */
+    @Volatile
+    var lastFetchedVersion: String? = null
+        private set
+
+    /**
+     * Performs a single update check.
+     * Can be called manually for testing.
+     */
+    suspend fun checkForUpdates() {
+        val currentVersion = PluginDescriptorProvider.getInstance().version
+        val ijBuild = ApplicationInfo.getInstance().build.asString()
+        val url = "https://mcp-steroid.jonnyzzz.com/version.json?intellij-version=$ijBuild"
+        log.debug("Checking for updates at $url (current version: $currentVersion)")
+
+        val response = withContext(Dispatchers.IO) {
+            try {
+                HttpRequests.request(url)
+                    .userAgent(buildUserAgent(currentVersion, ijBuild))
+                    .connectTimeout(10_000)
+                    .readTimeout(10_000)
+                    .readString()
+            } catch (e: Exception) {
+                log.debug("Update check failed: ${e.message}")
+                null
+            }
+        } ?: return
+
+        val versionInfo = try {
+            json.decodeFromString<VersionInfo>(response)
+        } catch (e: Exception) {
+            log.debug("Failed to parse version response: ${e.message}")
+            return
+        }
+
+        val remoteVersion = versionInfo.versionBase
+        lastFetchedVersion = remoteVersion
+
+        log.info("Remote version: $remoteVersion, current version: $currentVersion")
+
+        if (!currentVersion.startsWith(remoteVersion)) {
+            log.info("MCP Steroid plugin update available: $remoteVersion (current: $currentVersion)")
+
+            // Show notification only once per IDE session
+            if (notificationShown.compareAndSet(false, true)) {
+                showUpdateNotification(currentVersion, remoteVersion)
+            }
+        }
+    }
+
+    /**
+     * Extracts the base version from a full version string.
+     * E.g., "0.86.0-SNAPSHOT-2026-01-30-12-34" -> "0.86.0"
+     */
+    private fun extractBaseVersion(fullVersion: String): String {
+        // Handle SNAPSHOT versions: take everything before "-SNAPSHOT"
+        val snapshotIndex = fullVersion.indexOf("-SNAPSHOT")
+        if (snapshotIndex > 0) {
+            return fullVersion.substring(0, snapshotIndex)
+        }
+        // Handle other suffixes: take everything before first dash
+        val dashIndex = fullVersion.indexOf('-')
+        if (dashIndex > 0) {
+            return fullVersion.substring(0, dashIndex)
+        }
+        return fullVersion
+    }
+
+    private fun showUpdateNotification(currentVersion: String, newVersion: String) {
+        val notificationGroup = NotificationGroupManager.getInstance()
+            .getNotificationGroup("jonnyzzz.mcp.steroid.updates")
+
+        notificationGroup.createNotification(
+            "MCP Steroid plugin update available",
+            "A new version of MCP Steroid is available: $newVersion (current: ${
+                extractBaseVersion(
+                    currentVersion
+                )
+            })",
+            NotificationType.INFORMATION
+        ).notify(null)
+    }
+
+    private fun buildUserAgent(pluginVersion: String, ijBuild: String): String {
+        return "MCP-Steroid/$pluginVersion (IntelliJ/$ijBuild)"
+    }
+
+    override fun dispose() {
+        scope.cancel()
+    }
+
+    fun startUpdates() {
+        scope.launch {
+            // Initial delay: wait a bit for IDE to fully start
+            delay(30.seconds)
+
+            while (isActive) {
+                yield()
+
+                // Check if updates are enabled
+                if (Registry.`is`("mcp.steroids.updates.enabled", true)) {
+                    try {
+                        checkForUpdates()
+                    } catch (e: Exception) {
+                        log.debug("Failed to check for updates: ${e.message}", e)
+                    }
+                }
+
+                // Wait before next check
+                delay(15.minutes)
+            }
+        }
+    }
+
+    private val json = Json { ignoreUnknownKeys = true }
+
+    companion object {
+        fun getInstance(): UpdateChecker = service()
+    }
+}
+
+@Serializable
+private data class VersionInfo(
+    @kotlinx.serialization.SerialName("version-base")
+    val versionBase: String
+)

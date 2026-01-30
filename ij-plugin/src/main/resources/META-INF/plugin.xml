@@ -81,6 +81,10 @@
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
+        <!-- Update checker notification group -->
+        <notificationGroup id="jonnyzzz.mcp.steroid.updates"
+                           displayType="BALLOON"/>
+
         <!-- Demo Mode overlay service (project-level) -->
         <projectService
             serviceImplementation="com.jonnyzzz.intellij.mcp.demo.DemoModeService"
@@ -117,6 +121,10 @@
             description="Background opacity (0-100)"/>
         <registryKey key="mcp.steroids.demo.focusFrame" defaultValue="true"
             description="Bring project frame to front when showing overlay"/>
+
+        <!-- Update checker registry keys -->
+        <registryKey key="mcp.steroids.updates.enabled" defaultValue="true"
+            description="Enable automatic update checks"/>
 
         <!-- Start MCP server when IDE is ready -->
         <postStartupActivity

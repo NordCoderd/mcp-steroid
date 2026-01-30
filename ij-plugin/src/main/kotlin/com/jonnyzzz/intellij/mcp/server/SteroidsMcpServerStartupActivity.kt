@@ -3,6 +3,7 @@ package com.jonnyzzz.intellij.mcp.server
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
+import com.jonnyzzz.intellij.mcp.updates.UpdateChecker
 
 /**
  * Startup activity that ensures the MCP server is started when the IDE opens.
@@ -18,5 +19,8 @@ class SteroidsMcpServerStartupActivity : ProjectActivity {
 
         // Write the server URL to this project's .idea folder
         ServerUrlWriter.getInstance().writeServerUrl(project, server.mcpUrl)
+
+        // Initialize update checker (runs periodic checks for new versions)
+        UpdateChecker.getInstance().startUpdates()
     }
 }
