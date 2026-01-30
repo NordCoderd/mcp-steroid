@@ -165,6 +165,7 @@ IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE A
 - [Plan.md](Plan.md) - Implementation plan and phases
 - [Suggestions.md](Suggestions.md) - Open questions and design decisions
 - [Discussions.md](Discussions.md) - Design discussions and decisions from Q&A sessions
+- [website/CLAUDE.md](website/CLAUDE.md) - Website build documentation
 
 ## Build Commands
 
@@ -988,6 +989,47 @@ The `ai-tests/` folder contains test prompts for validating MCP integration.
 - `06-project-opening.md` - Project opening workflow
 
 See `ai-tests/_INSTRUCTIONS.md` for detailed usage.
+
+## Website
+
+The public website at https://mcp-steroid.jonnyzzz.com is built with Hugo from the `website/` directory.
+
+### Architecture
+
+The website uses a nested repository pattern:
+- **Source**: `website/` contains Hugo templates, content, and configuration
+- **Output**: Hugo builds to `website/mcp-steroid-public/docs/`
+- **Deployment**: `mcp-steroid-public/` is a clone of the main repository; pushing to it updates GitHub Pages
+
+### Building the Website
+
+```bash
+cd website
+
+# Start development server (auto-clones mcp-steroid-public if needed)
+make dev
+
+# Build the site
+make build
+
+# Publish changes
+cd mcp-steroid-public
+git add docs
+git commit -m "Update website"
+git push origin main
+```
+
+The Makefile automatically clones `mcp-steroid-public` if it doesn't exist.
+
+### Key Files
+
+- `website/hugo.toml` - Site configuration, version, featured videos, what's new entries
+- `website/content/` - Page content in markdown
+- `website/layouts/` - Hugo templates
+- `website/static/` - Static assets (logo, CNAME)
+- `../VERSION` - Plugin version (auto-synced to website during build)
+
+See [website/CLAUDE.md](website/CLAUDE.md) for detailed documentation.
 
 ## Code Review Using IntelliJ MCP
 
