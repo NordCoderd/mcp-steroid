@@ -1,1 +1,0 @@
-Supported all IntelliJ-based IDEs, including Rider, Android Studio, and GoLand

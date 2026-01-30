@@ -15,7 +15,8 @@ plugins {
 }
 
 group = "com.jonnyzzz.intellij"
-version = "0.86.0-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}"
+val baseVersion = file("VERSION").readText().trim()
+version = "$baseVersion-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}"
 
 repositories {
     mavenCentral()

@@ -36,3 +36,7 @@ docs/runs/
 
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+
+# Website public repository checkout
+website/mcp-steroid-public/
+website/.hugo_build.lock
