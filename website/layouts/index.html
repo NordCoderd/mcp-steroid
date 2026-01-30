@@ -31,14 +31,14 @@
     h1 {
         font-size: 2.5rem;
         margin-bottom: 1rem;
-        background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+        background: var(--gradient-brand);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
     .tagline {
         font-size: 1.2rem;
-        color: #a0a0b0;
+        color: var(--color-tertiary);
         margin-bottom: 2rem;
         line-height: 1.6;
     }
@@ -51,7 +51,7 @@
     h2 {
         font-size: 1.5rem;
         margin-bottom: 1.5rem;
-        color: #d0d0e0;
+        color: var(--color-secondary);
         text-align: center;
     }
     .whatsnew-section {
@@ -72,8 +72,8 @@
     }
     .whatsnew-label {
         display: inline-block;
-        background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
-        color: #fff;
+        background: var(--gradient-brand);
+        color: var(--color-primary);
         padding: 0.2rem 0.6rem;
         border-radius: 4px;
         font-size: 0.75rem;
@@ -98,13 +98,13 @@
         padding-top: 0;
     }
     .whatsnew-date {
-        color: #808090;
+        color: var(--color-quaternary);
         font-size: 0.85rem;
         white-space: nowrap;
         min-width: 90px;
     }
     .whatsnew-text {
-        color: #c0c0d0;
+        color: var(--color-secondary);
         font-size: 0.95rem;
         line-height: 1.4;
     }
@@ -121,7 +121,7 @@
         text-align: left;
     }
     .about-content p {
-        color: #b0b0c0;
+        color: var(--color-tertiary);
         line-height: 1.7;
         margin-bottom: 1rem;
     }
@@ -133,7 +133,7 @@
         margin: 1.5rem 0;
     }
     .features-list li {
-        color: #b0b0c0;
+        color: var(--color-tertiary);
         padding: 0.5rem 0;
         padding-left: 1.5rem;
         position: relative;
@@ -142,7 +142,7 @@
         content: "\2192";
         position: absolute;
         left: 0;
-        color: #6B57FF;
+        color: var(--color-brand-purple);
     }
     .agents-list {
         display: flex;
@@ -152,7 +152,7 @@
     }
     .agent-badge {
         background: rgba(107, 87, 255, 0.2);
-        color: #a0a0ff;
+        color: var(--color-link);
         padding: 0.25rem 0.75rem;
         border-radius: 20px;
         font-size: 0.85rem;
@@ -160,7 +160,7 @@
     .version-badge {
         display: inline-block;
         background: rgba(107, 87, 255, 0.3);
-        color: #c0c0ff;
+        color: var(--color-code);
         padding: 0.25rem 0.75rem;
         border-radius: 20px;
         font-size: 0.9rem;
@@ -180,10 +180,10 @@
     .cta-card h3 {
         font-size: 1.3rem;
         margin-bottom: 1rem;
-        color: #fff;
+        color: var(--color-primary);
     }
     .cta-card p {
-        color: #a0a0b0;
+        color: var(--color-tertiary);
         margin-bottom: 1.5rem;
         line-height: 1.6;
     }
@@ -245,11 +245,11 @@
         font-weight: 600;
         line-height: 1.4;
         margin-bottom: 0.5rem;
-        color: #fff;
+        color: var(--color-primary);
     }
     .video-meta {
         font-size: 0.8rem;
-        color: #808090;
+        color: var(--color-quaternary);
     }
     .playlist-link {
         text-align: center;
@@ -268,11 +268,11 @@
         padding: 1.5rem;
     }
     .feedback-card p {
-        color: #909090;
+        color: var(--color-quaternary);
         margin-bottom: 1rem;
     }
     .feedback-card a {
-        color: #a0a0ff;
+        color: var(--color-link);
         text-decoration: none;
     }
     .feedback-card a:hover {

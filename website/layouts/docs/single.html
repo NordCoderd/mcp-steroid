@@ -31,7 +31,7 @@
         font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: #808090;
+        color: var(--color-quaternary);
         margin-bottom: 1rem;
     }
     .docs-sidebar ul {
@@ -41,7 +41,7 @@
         margin-bottom: 0.5rem;
     }
     .docs-sidebar a {
-        color: #a0a0b0;
+        color: var(--color-tertiary);
         text-decoration: none;
         font-size: 0.95rem;
         display: block;
@@ -51,12 +51,12 @@
         transition: all 0.2s;
     }
     .docs-sidebar a:hover {
-        color: #fff;
+        color: var(--color-primary);
         text-decoration: none;
     }
     .docs-sidebar a.active {
-        color: #fff;
-        border-left-color: #6B57FF;
+        color: var(--color-primary);
+        border-left-color: var(--color-brand-purple);
         background: rgba(107, 87, 255, 0.1);
     }
     .docs-content {
@@ -67,14 +67,14 @@
     .docs-content h1 {
         font-size: 2.5rem;
         margin-bottom: 1.5rem;
-        background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+        background: var(--gradient-brand);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
     .docs-content h2 {
         font-size: 1.5rem;
-        color: #d0d0e0;
+        color: var(--color-secondary);
         margin-top: 2.5rem;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
@@ -83,17 +83,17 @@
     }
     .docs-content h3 {
         font-size: 1.2rem;
-        color: #c0c0d0;
+        color: var(--color-secondary);
         margin-top: 2rem;
         margin-bottom: 0.75rem;
     }
     .docs-content p {
-        color: #b0b0c0;
+        color: var(--color-tertiary);
         line-height: 1.7;
         margin-bottom: 1rem;
     }
     .docs-content ul, .docs-content ol {
-        color: #b0b0c0;
+        color: var(--color-tertiary);
         margin-bottom: 1rem;
         padding-left: 1.5rem;
     }
@@ -111,13 +111,13 @@
         text-align: left;
         padding: 0.75rem;
         border-bottom: 2px solid rgba(107, 87, 255, 0.3);
-        color: #d0d0e0;
+        color: var(--color-secondary);
         font-weight: 600;
     }
     .docs-content td {
         padding: 0.75rem;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        color: #a0a0b0;
+        color: var(--color-tertiary);
         vertical-align: top;
     }
     .docs-content tr:hover td {
@@ -143,17 +143,17 @@
     }
     .docs-content .note {
         background: rgba(107, 87, 255, 0.1);
-        border-left: 3px solid #6B57FF;
+        border-left: 3px solid var(--color-brand-purple);
         border-radius: 0 8px 8px 0;
         padding: 1rem 1.25rem;
         margin: 1.5rem 0;
     }
     .docs-content .note p {
         margin: 0;
-        color: #c0c0d0;
+        color: var(--color-secondary);
     }
     .docs-content .note strong {
-        color: #fff;
+        color: var(--color-primary);
     }
     @media (max-width: 900px) {
         .main-content {
