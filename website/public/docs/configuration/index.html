@@ -58,13 +58,6 @@
             width: 32px;
             height: 32px;
         }
-         
-        .nav-brand {
-            padding: 6px 0;
-            min-height: 44px;
-            display: flex;
-            align-items: center;
-        }
         .nav-title {
             font-weight: 700;
             font-size: 1.1rem;
@@ -87,8 +80,6 @@
             display: flex;
             align-items: center;
             gap: 0.25rem;
-            min-height: 44px;
-            padding: 8px 0;
         }
         .nav-link:hover {
             color: #fff;
@@ -108,8 +99,6 @@
             color: #fff;
             cursor: pointer;
             padding: 0.5rem;
-            min-width: 44px;
-            min-height: 44px;
         }
         .nav-toggle svg {
             width: 24px;
@@ -165,7 +154,7 @@
             align-items: center;
         }
         .social-links a {
-            color: #909090;
+            color: #606070;
             transition: color 0.2s;
         }
         .social-links a:hover {
@@ -188,8 +177,6 @@
             font-weight: 600;
             font-size: 1rem;
             transition: transform 0.2s, box-shadow 0.2s;
-            min-height: 44px;
-            min-width: 44px;
         }
         .btn:hover {
             text-decoration: none;
@@ -221,38 +208,10 @@
             border-radius: 8px;
             padding: 1rem;
             overflow-x: auto;
-            max-width: 100%;
         }
         pre code {
             background: none;
             padding: 0;
-        }
-         
-        a:focus-visible,
-        button:focus-visible,
-        input:focus-visible,
-        textarea:focus-visible {
-            outline: 2px solid #6B57FF;
-            outline-offset: 2px;
-            border-radius: 4px;
-        }
-        a:focus-visible {
-            background: rgba(107, 87, 255, 0.1);
-        }
-         
-        .skip-link {
-            position: absolute;
-            top: -40px;
-            left: 0;
-            background: #6B57FF;
-            color: white;
-            padding: 8px 16px;
-            z-index: 100;
-            text-decoration: none;
-            border-radius: 0 0 4px 0;
-        }
-        .skip-link:focus {
-            top: 0;
         }
          
         
@@ -307,7 +266,7 @@
         max-width: 800px;
     }
     .docs-content h1 {
-        font-size: 2.5rem;
+        font-size: 2rem;
         margin-bottom: 1.5rem;
         background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
         -webkit-background-clip: text;
@@ -365,24 +324,6 @@
     .docs-content tr:hover td {
         background: rgba(255, 255, 255, 0.02);
     }
-     
-    .docs-content pre {
-        overflow-x: auto;
-        max-width: 100%;
-    }
-    .docs-content code {
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-    }
-    .docs-content table {
-        display: block;
-        overflow-x: auto;
-        max-width: 100%;
-    }
-    .docs-content p {
-        overflow-wrap: break-word;
-        word-wrap: break-word;
-    }
     .docs-content .note {
         background: rgba(107, 87, 255, 0.1);
         border-left: 3px solid #6B57FF;
@@ -428,7 +369,6 @@
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "dd1a589b6e154b0a985f8f14ca8c4a4a"}'></script>
 </head>
 <body>
-    <a href="#main-content" class="skip-link">Skip to main content</a>
     <nav class="nav">
     <div class="nav-container">
         <a href="/" class="nav-brand">
@@ -477,7 +417,7 @@
 </nav>
 
 
-    <main class="main-content" id="main-content">
+    <main class="main-content">
         
 <aside class="docs-sidebar">
     <h3>Documentation</h3>
@@ -668,19 +608,7 @@
     <script>
         
         document.querySelector('.nav-toggle')?.addEventListener('click', function() {
-            const navLinks = document.querySelector('.nav-links');
-            const isOpen = navLinks.classList.toggle('open');
-            this.setAttribute('aria-expanded', isOpen);
-        });
-
-        
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'Escape' && document.querySelector('.nav-links.open')) {
-                document.querySelector('.nav-links').classList.remove('open');
-                const toggle = document.querySelector('.nav-toggle');
-                toggle?.setAttribute('aria-expanded', 'false');
-                toggle?.focus();
-            }
+            document.querySelector('.nav-links').classList.toggle('open');
         });
     </script>
 </body>
