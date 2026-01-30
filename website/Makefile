@@ -21,12 +21,14 @@ WHATSNEW := $(shell cat whatsnew.txt 2>/dev/null | tr '\n' ' ' | sed 's/  */ /g'
 setup:
 	git clone git@github.com:jonnyzzz/mcp-steroid.git mcp-steroid-public
 
-# Update version and whatsnew in hugo.toml
+# Update version and whatsnew in hugo.toml, generate version.json
 update-config:
 	@echo "Updating version to $(VERSION)"
 	@sed -i.bak 's/version = ".*"/version = "$(VERSION)"/' hugo.toml && rm -f hugo.toml.bak
 	@echo "Updating whatsnew"
 	@sed -i.bak 's/whatsnew = ".*"/whatsnew = "$(WHATSNEW)"/' hugo.toml && rm -f hugo.toml.bak
+	@echo "Generating version.json"
+	@echo '{"version-base": "$(VERSION)"}' > static/version.json
 
 # Start development server with live reload
 dev: update-config
