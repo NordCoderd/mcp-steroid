@@ -24,8 +24,14 @@ title = 'MCP Steroid - IntelliJ Plugin for AI Agents'
   youtubeChannel = "https://youtube.com/@jonnyzzz"
   # Version is read from ../VERSION file during build (see Makefile)
   version = "0.86.0"
-  # What's new is read from whatsnew.txt during build (see Makefile)
-  whatsnew = "Supported all IntelliJ-based IDEs, including Rider, Android Studio, and GoLand"
+
+[[params.whatsnew]]
+  date = "2026-01-30"
+  text = "Website launched at mcp-steroid.jonnyzzz.com"
+
+[[params.whatsnew]]
+  date = "2026-01-29"
+  text = "Supported all IntelliJ-based IDEs, including Rider, Android Studio, and GoLand"
 
 [[params.featuredVideos]]
   id = "6ByedA15n8Q"

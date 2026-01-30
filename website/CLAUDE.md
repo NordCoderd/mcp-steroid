@@ -44,6 +44,10 @@ git push origin main
 
 2. **Public Repository README**: The public repository at https://github.com/jonnyzzz/mcp-steroid contains issues and is user-facing. The README.md in that repository should be kept in sync with the website content and provide similar information about the plugin.
 
-3. **Featured Videos**: Update the `[[params.featuredVideos]]` entries in `hugo.toml` to change which videos appear on the homepage.
+3. **What's New**: Add new entries to `[[params.whatsnew]]` in `hugo.toml` with `date` and `text` fields. Entries are displayed in the order they appear in the file (newest first).
 
-4. **CNAME**: The `static/CNAME` file configures the custom domain. Do not remove it.
+4. **Featured Videos**: Update the `[[params.featuredVideos]]` entries in `hugo.toml` to change which videos appear on the homepage.
+
+5. **CNAME**: The `static/CNAME` file configures the custom domain. Do not remove it.
+
+6. **version.json**: Published at `/version.json` with the current version. Generated automatically during build.
