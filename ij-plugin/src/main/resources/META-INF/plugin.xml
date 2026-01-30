@@ -63,15 +63,19 @@
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionScreenshotToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionInputToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectToolHandler"/>
+        <!-- Main skill guides -->
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.SkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.CodingWithIntellijResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.DebuggerSkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.TestSkillResourceHandler"/>
+        <!-- Example resources by topic -->
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.LspExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.IdeExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.DebuggerExamplesResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.TestSkillResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.TestExamplesResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VcsExamplesResourceHandler"/>
+        <!-- Other resources -->
+        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ResourceGraphHandler"/>
 
         <!-- Screenshot metadata providers -->

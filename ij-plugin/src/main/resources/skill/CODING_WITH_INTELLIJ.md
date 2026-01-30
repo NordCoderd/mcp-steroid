@@ -1,0 +1,1248 @@
+# Coding with IntelliJ APIs - Comprehensive Guide for AI Agents
+
+This guide teaches you how to write effective Kotlin code that executes inside IntelliJ IDEA's runtime environment via `steroid_execute_code`. You'll learn the execution model, available APIs, and best practices for working with PSI (Program Structure Interface), VFS (Virtual File System), and other IntelliJ platform APIs.
+
+---
+
+## Table of Contents
+
+1. [Introduction](#introduction)
+2. [Execution Model](#execution-model)
+3. [McpScriptContext API Reference](#mcpscriptcontext-api-reference)
+4. [Threading and Read/Write Actions](#threading-and-readwrite-actions)
+5. [Common Patterns](#common-patterns)
+6. [PSI Operations](#psi-operations)
+7. [Code Analysis](#code-analysis)
+8. [Document and Editor Operations](#document-and-editor-operations)
+9. [VFS Operations](#vfs-operations)
+10. [Refactoring Operations](#refactoring-operations)
+11. [Code Completion and Introspection](#code-completion-and-introspection)
+12. [Services and Components](#services-and-components)
+13. [Error Handling](#error-handling)
+14. [Best Practices](#best-practices)
+15. [Quick Reference Card](#quick-reference-card)
+
+---
+
+## Introduction
+
+### What is steroid_execute_code?
+
+`steroid_execute_code` is an MCP tool that executes Kotlin code directly inside IntelliJ IDEA's JVM. Your code runs with full access to:
+
+- **Project model** - modules, dependencies, source roots
+- **PSI (Program Structure Interface)** - parsed code representation
+- **VFS (Virtual File System)** - file access layer
+- **IntelliJ indices** - fast code search and navigation
+- **Editor APIs** - document manipulation, caret position
+- **Refactoring APIs** - automated code transformations
+- **Inspection APIs** - code quality analysis
+
+### Why Use IntelliJ APIs Over File Operations?
+
+| Instead of... | Use IntelliJ API | Why? |
+|--------------|------------------|------|
+| `grep`, `find` | PSI search, Find Usages | Understands code structure, not just text |
+| Reading files with `cat` | VFS and PSI APIs | Respects IDE's caching and encoding |
+| Manual text replacement | Refactoring APIs | Maintains code correctness and formatting |
+| Guessing code structure | Query project model | IDE has already indexed everything |
+
+**The IDE knows the code better than any file search tool.**
+
+### Learning Curve
+
+**Important**: Writing IntelliJ API code may require several attempts. This is normal! The API surface is vast and powerful. Keep trying - each attempt teaches you more about the available APIs.
+
+- Use `printException(msg, throwable)` to see full stack traces
+- Check return types and nullability
+- Use reflection to discover available methods
+- Consult the [IntelliJ Platform SDK docs](https://plugins.jetbrains.com/docs/intellij/)
+
+---
+
+## Execution Model
+
+### Script Structure
+
+Your code is the **suspend function body**. You do NOT need an `execute { }` wrapper.
+
+```kotlin
+// ✓ CORRECT - This is your script
+println("Hello from IntelliJ!")
+val projectName = project.name
+println("Project: $projectName")
+
+// ✗ WRONG - Do not wrap in execute { }
+execute {
+    println("Hello")  // ERROR: execute is not defined
+}
+```
+
+### Script is a Coroutine
+
+The script body runs as a **suspend function**. This means:
+
+- Use coroutine APIs directly (no `runBlocking` needed)
+- Call suspend functions without special wrappers
+- Use `delay()` instead of `Thread.sleep()`
+
+```kotlin
+// ✓ CORRECT - Direct coroutine usage
+delay(1000)
+progress("Step 1 complete")
+
+// ✗ WRONG - Never use runBlocking
+runBlocking {  // ERROR: Causes deadlocks!
+    delay(1000)
+}
+```
+
+### Automatic Smart Mode
+
+`waitForSmartMode()` is called **automatically before your script starts**. You only need to call it again if you trigger indexing mid-script.
+
+```kotlin
+// Smart mode already waited - safe to use indices immediately
+val classes = readAction {
+    JavaPsiFacade.getInstance(project)
+        .findClass("com.example.MyClass", allScope())
+}
+
+// Only call again if you trigger re-indexing
+// (rare - most operations don't trigger indexing)
+```
+
+### Execution Flow
+
+1. **Submit code** via `steroid_execute_code`
+2. **Review phase** (if enabled) - human approval
+3. **Compilation** - Kotlin script engine compiles your code
+   - Fast failure if compilation errors occur
+4. **Execution** - Your script body runs with timeout
+   - Progress messages throttled to 1/second
+   - Context disposed when complete
+5. **Response** - Output returned to MCP client
+
+### Fast Failure
+
+Errors are reported immediately (no waiting for timeout):
+
+- **Script engine not available** → ERROR immediately
+- **Compilation errors** → ERROR with details immediately
+- **Runtime errors** → ERROR with stack trace
+- **Timeout** → Execution cancelled, resources cleaned up
+
+---
+
+## McpScriptContext API Reference
+
+The `McpScriptContext` is the receiver (`this`) of your script body. It provides access to the project, output methods, and utility functions.
+
+**Source**: [`src/main/kotlin/com/jonnyzzz/intellij/mcp/execution/McpScriptContext.kt`](../../kotlin/com/jonnyzzz/intellij/mcp/execution/McpScriptContext.kt)
+
+### Core Properties
+
+```kotlin
+project: Project         // IntelliJ Project instance
+params: JsonElement      // Original tool execution parameters (JSON)
+disposable: Disposable   // Parent Disposable for resource cleanup
+isDisposed: Boolean      // Check if context is disposed
+```
+
+### Output Methods
+
+```kotlin
+// Print space-separated values
+println(vararg values: Any?)
+
+// Serialize to pretty JSON (uses Jackson)
+printJson(obj: Any)
+
+// Report error without failing execution (includes stack trace)
+printException(msg: String, throwable: Throwable)
+
+// Report progress (throttled to 1 message per second)
+progress(message: String)
+
+// Capture IDE screenshot - artifacts saved as screenshot.png, screenshot-tree.md, screenshot-meta.json
+takeIdeScreenshot(fileName: String = "screenshot"): String  // returns execution_id
+```
+
+### Built-in Read/Write Actions (NO IMPORTS NEEDED!)
+
+```kotlin
+// Execute under read lock (for PSI/VFS reads)
+suspend fun <T> readAction(block: () -> T): T
+
+// Execute under write lock (for PSI/VFS writes)
+suspend fun <T> writeAction(block: () -> T): T
+
+// Wait for smart mode + read action in one call
+suspend fun <T> smartReadAction(block: () -> T): T
+```
+
+**Important**: These are **built-in** - you do NOT need to import `readAction` or `writeAction` from IntelliJ Platform!
+
+### Built-in Search Scopes (NO IMPORTS NEEDED!)
+
+```kotlin
+// Project files only (no libraries)
+fun projectScope(): GlobalSearchScope
+
+// Project + libraries
+fun allScope(): GlobalSearchScope
+```
+
+### File Access Helpers
+
+```kotlin
+// Find VirtualFile by absolute path
+fun findFile(path: String): VirtualFile?
+
+// Find PsiFile by absolute path (suspend - uses readAction)
+suspend fun findPsiFile(path: String): PsiFile?
+
+// Find VirtualFile relative to project base path
+fun findProjectFile(relativePath: String): VirtualFile?
+
+// Find PsiFile relative to project base path (suspend - uses readAction)
+suspend fun findProjectPsiFile(relativePath: String): PsiFile?
+```
+
+### IDE Utilities
+
+```kotlin
+// Wait for indexing to complete (called automatically before script starts)
+suspend fun waitForSmartMode()
+
+// Check if daemon code analyzer is currently running
+fun isDaemonRunning(): Boolean
+
+// Wait for highlighting to complete on a file (requires IDE window focus)
+suspend fun waitForDaemonAnalysis(file: VirtualFile, timeout: Duration = 30.seconds): Boolean
+
+// Get highlights after analysis completes (note: requires IDE window focus)
+suspend fun getHighlightsWhenReady(
+    file: VirtualFile,
+    minSeverityValue: Int = HighlightSeverity.WEAK_WARNING.myVal,
+    timeout: Duration = 30.seconds
+): List<HighlightInfo>
+
+// ✓ RECOMMENDED: Run inspections bypassing daemon cache (works regardless of window focus)
+suspend fun runInspectionsDirectly(
+    file: VirtualFile,
+    includeInfoSeverity: Boolean = false
+): Map<String, List<ProblemDescriptor>>
+
+// Disable automatic cancellation when modal dialogs appear
+fun doNotCancelOnModalityStateChange()
+```
+
+### Disposable Hierarchy
+
+The context provides a `disposable` property for resource cleanup:
+
+```kotlin
+// Access the execution's parent Disposable
+val execDisposable = disposable
+
+// Register your own cleanup
+val myResource = Disposer.newDisposable("my-resource")
+Disposer.register(execDisposable, myResource)
+
+// myResource will be disposed when execution completes (success, error, or timeout)
+```
+
+---
+
+## Threading and Read/Write Actions
+
+### IntelliJ Threading Model
+
+IntelliJ Platform has strict threading rules:
+
+1. **EDT (Event Dispatch Thread)** - UI updates only
+2. **Read actions** required for PSI/VFS reads
+3. **Write actions** required for PSI/VFS writes
+4. **Smart mode** required for index-dependent operations
+
+**See**: [IntelliJ Threading Rules](https://plugins.jetbrains.com/docs/intellij/general-threading-rules.html)
+
+### Using Built-in Read Actions
+
+```kotlin
+// ✓ CORRECT - Use built-in readAction (no import needed)
+val psiFile = readAction {
+    PsiManager.getInstance(project).findFile(virtualFile)
+}
+
+// Also correct - but built-in is more convenient
+import com.intellij.openapi.application.readAction
+val psiFile = readAction {
+    PsiManager.getInstance(project).findFile(virtualFile)
+}
+```
+
+### Using Built-in Write Actions
+
+```kotlin
+// ✓ CORRECT - Use built-in writeAction (no import needed)
+writeAction {
+    document.setText("new content")
+}
+
+// For command-wrapped writes (shows in undo stack)
+import com.intellij.openapi.command.WriteCommandAction
+WriteCommandAction.runWriteCommandAction(project) {
+    document.insertString(0, "// Added comment\n")
+}
+```
+
+### Smart Read Actions (Recommended)
+
+Use `smartReadAction` when you need both smart mode and read access:
+
+```kotlin
+// ✓ RECOMMENDED - Combines waitForSmartMode() + readAction in one call
+val classes = smartReadAction {
+    KotlinClassShortNameIndex.get("MyService", project, projectScope())
+}
+
+// Equivalent to:
+waitForSmartMode()
+val classes = readAction {
+    KotlinClassShortNameIndex.get("MyService", project, projectScope())
+}
+```
+
+### Smart Mode vs Dumb Mode
+
+During indexing, the IDE is in "dumb mode" - many APIs are unavailable:
+
+```kotlin
+import com.intellij.openapi.project.DumbService
+
+if (DumbService.isDumb(project)) {
+    println("IDE is indexing - indices not available")
+} else {
+    println("Smart mode - all APIs available")
+}
+```
+
+**Good news**: `waitForSmartMode()` is called automatically before your script starts!
+
+---
+
+## Common Patterns
+
+### Get Project Info
+
+```kotlin
+println("Project: ${project.name}")
+println("Base path: ${project.basePath}")
+```
+
+### Get IDE Log Path
+
+```kotlin
+val logPath = com.intellij.openapi.application.PathManager.getLogPath()
+println("Log: $logPath/idea.log")
+```
+
+### List Plugins
+
+```kotlin
+import com.intellij.ide.plugins.PluginManagerCore
+
+PluginManagerCore.getLoadedPlugins()
+    .filter { it.isEnabled }
+    .forEach { println("${it.name}: ${it.version}") }
+```
+
+### Find Plugin by ID
+
+```kotlin
+import com.intellij.ide.plugins.PluginManagerCore
+
+val plugin = PluginManagerCore.loadedPlugins
+    .find { it.pluginId.idString == "org.jetbrains.kotlin" }
+println("Kotlin plugin: ${plugin?.version}")
+```
+
+### Navigate Project Files
+
+```kotlin
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.vfs.VfsUtil
+
+ProjectRootManager.getInstance(project).contentRoots.forEach { root ->
+    println("Root: ${root.path}")
+    VfsUtil.iterateChildrenRecursively(root, null) { file ->
+        if (file.extension == "kt") println("  ${file.path}")
+        true
+    }
+}
+```
+
+### Check File Type in Project
+
+```kotlin
+import com.intellij.openapi.roots.ProjectFileIndex
+import com.intellij.openapi.vfs.LocalFileSystem
+
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+
+if (vf != null) {
+    val fileIndex = ProjectFileIndex.getInstance(project)
+
+    println("Is in project: ${fileIndex.isInProject(vf)}")
+    println("Is in source: ${fileIndex.isInSource(vf)}")
+    println("Is in test source: ${fileIndex.isInTestSourceContent(vf)}")
+    println("Is in library: ${fileIndex.isInLibraryClasses(vf)}")
+
+    val module = fileIndex.getModuleForFile(vf)
+    println("Module: ${module?.name}")
+}
+```
+
+---
+
+## PSI Operations
+
+PSI (Program Structure Interface) is IntelliJ's parsed representation of source code. It provides a rich API for code analysis and manipulation.
+
+### End-to-End Example: Find Kotlin Class Methods
+
+```kotlin
+import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
+
+// smartReadAction = waitForSmartMode() + readAction { } in one call
+smartReadAction {
+    // Use built-in projectScope() helper
+    val classes = KotlinClassShortNameIndex.get("MyService", project, projectScope())
+
+    if (classes.isEmpty()) {
+        println("No class named 'MyService' found")
+        return@smartReadAction
+    }
+
+    classes.forEach { ktClass ->
+        println("Class: ${ktClass.fqName}")
+        println("File: ${ktClass.containingFile.virtualFile.path}")
+
+        // List all methods
+        ktClass.declarations.filterIsInstance<org.jetbrains.kotlin.psi.KtNamedFunction>()
+            .forEach { method ->
+                val params = method.valueParameters.joinToString { "${it.name}: ${it.typeReference?.text}" }
+                val returnType = method.typeReference?.text ?: "Unit"
+                println("  fun ${method.name}($params): $returnType")
+            }
+    }
+}
+```
+
+### Find Usages
+
+```kotlin
+import com.intellij.psi.search.searches.ReferencesSearch
+import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
+
+// smartReadAction = waitForSmartMode() + readAction
+smartReadAction {
+    // Use built-in projectScope() helper
+    val classes = KotlinClassShortNameIndex.get("MyService", project, projectScope())
+    val targetClass = classes.firstOrNull()
+
+    if (targetClass == null) {
+        println("Class not found")
+        return@smartReadAction
+    }
+
+    // Find all usages using findAll() (returns a Collection)
+    val usages = ReferencesSearch.search(targetClass, projectScope()).findAll()
+
+    println("Found ${usages.size} usages of ${targetClass.name}:")
+    usages.forEach { ref ->
+        val file = ref.element.containingFile.virtualFile.path
+        val offset = ref.element.textOffset
+        println("  $file:$offset")
+    }
+}
+```
+
+### PSI Tree Navigation
+
+```kotlin
+import com.intellij.psi.PsiManager
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.PsiElement
+import com.intellij.openapi.vfs.LocalFileSystem
+
+readAction {
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")
+    val psiFile = PsiManager.getInstance(project).findFile(vf!!)
+
+    // Navigate parent chain
+    val element = psiFile?.findElementAt(100) // element at offset 100
+    var current: PsiElement? = element
+    while (current != null) {
+        println("${current.javaClass.simpleName}: ${current.text.take(50)}")
+        current = current.parent
+    }
+}
+```
+
+### Find Elements by Type
+
+```kotlin
+import com.intellij.psi.PsiManager
+import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.kotlin.psi.KtNamedFunction
+import org.jetbrains.kotlin.psi.KtClass
+
+readAction {
+    val psiFile = findPsiFile("/path/to/file.kt")
+
+    if (psiFile != null) {
+        // Find all functions in file
+        val functions = PsiTreeUtil.findChildrenOfType(psiFile, KtNamedFunction::class.java)
+        functions.forEach { fn ->
+            println("Function: ${fn.name} at line ${fn.textOffset}")
+        }
+
+        // Find all classes
+        val classes = PsiTreeUtil.findChildrenOfType(psiFile, KtClass::class.java)
+        classes.forEach { cls ->
+            println("Class: ${cls.name}")
+        }
+    }
+}
+```
+
+### Java PSI - Find Class by FQN
+
+```kotlin
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.search.GlobalSearchScope
+
+readAction {
+    val facade = JavaPsiFacade.getInstance(project)
+    val psiClass = facade.findClass(
+        "com.example.MyClass",
+        GlobalSearchScope.allScope(project)
+    )
+
+    if (psiClass != null) {
+        println("Found class: ${psiClass.qualifiedName}")
+        println("File: ${psiClass.containingFile.virtualFile.path}")
+
+        // List methods
+        psiClass.methods.forEach { method ->
+            val params = method.parameterList.parameters
+                .joinToString { "${it.name}: ${it.type.presentableText}" }
+            println("  ${method.name}($params): ${method.returnType?.presentableText}")
+        }
+
+        // List fields
+        psiClass.fields.forEach { field ->
+            println("  field ${field.name}: ${field.type.presentableText}")
+        }
+    }
+}
+```
+
+### Find Class Hierarchy
+
+```kotlin
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.searches.ClassInheritorsSearch
+
+readAction {
+    val baseClass = JavaPsiFacade.getInstance(project)
+        .findClass("java.util.List", GlobalSearchScope.allScope(project))
+
+    if (baseClass != null) {
+        // Find all implementations
+        val inheritors = ClassInheritorsSearch.search(
+            baseClass,
+            GlobalSearchScope.projectScope(project),
+            true // include anonymous
+        ).findAll()
+
+        println("Found ${inheritors.size} implementations of ${baseClass.name}")
+        inheritors.take(20).forEach { impl ->
+            println("  ${impl.qualifiedName}")
+        }
+    }
+}
+```
+
+---
+
+## Code Analysis
+
+### Run Inspections Directly (Recommended)
+
+**⚠️ WARNING**: The daemon code analyzer returns stale results if the IDE window is not focused. Always use `runInspectionsDirectly()` for reliable results.
+
+```kotlin
+// ✓ RECOMMENDED - Reliable regardless of window focus
+val file = requireNotNull(findProjectFile("src/main/kotlin/MyClass.kt")) { "File not found" }
+
+val problems = runInspectionsDirectly(file)
+
+if (problems.isEmpty()) {
+    println("No problems found!")
+} else {
+    problems.forEach { (inspectionId, descriptors) ->
+        descriptors.forEach { problem ->
+            val element = problem.psiElement
+            val line = if (element != null) {
+                val doc = com.intellij.psi.PsiDocumentManager.getInstance(project)
+                    .getDocument(element.containingFile)
+                doc?.getLineNumber(element.textOffset)?.plus(1) ?: "?"
+            } else "?"
+            println("[$inspectionId] Line $line: ${problem.descriptionTemplate}")
+        }
+    }
+}
+```
+
+**Parameters:**
+- `file`: VirtualFile to inspect
+- `includeInfoSeverity`: Include INFO-level problems (default: false, only WEAK_WARNING and above)
+
+**Returns:** `Map<String, List<ProblemDescriptor>>` - inspection tool ID to problems found
+
+### Get Errors and Warnings (Daemon-based, requires window focus)
+
+**Note**: This approach may return stale results if the IDE window is not focused. Prefer `runInspectionsDirectly()` for MCP use cases.
+
+```kotlin
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
+import com.intellij.codeInsight.daemon.impl.HighlightInfo
+import com.intellij.lang.annotation.HighlightSeverity
+import com.intellij.psi.PsiManager
+import com.intellij.openapi.vfs.LocalFileSystem
+
+readAction {
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+    val psiFile = PsiManager.getInstance(project).findFile(vf!!)
+    val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)
+
+    if (psiFile != null && document != null) {
+        val highlights = DaemonCodeAnalyzerEx.getInstanceEx(project)
+            .getFileLevelHighlights(project, psiFile)
+
+        highlights.forEach { info ->
+            val severity = info.severity
+            println("[$severity] ${info.description} at ${info.startOffset}")
+        }
+    }
+}
+```
+
+---
+
+## Document and Editor Operations
+
+### Read Document Content
+
+```kotlin
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.vfs.LocalFileSystem
+
+readAction {
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+    val document = FileDocumentManager.getInstance().getDocument(vf!!)
+
+    if (document != null) {
+        println("Lines: ${document.lineCount}")
+        println("Length: ${document.textLength}")
+
+        // Get specific line
+        val lineNum = 5
+        if (lineNum < document.lineCount) {
+            val startOffset = document.getLineStartOffset(lineNum)
+            val endOffset = document.getLineEndOffset(lineNum)
+            println("Line $lineNum: ${document.getText().substring(startOffset, endOffset)}")
+        }
+    }
+}
+```
+
+### Modify Document
+
+**CAUTION: This modifies files on disk!**
+
+```kotlin
+import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.vfs.LocalFileSystem
+
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")
+val document = FileDocumentManager.getInstance().getDocument(vf!!)
+
+if (document != null) {
+    WriteCommandAction.runWriteCommandAction(project) {
+        // Insert at position
+        document.insertString(0, "// Added comment\n")
+
+        // Or replace text
+        // document.replaceString(startOffset, endOffset, "new text")
+
+        // Or delete
+        // document.deleteString(startOffset, endOffset)
+    }
+    println("Document modified")
+}
+```
+
+### Access Current Editor
+
+```kotlin
+import com.intellij.openapi.fileEditor.FileEditorManager
+
+readAction {
+    val editor = FileEditorManager.getInstance(project).selectedTextEditor
+
+    if (editor != null) {
+        val document = editor.document
+        val caretModel = editor.caretModel
+        val selectionModel = editor.selectionModel
+
+        println("Current file: ${editor.virtualFile?.name}")
+        println("Caret offset: ${caretModel.offset}")
+        println("Caret line: ${caretModel.logicalPosition.line}")
+
+        if (selectionModel.hasSelection()) {
+            println("Selected: ${selectionModel.selectedText}")
+        }
+    } else {
+        println("No editor open")
+    }
+}
+```
+
+---
+
+## VFS Operations
+
+### Read File Content
+
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+import java.nio.charset.StandardCharsets
+
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.txt")
+
+if (vf != null && !vf.isDirectory) {
+    val content = String(vf.contentsToByteArray(), StandardCharsets.UTF_8)
+    println("File content (${content.length} chars):")
+    println(content.take(500))
+}
+```
+
+### Refresh a Specific File
+
+Use this only when you know a file changed outside the IDE:
+
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
+
+val path = "/path/to/file.txt"
+val vf = LocalFileSystem.getInstance().refreshAndFindFileByPath(path)
+if (vf != null) {
+    VfsUtil.markDirtyAndRefresh(false, false, false, vf)
+}
+```
+
+### List Directory Contents
+
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+
+val dir = LocalFileSystem.getInstance().findFileByPath("/path/to/directory")
+
+if (dir != null && dir.isDirectory) {
+    dir.children.forEach { child ->
+        val type = if (child.isDirectory) "DIR" else "FILE"
+        println("[$type] ${child.name}")
+    }
+}
+```
+
+### Create File
+
+**CAUTION: This modifies the filesystem!**
+
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+
+writeAction {
+    val parentDir = LocalFileSystem.getInstance().findFileByPath("/path/to/dir")
+    if (parentDir != null) {
+        val newFile = parentDir.createChildData(this, "newfile.txt")
+        newFile.setBinaryContent("Hello, World!".toByteArray())
+        println("Created: ${newFile.path}")
+    }
+}
+```
+
+---
+
+## Refactoring Operations
+
+### Rename Element
+
+**CAUTION: This modifies code!**
+
+```kotlin
+import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.psi.PsiNamedElement
+
+// First find the element to rename in a read action
+val element = readAction {
+    // ... find your PsiElement
+}
+
+if (element is PsiNamedElement) {
+    WriteCommandAction.runWriteCommandAction(project) {
+        element.setName("newName")
+    }
+    println("Renamed to: newName")
+}
+```
+
+### Safe Refactoring with RefactoringFactory
+
+```kotlin
+import com.intellij.refactoring.RefactoringFactory
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.search.GlobalSearchScope
+
+val psiClass = readAction {
+    JavaPsiFacade.getInstance(project)
+        .findClass("com.example.OldName", GlobalSearchScope.projectScope(project))
+}
+
+if (psiClass != null) {
+    val factory = RefactoringFactory.getInstance(project)
+    val rename = factory.createRename(psiClass, "NewName")
+    rename.run()
+    println("Refactoring completed")
+}
+```
+
+---
+
+## Code Completion and Introspection
+
+### Using PsiReference.getVariants() (Simplest)
+
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.psi.PsiManager
+import com.intellij.codeInsight.lookup.LookupElement
+
+val filePath = "/path/to/YourFile.kt"
+val offset = 150  // Position where you want completions
+
+val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
+if (vf == null) {
+    println("File not found")
+    return
+}
+
+val completions = readAction {
+    val psiFile = PsiManager.getInstance(project).findFile(vf)
+    if (psiFile == null) return@readAction emptyArray<Any>()
+
+    val element = psiFile.findElementAt(offset)
+    val reference = element?.reference
+
+    reference?.getVariants() ?: emptyArray()
+}
+
+println("Found ${completions.size} completions:")
+completions.forEach { variant ->
+    when (variant) {
+        is LookupElement -> println("  - ${variant.lookupString}")
+        is String -> println("  - $variant")
+        else -> println("  - ${variant.javaClass.simpleName}: $variant")
+    }
+}
+```
+
+### Introspect a Class - Get All Methods and Fields
+
+```kotlin
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.search.GlobalSearchScope
+
+val className = "com.intellij.openapi.project.Project"
+
+readAction {
+    val psiClass = JavaPsiFacade.getInstance(project)
+        .findClass(className, GlobalSearchScope.allScope(project))
+
+    if (psiClass == null) {
+        println("Class not found: $className")
+        return@readAction
+    }
+
+    println("=== Class: ${psiClass.qualifiedName} ===\n")
+
+    // Get all methods (including inherited)
+    val methods = psiClass.allMethods
+    println("Methods (${methods.size}):")
+    methods
+        .filter { !it.isConstructor }
+        .sortedBy { it.name }
+        .take(30)
+        .forEach { method ->
+            val params = method.parameterList.parameters
+                .joinToString(", ") { "${it.name}: ${it.type.presentableText}" }
+            val returnType = method.returnType?.presentableText ?: "void"
+            println("  ${method.name}($params): $returnType")
+        }
+
+    // Get all fields
+    val fields = psiClass.allFields
+    println("\nFields (${fields.size}):")
+    fields.sortedBy { it.name }.forEach { field ->
+        println("  ${field.name}: ${field.type.presentableText}")
+    }
+}
+```
+
+### Resolve Reference - Find What a Symbol Points To
+
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.psi.PsiManager
+import com.intellij.psi.PsiMethod
+import com.intellij.psi.PsiField
+import com.intellij.psi.PsiClass
+import com.intellij.psi.PsiVariable
+
+val filePath = "/path/to/YourFile.kt"
+val offset = 150  // Put caret on a symbol you want to resolve
+
+val vf = LocalFileSystem.getInstance().findFileByPath(filePath)
+if (vf == null) {
+    println("File not found")
+    return
+}
+
+readAction {
+    val psiFile = PsiManager.getInstance(project).findFile(vf)
+    val element = psiFile?.findElementAt(offset)
+    val reference = element?.parent?.reference ?: element?.reference
+
+    if (reference == null) {
+        println("No reference at offset $offset")
+        return@readAction
+    }
+
+    println("Reference text: ${reference.element.text}")
+
+    val resolved = reference.resolve()
+    if (resolved == null) {
+        println("Could not resolve reference")
+        return@readAction
+    }
+
+    println("Resolved to: ${resolved.javaClass.simpleName}")
+
+    when (resolved) {
+        is PsiMethod -> {
+            println("Method: ${resolved.name}")
+            println("Containing class: ${resolved.containingClass?.qualifiedName}")
+            println("Return type: ${resolved.returnType?.presentableText}")
+            println("Parameters:")
+            resolved.parameterList.parameters.forEach { param ->
+                println("  ${param.name}: ${param.type.presentableText}")
+            }
+        }
+        is PsiField -> {
+            println("Field: ${resolved.name}")
+            println("Type: ${resolved.type.presentableText}")
+            println("Containing class: ${resolved.containingClass?.qualifiedName}")
+        }
+        is PsiClass -> {
+            println("Class: ${resolved.qualifiedName}")
+            println("Is interface: ${resolved.isInterface}")
+        }
+        is PsiVariable -> {
+            println("Variable: ${resolved.name}")
+            println("Type: ${resolved.type.presentableText}")
+        }
+        else -> {
+            println("Resolved element: ${resolved.text?.take(100)}")
+        }
+    }
+}
+```
+
+---
+
+## Services and Components
+
+### Access Project Services
+
+```kotlin
+import com.intellij.openapi.components.service
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.module.ModuleManager
+
+// Project root manager
+val rootManager = ProjectRootManager.getInstance(project)
+println("SDK: ${rootManager.projectSdk?.name}")
+
+// Module manager
+val moduleManager = ModuleManager.getInstance(project)
+moduleManager.modules.forEach { module ->
+    println("Module: ${module.name}")
+}
+
+// Content roots
+rootManager.contentRoots.forEach { root ->
+    println("Content root: ${root.path}")
+}
+
+// Source roots
+rootManager.contentSourceRoots.forEach { src ->
+    println("Source root: ${src.path}")
+}
+```
+
+### Service Access Pattern
+
+```kotlin
+// Project-level service
+val storage = project.service<ExecutionStorage>()
+
+// Application-level service
+val mcpServer = service<SteroidsMcpServer>()
+```
+
+---
+
+## Error Handling
+
+### Use printException for Errors
+
+```kotlin
+try {
+    // risky operation
+    val result = someOperationThatMightFail()
+} catch (e: Exception) {
+    // ✓ RECOMMENDED - includes stack trace in output
+    printException("Operation failed", e)
+}
+```
+
+### Never Catch ProcessCanceledException
+
+```kotlin
+import com.intellij.openapi.progress.ProcessCanceledException
+
+try {
+    // some operation
+} catch (e: ProcessCanceledException) {
+    // ✗ WRONG - Never catch this!
+    throw e  // Always rethrow
+}
+```
+
+---
+
+## Best Practices
+
+### 1. Use smartReadAction for PSI Operations
+
+```kotlin
+// ✓ RECOMMENDED - combines wait + read in one call
+val classes = smartReadAction {
+    KotlinClassShortNameIndex.get("MyClass", project, projectScope())
+}
+
+// Instead of:
+waitForSmartMode()
+val classes = readAction {
+    KotlinClassShortNameIndex.get("MyClass", project, projectScope())
+}
+```
+
+### 2. Use Built-in Helpers
+
+No imports needed for:
+- `readAction`, `writeAction`, `smartReadAction`
+- `projectScope()`, `allScope()`
+- `findPsiFile()`, `findProjectFile()`
+
+### 3. Imports Are Optional
+
+Default imports are provided automatically. Add imports only when needed:
+
+```kotlin
+// ✓ CORRECT - top-level imports when needed
+import com.intellij.psi.PsiManager
+
+val psiFile = readAction {
+    PsiManager.getInstance(project).findFile(virtualFile)
+}
+```
+
+### 4. Prefer IntelliJ APIs Over File Operations
+
+The IDE has indexed everything - use it!
+
+### 5. Use Meaningful task_id
+
+Group related executions with the same `task_id`.
+
+### 6. Report Progress
+
+```kotlin
+progress("Step 1 of 5...")
+delay(1000)
+progress("Step 2 of 5...")
+```
+
+### 7. Use printException for Errors
+
+Includes full stack trace in output.
+
+### 8. Keep Trying
+
+The IntelliJ API has a learning curve - persistence pays off!
+
+### 9. Use runInspectionsDirectly for Code Analysis
+
+More reliable than daemon-based analysis (works even when IDE window is not focused).
+
+### 10. Never Use runBlocking
+
+You're already in a coroutine context!
+
+---
+
+## Quick Reference Card
+
+### Context Properties
+
+```kotlin
+project: Project         // Current project
+params: JsonElement      // Execution parameters
+disposable: Disposable   // For cleanup
+isDisposed: Boolean      // Check if disposed
+```
+
+### Output
+
+```kotlin
+println(vararg values)                 // Print values
+printJson(obj)                         // JSON output
+printException(msg, throwable)         // Error with stack trace
+progress(msg)                          // Progress (throttled)
+takeIdeScreenshot(fileName)            // Capture screenshot
+```
+
+### Read/Write (No imports needed!)
+
+```kotlin
+readAction { }           // Read PSI/VFS
+writeAction { }          // Write PSI/VFS
+smartReadAction { }      // Wait + read
+```
+
+### Scopes (No imports needed!)
+
+```kotlin
+projectScope()           // Project files only
+allScope()               // Project + libraries
+```
+
+### File Access
+
+```kotlin
+findFile(path)                    // VirtualFile by absolute path
+findPsiFile(path)                 // PsiFile by absolute path
+findProjectFile(relativePath)     // VirtualFile by project-relative path
+findProjectPsiFile(relativePath)  // PsiFile by project-relative path
+```
+
+### Code Analysis (Recommended)
+
+```kotlin
+runInspectionsDirectly(file, includeInfoSeverity = false)
+```
+
+### Common Imports
+
+```kotlin
+// PSI
+import com.intellij.psi.PsiManager
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.search.searches.ReferencesSearch
+
+// Java PSI
+import com.intellij.psi.JavaPsiFacade
+
+// Kotlin PSI
+import org.jetbrains.kotlin.psi.KtClass
+import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
+
+// VFS
+import com.intellij.openapi.vfs.LocalFileSystem
+
+// Editor
+import com.intellij.openapi.fileEditor.FileEditorManager
+
+// Commands
+import com.intellij.openapi.command.WriteCommandAction
+```
+
+### Thread Safety
+
+```kotlin
+readAction { }    // For reading PSI/VFS
+writeAction { }   // For writing PSI/VFS
+smartReadAction { } // Wait for indexing + read
+```
+
+### Example: Find and Modify
+
+```kotlin
+import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
+import com.intellij.openapi.command.WriteCommandAction
+
+// Find
+val ktClass = smartReadAction {
+    KotlinClassShortNameIndex.get("MyClass", project, projectScope()).firstOrNull()
+}
+
+// Modify
+if (ktClass != null) {
+    WriteCommandAction.runWriteCommandAction(project) {
+        ktClass.setName("MyNewClass")
+    }
+}
+```
+
+---
+
+**End of Guide**
+
+For more examples, see the MCP resources:
+- `mcp-steroid://lsp/overview` - LSP-like examples
+- `mcp-steroid://ide/overview` - IDE power operations
+- `mcp-steroid://debugger/overview` - Debugger examples
+
+**IntelliJ Platform SDK**: https://plugins.jetbrains.com/docs/intellij/
+**Source Code**: https://github.com/JetBrains/intellij-community

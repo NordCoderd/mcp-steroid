@@ -132,20 +132,34 @@ Send input events (keyboard + mouse) using a sequence string.
 - Input focuses the screenshot window before dispatching events.
 
 ### `steroid_execute_code`
-Execute Kotlin code in IntelliJ's runtime.
+Executes Kotlin code in the IntelliJ IDE's runtime context.
 
 **Parameters:**
-- `project_name` (required): Target project from `steroid_list_projects`
-- `code` (required): Kotlin suspend function body
-- `reason` (required): Human-readable explanation
-- `task_id` (required): Group related executions
+- `project_name` (required): Target project name from `steroid_list_projects`
+- `code` (required): Kotlin suspend function body to execute
+- `task_id` (required): Identifier to group related executions
+- `reason` (required): Human-readable execution reason
 - `timeout` (optional): Timeout in seconds (default: 60)
-- `required_plugins` (optional): List of required plugin IDs (example: `com.intellij.database`)
+- `required_plugins` (optional): List of required plugin IDs (e.g., `["com.intellij.database"]`)
 
-**Extras:**
-- Inside the script body, call `takeIdeScreenshot()` to attach an `image/png` payload to the response.
-- Artifacts are saved as `screenshot.png`, `screenshot-tree.md`, and `screenshot-meta.json`.
-- The `fileName` argument is ignored to keep filenames stable.
+**Execution Model:**
+- Synchronous request-response - blocks until completion
+- Progress notifications sent via MCP progress protocol
+- No polling required - output returned in response
+- Returns `execution_id` for use with `steroid_execute_feedback`
+
+**Response:**
+- Text content with script output (stdout, progress messages)
+- Error message on failure
+
+**Runtime Context:**
+- Code runs in IDE's JVM with full IntelliJ Platform API access
+- `McpScriptContext` is the receiver (`this`)
+- `waitForSmartMode()` called automatically before execution
+- Use `readAction`/`writeAction` for PSI/VFS access
+- Call `takeIdeScreenshot()` to attach IDE screenshot to response
+
+**For detailed coding guide, see:** `mcp-steroid://coding-with-intellij`
 
 ### `steroid_execute_feedback`
 Rate execution results. Use after `steroid_execute_code`.
@@ -179,6 +193,7 @@ This server exposes built-in resources through the MCP resource APIs. These are 
 
 **Key resources provided by this server:**
 - `mcp-steroid://skill/intellij-api-poweruser-guide` - This guide as a resource.
+- `mcp-steroid://coding-with-intellij` - Comprehensive guide for writing IntelliJ API code (execution model, patterns, examples).
 - `mcp-steroid://skill/debugger-guide` - Debugger-focused skill guide (breakpoints, sessions, threads).
 - `mcp-steroid://lsp/overview` - Overview of LSP-like examples and how to use them.
 - `mcp-steroid://lsp/<id>` - Runnable Kotlin scripts (e.g., `go-to-definition`, `find-references`, `rename`, `code-action`, `signature-help`).
