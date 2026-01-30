@@ -1,8 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
@@ -13,25 +11,21 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Resource metadata (name, description) is dynamically parsed from
  * KDoc comments in the .md files.
  */
-@Service(Service.Level.APP)
 class TestExamplesResourceHandler : McpRegistrar {
+    private val RESOURCE_DIR = "/test-examples"
+    private val OVERVIEW_FILE = "TEST_OVERVIEW.md"
 
-    companion object {
-        private const val RESOURCE_DIR = "/test-examples"
-        private const val OVERVIEW_FILE = "TEST_OVERVIEW.md"
-
-        private val EXAMPLE_FILES = listOf(
-            "list-run-configurations.md",
-            "run-tests.md",
-            "wait-for-completion.md",
-            "inspect-test-results.md",
-            "test-tree-navigation.md",
-            "test-statistics.md",
-            "test-failure-details.md",
-            "find-recent-test-run.md",
-                    "demo-debug-test.md",
-)
-    }
+    private val EXAMPLE_FILES = listOf(
+        "list-run-configurations.md",
+        "run-tests.md",
+        "wait-for-completion.md",
+        "inspect-test-results.md",
+        "test-tree-navigation.md",
+        "test-statistics.md",
+        "test-failure-details.md",
+        "find-recent-test-run.md",
+        "demo-debug-test.md",
+    )
 
     /** Dynamically loaded examples with metadata parsed from KDoc comments */
     val examples: List<DynamicResource> by lazy {
@@ -104,5 +98,3 @@ class TestExamplesResourceHandler : McpRegistrar {
         }
     }
 }
-
-inline val testExamplesResourceHandler: TestExamplesResourceHandler get() = service()

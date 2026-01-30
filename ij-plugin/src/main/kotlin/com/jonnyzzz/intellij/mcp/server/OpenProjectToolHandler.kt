@@ -5,7 +5,6 @@ import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.project.ex.ProjectManagerEx
@@ -14,7 +13,6 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.mcp.builder
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
@@ -38,10 +36,7 @@ import java.nio.file.Path
  * The tool can optionally trust the project path before opening, which allows skipping
  * the trust dialog.
  */
-@Service(Service.Level.APP)
-class OpenProjectToolHandler(
-    private val coroutineScope: CoroutineScope
-) : McpRegistrar {
+class OpenProjectToolHandler : McpRegistrar {
     private val log = thisLogger()
     private val toolDescription = """
         Open a project in the IDE. This tool initiates the project opening process and returns quickly.
@@ -106,9 +101,9 @@ class OpenProjectToolHandler(
         val args = context.params.arguments ?: return errorResult("Missing arguments")
         val projectPathStr = args["project_path"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: project_path")
-        val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
+        args["task_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: task_id")
-        val reason = args["reason"]?.jsonPrimitive?.contentOrNull
+        args["reason"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: reason")
         val trustProject = args["trust_project"]?.jsonPrimitive?.boolean ?: true
 

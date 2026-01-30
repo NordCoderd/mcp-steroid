@@ -12,7 +12,8 @@ import com.intellij.openapi.actionSystem.impl.PresentationFactory
 import com.intellij.openapi.actionSystem.impl.Utils
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.Service
+import com.intellij.openapi.editor.Document
+import com.intellij.openapi.editor.ScrollType
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.DumbService
@@ -22,32 +23,13 @@ import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileManager
-import com.intellij.openapi.editor.Document
-import com.intellij.openapi.editor.ScrollType
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
-import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.mcp.McpJson
-import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
+import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.intOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 import java.nio.file.Path
 import kotlin.coroutines.resume
 
@@ -117,7 +99,6 @@ data class GutterIconInfo(
 /**
  * Handler for the steroid_action_discovery MCP tool.
  */
-@Service(Service.Level.APP)
 class ActionDiscoveryToolHandler : McpRegistrar {
     override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
@@ -268,15 +249,12 @@ class ActionDiscoveryToolHandler : McpRegistrar {
     }
 
     private fun parseActionGroups(array: JsonArray?): List<String> {
-        if (array == null) {
-            return listOf(IdeActions.GROUP_EDITOR_POPUP, IdeActions.GROUP_EDITOR_GUTTER)
-        }
+        array ?: return listOf(IdeActions.GROUP_EDITOR_POPUP, IdeActions.GROUP_EDITOR_GUTTER)
         val groups = array
-            ?.mapNotNull { it.jsonPrimitive.contentOrNull }
-            ?.map { it.trim() }
-            ?.filter { it.isNotEmpty() }
-            ?.distinct()
-            ?: emptyList()
+            .mapNotNull { it.jsonPrimitive.contentOrNull }
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
         return groups
     }
 

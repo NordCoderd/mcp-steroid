@@ -5,7 +5,6 @@ import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.server.ActionDiscoveryResponse
-import com.jonnyzzz.intellij.mcp.server.CapabilitiesResponse
 import com.jonnyzzz.intellij.mcp.server.ListProjectsResponse
 import com.jonnyzzz.intellij.mcp.server.ListWindowsResponse
 import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
@@ -212,42 +211,6 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertNull("Initialize should not return error", initRpc.error)
 
         return sessionId!!
-    }
-
-    fun testCapabilitiesToolListsPlugins(): Unit = timeoutRunBlocking(30.seconds) {
-        val server = SteroidsMcpServer.getInstance()
-        server.startServerIfNeeded()
-        val sessionId = startSession(server)
-
-        val capabilitiesResponse = client.post(server.mcpUrl) {
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Application.Json)
-            header(McpHttpTransport.SESSION_HEADER, sessionId)
-            setBody(
-                buildJsonObject {
-                    put("jsonrpc", "2.0")
-                    put("id", "capabilities-1")
-                    put("method", "tools/call")
-                    putJsonObject("params") {
-                        put("name", "steroid_capabilities")
-                    }
-                }.toString()
-            )
-        }
-
-        assertEquals(HttpStatusCode.OK, capabilitiesResponse.status)
-        val capabilitiesRpc = McpJson.decodeFromString<JsonRpcResponse>(capabilitiesResponse.bodyAsText())
-        assertNull("steroid_capabilities should return result payload", capabilitiesRpc.error)
-        val capabilitiesResult = McpJson.decodeFromJsonElement<ToolCallResult>(capabilitiesRpc.result!!)
-        assertFalse("steroid_capabilities should succeed", capabilitiesResult.isError)
-        val payload = (capabilitiesResult.content.single() as ContentItem.Text).text
-        val capabilities = McpJson.decodeFromString<CapabilitiesResponse>(payload)
-        assertTrue("Should report IDE info", capabilities.ide.name.isNotBlank())
-        assertTrue("Should report plugins", capabilities.plugins.isNotEmpty())
-        assertTrue(
-            "Should include Java plugin",
-            capabilities.plugins.any { it.id == "com.intellij.java" && it.enabled }
-        )
     }
 
     fun testActionDiscoveryToolReturnsContext(): Unit = timeoutRunBlocking(30.seconds) {

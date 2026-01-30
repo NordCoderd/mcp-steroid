@@ -1,19 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
  * Handler for the IntelliJ Test Runner skill guide resource.
  */
-@Service(Service.Level.APP)
 class TestSkillResourceHandler : McpRegistrar {
-
-    companion object {
-        private const val SKILL_RESOURCE_PATH = "/skill/TEST_SKILL.md"
-    }
+    private val SKILL_RESOURCE_PATH = "/skill/TEST_SKILL.md"
 
     private val resourceUri = "mcp-steroid://skill/test-runner-guide"
     private val resourceName = "IntelliJ Test Runner Skill Guide"
@@ -49,5 +43,3 @@ class TestSkillResourceHandler : McpRegistrar {
 
     fun loadSkillMd(): String = skillContent
 }
-
-inline val testSkillResourceHandler: TestSkillResourceHandler get() = service()

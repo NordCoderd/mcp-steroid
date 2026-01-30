@@ -2,7 +2,6 @@
 package com.jonnyzzz.intellij.mcp.server
 
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.ProjectManager
 import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
@@ -15,7 +14,6 @@ import kotlinx.serialization.json.putJsonObject
 /**
  * Handler for the steroid_list_projects MCP tool.
  */
-@Service(Service.Level.APP)
 class ListProjectsToolHandler : McpRegistrar {
 
     override fun register(server: McpServerCore) {

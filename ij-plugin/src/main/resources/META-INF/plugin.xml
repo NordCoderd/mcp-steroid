@@ -58,7 +58,6 @@
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ListWindowsToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ExecuteCodeToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ExecuteFeedbackToolHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.CapabilitiesToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ActionDiscoveryToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionScreenshotToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionInputToolHandler"/>

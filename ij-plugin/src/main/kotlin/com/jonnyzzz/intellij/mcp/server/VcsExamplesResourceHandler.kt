@@ -1,15 +1,12 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
  * Handler for VCS (Version Control System) example resources.
  * Provides code snippets for Git annotations, history, and other VCS operations.
  */
-@Service(Service.Level.APP)
 class VcsExamplesResourceHandler : McpRegistrar {
 
     data class VcsExample(
@@ -96,5 +93,3 @@ class VcsExamplesResourceHandler : McpRegistrar {
             ?: error("VCS example resource is not found: $resourceFile")
     }
 }
-
-inline val vcsExamplesResourceHandler: VcsExamplesResourceHandler get() = service()

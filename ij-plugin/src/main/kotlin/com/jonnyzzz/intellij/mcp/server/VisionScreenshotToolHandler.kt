@@ -2,28 +2,16 @@
 package com.jonnyzzz.intellij.mcp.server
 
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.ProjectManager
-import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
-import com.jonnyzzz.intellij.mcp.mcp.builder
+import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import com.jonnyzzz.intellij.mcp.vision.VisionService
-import kotlinx.serialization.json.add
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
-import kotlinx.serialization.json.putJsonObject
-import java.util.Base64
+import kotlinx.serialization.json.*
+import java.util.*
 
 /**
  * Handler for the steroid_take_screenshot MCP tool.
  */
-@Service(Service.Level.APP)
 class VisionScreenshotToolHandler : McpRegistrar {
     private val toolDescription = """
         Capture a screenshot of the IDE and return an image payload.

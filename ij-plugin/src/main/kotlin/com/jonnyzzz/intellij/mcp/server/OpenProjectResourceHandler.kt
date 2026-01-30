@@ -1,8 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
@@ -11,7 +9,6 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  *
  * Resources are registered under the URI scheme `mcp-steroid://open-project/`.
  */
-@Service(Service.Level.APP)
 class OpenProjectResourceHandler : McpRegistrar {
 
     /**
@@ -116,5 +113,3 @@ class OpenProjectResourceHandler : McpRegistrar {
             ?: error("Open project example resource is not found: $resourceFile")
     }
 }
-
-inline val openProjectResourceHandler: OpenProjectResourceHandler get() = service()

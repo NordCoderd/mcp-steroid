@@ -1,8 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
@@ -13,22 +11,18 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Resource metadata (name, description) is dynamically parsed from
  * KDoc comments in the .kts files.
  */
-@Service(Service.Level.APP)
 class DebuggerExamplesResourceHandler : McpRegistrar {
+    private val RESOURCE_DIR = "/debugger-examples"
+    private val OVERVIEW_FILE = "DEBUGGER_OVERVIEW.md"
 
-    companion object {
-        private const val RESOURCE_DIR = "/debugger-examples"
-        private const val OVERVIEW_FILE = "DEBUGGER_OVERVIEW.md"
-
-        private val EXAMPLE_FILES = listOf(
-            "set-line-breakpoint.kts",
-            "debug-run-configuration.kts",
-            "debug-session-control.kts",
-            "debug-list-threads.kts",
-            "debug-thread-dump.kts",
-                    "demo-debug-test.kts",
-)
-    }
+    private val EXAMPLE_FILES = listOf(
+        "set-line-breakpoint.kts",
+        "debug-run-configuration.kts",
+        "debug-session-control.kts",
+        "debug-list-threads.kts",
+        "debug-thread-dump.kts",
+        "demo-debug-test.kts",
+    )
 
     /** Dynamically loaded examples with metadata parsed from KDoc comments */
     val examples: List<DynamicResource> by lazy {
@@ -101,5 +95,3 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
         }
     }
 }
-
-inline val debuggerExamplesResourceHandler: DebuggerExamplesResourceHandler get() = service()

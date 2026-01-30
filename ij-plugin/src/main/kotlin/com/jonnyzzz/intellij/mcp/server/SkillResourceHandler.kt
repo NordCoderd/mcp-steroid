@@ -9,9 +9,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Handler for the IntelliJ API Power User Guide resource.
  * Serves the SKILL.md content as an MCP resource.
  */
-@Service(Service.Level.APP)
 class SkillResourceHandler : McpRegistrar {
-
     val resourceUri = "mcp-steroid://skill/intellij-api-poweruser-guide"
     val resourceName = "IntelliJ API Power User Guide"
 
@@ -35,10 +33,13 @@ class SkillResourceHandler : McpRegistrar {
             name = resourceName,
             description = resourceDescription,
             mimeType = "text/markdown",
-            contentProvider = ::loadSkillMd
+            contentProvider = { skillResourceHandler.loadSkillMd() }
         )
     }
+}
 
+@Service(Service.Level.APP)
+class SkillResource {
     /**
      * Load the SKILL.md content from resources.
      * Can be used by both MCP resource and HTTP endpoints.
@@ -65,4 +66,5 @@ class SkillResourceHandler : McpRegistrar {
     }
 }
 
-inline val skillResourceHandler: SkillResourceHandler get() = service()
+inline val skillResourceHandler: SkillResource get() = service()
+

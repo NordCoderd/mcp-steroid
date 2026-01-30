@@ -4,17 +4,11 @@ package com.jonnyzzz.intellij.mcp.server
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.wm.IdeFrame
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.ex.StatusBarEx
-import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.mcp.McpJson
-import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallParams
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
+import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
 import com.jonnyzzz.intellij.mcp.vision.WindowIdUtil
 import kotlinx.coroutines.Dispatchers
@@ -29,7 +23,6 @@ import javax.swing.SwingUtilities
 /**
  * Handler for the steroid_list_windows MCP tool.
  */
-@Service(Service.Level.APP)
 class ListWindowsToolHandler : McpRegistrar {
     override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
@@ -63,7 +56,7 @@ class ListWindowsToolHandler : McpRegistrar {
                 val bounds = window?.bounds
 
                 // Collect progress tasks from the status bar using new ProgressModel API
-                val statusBar = (frame as? IdeFrame)?.statusBar as? StatusBarEx
+                val statusBar = frame.statusBar as? StatusBarEx
                 statusBar?.let { bar ->
                     val tasks = bar.backgroundProcessModels
                     tasks.forEach { pair ->
@@ -185,7 +178,7 @@ data class ProgressTaskInfo(
     val fraction: Double?,
     /** True if progress is indeterminate (no percentage) */
     val isIndeterminate: Boolean,
-    /** True if the task can be cancelled */
+    /** True if the task can be canceled */
     val isCancellable: Boolean,
     /** Project name this task belongs to (if known) */
     val projectName: String?

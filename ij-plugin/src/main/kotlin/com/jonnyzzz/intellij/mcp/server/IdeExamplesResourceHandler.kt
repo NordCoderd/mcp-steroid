@@ -1,8 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
@@ -13,37 +11,33 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Resource metadata (name, description) is dynamically parsed from
  * KDoc comments in the .kts files.
  */
-@Service(Service.Level.APP)
 class IdeExamplesResourceHandler : McpRegistrar {
+    private val RESOURCE_DIR = "/ide-examples"
 
-    companion object {
-        private const val RESOURCE_DIR = "/ide-examples"
-
-        /** List of example file names in the ide-examples directory */
-        private val EXAMPLE_FILES = listOf(
-            "extract-method.kts",
-            "introduce-variable.kts",
-            "inline-method.kts",
-            "change-signature.kts",
-            "move-file.kts",
-            "safe-delete.kts",
-            "optimize-imports.kts",
-            "generate-override.kts",
-            "inspect-and-fix.kts",
-            "hierarchy-search.kts",
-            "call-hierarchy.kts",
-            "run-configuration.kts",
-            "demo-debug-test.kts",
-            "pull-up-members.kts",
-            "push-down-members.kts",
-            "extract-interface.kts",
-            "move-class.kts",
-            "generate-constructor.kts",
-            "project-dependencies.kts",
-            "inspection-summary.kts",
-            "project-search.kts",
-        )
-    }
+    /** List of example file names in the ide-examples directory */
+    private val EXAMPLE_FILES = listOf(
+        "extract-method.kts",
+        "introduce-variable.kts",
+        "inline-method.kts",
+        "change-signature.kts",
+        "move-file.kts",
+        "safe-delete.kts",
+        "optimize-imports.kts",
+        "generate-override.kts",
+        "inspect-and-fix.kts",
+        "hierarchy-search.kts",
+        "call-hierarchy.kts",
+        "run-configuration.kts",
+        "demo-debug-test.kts",
+        "pull-up-members.kts",
+        "push-down-members.kts",
+        "extract-interface.kts",
+        "move-class.kts",
+        "generate-constructor.kts",
+        "project-dependencies.kts",
+        "inspection-summary.kts",
+        "project-search.kts",
+    )
 
     /** Dynamically loaded examples with metadata parsed from KDoc comments */
     val examples: List<DynamicResource> by lazy {
@@ -92,5 +86,3 @@ class IdeExamplesResourceHandler : McpRegistrar {
             ?: error("IDE example resource not found: $resourceFile")
     }
 }
-
-inline val ideExamplesResourceHandler: IdeExamplesResourceHandler get() = service()

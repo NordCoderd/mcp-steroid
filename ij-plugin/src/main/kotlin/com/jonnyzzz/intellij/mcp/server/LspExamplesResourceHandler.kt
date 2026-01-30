@@ -1,8 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 
 /**
@@ -10,7 +8,6 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
  * Each example is a complete Kotlin script demonstrating how to implement
  * a common LSP method using IntelliJ Platform APIs.
  */
-@Service(Service.Level.APP)
 class LspExamplesResourceHandler : McpRegistrar {
 
     /**
@@ -236,5 +233,3 @@ class LspExamplesResourceHandler : McpRegistrar {
             ?: error("LSP example resource is not found: $resourceFile")
     }
 }
-
-inline val lspExamplesResourceHandler: LspExamplesResourceHandler get() = service()

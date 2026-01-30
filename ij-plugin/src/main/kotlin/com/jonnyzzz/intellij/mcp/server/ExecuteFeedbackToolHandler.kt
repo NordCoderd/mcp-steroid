@@ -2,12 +2,9 @@
 package com.jonnyzzz.intellij.mcp.server
 
 import com.intellij.openapi.application.readAction
-import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.ProjectManager.getInstance
-import com.jonnyzzz.intellij.mcp.execution.CodeButcher
-import com.jonnyzzz.intellij.mcp.execution.codeButcher
 import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallParams
