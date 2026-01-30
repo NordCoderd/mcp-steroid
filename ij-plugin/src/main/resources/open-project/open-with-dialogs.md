@@ -99,7 +99,7 @@ The Trust Project dialog has these buttons:
 ← Input delivered
 
 → steroid_list_projects()
-← {"projects":[{"name":"untrusted-project","path":"/path/to/untrusted-project"}, ...]}
+← {"ide":{"name":"IntelliJ IDEA","version":"2025.3.2","build":"IU-253.30387.160"},"projects":[{"name":"untrusted-project","path":"/path/to/untrusted-project"}, ...]}
 ```
 
 ## When to Use This Approach

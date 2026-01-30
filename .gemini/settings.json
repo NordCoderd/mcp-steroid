@@ -1,7 +1,11 @@
 {
   "mcpServers": {
     "intellij-steroid": {
-      "url": "http://localhost:6315/mcp",
+      "url": "http://localhost:6316/mcp",
+      "type": "http"
+    },
+    "rider-steroid": {
+      "url": "http://localhost:6316/mcp",
       "type": "http"
     }
   }

@@ -99,6 +99,9 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertFalse("steroid_list_projects should succeed", listProjectsResult.isError)
         val projectsPayload = (listProjectsResult.content.single() as ContentItem.Text).text
         val projects = McpJson.decodeFromString<ListProjectsResponse>(projectsPayload)
+        assertTrue("IDE name should be reported", projects.ide.name.isNotBlank())
+        assertTrue("IDE version should be reported", projects.ide.version.isNotBlank())
+        assertTrue("IDE build should be reported", projects.ide.build.isNotBlank())
         assertTrue(
             "Current project should be discoverable via MCP tool",
             projects.projects.any { it.name == project.name }

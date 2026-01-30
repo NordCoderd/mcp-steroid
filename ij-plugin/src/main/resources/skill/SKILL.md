@@ -38,7 +38,7 @@ Execute Kotlin code directly in IntelliJ IDEA's runtime with full access to the 
 **Example session:**
 ```
 → steroid_list_projects
-← {"projects":[{"name":"my-app","path":"/path/to/my-app"}]}
+← {"ide":{"name":"IntelliJ IDEA","version":"2025.3.2","build":"IU-253.30387.160"},"projects":[{"name":"my-app","path":"/path/to/my-app"}]}
 
 → steroid_execute_code(project_name="my-app", code="println(project.name)", ...)
 ← "my-app"
@@ -62,7 +62,7 @@ The IDE has indexed everything. It knows the code better than any file search.
 ## Available Tools
 
 ### `steroid_list_projects`
-List all open projects. Returns project names for use with `steroid_execute_code`.
+List all open projects. Returns IDE metadata and project names for use with `steroid_execute_code`.
 
 ### `steroid_list_windows`
 List open IDE windows and their associated projects. Some windows may not be tied to a project and a project can have multiple windows.

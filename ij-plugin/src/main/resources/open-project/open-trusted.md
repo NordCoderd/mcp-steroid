@@ -47,6 +47,11 @@ Expected response includes your project:
 
 ```json
 {
+  "ide": {
+    "name": "IntelliJ IDEA",
+    "version": "2025.3.2",
+    "build": "IU-253.30387.160"
+  },
   "projects": [
     {"name": "your-project", "path": "/absolute/path/to/your/project"}
   ]
@@ -78,7 +83,7 @@ Now you can use `steroid_execute_code` with the project:
 → [wait 3 seconds]
 
 → steroid_list_projects()
-← {"projects":[{"name":"my-app","path":"/Users/me/projects/my-app"}]}
+← {"ide":{"name":"IntelliJ IDEA","version":"2025.3.2","build":"IU-253.30387.160"},"projects":[{"name":"my-app","path":"/Users/me/projects/my-app"}]}
 
 → steroid_execute_code(project_name="my-app", code="println(project.basePath)", ...)
 ← /Users/me/projects/my-app

@@ -32,12 +32,12 @@ data class ExecCodeParams(
  */
 class ExecuteCodeToolHandler : McpRegistrar {
     private val toolDescription get() = """
-             Execute Kotlin code directly in IntelliJ's runtime with full API access.
+             WHAT: Finally SEE IntelliJ-based IDEs - not just read code. The only MCP server with visual understanding and full IDE control.
+             HOW: Execute Kotlin code directly in IntelliJ's runtime with full API access. 
 
              📖 **COMPLETE GUIDE**: [Coding with IntelliJ APIs](mcp-steroid://coding-with-intellij)
 
-             This is a stateful API - everything you do changes the IDE state. The IDE is running
-             exclusively for you. Use it aggressively instead of manual file operations.
+             This is a **stateful** API - everything you do changes the IDE state. The IntelliJ IDE is running exclusively for you. Use it aggressively instead of manual file operations.
 
              **Quick Start:**
              - Your code is a suspend function body (never use runBlocking)
@@ -75,6 +75,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - 🧪 [Test Runner Guide](mcp-steroid://skill/test-runner-guide) - Test execution
 
              IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
+
              💡 Call steroid_execute_feedback after execution to rate success
          """.trim().lines().joinToString("\n") { it.trim() }
 

@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.intellij.mcp.server
 
+import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.ProjectManager
 import com.jonnyzzz.intellij.mcp.mcp.*
@@ -49,7 +50,15 @@ class ListProjectsToolHandler : McpRegistrar {
             )
         }
 
-        val response = ListProjectsResponse(projects)
+        val appInfo = ApplicationInfo.getInstance()
+        val response = ListProjectsResponse(
+            ide = IdeInfo(
+                name = appInfo.fullApplicationName,
+                version = appInfo.fullVersion,
+                build = appInfo.build.asString()
+            ),
+            projects = projects
+        )
         val json = McpJson.encodeToString(ListProjectsResponse.serializer(), response)
 
         return ToolCallResult(
@@ -59,7 +68,17 @@ class ListProjectsToolHandler : McpRegistrar {
 }
 
 @Serializable
-data class ListProjectsResponse(val projects: List<ProjectInfo>)
+data class ListProjectsResponse(
+    val ide: IdeInfo,
+    val projects: List<ProjectInfo>
+)
+
+@Serializable
+data class IdeInfo(
+    val name: String,
+    val version: String,
+    val build: String
+)
 
 @Serializable
 data class ProjectInfo(

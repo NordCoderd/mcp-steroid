@@ -477,6 +477,121 @@ matchingActions.take(20).forEach { actionId ->
 println("Total matching actions: ${matchingActions.size}")
 ```
 
+## Working with Rider and C# Projects
+
+MCP Steroid fully supports JetBrains Rider for C# and .NET development. All `steroid_*` tools work with Rider projects.
+
+### Key Differences from Java/Kotlin
+
+1. **Language Support**: Rider uses ReSharper for C# language features (PSI, inspections, refactorings).
+2. **Project Model**: Solutions (`.sln`) and projects (`.csproj`) instead of Gradle/Maven.
+3. **PSI Structure**: C# PSI trees use different element types than Java/Kotlin.
+4. **File Types**: Primary files are `.cs`, `.csproj`, and `.sln`.
+
+### Rider-Specific Tools
+
+All MCP Steroid tools work identically in Rider:
+- `steroid_execute_code` - Execute Kotlin scripts with full Rider API access
+- `steroid_list_projects` - Lists open C# solutions
+- `steroid_list_windows` - Works with Rider windows
+- `steroid_take_screenshot` - Capture Rider UI
+- `steroid_input` - Interact with Rider
+- `steroid_action_discovery` - Discover Rider-specific actions
+- `steroid_open_project` - Open C# solutions
+
+### C# File Operations
+
+Read a C# file:
+
+```kotlin
+import com.intellij.openapi.application.readAction
+import com.intellij.psi.PsiManager
+
+val file = findProjectFile("src/Example.cs")
+if (file != null) {
+    val text = readAction { PsiManager.getInstance(project).findFile(file)?.text }
+    println(text)
+} else {
+    println("File not found")
+}
+```
+
+List C# files:
+
+```kotlin
+val csFiles = findProjectFiles("**/*.cs")
+csFiles.forEach { println(it.path) }
+```
+
+Open a C# file in the editor:
+
+```kotlin
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
+
+val file = findProjectFile("src/Example.cs")
+if (file != null) {
+    FileEditorManager.getInstance(project).openTextEditor(OpenFileDescriptor(project, file), true)
+    println("Opened Example.cs in editor")
+}
+```
+
+### ReSharper Integration
+
+Rider integrates ReSharper for C# language features. Key points:
+- Standard IntelliJ PSI APIs work for basic operations
+- Some advanced features may require ReSharper-specific APIs
+- Refactoring and inspections use ReSharper backend services
+
+### Common Gotchas
+
+1. **Solution Structure**: Rider uses `.sln` files; use `project.basePath` for the solution root
+2. **File Extensions**: Filter for `"*.cs"` instead of `"*.java"` or `"*.kt"`
+3. **PSI Classes**: C# PSI elements have different class names
+4. **Project Model**: Modules in Rider map to `.csproj` projects
+
+### Example: Creating a C# Class
+
+```kotlin
+import com.intellij.openapi.application.readAction
+import com.intellij.openapi.application.writeAction
+import com.intellij.openapi.vfs.VfsUtil
+import java.nio.file.Path
+
+val projectPath = Path.of(requireNotNull(project.basePath))
+val projectDir = readAction {
+    VfsUtil.findFileByIoFile(projectPath.toFile(), true)
+}
+
+writeAction {
+    val src = projectDir?.findChild("src") ?: projectDir?.createChildDirectory(this, "src")
+    val csFile = src?.createChildData(this, "Example.cs")
+    csFile?.setBinaryContent(
+        """
+        using System;
+
+        namespace MyNamespace
+        {
+            public class Example
+            {
+                public static void Main(string[] args)
+                {
+                    Console.WriteLine("Hello from MCP Steroid!");
+                }
+            }
+        }
+        """.trimIndent().toByteArray()
+    )
+}
+
+println("Created src/Example.cs")
+```
+
+### Further Reading
+
+- [C# Examples for Rider](docs/rider-integration/CSHARP-EXAMPLES.md)
+- [Rider Plugin Development](https://plugins.jetbrains.com/docs/intellij/rider.html)
+
 ## Error Handling
 
 Always handle errors gracefully:
