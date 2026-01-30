@@ -4,19 +4,36 @@
     <vendor>jonnyzzz.com</vendor>
 
     <description><![CDATA[
-    MCP Steroid is an MCP Server that brings all IntelliJ-based IDE
-    features to AI Agents, just the same way what IntelliJ brings
-    to developers.
-    <br /><br />
-    The plugin uses an alternative approach and allows your AI Agent to
-    interact with IntelliJ-based IDE via IntelliJ API directly.
-    <br /><br />
-    <b>Demo: CodeDozer & IntelliJ Debugger</b>
+    <p><strong>MCP Steroid</strong> brings the full power of the IntelliJ Platform to AI agents through the Model Context Protocol (MCP).</p>
+
+    <p><b>IntelliJ platform works for AI agents as great as for human developers.</b></p>
+
+    <p>MCP Steroid is an independent research project by Eugene Petrenko (jonnyzzz). Not affiliated with, endorsed by, or supported by JetBrains s.r.o.</p>
+
+    <h3>What You Get</h3>
+    <ul>
+        <li><b>9 MCP Tools:</b> Control IntelliJ IDEA programmatically - execute code, take screenshots, discover actions, debug, and more</li>
+        <li><b>58 MCP Resources:</b> Comprehensive guides covering LSP, IDE operations, debugger, tests, VCS, and more</li>
+        <li><b>Vision Capabilities:</b> AI agents can see your IDE with screenshots and OCR (unique to MCP Steroid)</li>
+        <li><b>Deep Integration:</b> Access PSI, inspections, refactorings, and full IntelliJ Platform API</li>
+        <li><b>Human Oversight:</b> Review and approve code execution with configurable safety controls</li>
+    </ul>
+
+    <h3>Why MCP Steroid?</h3>
+    <p>Unlike LSP-only solutions, MCP Steroid gives AI agents the same powerful IDE capabilities that developers use - semantic understanding, advanced refactorings, debugging, test running, and visual awareness.</p>
+
+    <p><b>Compatible with all IntelliJ Platform-based IDEs:</b> IntelliJ IDEA, PyCharm, WebStorm, GoLand, CLion, Rider, and more.</p>
+
+    <p><b>Requirements:</b> IntelliJ IDEA 2025.3 or newer (build 253 or later)</p>
+
     <br />
+    <h3>Demo: CodeDozer & IntelliJ Debugger</h3>
     <iframe width="560" height="315" src="https://www.youtube.com/embed/8MjogrpfXLU" frameborder="0" allowfullscreen></iframe>
     <br /><br />
-    Follow <a href="https://mcp-steroid.jonnyzzz.com">https://mcp-steroid.jonnyzzz.com</a>
-    for more information and documentation.
+
+    <p>Visit <a href="https://mcp-steroid.jonnyzzz.com">https://mcp-steroid.jonnyzzz.com</a> for documentation and examples.</p>
+
+    <p><small>IntelliJ IDEA, IntelliJ Platform, PyCharm, WebStorm, and JetBrains are trademarks of JetBrains s.r.o.</small></p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
