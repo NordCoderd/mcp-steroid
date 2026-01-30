@@ -193,7 +193,7 @@ val verifyBundledLibraries by tasks.registering {
         // Assert expected libraries - update this list when dependencies change
         val expectedFiles = sortedSetOf(
             //our binaires
-            "lib/intellij-mcp-steroid-${project.version}.jar",
+            "lib/mcp-steroid-${project.version}.jar",
             "lib/ocr-common-${project.version}.jar",
             "ocr-tesseract/lib/ocr-common-${project.version}.jar",
             "ocr-tesseract/lib/ocr-tesseract-${project.version}.jar",
