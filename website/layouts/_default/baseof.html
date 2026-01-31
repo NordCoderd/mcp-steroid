@@ -73,6 +73,13 @@
             width: 32px;
             height: 32px;
         }
+        /* Ensure minimum touch target size (44x44px) */
+        .nav-brand {
+            padding: 6px 0;
+            min-height: 44px;
+            display: flex;
+            align-items: center;
+        }
         .nav-title {
             font-weight: 700;
             font-size: 1.1rem;
@@ -95,6 +102,8 @@
             display: flex;
             align-items: center;
             gap: 0.25rem;
+            min-height: 44px;
+            padding: 8px 0;
         }
         .nav-link:hover {
             color: #fff;
@@ -114,6 +123,8 @@
             color: #fff;
             cursor: pointer;
             padding: 0.5rem;
+            min-width: 44px;
+            min-height: 44px;
         }
         .nav-toggle svg {
             width: 24px;
@@ -169,7 +180,7 @@
             align-items: center;
         }
         .social-links a {
-            color: #606070;
+            color: #909090;
             transition: color 0.2s;
         }
         .social-links a:hover {
@@ -192,6 +203,8 @@
             font-weight: 600;
             font-size: 1rem;
             transition: transform 0.2s, box-shadow 0.2s;
+            min-height: 44px;
+            min-width: 44px;
         }
         .btn:hover {
             text-decoration: none;
@@ -223,10 +236,38 @@
             border-radius: 8px;
             padding: 1rem;
             overflow-x: auto;
+            max-width: 100%;
         }
         pre code {
             background: none;
             padding: 0;
+        }
+        /* Focus indicators for accessibility (WCAG 2.4.7) */
+        a:focus-visible,
+        button:focus-visible,
+        input:focus-visible,
+        textarea:focus-visible {
+            outline: 2px solid #6B57FF;
+            outline-offset: 2px;
+            border-radius: 4px;
+        }
+        a:focus-visible {
+            background: rgba(107, 87, 255, 0.1);
+        }
+        /* Skip link for keyboard users (WCAG 2.4.1) */
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: #6B57FF;
+            color: white;
+            padding: 8px 16px;
+            z-index: 100;
+            text-decoration: none;
+            border-radius: 0 0 4px 0;
+        }
+        .skip-link:focus {
+            top: 0;
         }
         /* Page-specific styles will be in block */
         {{ block "styles" . }}{{ end }}
@@ -234,9 +275,10 @@
     <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "dd1a589b6e154b0a985f8f14ca8c4a4a"}'></script><!-- End Cloudflare Web Analytics -->
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
     {{ partial "nav.html" . }}
 
-    <main class="main-content">
+    <main class="main-content" id="main-content">
         {{ block "main" . }}{{ end }}
     </main>
 
@@ -245,7 +287,19 @@
     <script>
         // Mobile nav toggle
         document.querySelector('.nav-toggle')?.addEventListener('click', function() {
-            document.querySelector('.nav-links').classList.toggle('open');
+            const navLinks = document.querySelector('.nav-links');
+            const isOpen = navLinks.classList.toggle('open');
+            this.setAttribute('aria-expanded', isOpen);
+        });
+
+        // Close mobile menu on Escape key (WCAG 2.1.2)
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && document.querySelector('.nav-links.open')) {
+                document.querySelector('.nav-links').classList.remove('open');
+                const toggle = document.querySelector('.nav-toggle');
+                toggle?.setAttribute('aria-expanded', 'false');
+                toggle?.focus();
+            }
         });
     </script>
 </body>
