@@ -8,28 +8,6 @@
     <meta name="description" content="AI agents can finally SEE IntelliJ - not just read code. Independent research project by Eugene Petrenko bringing visual understanding and full IDE control to AI agents.">
     <link rel="icon" type="image/svg+xml" href="/pluginIcon.svg">
     <style>
-        :root {
-             
-            --color-primary: #ffffff;
-            --color-secondary: #d0d0e0;
-            --color-tertiary: #b0b0c0;
-            --color-quaternary: #909090;
-
-             
-            --gradient-brand: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
-            --color-brand-purple: #6B57FF;
-            --color-brand-pink: #FE2857;
-
-             
-            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            --bg-overlay: rgba(255, 255, 255, 0.05);
-            --bg-code: rgba(0, 0, 0, 0.3);
-
-             
-            --color-link: #a0a0ff;
-            --color-code: #c0c0ff;
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -40,11 +18,11 @@
             display: flex;
             flex-direction: column;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg-gradient);
-            color: var(--color-primary);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
         }
         a {
-            color: var(--color-link);
+            color: #a0a0ff;
             text-decoration: none;
         }
         a:hover {
@@ -72,7 +50,7 @@
             align-items: center;
             gap: 0.75rem;
             text-decoration: none;
-            color: var(--color-primary);
+            color: #fff;
         }
         .nav-brand:hover {
             text-decoration: none;
@@ -91,7 +69,7 @@
         .nav-title {
             font-weight: 700;
             font-size: 1.1rem;
-            background: var(--gradient-brand);
+            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -102,7 +80,7 @@
             gap: 2rem;
         }
         .nav-link {
-            color: var(--color-tertiary);
+            color: #a0a0b0;
             text-decoration: none;
             font-size: 0.95rem;
             font-weight: 500;
@@ -114,11 +92,11 @@
             padding: 8px 0;
         }
         .nav-link:hover {
-            color: var(--color-primary);
+            color: #fff;
             text-decoration: none;
         }
         .nav-link.active {
-            color: var(--color-primary);
+            color: #fff;
         }
         .nav-link svg {
             width: 16px;
@@ -128,7 +106,7 @@
             display: none;
             background: none;
             border: none;
-            color: var(--color-primary);
+            color: #fff;
             cursor: pointer;
             padding: 0.5rem;
             min-width: 44px;
@@ -162,14 +140,6 @@
                 width: 100%;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }
-            .social-links a {
-                min-width: 44px;
-                min-height: 44px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                padding: 10px;
-            }
         }
          
         .main-content {
@@ -196,11 +166,11 @@
             align-items: center;
         }
         .social-links a {
-            color: var(--color-quaternary);
+            color: #909090;
             transition: color 0.2s;
         }
         .social-links a:hover {
-            color: var(--color-tertiary);
+            color: #a0a0b0;
             text-decoration: none;
         }
         .social-links svg {
@@ -213,7 +183,7 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.875rem 1.5rem;
-            color: var(--color-primary);
+            color: #fff;
             text-decoration: none;
             border-radius: 8px;
             font-weight: 600;
@@ -228,7 +198,7 @@
             box-shadow: 0 10px 30px rgba(107, 87, 255, 0.3);
         }
         .btn-primary {
-            background: var(--gradient-brand);
+            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
         }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.1);
@@ -241,14 +211,14 @@
          
         code {
             font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-            background: var(--bg-code);
+            background: rgba(0, 0, 0, 0.3);
             padding: 0.1rem 0.4rem;
             border-radius: 4px;
-            color: var(--color-code);
+            color: #c0c0ff;
             font-size: 0.9em;
         }
         pre {
-            background: var(--bg-code);
+            background: rgba(0, 0, 0, 0.3);
             border-radius: 8px;
             padding: 1rem;
             overflow-x: auto;
@@ -263,7 +233,7 @@
         button:focus-visible,
         input:focus-visible,
         textarea:focus-visible {
-            outline: 2px solid var(--color-brand-purple);
+            outline: 2px solid #6B57FF;
             outline-offset: 2px;
             border-radius: 4px;
         }
@@ -275,10 +245,10 @@
             position: absolute;
             top: -40px;
             left: 0;
-            background: var(--color-brand-purple);
-            color: var(--color-primary);
+            background: #6B57FF;
+            color: white;
             padding: 8px 16px;
-            z-index: 1001;
+            z-index: 100;
             text-decoration: none;
             border-radius: 0 0 4px 0;
         }
@@ -304,14 +274,14 @@
     h1 {
         font-size: 2.5rem;
         margin-bottom: 1rem;
-        background: var(--gradient-brand);
+        background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
     .tagline {
         font-size: 1.2rem;
-        color: var(--color-tertiary);
+        color: #a0a0b0;
         margin-bottom: 2rem;
         line-height: 1.6;
     }
@@ -324,7 +294,7 @@
     h2 {
         font-size: 1.5rem;
         margin-bottom: 1.5rem;
-        color: var(--color-secondary);
+        color: #d0d0e0;
         text-align: center;
     }
     .whatsnew-section {
@@ -345,8 +315,8 @@
     }
     .whatsnew-label {
         display: inline-block;
-        background: var(--gradient-brand);
-        color: var(--color-primary);
+        background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+        color: #fff;
         padding: 0.2rem 0.6rem;
         border-radius: 4px;
         font-size: 0.75rem;
@@ -371,13 +341,13 @@
         padding-top: 0;
     }
     .whatsnew-date {
-        color: var(--color-quaternary);
+        color: #808090;
         font-size: 0.85rem;
         white-space: nowrap;
         min-width: 90px;
     }
     .whatsnew-text {
-        color: var(--color-secondary);
+        color: #c0c0d0;
         font-size: 0.95rem;
         line-height: 1.4;
     }
@@ -394,7 +364,7 @@
         text-align: left;
     }
     .about-content p {
-        color: var(--color-tertiary);
+        color: #b0b0c0;
         line-height: 1.7;
         margin-bottom: 1rem;
     }
@@ -406,7 +376,7 @@
         margin: 1.5rem 0;
     }
     .features-list li {
-        color: var(--color-tertiary);
+        color: #b0b0c0;
         padding: 0.5rem 0;
         padding-left: 1.5rem;
         position: relative;
@@ -415,7 +385,7 @@
         content: "\2192";
         position: absolute;
         left: 0;
-        color: var(--color-brand-purple);
+        color: #6B57FF;
     }
     .agents-list {
         display: flex;
@@ -425,7 +395,7 @@
     }
     .agent-badge {
         background: rgba(107, 87, 255, 0.2);
-        color: var(--color-link);
+        color: #a0a0ff;
         padding: 0.25rem 0.75rem;
         border-radius: 20px;
         font-size: 0.85rem;
@@ -433,7 +403,7 @@
     .version-badge {
         display: inline-block;
         background: rgba(107, 87, 255, 0.3);
-        color: var(--color-code);
+        color: #c0c0ff;
         padding: 0.25rem 0.75rem;
         border-radius: 20px;
         font-size: 0.9rem;
@@ -453,10 +423,10 @@
     .cta-card h3 {
         font-size: 1.3rem;
         margin-bottom: 1rem;
-        color: var(--color-primary);
+        color: #fff;
     }
     .cta-card p {
-        color: var(--color-tertiary);
+        color: #a0a0b0;
         margin-bottom: 1.5rem;
         line-height: 1.6;
     }
@@ -518,11 +488,11 @@
         font-weight: 600;
         line-height: 1.4;
         margin-bottom: 0.5rem;
-        color: var(--color-primary);
+        color: #fff;
     }
     .video-meta {
         font-size: 0.8rem;
-        color: var(--color-quaternary);
+        color: #808090;
     }
     .playlist-link {
         text-align: center;
@@ -541,11 +511,11 @@
         padding: 1.5rem;
     }
     .feedback-card p {
-        color: var(--color-quaternary);
+        color: #909090;
         margin-bottom: 1rem;
     }
     .feedback-card a {
-        color: var(--color-link);
+        color: #a0a0ff;
         text-decoration: none;
     }
     .feedback-card a:hover {

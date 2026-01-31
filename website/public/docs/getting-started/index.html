@@ -7,28 +7,6 @@
     <meta name="description" content="Install and set up MCP Steroid with your AI agent">
     <link rel="icon" type="image/svg+xml" href="/pluginIcon.svg">
     <style>
-        :root {
-             
-            --color-primary: #ffffff;
-            --color-secondary: #d0d0e0;
-            --color-tertiary: #b0b0c0;
-            --color-quaternary: #909090;
-
-             
-            --gradient-brand: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
-            --color-brand-purple: #6B57FF;
-            --color-brand-pink: #FE2857;
-
-             
-            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            --bg-overlay: rgba(255, 255, 255, 0.05);
-            --bg-code: rgba(0, 0, 0, 0.3);
-
-             
-            --color-link: #a0a0ff;
-            --color-code: #c0c0ff;
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -39,11 +17,11 @@
             display: flex;
             flex-direction: column;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: var(--bg-gradient);
-            color: var(--color-primary);
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
         }
         a {
-            color: var(--color-link);
+            color: #a0a0ff;
             text-decoration: none;
         }
         a:hover {
@@ -71,7 +49,7 @@
             align-items: center;
             gap: 0.75rem;
             text-decoration: none;
-            color: var(--color-primary);
+            color: #fff;
         }
         .nav-brand:hover {
             text-decoration: none;
@@ -90,7 +68,7 @@
         .nav-title {
             font-weight: 700;
             font-size: 1.1rem;
-            background: var(--gradient-brand);
+            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -101,7 +79,7 @@
             gap: 2rem;
         }
         .nav-link {
-            color: var(--color-tertiary);
+            color: #a0a0b0;
             text-decoration: none;
             font-size: 0.95rem;
             font-weight: 500;
@@ -113,11 +91,11 @@
             padding: 8px 0;
         }
         .nav-link:hover {
-            color: var(--color-primary);
+            color: #fff;
             text-decoration: none;
         }
         .nav-link.active {
-            color: var(--color-primary);
+            color: #fff;
         }
         .nav-link svg {
             width: 16px;
@@ -127,7 +105,7 @@
             display: none;
             background: none;
             border: none;
-            color: var(--color-primary);
+            color: #fff;
             cursor: pointer;
             padding: 0.5rem;
             min-width: 44px;
@@ -161,14 +139,6 @@
                 width: 100%;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }
-            .social-links a {
-                min-width: 44px;
-                min-height: 44px;
-                display: inline-flex;
-                align-items: center;
-                justify-content: center;
-                padding: 10px;
-            }
         }
          
         .main-content {
@@ -195,11 +165,11 @@
             align-items: center;
         }
         .social-links a {
-            color: var(--color-quaternary);
+            color: #909090;
             transition: color 0.2s;
         }
         .social-links a:hover {
-            color: var(--color-tertiary);
+            color: #a0a0b0;
             text-decoration: none;
         }
         .social-links svg {
@@ -212,7 +182,7 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.875rem 1.5rem;
-            color: var(--color-primary);
+            color: #fff;
             text-decoration: none;
             border-radius: 8px;
             font-weight: 600;
@@ -227,7 +197,7 @@
             box-shadow: 0 10px 30px rgba(107, 87, 255, 0.3);
         }
         .btn-primary {
-            background: var(--gradient-brand);
+            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
         }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.1);
@@ -240,14 +210,14 @@
          
         code {
             font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-            background: var(--bg-code);
+            background: rgba(0, 0, 0, 0.3);
             padding: 0.1rem 0.4rem;
             border-radius: 4px;
-            color: var(--color-code);
+            color: #c0c0ff;
             font-size: 0.9em;
         }
         pre {
-            background: var(--bg-code);
+            background: rgba(0, 0, 0, 0.3);
             border-radius: 8px;
             padding: 1rem;
             overflow-x: auto;
@@ -262,7 +232,7 @@
         button:focus-visible,
         input:focus-visible,
         textarea:focus-visible {
-            outline: 2px solid var(--color-brand-purple);
+            outline: 2px solid #6B57FF;
             outline-offset: 2px;
             border-radius: 4px;
         }
@@ -274,10 +244,10 @@
             position: absolute;
             top: -40px;
             left: 0;
-            background: var(--color-brand-purple);
-            color: var(--color-primary);
+            background: #6B57FF;
+            color: white;
             padding: 8px 16px;
-            z-index: 1001;
+            z-index: 100;
             text-decoration: none;
             border-radius: 0 0 4px 0;
         }
@@ -303,7 +273,7 @@
         font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: var(--color-quaternary);
+        color: #808090;
         margin-bottom: 1rem;
     }
     .docs-sidebar ul {
@@ -313,7 +283,7 @@
         margin-bottom: 0.5rem;
     }
     .docs-sidebar a {
-        color: var(--color-tertiary);
+        color: #a0a0b0;
         text-decoration: none;
         font-size: 0.95rem;
         display: block;
@@ -323,12 +293,12 @@
         transition: all 0.2s;
     }
     .docs-sidebar a:hover {
-        color: var(--color-primary);
+        color: #fff;
         text-decoration: none;
     }
     .docs-sidebar a.active {
-        color: var(--color-primary);
-        border-left-color: var(--color-brand-purple);
+        color: #fff;
+        border-left-color: #6B57FF;
         background: rgba(107, 87, 255, 0.1);
     }
     .docs-content {
@@ -339,14 +309,14 @@
     .docs-content h1 {
         font-size: 2.5rem;
         margin-bottom: 1.5rem;
-        background: var(--gradient-brand);
+        background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
     .docs-content h2 {
         font-size: 1.5rem;
-        color: var(--color-secondary);
+        color: #d0d0e0;
         margin-top: 2.5rem;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
@@ -355,17 +325,17 @@
     }
     .docs-content h3 {
         font-size: 1.2rem;
-        color: var(--color-secondary);
+        color: #c0c0d0;
         margin-top: 2rem;
         margin-bottom: 0.75rem;
     }
     .docs-content p {
-        color: var(--color-tertiary);
+        color: #b0b0c0;
         line-height: 1.7;
         margin-bottom: 1rem;
     }
     .docs-content ul, .docs-content ol {
-        color: var(--color-tertiary);
+        color: #b0b0c0;
         margin-bottom: 1rem;
         padding-left: 1.5rem;
     }
@@ -383,13 +353,13 @@
         text-align: left;
         padding: 0.75rem;
         border-bottom: 2px solid rgba(107, 87, 255, 0.3);
-        color: var(--color-secondary);
+        color: #d0d0e0;
         font-weight: 600;
     }
     .docs-content td {
         padding: 0.75rem;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        color: var(--color-tertiary);
+        color: #a0a0b0;
         vertical-align: top;
     }
     .docs-content tr:hover td {
@@ -415,17 +385,17 @@
     }
     .docs-content .note {
         background: rgba(107, 87, 255, 0.1);
-        border-left: 3px solid var(--color-brand-purple);
+        border-left: 3px solid #6B57FF;
         border-radius: 0 8px 8px 0;
         padding: 1rem 1.25rem;
         margin: 1.5rem 0;
     }
     .docs-content .note p {
         margin: 0;
-        color: var(--color-secondary);
+        color: #c0c0d0;
     }
     .docs-content .note strong {
-        color: var(--color-primary);
+        color: #fff;
     }
     @media (max-width: 900px) {
         .main-content {
@@ -448,9 +418,6 @@
             border-left: none;
             border-radius: 20px;
             background: rgba(255, 255, 255, 0.05);
-            min-height: 44px;
-            display: inline-flex;
-            align-items: center;
         }
         .docs-sidebar a.active {
             background: rgba(107, 87, 255, 0.2);
@@ -534,15 +501,12 @@
 
 <article class="docs-content">
     <h1>Getting Started</h1>
-    <h2 id="what-is-mcp-steroid">What is MCP Steroid?</h2>
-<p>MCP Steroid gives AI agents <strong>visual understanding and full control</strong> of your IntelliJ-based IDE through the Model Context Protocol. Unlike traditional code assistants that only see text, MCP Steroid lets agents SEE your IDE: dialogs, toolbars, debugger state, test results, and visual elements.</p>
-<p><strong><a href="https://jonnyzzz.com/blog/2026/01/04/mcp-steroids-intellij/">Read the full introduction →</a></strong></p>
-<h2 id="installation">Installation</h2>
+    <h2 id="installation">Installation</h2>
 <p>MCP Steroid is distributed as an IntelliJ plugin. Currently in early access - <a href="https://linkedin.com/in/jonnyzzz">message Eugene Petrenko on LinkedIn</a> to get access.</p>
 <h3 id="requirements">Requirements</h3>
 <ul>
 <li>IntelliJ IDEA 2025.3+ (or any IntelliJ-based IDE: Rider, Android Studio, GoLand, WebStorm, PyCharm, etc.)</li>
-<li>An MCP-compatible AI agent (Claude Code, Codex, Gemini, or any MCP client)</li>
+<li>An MCP-compatible AI agent (Claude, GPT, Gemini, Cursor, or any MCP client)</li>
 </ul>
 <h3 id="install-the-plugin">Install the Plugin</h3>
 <ol>
@@ -557,10 +521,16 @@
 <p>The MCP server URL is written to <code>.idea/mcp-steroid.md</code>. The first line contains the URL:</p>
 <pre tabindex="0"><code>http://127.0.0.1:6315/mcp
 </code></pre><h3 id="claude-code-cli">Claude Code CLI</h3>
-<p>The official Anthropic CLI with full MCP support:</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>claude mcp add --transport http mcp-steroid http://127.0.0.1:6315/mcp
-</span></span></code></pre></div><p>Verify the connection:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>claude -p <span style="color:#e6db74">&#34;List all open projects using steroid_list_projects&#34;</span>
+</span></span></code></pre></div><h3 id="cursor">Cursor</h3>
+<p>Add to your MCP configuration:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
+</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;mcpServers&#34;</span>: {
+</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;mcp-steroid&#34;</span>: {
+</span></span><span style="display:flex;"><span>      <span style="color:#f92672">&#34;url&#34;</span>: <span style="color:#e6db74">&#34;http://127.0.0.1:6315/mcp&#34;</span>
+</span></span><span style="display:flex;"><span>    }
+</span></span><span style="display:flex;"><span>  }
+</span></span><span style="display:flex;"><span>}
 </span></span></code></pre></div><h3 id="openai-codex-cli">OpenAI Codex CLI</h3>
 <p>Codex CLI uses a TOML configuration file for HTTP-based MCP servers. Create or edit <code>~/.codex/config.toml</code>:</p>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>MCP_URL<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>cat .idea/mcp-steroid.md<span style="color:#66d9ef">)</span>
@@ -571,30 +541,15 @@
 </span></span></span><span style="display:flex;"><span><span style="color:#e6db74">[mcp_servers.intellij-steroid]
 </span></span></span><span style="display:flex;"><span><span style="color:#e6db74">url = &#34;$MCP_URL&#34;
 </span></span></span><span style="display:flex;"><span><span style="color:#e6db74">EOF</span>
-</span></span></code></pre></div><p>Verify the connection:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>codex exec <span style="color:#e6db74">&#34;List all open projects using steroid_list_projects&#34;</span>
 </span></span></code></pre></div><p><strong>Note</strong>: <code>codex mcp add</code> only supports stdio servers; HTTP servers require TOML configuration.</p>
-<h3 id="google-gemini-cli">Google Gemini CLI</h3>
-<p>The official Google CLI with MCP support:</p>
+<h3 id="gemini-cli">Gemini CLI</h3>
 <div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>MCP_URL<span style="color:#f92672">=</span><span style="color:#66d9ef">$(</span>cat .idea/mcp-steroid.md<span style="color:#66d9ef">)</span>
 </span></span><span style="display:flex;"><span>gemini mcp add intellij-steroid <span style="color:#e6db74">&#34;</span>$MCP_URL<span style="color:#e6db74">&#34;</span> --transport http --scope user
 </span></span><span style="display:flex;"><span>
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># Verify connection</span>
 </span></span><span style="display:flex;"><span>gemini mcp list
 </span></span><span style="display:flex;"><span><span style="color:#75715e"># Should show: ✓ intellij-steroid: &lt;url&gt; (http) - Connected</span>
-</span></span></code></pre></div><p>Test the connection:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span>gemini <span style="color:#e6db74">&#34;List all open projects using steroid_list_projects&#34;</span>
-</span></span></code></pre></div><h3 id="cursor-alternative">Cursor (Alternative)</h3>
-<p>Cursor has basic MCP support. Add to your MCP configuration:</p>
-<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-json" data-lang="json"><span style="display:flex;"><span>{
-</span></span><span style="display:flex;"><span>  <span style="color:#f92672">&#34;mcpServers&#34;</span>: {
-</span></span><span style="display:flex;"><span>    <span style="color:#f92672">&#34;mcp-steroid&#34;</span>: {
-</span></span><span style="display:flex;"><span>      <span style="color:#f92672">&#34;url&#34;</span>: <span style="color:#e6db74">&#34;http://127.0.0.1:6315/mcp&#34;</span>
-</span></span><span style="display:flex;"><span>    }
-</span></span><span style="display:flex;"><span>  }
-</span></span><span style="display:flex;"><span>}
-</span></span></code></pre></div><p><strong>Note</strong>: For the best MCP Steroid experience, we recommend using Claude Code CLI, Codex CLI, or Gemini CLI, which have more mature MCP implementations.</p>
-<h3 id="other-mcp-clients">Other MCP Clients</h3>
+</span></span></code></pre></div><h3 id="other-mcp-clients">Other MCP Clients</h3>
 <p>Any MCP-compatible client can connect using the HTTP/SSE transport at the server URL.</p>
 <h2 id="agent-skills-setup-optional">Agent Skills Setup (Optional)</h2>
 <p>MCP Steroid implements the <a href="https://agentskills.io">Agent Skills</a> protocol, making capabilities discoverable to AI agents.</p>
@@ -664,8 +619,17 @@
 </ol>
 <p><strong>Session Recovery After IDE Restart</strong></p>
 <p>When IntelliJ restarts, the MCP server creates a new session. MCP clients will receive a <code>Mcp-Session-Notice</code> header and should update their stored session ID automatically.</p>
-<h3 id="quick-verification">Quick Verification</h3>
-<p>After connecting your AI agent, you should see a list of currently open IntelliJ projects when testing with the <code>steroid_list_projects</code> tool. If the connection works, your agent can now access all MCP Steroid capabilities.</p>
+<h3 id="verification-commands">Verification Commands</h3>
+<p>Test the connection with your first command:</p>
+<div class="highlight"><pre tabindex="0" style="color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4;"><code class="language-bash" data-lang="bash"><span style="display:flex;"><span><span style="color:#75715e"># Using Claude Code CLI</span>
+</span></span><span style="display:flex;"><span>claude -p <span style="color:#e6db74">&#34;List all open projects using steroid_list_projects&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Using Gemini CLI</span>
+</span></span><span style="display:flex;"><span>gemini <span style="color:#e6db74">&#34;List all open projects using steroid_list_projects&#34;</span>
+</span></span><span style="display:flex;"><span>
+</span></span><span style="display:flex;"><span><span style="color:#75715e"># Using Codex CLI</span>
+</span></span><span style="display:flex;"><span>codex exec <span style="color:#e6db74">&#34;List all open projects using steroid_list_projects&#34;</span>
+</span></span></code></pre></div><p>You should see a list of currently open IntelliJ projects.</p>
 <p>For more troubleshooting help, see <a href="https://github.com/jonnyzzz/mcp-steroid/issues">GitHub Issues</a>.</p>
 <h2 id="next-steps">Next Steps</h2>
 <ul>
