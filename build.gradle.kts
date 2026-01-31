@@ -1,3 +1,5 @@
+@file:Suppress("HasPlatformType")
+
 import de.undercouch.gradle.tasks.download.Download
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import java.net.HttpURLConnection
@@ -76,13 +78,14 @@ kotlin {
     jvmToolchain(21)
 }
 
+val generatedSourcesPath = layout.buildDirectory.dir("generated/kotlin")
+
 // Generate metadata with encoded version and time bomb
 val generateMetadata by tasks.registering {
     group = "build"
     description = "Generate plugin metadata with version and time bomb"
 
-    val outputDir = layout.buildDirectory.dir("generated/kotlin")
-    val outputFile = outputDir.map { it.file("PluginMetadata.kt") }
+    val outputFile = generatedSourcesPath.map { it.file("PluginMetadata.kt") }
 
     outputs.file(outputFile)
     outputs.upToDateWhen { false }
@@ -152,7 +155,7 @@ val generateMetadata by tasks.registering {
 
 // Add generated sources to main source set and make kotlin compilation depend on it
 kotlin.sourceSets.main {
-    kotlin.srcDir(layout.buildDirectory.dir("generated/kotlin"))
+    kotlin.srcDir(generatedSourcesPath)
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
@@ -251,8 +254,10 @@ listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
 }
 
 tasks.buildPlugin {
+    val dir = layout.buildDirectory.dir("distributions")
     doFirst {
-        delete(layout.buildDirectory.dir("distributions"))
+        delete(dir)
+        mkdir(dir)
     }
 }
 
