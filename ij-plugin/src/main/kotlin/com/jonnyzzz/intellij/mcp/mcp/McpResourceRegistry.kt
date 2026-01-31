@@ -2,6 +2,7 @@
 package com.jonnyzzz.intellij.mcp.mcp
 
 import com.intellij.openapi.diagnostic.thisLogger
+import com.jonnyzzz.intellij.mcp.validateTimeBomb
 
 /**
  * Registry for MCP resources.
@@ -42,6 +43,8 @@ class McpResourceRegistry {
      * Read a resource by URI.
      */
     fun readResource(uri: String): ResourceReadResult? {
+        validateTimeBomb()
+
         val definition = resources[uri] ?: return null
 
         val content = try {

@@ -13,6 +13,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.mcp.builder
+import com.jonnyzzz.intellij.mcp.validateTimeBomb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
@@ -98,6 +99,8 @@ class OpenProjectToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(context: ToolCallContext): ToolCallResult {
+        validateTimeBomb()
+
         val args = context.params.arguments ?: return errorResult("Missing arguments")
         val projectPathStr = args["project_path"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: project_path")

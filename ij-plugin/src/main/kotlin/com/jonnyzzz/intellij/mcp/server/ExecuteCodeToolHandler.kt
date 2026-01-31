@@ -13,6 +13,7 @@ import com.jonnyzzz.intellij.mcp.mcp.ContentItem
 import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallContext
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
+import com.jonnyzzz.intellij.mcp.validateTimeBomb
 import kotlinx.serialization.json.*
 
 data class ExecCodeParams(
@@ -130,6 +131,8 @@ class ExecuteCodeToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(context: ToolCallContext): ToolCallResult {
+        validateTimeBomb()
+
         val params = context.params
         val args = params.arguments ?: return errorResult("Missing arguments")
 

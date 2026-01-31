@@ -10,6 +10,7 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.ex.StatusBarEx
 import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import com.jonnyzzz.intellij.mcp.validateTimeBomb
 import com.jonnyzzz.intellij.mcp.vision.WindowIdUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,6 +40,8 @@ class ListWindowsToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(params: ToolCallParams): ToolCallResult {
+        validateTimeBomb()
+
         val (windowInfos, progressTasks) = withContext(Dispatchers.EDT) {
             // Check if any modal dialog is showing in the IDE
             // Compare current modality state with nonModal - if different, modal is showing

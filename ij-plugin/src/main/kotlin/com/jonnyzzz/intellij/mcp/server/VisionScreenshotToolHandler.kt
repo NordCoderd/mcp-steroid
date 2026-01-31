@@ -5,6 +5,7 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.ProjectManager
 import com.jonnyzzz.intellij.mcp.mcp.*
 import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import com.jonnyzzz.intellij.mcp.validateTimeBomb
 import com.jonnyzzz.intellij.mcp.vision.VisionService
 import kotlinx.serialization.json.*
 import java.util.*
@@ -64,6 +65,8 @@ class VisionScreenshotToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(context: ToolCallContext): ToolCallResult {
+        validateTimeBomb()
+
         val args = context.params.arguments ?: return errorResult("Missing arguments")
         val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: project_name")

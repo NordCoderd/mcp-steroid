@@ -10,6 +10,7 @@ import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallParams
 import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
 import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
+import com.jonnyzzz.intellij.mcp.validateTimeBomb
 import kotlinx.serialization.json.*
 
 /**
@@ -93,6 +94,8 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(params: ToolCallParams): ToolCallResult {
+        validateTimeBomb()
+
         val args = params.arguments ?: return errorResult("Missing arguments")
 
         val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
