@@ -7,6 +7,28 @@
     <meta name="description" content="Registry keys and settings for MCP Steroid">
     <link rel="icon" type="image/svg+xml" href="/pluginIcon.svg">
     <style>
+        :root {
+             
+            --color-primary: #ffffff;
+            --color-secondary: #d0d0e0;
+            --color-tertiary: #b0b0c0;
+            --color-quaternary: #909090;
+
+             
+            --gradient-brand: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+            --color-brand-purple: #6B57FF;
+            --color-brand-pink: #FE2857;
+
+             
+            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --bg-overlay: rgba(255, 255, 255, 0.05);
+            --bg-code: rgba(0, 0, 0, 0.3);
+
+             
+            --color-link: #a0a0ff;
+            --color-code: #c0c0ff;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -17,11 +39,11 @@
             display: flex;
             flex-direction: column;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
+            background: var(--bg-gradient);
+            color: var(--color-primary);
         }
         a {
-            color: #a0a0ff;
+            color: var(--color-link);
             text-decoration: none;
         }
         a:hover {
@@ -49,7 +71,7 @@
             align-items: center;
             gap: 0.75rem;
             text-decoration: none;
-            color: #fff;
+            color: var(--color-primary);
         }
         .nav-brand:hover {
             text-decoration: none;
@@ -68,7 +90,7 @@
         .nav-title {
             font-weight: 700;
             font-size: 1.1rem;
-            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+            background: var(--gradient-brand);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -79,7 +101,7 @@
             gap: 2rem;
         }
         .nav-link {
-            color: #a0a0b0;
+            color: var(--color-tertiary);
             text-decoration: none;
             font-size: 0.95rem;
             font-weight: 500;
@@ -91,11 +113,11 @@
             padding: 8px 0;
         }
         .nav-link:hover {
-            color: #fff;
+            color: var(--color-primary);
             text-decoration: none;
         }
         .nav-link.active {
-            color: #fff;
+            color: var(--color-primary);
         }
         .nav-link svg {
             width: 16px;
@@ -105,7 +127,7 @@
             display: none;
             background: none;
             border: none;
-            color: #fff;
+            color: var(--color-primary);
             cursor: pointer;
             padding: 0.5rem;
             min-width: 44px;
@@ -139,6 +161,14 @@
                 width: 100%;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }
+            .social-links a {
+                min-width: 44px;
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 10px;
+            }
         }
          
         .main-content {
@@ -165,11 +195,11 @@
             align-items: center;
         }
         .social-links a {
-            color: #909090;
+            color: var(--color-quaternary);
             transition: color 0.2s;
         }
         .social-links a:hover {
-            color: #a0a0b0;
+            color: var(--color-tertiary);
             text-decoration: none;
         }
         .social-links svg {
@@ -182,7 +212,7 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.875rem 1.5rem;
-            color: #fff;
+            color: var(--color-primary);
             text-decoration: none;
             border-radius: 8px;
             font-weight: 600;
@@ -197,7 +227,7 @@
             box-shadow: 0 10px 30px rgba(107, 87, 255, 0.3);
         }
         .btn-primary {
-            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+            background: var(--gradient-brand);
         }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.1);
@@ -210,14 +240,14 @@
          
         code {
             font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-            background: rgba(0, 0, 0, 0.3);
+            background: var(--bg-code);
             padding: 0.1rem 0.4rem;
             border-radius: 4px;
-            color: #c0c0ff;
+            color: var(--color-code);
             font-size: 0.9em;
         }
         pre {
-            background: rgba(0, 0, 0, 0.3);
+            background: var(--bg-code);
             border-radius: 8px;
             padding: 1rem;
             overflow-x: auto;
@@ -232,7 +262,7 @@
         button:focus-visible,
         input:focus-visible,
         textarea:focus-visible {
-            outline: 2px solid #6B57FF;
+            outline: 2px solid var(--color-brand-purple);
             outline-offset: 2px;
             border-radius: 4px;
         }
@@ -244,10 +274,10 @@
             position: absolute;
             top: -40px;
             left: 0;
-            background: #6B57FF;
-            color: white;
+            background: var(--color-brand-purple);
+            color: var(--color-primary);
             padding: 8px 16px;
-            z-index: 100;
+            z-index: 1001;
             text-decoration: none;
             border-radius: 0 0 4px 0;
         }
@@ -273,7 +303,7 @@
         font-size: 0.8rem;
         text-transform: uppercase;
         letter-spacing: 0.5px;
-        color: #808090;
+        color: var(--color-quaternary);
         margin-bottom: 1rem;
     }
     .docs-sidebar ul {
@@ -283,7 +313,7 @@
         margin-bottom: 0.5rem;
     }
     .docs-sidebar a {
-        color: #a0a0b0;
+        color: var(--color-tertiary);
         text-decoration: none;
         font-size: 0.95rem;
         display: block;
@@ -293,12 +323,12 @@
         transition: all 0.2s;
     }
     .docs-sidebar a:hover {
-        color: #fff;
+        color: var(--color-primary);
         text-decoration: none;
     }
     .docs-sidebar a.active {
-        color: #fff;
-        border-left-color: #6B57FF;
+        color: var(--color-primary);
+        border-left-color: var(--color-brand-purple);
         background: rgba(107, 87, 255, 0.1);
     }
     .docs-content {
@@ -309,14 +339,14 @@
     .docs-content h1 {
         font-size: 2.5rem;
         margin-bottom: 1.5rem;
-        background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+        background: var(--gradient-brand);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
     .docs-content h2 {
         font-size: 1.5rem;
-        color: #d0d0e0;
+        color: var(--color-secondary);
         margin-top: 2.5rem;
         margin-bottom: 1rem;
         padding-bottom: 0.5rem;
@@ -325,17 +355,17 @@
     }
     .docs-content h3 {
         font-size: 1.2rem;
-        color: #c0c0d0;
+        color: var(--color-secondary);
         margin-top: 2rem;
         margin-bottom: 0.75rem;
     }
     .docs-content p {
-        color: #b0b0c0;
+        color: var(--color-tertiary);
         line-height: 1.7;
         margin-bottom: 1rem;
     }
     .docs-content ul, .docs-content ol {
-        color: #b0b0c0;
+        color: var(--color-tertiary);
         margin-bottom: 1rem;
         padding-left: 1.5rem;
     }
@@ -353,13 +383,13 @@
         text-align: left;
         padding: 0.75rem;
         border-bottom: 2px solid rgba(107, 87, 255, 0.3);
-        color: #d0d0e0;
+        color: var(--color-secondary);
         font-weight: 600;
     }
     .docs-content td {
         padding: 0.75rem;
         border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        color: #a0a0b0;
+        color: var(--color-tertiary);
         vertical-align: top;
     }
     .docs-content tr:hover td {
@@ -385,17 +415,17 @@
     }
     .docs-content .note {
         background: rgba(107, 87, 255, 0.1);
-        border-left: 3px solid #6B57FF;
+        border-left: 3px solid var(--color-brand-purple);
         border-radius: 0 8px 8px 0;
         padding: 1rem 1.25rem;
         margin: 1.5rem 0;
     }
     .docs-content .note p {
         margin: 0;
-        color: #c0c0d0;
+        color: var(--color-secondary);
     }
     .docs-content .note strong {
-        color: #fff;
+        color: var(--color-primary);
     }
     @media (max-width: 900px) {
         .main-content {
@@ -418,6 +448,9 @@
             border-left: none;
             border-radius: 20px;
             background: rgba(255, 255, 255, 0.05);
+            min-height: 44px;
+            display: inline-flex;
+            align-items: center;
         }
         .docs-sidebar a.active {
             background: rgba(107, 87, 255, 0.2);

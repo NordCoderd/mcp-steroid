@@ -22,6 +22,28 @@
     <meta name="description" content="{{ with .Description }}{{ . }}{{ else }}{{ .Site.Params.description }}{{ end }}">
     <link rel="icon" type="image/svg+xml" href="{{ "pluginIcon.svg" | relURL }}">
     <style>
+        :root {
+            /* Color System - Semantic Tokens */
+            --color-primary: #ffffff;
+            --color-secondary: #d0d0e0;
+            --color-tertiary: #b0b0c0;
+            --color-quaternary: #909090;
+
+            /* Brand Colors */
+            --gradient-brand: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+            --color-brand-purple: #6B57FF;
+            --color-brand-pink: #FE2857;
+
+            /* Background */
+            --bg-gradient: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            --bg-overlay: rgba(255, 255, 255, 0.05);
+            --bg-code: rgba(0, 0, 0, 0.3);
+
+            /* Accent Colors */
+            --color-link: #a0a0ff;
+            --color-code: #c0c0ff;
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -32,11 +54,11 @@
             display: flex;
             flex-direction: column;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-            color: #fff;
+            background: var(--bg-gradient);
+            color: var(--color-primary);
         }
         a {
-            color: #a0a0ff;
+            color: var(--color-link);
             text-decoration: none;
         }
         a:hover {
@@ -64,7 +86,7 @@
             align-items: center;
             gap: 0.75rem;
             text-decoration: none;
-            color: #fff;
+            color: var(--color-primary);
         }
         .nav-brand:hover {
             text-decoration: none;
@@ -83,7 +105,7 @@
         .nav-title {
             font-weight: 700;
             font-size: 1.1rem;
-            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+            background: var(--gradient-brand);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
@@ -94,7 +116,7 @@
             gap: 2rem;
         }
         .nav-link {
-            color: #a0a0b0;
+            color: var(--color-tertiary);
             text-decoration: none;
             font-size: 0.95rem;
             font-weight: 500;
@@ -106,11 +128,11 @@
             padding: 8px 0;
         }
         .nav-link:hover {
-            color: #fff;
+            color: var(--color-primary);
             text-decoration: none;
         }
         .nav-link.active {
-            color: #fff;
+            color: var(--color-primary);
         }
         .nav-link svg {
             width: 16px;
@@ -120,7 +142,7 @@
             display: none;
             background: none;
             border: none;
-            color: #fff;
+            color: var(--color-primary);
             cursor: pointer;
             padding: 0.5rem;
             min-width: 44px;
@@ -154,6 +176,14 @@
                 width: 100%;
                 border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             }
+            .social-links a {
+                min-width: 44px;
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                padding: 10px;
+            }
         }
         /* Main content */
         .main-content {
@@ -180,11 +210,11 @@
             align-items: center;
         }
         .social-links a {
-            color: #909090;
+            color: var(--color-quaternary);
             transition: color 0.2s;
         }
         .social-links a:hover {
-            color: #a0a0b0;
+            color: var(--color-tertiary);
             text-decoration: none;
         }
         .social-links svg {
@@ -197,7 +227,7 @@
             align-items: center;
             gap: 0.5rem;
             padding: 0.875rem 1.5rem;
-            color: #fff;
+            color: var(--color-primary);
             text-decoration: none;
             border-radius: 8px;
             font-weight: 600;
@@ -212,7 +242,7 @@
             box-shadow: 0 10px 30px rgba(107, 87, 255, 0.3);
         }
         .btn-primary {
-            background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
+            background: var(--gradient-brand);
         }
         .btn-secondary {
             background: rgba(255, 255, 255, 0.1);
@@ -225,14 +255,14 @@
         /* Code styling */
         code {
             font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
-            background: rgba(0, 0, 0, 0.3);
+            background: var(--bg-code);
             padding: 0.1rem 0.4rem;
             border-radius: 4px;
-            color: #c0c0ff;
+            color: var(--color-code);
             font-size: 0.9em;
         }
         pre {
-            background: rgba(0, 0, 0, 0.3);
+            background: var(--bg-code);
             border-radius: 8px;
             padding: 1rem;
             overflow-x: auto;
@@ -247,7 +277,7 @@
         button:focus-visible,
         input:focus-visible,
         textarea:focus-visible {
-            outline: 2px solid #6B57FF;
+            outline: 2px solid var(--color-brand-purple);
             outline-offset: 2px;
             border-radius: 4px;
         }
@@ -259,10 +289,10 @@
             position: absolute;
             top: -40px;
             left: 0;
-            background: #6B57FF;
-            color: white;
+            background: var(--color-brand-purple);
+            color: var(--color-primary);
             padding: 8px 16px;
-            z-index: 100;
+            z-index: 1001;
             text-decoration: none;
             border-radius: 0 0 4px 0;
         }

@@ -4,6 +4,12 @@ description: "Install and set up MCP Steroid with your AI agent"
 weight: 1
 ---
 
+## What is MCP Steroid?
+
+MCP Steroid gives AI agents **visual understanding and full control** of your IntelliJ-based IDE through the Model Context Protocol. Unlike traditional code assistants that only see text, MCP Steroid lets agents SEE your IDE: dialogs, toolbars, debugger state, test results, and visual elements.
+
+**[Read the full introduction →](https://jonnyzzz.com/blog/2026/01/04/mcp-steroids-intellij/)**
+
 ## Installation
 
 MCP Steroid is distributed as an IntelliJ plugin. Currently in early access - [message Eugene Petrenko on LinkedIn](https://linkedin.com/in/jonnyzzz) to get access.
@@ -11,7 +17,7 @@ MCP Steroid is distributed as an IntelliJ plugin. Currently in early access - [m
 ### Requirements
 
 - IntelliJ IDEA 2025.3+ (or any IntelliJ-based IDE: Rider, Android Studio, GoLand, WebStorm, PyCharm, etc.)
-- An MCP-compatible AI agent (Claude, GPT, Gemini, Cursor, or any MCP client)
+- An MCP-compatible AI agent (Claude Code, Codex, Gemini, or any MCP client)
 
 ### Install the Plugin
 
@@ -34,22 +40,15 @@ http://127.0.0.1:6315/mcp
 
 ### Claude Code CLI
 
+The official Anthropic CLI with full MCP support:
+
 ```bash
 claude mcp add --transport http mcp-steroid http://127.0.0.1:6315/mcp
 ```
 
-### Cursor
-
-Add to your MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "mcp-steroid": {
-      "url": "http://127.0.0.1:6315/mcp"
-    }
-  }
-}
+Verify the connection:
+```bash
+claude -p "List all open projects using steroid_list_projects"
 ```
 
 ### OpenAI Codex CLI
@@ -67,9 +66,16 @@ url = "$MCP_URL"
 EOF
 ```
 
+Verify the connection:
+```bash
+codex exec "List all open projects using steroid_list_projects"
+```
+
 **Note**: `codex mcp add` only supports stdio servers; HTTP servers require TOML configuration.
 
-### Gemini CLI
+### Google Gemini CLI
+
+The official Google CLI with MCP support:
 
 ```bash
 MCP_URL=$(cat .idea/mcp-steroid.md)
@@ -79,6 +85,27 @@ gemini mcp add intellij-steroid "$MCP_URL" --transport http --scope user
 gemini mcp list
 # Should show: ✓ intellij-steroid: <url> (http) - Connected
 ```
+
+Test the connection:
+```bash
+gemini "List all open projects using steroid_list_projects"
+```
+
+### Cursor (Alternative)
+
+Cursor has basic MCP support. Add to your MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "mcp-steroid": {
+      "url": "http://127.0.0.1:6315/mcp"
+    }
+  }
+}
+```
+
+**Note**: For the best MCP Steroid experience, we recommend using Claude Code CLI, Codex CLI, or Gemini CLI, which have more mature MCP implementations.
 
 ### Other MCP Clients
 
@@ -164,22 +191,9 @@ If port 6315 is in use, change it:
 
 When IntelliJ restarts, the MCP server creates a new session. MCP clients will receive a `Mcp-Session-Notice` header and should update their stored session ID automatically.
 
-### Verification Commands
+### Quick Verification
 
-Test the connection with your first command:
-
-```bash
-# Using Claude Code CLI
-claude -p "List all open projects using steroid_list_projects"
-
-# Using Gemini CLI
-gemini "List all open projects using steroid_list_projects"
-
-# Using Codex CLI
-codex exec "List all open projects using steroid_list_projects"
-```
-
-You should see a list of currently open IntelliJ projects.
+After connecting your AI agent, you should see a list of currently open IntelliJ projects when testing with the `steroid_list_projects` tool. If the connection works, your agent can now access all MCP Steroid capabilities.
 
 For more troubleshooting help, see [GitHub Issues](https://github.com/jonnyzzz/mcp-steroid/issues).
 
