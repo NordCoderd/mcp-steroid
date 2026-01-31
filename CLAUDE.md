@@ -20,7 +20,7 @@ better than a test that does not check the problems. Make sure you fix tests.
 
 Check your changes to see if there are no new warnings added to the code.
 
-You should log new ideas and tasks as GitHub issues, focus on the main goal. Iterate over tasks later.
+You should log new ideas and tasks in TODO* files in the repository (for example TODO.md), focus on the main goal. Iterate over tasks later.
 
 ## Workflow Best Practices
 
@@ -62,7 +62,7 @@ All bugs must be fixed using a test-first approach:
 - [ ] Update documentation and other .md files in the project
 - [ ] Commit with descriptive message
 - [ ] Verify tests pass
-- [ ] Update related GitHub issues with status, and explain the changes made
+- [ ] Update related TODO* entries with status, and explain the changes made
 
 ### Bug Fix Requirements
 
@@ -78,50 +78,49 @@ All bugs must be fixed using a test-first approach:
 - Run compile and tests when work is done
 - Avoid over-engineering - only add what's necessary
 
-### Issue-Driven Development
+### TODO-Driven Development
 
-**All tasks must be tracked as GitHub issues.** Use `gh` CLI for all issue management.
+**All tasks must be tracked in TODO* files in the repository (for example `TODO.md`, `TODO-*.md`).**
 
 When working on this repository, follow this structured workflow:
 
-1. **Log ALL tasks as GitHub issues**
-   - Every task, bug, or improvement must have a GitHub issue
-   - Use `gh issue create` with clear title and description
+1. **Log ALL tasks in TODO* files**
+   - Every task, bug, or improvement must have a TODO entry
+   - Use the most relevant TODO file (general in `TODO.md`, topic-specific in `TODO-<topic>.md`)
    - Include steps to reproduce for bug reports
    - Add acceptance criteria when possible
 
-2. **Review open issues first**
-   - Run `gh issue list` to see all open issues
+2. **Review TODO* files first**
+   - Scan `TODO*.md` to see all open items
    - Prioritize by impact and dependencies
-   - Group related issues for efficient resolution
+   - Group related items for efficient resolution
 
-3. **Use issues to plan work**
-   - Leave comments on issues with ideas and suggestions
-   - Use `gh issue comment <number> --body "..."` to add thoughts
+3. **Use TODO entries to plan work**
+   - Add notes/updates directly under the entry
    - Document design decisions and alternatives considered
-   - Update issue description if scope changes
+   - Update the entry if scope changes
 
-4. **Work on issues one-by-one**
-   - Focus on a single issue until it's resolved
-   - Use the todo list to track progress within an issue
-   - Mark issue as complete only when fully verified
+4. **Work on items one-by-one**
+   - Focus on a single TODO entry until it's resolved
+   - Use the todo list to track progress within an entry
+   - Mark the entry as complete only when fully verified
 
-5. **For each issue**:
-   - Read and understand the issue description
+5. **For each item**:
+   - Read and understand the TODO entry
    - Add a failing test that reproduces the problem
    - Implement the fix/feature
    - Run Gradle `build` in the IDE via MCP to verify
-   - Close the issue with `gh issue close <number>`
+   - Mark the TODO entry as done (move to a Resolved/Done section or add a dated completion note)
 
-6. **Create new issues for discovered work**
-   - If you find unrelated issues during work, create new GitHub issues
-   - Use `gh issue create` with clear title and description
-   - Don't scope-creep current issue - defer to new issues
+6. **Create new TODO entries for discovered work**
+   - If you find unrelated issues during work, add a new TODO entry
+   - Keep the current scope focused; defer to a new TODO entry
 
 7. **Commit and verify frequently**
    - Commit logical changes together
    - Run tests after each significant change
    - Keep commits focused and atomic
+
 
 ### Testing Requirements
 
@@ -925,9 +924,9 @@ class MyTest : BasePlatformTestCase() {
 }
 ```
 
-## GitHub Issues Workflow
+## TODO Files Workflow
 
-### Finding and Creating Issues
+### Finding and Creating TODO Entries
 
 1. **Review source files using IntelliJ MCP**:
    - Open files in the editor via `steroid_execute_code`
@@ -935,34 +934,29 @@ class MyTest : BasePlatformTestCase() {
    - Review warnings, errors, and suggestions from the IDE
    - Check TODO/FIXME comments in code
 
-2. **Create GitHub issues for improvements**:
-   ```bash
-   gh issue create --repo jonnyzzz/intellij-mcp-steroids \
-     --title "Issue title" \
-     --body "Description"
-   ```
+2. **Create TODO entries for improvements**:
+   - Add entries to the appropriate `TODO*.md` file (`TODO.md` or a topic-specific `TODO-<topic>.md`)
+   - Include a short title, description, and acceptance criteria
 
-3. **Link issues to code locations**:
+3. **Link TODO entries to code locations**:
    - Reference file paths and line numbers
    - Quote relevant code snippets
-   - Tag with appropriate labels
 
-### Working Through Issues
+### Working Through TODO Entries
 
-1. **List open issues**:
-   ```bash
-   gh issue list --repo jonnyzzz/intellij-mcp-steroids
-   ```
+1. **List open TODO entries**:
+   - Scan `TODO*.md` and pick the next item by priority
 
-2. **Work on issues one by one**:
+2. **Work on items one by one**:
    - Research IntelliJ codebase at `../intellij` for patterns
    - Use IntelliJ MCP to explore APIs
    - Implement the fix
    - Run tests in the IDE via MCP (Gradle run configuration)
    - Deploy: `./gradlew deployPlugin`
 
-3. **Close issues with commits**:
-   - Reference issue in commit message: `Fixes #123`
+3. **Close out TODO entries**:
+   - Update the entry with completion notes and date
+
 
 ## AI Tests
 
