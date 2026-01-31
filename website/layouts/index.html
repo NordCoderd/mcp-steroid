@@ -355,8 +355,8 @@
     <h1>MCP Steroid</h1>
     <span class="version-badge">v{{ .Site.Params.version }}</span>
     <p class="tagline">
-        Give AI the whole IntelliJ, not just the files<br><br>
-        AI agents can finally SEE IntelliJ - not just read code. The only MCP server with visual understanding and full IDE control through the Model Context Protocol.
+        Give AI the whole IDE, not just the files<br><br>
+        AI agents can finally SEE your IDE - not just read code. The only MCP server with visual understanding and full control of IntelliJ IDEA, Rider, Android Studio, and all JetBrains IDEs through the Model Context Protocol.
     </p>
     <div class="cta-buttons">
         <a href="https://linkedin.com/in/jonnyzzz" class="btn btn-primary" target="_blank" rel="noopener">
@@ -384,18 +384,24 @@
     <h2>About the MCP Server</h2>
     <div class="about-content">
         <p>
-            MCP Steroid is an MCP Server for IntelliJ-based IDEs, packaged as an IntelliJ plugin.
-            It exposes IDE APIs and resources to ANY AI agent or LLM through Kotlin script execution inside the IDE runtime.
+            MCP Steroid is a Model Context Protocol server for JetBrains IDEs, packaged as a plugin.
+            It exposes IDE APIs, visual state, and runtime environment to ANY AI agent through Kotlin code execution and screenshot capture.
+        </p>
+        <p>
+            Unlike traditional code assistants that only see text, MCP Steroid lets agents SEE your IDE:
+            dialogs, toolbars, debugger state, test results, and visual elements. Agents can take screenshots,
+            interact with UI, execute tests, run refactorings, and control the full IDE programmatically.
         </p>
         <p>
             Works with Claude, GPT, Gemini, Llama, and any MCP-compatible client.
-            No vendor lock-in &mdash; standard MCP protocol.
+            No vendor lock-in &mdash; open standard protocol.
         </p>
         <ul class="features-list">
-            <li>9 MCP tools and 61 MCP resources from the IDE</li>
-            <li>All IntelliJ-based IDEs supported (IntelliJ IDEA, Rider, Android Studio, GoLand, and more)</li>
-            <li>Execute IDE APIs, refactorings, and VFS operations directly from your AI agent</li>
-            <li>Human review by default (ALWAYS mode)</li>
+            <li>Visual Understanding: Screenshot capture, UI interaction, modal dialog detection</li>
+            <li>Full IDE Control: Execute any IntelliJ API via Kotlin code - refactorings, tests, debugger, VFS</li>
+            <li>All JetBrains IDEs: IntelliJ IDEA, Rider (C#), Android Studio, GoLand, PyCharm, WebStorm, and more</li>
+            <li>9 MCP tools and 58 MCP resources exposed from IDE runtime</li>
+            <li>Human review by default (configurable ALWAYS/TRUSTED/NEVER modes)</li>
         </ul>
         <p>Works with Claude, GPT, Gemini, Llama, and ANY MCP client:</p>
         <div class="agents-list">

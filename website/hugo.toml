@@ -14,7 +14,7 @@
 
 baseURL = 'https://mcp-steroid.jonnyzzz.com/'
 languageCode = 'en-us'
-title = 'MCP Steroid - Give AI the whole IntelliJ, not just the files'
+title = 'MCP Steroid - Give AI the whole IDE, not just the files'
 disableKinds = ['taxonomy', 'term']
 
 [markup]
@@ -41,7 +41,7 @@ disableKinds = ['taxonomy', 'term']
     weight = 4
 
 [params]
-  description = "AI agents can finally SEE IntelliJ - not just read code. Independent research project by Eugene Petrenko bringing visual understanding and full IDE control to AI agents."
+  description = "AI agents can finally SEE your JetBrains IDE - not just read code. Model Context Protocol server bringing visual understanding and full IDE control to AI agents across IntelliJ IDEA, Rider, Android Studio, and more."
   playlistUrl = "https://www.youtube.com/playlist?list=PLitZWClhc4Qgz3w8qrtctMR_lpIc81n0f"
   githubUrl = "https://github.com/jonnyzzz/mcp-steroid"
   githubIssuesUrl = "https://github.com/jonnyzzz/mcp-steroid/issues"

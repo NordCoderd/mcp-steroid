@@ -14,7 +14,6 @@
   limitations under the License.
 */}}
 {{ define "styles" }}
-<style>
     .main-content {
         flex-direction: row;
         align-items: flex-start;
@@ -66,7 +65,7 @@
         max-width: 800px;
     }
     .docs-content h1 {
-        font-size: 2rem;
+        font-size: 2.5rem;
         margin-bottom: 1.5rem;
         background: linear-gradient(135deg, #6B57FF 0%, #FE2857 100%);
         -webkit-background-clip: text;
@@ -124,6 +123,24 @@
     .docs-content tr:hover td {
         background: rgba(255, 255, 255, 0.02);
     }
+    /* Fix horizontal scrolling on mobile */
+    .docs-content pre {
+        overflow-x: auto;
+        max-width: 100%;
+    }
+    .docs-content code {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+    }
+    .docs-content table {
+        display: block;
+        overflow-x: auto;
+        max-width: 100%;
+    }
+    .docs-content p {
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+    }
     .docs-content .note {
         background: rgba(107, 87, 255, 0.1);
         border-left: 3px solid #6B57FF;
@@ -164,7 +181,6 @@
             background: rgba(107, 87, 255, 0.2);
         }
     }
-</style>
 {{ end }}
 
 {{ define "main" }}
