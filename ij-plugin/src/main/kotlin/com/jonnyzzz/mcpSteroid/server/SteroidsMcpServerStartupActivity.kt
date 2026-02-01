@@ -3,9 +3,10 @@ package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
+import com.intellij.openapi.startup.StartupActivity
 import com.jonnyzzz.mcpSteroid.demo.DemoModeService
-import com.jonnyzzz.mcpSteroid.updates.AnalyticsBeacon
 import com.jonnyzzz.mcpSteroid.updates.UpdateChecker
+import java.security.MessageDigest
 
 /**
  * Startup activity that ensures the MCP server is started when the IDE opens.
@@ -24,8 +25,5 @@ class SteroidsMcpServerStartupActivity : ProjectActivity {
         UpdateChecker.getInstance().startUpdates()
 
         DemoModeService.getInstance(project).startDemoNotifications()
-
-        // Track plugin startup (privacy-conscious: hash project path)
-        AnalyticsBeacon.getInstance().send("plugin-startup")
     }
 }
