@@ -1,7 +1,5 @@
 FROM ubuntu:22.04
 
-ARG CACHE_BUST=1
-
 # Install dependencies including Node.js 20+
 RUN apt-get update && \
     apt-get install -y curl ca-certificates gnupg git jq && \
@@ -12,6 +10,8 @@ RUN apt-get update && \
     apt-get install -y nodejs && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+ARG CACHE_BUST=1
 
 # Install Gemini CLI globally
 RUN npm install -g @google/gemini-cli

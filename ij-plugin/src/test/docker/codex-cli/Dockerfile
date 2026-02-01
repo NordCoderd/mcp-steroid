@@ -1,7 +1,5 @@
 FROM ubuntu:22.04
 
-ARG CACHE_BUST=1
-
 # Install dependencies including Node.js 20+ (required for Codex)
 RUN apt-get update && \
     apt-get install -y curl ca-certificates gnupg && \
@@ -12,6 +10,8 @@ RUN apt-get update && \
     apt-get install -y nodejs && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+ARG CACHE_BUST=1
 
 # Install Codex CLI globally as root (before creating user)
 RUN npm install -g @openai/codex
