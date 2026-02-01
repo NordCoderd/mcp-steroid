@@ -1,12 +1,12 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp
+package com.jonnyzzz.mcpSteroid
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.execution.ExecutionResultBuilder
-import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
-import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
-import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
+import com.jonnyzzz.mcpSteroid.execution.ExecutionResultBuilder
+import com.jonnyzzz.mcpSteroid.mcp.ContentItem
+import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.server.ExecCodeParams
+import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive

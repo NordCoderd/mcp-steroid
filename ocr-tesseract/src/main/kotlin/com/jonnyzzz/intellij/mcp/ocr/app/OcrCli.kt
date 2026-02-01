@@ -1,10 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.ocr.app
+package com.jonnyzzz.mcpSteroid.ocr.app
 
-import com.jonnyzzz.intellij.mcp.ocr.OcrLevel
-import com.jonnyzzz.intellij.mcp.ocr.OcrRect
-import com.jonnyzzz.intellij.mcp.ocr.OcrResult
-import com.jonnyzzz.intellij.mcp.ocr.OcrTextBlock
+import com.jonnyzzz.mcpSteroid.ocr.OcrLevel
+import com.jonnyzzz.mcpSteroid.ocr.OcrRect
+import com.jonnyzzz.mcpSteroid.ocr.OcrResult
+import com.jonnyzzz.mcpSteroid.ocr.OcrTextBlock
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import net.sourceforge.tess4j.ITessAPI

@@ -1,13 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.execution
+package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.getExecutionIdFromResult
-import com.jonnyzzz.intellij.mcp.setServerPortProperties
-import com.jonnyzzz.intellij.mcp.testExecParams
-import com.jonnyzzz.intellij.mcp.storage.storagePaths
+import com.jonnyzzz.mcpSteroid.getExecutionIdFromResult
+import com.jonnyzzz.mcpSteroid.setServerPortProperties
+import com.jonnyzzz.mcpSteroid.testExecParams
+import com.jonnyzzz.mcpSteroid.storage.storagePaths
 import java.nio.file.Path
 import kotlin.io.path.exists
 import kotlin.io.path.readText

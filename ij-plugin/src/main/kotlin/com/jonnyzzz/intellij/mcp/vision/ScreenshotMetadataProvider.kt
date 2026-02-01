@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.vision
+package com.jonnyzzz.mcpSteroid.vision
 
 import com.intellij.openapi.extensions.ExtensionPointName
 import com.intellij.openapi.project.Project
@@ -143,6 +143,6 @@ interface ScreenshotMetadataProvider {
 
     companion object {
         val EP_NAME: ExtensionPointName<ScreenshotMetadataProvider> =
-            ExtensionPointName.create("com.jonnyzzz.intellij.mcp-steroid.screenshotMetadataProvider")
+            ExtensionPointName.create("com.jonnyzzz.mcp-steroid.screenshotMetadataProvider")
     }
 }

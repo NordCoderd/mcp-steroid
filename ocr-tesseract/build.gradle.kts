@@ -31,7 +31,7 @@ dependencies {
 
 application {
     applicationName = "ocr-tesseract"
-    mainClass.set("com.jonnyzzz.intellij.mcp.ocr.app.OcrCliKt")
+    mainClass.set("com.jonnyzzz.mcpSteroid.ocr.app.OcrCliKt")
 }
 
 kotlin {

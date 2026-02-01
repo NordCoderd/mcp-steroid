@@ -42,45 +42,45 @@
         <!-- Extension point for registering MCP tools and resources -->
         <extensionPoint
             name="mcpRegistrar"
-            interface="com.jonnyzzz.intellij.mcp.server.McpRegistrar"
+            interface="com.jonnyzzz.mcpSteroid.server.McpRegistrar"
             dynamic="true"/>
 
         <!-- Extension point for screenshot metadata providers -->
         <extensionPoint
             name="screenshotMetadataProvider"
-            interface="com.jonnyzzz.intellij.mcp.vision.ScreenshotMetadataProvider"
+            interface="com.jonnyzzz.mcpSteroid.vision.ScreenshotMetadataProvider"
             dynamic="true"/>
     </extensionPoints>
 
     <!-- MCP tool and resource registrars -->
     <extensions defaultExtensionNs="com.jonnyzzz.mcp-steroid">
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ListProjectsToolHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ListWindowsToolHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ExecuteCodeToolHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ExecuteFeedbackToolHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ActionDiscoveryToolHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionScreenshotToolHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VisionInputToolHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.ListProjectsToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.ListWindowsToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.ExecuteCodeToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.ExecuteFeedbackToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.ActionDiscoveryToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.VisionScreenshotToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.VisionInputToolHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.OpenProjectToolHandler"/>
         <!-- Main skill guides -->
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.SkillResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.CodingWithIntellijResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.DebuggerSkillResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.TestSkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.SkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.CodingWithIntellijResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.DebuggerSkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.TestSkillResourceHandler"/>
         <!-- Example resources by topic -->
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.LspExamplesResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.IdeExamplesResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.DebuggerExamplesResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.TestExamplesResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.VcsExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.LspExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.IdeExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.DebuggerExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.TestExamplesResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.VcsExamplesResourceHandler"/>
         <!-- Other resources -->
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.OpenProjectResourceHandler"/>
-        <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ResourceGraphHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.OpenProjectResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.ResourceGraphHandler"/>
 
         <!-- Screenshot metadata providers -->
-        <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.ScreenshotImageProvider"/>
-        <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.SwingComponentTreeProvider"/>
-        <screenshotMetadataProvider implementation="com.jonnyzzz.intellij.mcp.vision.OcrMetadataProvider"/>
+        <screenshotMetadataProvider implementation="com.jonnyzzz.mcpSteroid.vision.ScreenshotImageProvider"/>
+        <screenshotMetadataProvider implementation="com.jonnyzzz.mcpSteroid.vision.SwingComponentTreeProvider"/>
+        <screenshotMetadataProvider implementation="com.jonnyzzz.mcpSteroid.vision.OcrMetadataProvider"/>
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
@@ -90,7 +90,7 @@
 
         <!-- Review panel notification -->
         <editorNotificationProvider
-            implementation="com.jonnyzzz.intellij.mcp.review.McpReviewNotificationProvider"/>
+            implementation="com.jonnyzzz.mcpSteroid.review.McpReviewNotificationProvider"/>
 
         <!-- Registry keys for configuration -->
         <registryKey key="mcp.steroid.review.mode" defaultValue="ALWAYS"
@@ -132,7 +132,7 @@
 
         <!-- Start MCP server when IDE is ready -->
         <postStartupActivity
-                implementation="com.jonnyzzz.intellij.mcp.server.SteroidsMcpServerStartupActivity"/>
+                implementation="com.jonnyzzz.mcpSteroid.server.SteroidsMcpServerStartupActivity"/>
     </extensions>
 
 </idea-plugin>

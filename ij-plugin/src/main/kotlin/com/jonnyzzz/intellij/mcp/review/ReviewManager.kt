@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.review
+package com.jonnyzzz.mcpSteroid.review
 
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
@@ -16,11 +16,11 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.readText
 import com.intellij.openapi.wm.WindowManager
-import com.jonnyzzz.intellij.mcp.execution.Diff
-import com.jonnyzzz.intellij.mcp.execution.ExecutionResultBuilder
-import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
-import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import com.jonnyzzz.mcpSteroid.execution.Diff
+import com.jonnyzzz.mcpSteroid.execution.ExecutionResultBuilder
+import com.jonnyzzz.mcpSteroid.server.ExecCodeParams
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import kotlinx.coroutines.*
 import java.awt.Frame
 import kotlin.time.Duration.Companion.seconds

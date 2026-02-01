@@ -1,22 +1,22 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.execution
+package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
-import com.jonnyzzz.intellij.mcp.mcp.builder
-import com.jonnyzzz.intellij.mcp.review.ReviewManager
-import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
-import com.jonnyzzz.intellij.mcp.server.McpProgressReporter
-import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
-import com.jonnyzzz.intellij.mcp.server.SkillReference
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
-import com.jonnyzzz.intellij.mcp.storage.executionStorage
-import com.jonnyzzz.intellij.mcp.demo.executionEventBroadcaster
+import com.jonnyzzz.mcpSteroid.mcp.ContentItem
+import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.mcp.builder
+import com.jonnyzzz.mcpSteroid.review.ReviewManager
+import com.jonnyzzz.mcpSteroid.server.ExecCodeParams
+import com.jonnyzzz.mcpSteroid.server.McpProgressReporter
+import com.jonnyzzz.mcpSteroid.server.NoOpProgressReporter
+import com.jonnyzzz.mcpSteroid.server.SkillReference
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+import com.jonnyzzz.mcpSteroid.storage.executionStorage
+import com.jonnyzzz.mcpSteroid.demo.executionEventBroadcaster
 import kotlinx.coroutines.*
 
 interface ExecutionResultBuilder {

@@ -1,11 +1,11 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.server
+package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
 import com.intellij.openapi.startup.StartupActivity
-import com.jonnyzzz.intellij.mcp.demo.DemoModeService
-import com.jonnyzzz.intellij.mcp.updates.UpdateChecker
+import com.jonnyzzz.mcpSteroid.demo.DemoModeService
+import com.jonnyzzz.mcpSteroid.updates.UpdateChecker
 
 /**
  * Startup activity that ensures the MCP server is started when the IDE opens.

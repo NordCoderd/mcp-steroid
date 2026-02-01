@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.koltinc
+package com.jonnyzzz.mcpSteroid.koltinc
 
 import com.intellij.execution.ExecutionException
 import com.intellij.execution.configurations.GeneralCommandLine
@@ -9,7 +9,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.SystemInfoRt
-import com.jonnyzzz.intellij.mcp.PluginDescriptorProvider
+import com.jonnyzzz.mcpSteroid.PluginDescriptorProvider
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path

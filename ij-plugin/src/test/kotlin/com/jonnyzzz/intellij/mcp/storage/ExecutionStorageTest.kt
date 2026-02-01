@@ -1,10 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.storage
+package com.jonnyzzz.mcpSteroid.storage
 
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.testExecParams
+import com.jonnyzzz.mcpSteroid.testExecParams
 import org.junit.Assert.assertNotEquals
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.serialization.json.jsonPrimitive

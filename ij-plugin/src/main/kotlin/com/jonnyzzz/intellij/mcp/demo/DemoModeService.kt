@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.demo
+package com.jonnyzzz.mcpSteroid.demo
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
@@ -10,7 +10,7 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.WindowManager
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import kotlinx.coroutines.*
 import java.awt.Frame
 import java.awt.geom.RoundRectangle2D

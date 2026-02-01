@@ -1,16 +1,16 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.server
+package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.ProjectManager.getInstance
-import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallParams
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallResult
-import com.jonnyzzz.intellij.mcp.storage.ExecutionStorage
-import com.jonnyzzz.intellij.mcp.validateTimeBomb
+import com.jonnyzzz.mcpSteroid.mcp.ContentItem
+import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
+import com.jonnyzzz.mcpSteroid.mcp.ToolCallParams
+import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.storage.ExecutionStorage
+import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import kotlinx.serialization.json.*
 
 /**

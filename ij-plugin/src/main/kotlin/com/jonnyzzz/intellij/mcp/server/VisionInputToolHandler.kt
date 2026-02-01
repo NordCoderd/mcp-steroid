@@ -1,15 +1,15 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.server
+package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.ProjectManager
-import com.jonnyzzz.intellij.mcp.mcp.*
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
-import com.jonnyzzz.intellij.mcp.storage.executionStorage
-import com.jonnyzzz.intellij.mcp.validateTimeBomb
-import com.jonnyzzz.intellij.mcp.vision.InputSequenceParser
-import com.jonnyzzz.intellij.mcp.vision.InputStep
-import com.jonnyzzz.intellij.mcp.vision.VisionService
+import com.jonnyzzz.mcpSteroid.mcp.*
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+import com.jonnyzzz.mcpSteroid.storage.executionStorage
+import com.jonnyzzz.mcpSteroid.validateTimeBomb
+import com.jonnyzzz.mcpSteroid.vision.InputSequenceParser
+import com.jonnyzzz.mcpSteroid.vision.InputStep
+import com.jonnyzzz.mcpSteroid.vision.VisionService
 import kotlinx.serialization.json.*
 
 /**
@@ -121,7 +121,7 @@ class VisionInputToolHandler : McpRegistrar {
             log("Using screenshot execution: $screenshotExecutionId")
 
             val parsed = InputSequenceParser().parse(sequence)
-            if (parsed.filterIsInstance<InputStep.Click>().any { it.target is com.jonnyzzz.intellij.mcp.vision.InputTarget.Unsupported }) {
+            if (parsed.filterIsInstance<InputStep.Click>().any { it.target is com.jonnyzzz.mcpSteroid.vision.InputTarget.Unsupported }) {
                 throw IllegalArgumentException("Unsupported target in sequence. Only screenshot/screen targets are supported.")
             }
 

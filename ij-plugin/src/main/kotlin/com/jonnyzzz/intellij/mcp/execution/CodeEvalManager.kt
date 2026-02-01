@@ -1,17 +1,17 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.execution
+package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.jonnyzzz.intellij.mcp.koltinc.KotlincCommandLine
-import com.jonnyzzz.intellij.mcp.koltinc.builder
-import com.jonnyzzz.intellij.mcp.koltinc.kotlincProcessClient
-import com.jonnyzzz.intellij.mcp.koltinc.scriptClassLoaderFactory
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
-import com.jonnyzzz.intellij.mcp.storage.executionStorage
+import com.jonnyzzz.mcpSteroid.koltinc.KotlincCommandLine
+import com.jonnyzzz.mcpSteroid.koltinc.builder
+import com.jonnyzzz.mcpSteroid.koltinc.kotlincProcessClient
+import com.jonnyzzz.mcpSteroid.koltinc.scriptClassLoaderFactory
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlin.io.path.div

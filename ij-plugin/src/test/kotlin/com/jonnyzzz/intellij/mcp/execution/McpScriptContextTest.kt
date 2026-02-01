@@ -1,10 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.execution
+package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.TestResultBuilder
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import com.jonnyzzz.mcpSteroid.TestResultBuilder
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import kotlinx.serialization.json.buildJsonObject
 
 /**

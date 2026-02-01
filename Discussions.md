@@ -448,7 +448,7 @@ IntelliJ Community includes a full MCP server plugin (`com.intellij.mcpServer`) 
 **Option A**: Implement `McpToolset` and register via:
 ```xml
 <extensions defaultExtensionNs="com.intellij.mcpServer">
-  <mcpToolset implementation="com.jonnyzzz.intellij.mcp.SteroidsMcpToolset"/>
+  <mcpToolset implementation="com.jonnyzzz.mcpSteroid.SteroidsMcpToolset"/>
 </extensions>
 ```
 

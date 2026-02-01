@@ -1,13 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp
+package com.jonnyzzz.mcpSteroid
 
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.mcp.*
-import com.jonnyzzz.intellij.mcp.server.ActionDiscoveryResponse
-import com.jonnyzzz.intellij.mcp.server.ListProjectsResponse
-import com.jonnyzzz.intellij.mcp.server.ListWindowsResponse
-import com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer
+import com.jonnyzzz.mcpSteroid.mcp.*
+import com.jonnyzzz.mcpSteroid.server.ActionDiscoveryResponse
+import com.jonnyzzz.mcpSteroid.server.ListProjectsResponse
+import com.jonnyzzz.mcpSteroid.server.ListWindowsResponse
+import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.*

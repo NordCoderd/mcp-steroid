@@ -1,7 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.mcp
+package com.jonnyzzz.mcpSteroid.mcp
 
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement

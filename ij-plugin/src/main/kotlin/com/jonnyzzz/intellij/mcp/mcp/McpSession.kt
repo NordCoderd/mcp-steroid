@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.mcp
+package com.jonnyzzz.mcpSteroid.mcp
 
 import com.intellij.openapi.diagnostic.Logger
 import kotlinx.coroutines.CompletableDeferred
@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 
-private val log = Logger.getInstance("com.jonnyzzz.intellij.mcp.mcp.McpSession")
+private val log = Logger.getInstance("com.jonnyzzz.mcpSteroid.mcp.McpSession")
 
 /**
  * Represents an MCP session with its state and notification channel.

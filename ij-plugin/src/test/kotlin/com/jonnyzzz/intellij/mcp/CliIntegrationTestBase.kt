@@ -1,9 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp
+package com.jonnyzzz.mcpSteroid
 
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.mcp.McpJson
+import com.jonnyzzz.mcpSteroid.mcp.McpJson
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -193,7 +193,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             println("EXEC1_OK")
 
             Call #2 code:
-            val server = com.jonnyzzz.intellij.mcp.server.SteroidsMcpServer.getInstance().getServer()
+            val server = com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer.getInstance().getServer()
             val forgotten = server.sessionManager.forgetAllSessionsForTest()
             println("SESSIONS_FORGOTTEN: " + forgotten)
 

@@ -1,12 +1,12 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.storage
+package com.jonnyzzz.mcpSteroid.storage
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.jonnyzzz.intellij.mcp.mcp.ToolCallParams
-import com.jonnyzzz.intellij.mcp.server.ExecCodeParams
+import com.jonnyzzz.mcpSteroid.mcp.ToolCallParams
+import com.jonnyzzz.mcpSteroid.server.ExecCodeParams
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

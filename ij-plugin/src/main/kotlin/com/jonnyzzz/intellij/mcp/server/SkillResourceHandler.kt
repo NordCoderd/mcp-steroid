@@ -1,9 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.server
+package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.jonnyzzz.intellij.mcp.mcp.McpServerCore
+import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 
 /**
  * Handler for the IntelliJ API Power User Guide resource.
@@ -53,7 +53,7 @@ class SkillResource {
     }
 
     private fun injectPluginVersion(content: String): String {
-        val version = com.jonnyzzz.intellij.mcp.PluginDescriptorProvider.getInstance().version
+        val version = com.jonnyzzz.mcpSteroid.PluginDescriptorProvider.getInstance().version
         val headerEnd = content.indexOf("\n---", startIndex = 3)
         if (content.startsWith("---") && headerEnd > 0) {
             val header = content.substring(0, headerEnd)

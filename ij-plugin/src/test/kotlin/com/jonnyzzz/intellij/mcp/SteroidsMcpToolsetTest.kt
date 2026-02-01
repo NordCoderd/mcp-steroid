@@ -1,15 +1,15 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp
+package com.jonnyzzz.mcpSteroid
 
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.execution.ExecutionManager
-import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
-import com.jonnyzzz.intellij.mcp.storage.ExecutionId
-import com.jonnyzzz.intellij.mcp.storage.executionStorage
-import com.jonnyzzz.intellij.mcp.vision.ScreenshotMeta
+import com.jonnyzzz.mcpSteroid.execution.ExecutionManager
+import com.jonnyzzz.mcpSteroid.mcp.ContentItem
+import com.jonnyzzz.mcpSteroid.server.NoOpProgressReporter
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+import com.jonnyzzz.mcpSteroid.storage.executionStorage
+import com.jonnyzzz.mcpSteroid.vision.ScreenshotMeta
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import kotlin.time.Duration.Companion.seconds
@@ -29,7 +29,7 @@ class SteroidsMcpToolsetTest : BasePlatformTestCase() {
         setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
     }
 
-    private fun getTextContent(result: com.jonnyzzz.intellij.mcp.mcp.ToolCallResult): String {
+    private fun getTextContent(result: com.jonnyzzz.mcpSteroid.mcp.ToolCallResult): String {
         return result.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
     }
 

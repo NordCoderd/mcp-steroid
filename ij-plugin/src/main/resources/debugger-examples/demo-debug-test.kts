@@ -32,7 +32,7 @@ import kotlinx.coroutines.withContext
 
 
 val configurationName = "DemoTestByJonnyzzz (Debug)"
-val testClass = "com.jonnyzzz.intellij.mcp.ocr.DemoTestByJonnyzzz"
+val testClass = "com.jonnyzzz.mcpSteroid.ocr.DemoTestByJonnyzzz"
 
 val runManager = RunManager.getInstance(project)
 val settings = runManager.allSettings.firstOrNull { it.name == configurationName }

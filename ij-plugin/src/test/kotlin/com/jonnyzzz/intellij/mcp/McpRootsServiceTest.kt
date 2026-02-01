@@ -1,9 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp
+package com.jonnyzzz.mcpSteroid
 
 import com.intellij.testFramework.UsefulTestCase
 import com.intellij.testFramework.common.timeoutRunBlocking
-import com.jonnyzzz.intellij.mcp.mcp.*
+import com.jonnyzzz.mcpSteroid.mcp.*
 import kotlin.time.Duration.Companion.seconds
 
 /**

@@ -1,10 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.vision
+package com.jonnyzzz.mcpSteroid.vision
 
 import com.intellij.openapi.diagnostic.thisLogger
-import com.jonnyzzz.intellij.mcp.ocr.OcrLevel
-import com.jonnyzzz.intellij.mcp.ocr.OcrProcessClient
-import com.jonnyzzz.intellij.mcp.ocr.OcrResult
+import com.jonnyzzz.mcpSteroid.ocr.OcrLevel
+import com.jonnyzzz.mcpSteroid.ocr.OcrProcessClient
+import com.jonnyzzz.mcpSteroid.ocr.OcrResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.nio.file.Files

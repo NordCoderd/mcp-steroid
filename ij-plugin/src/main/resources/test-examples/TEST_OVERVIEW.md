@@ -24,7 +24,7 @@ This directory contains runnable examples for IntelliJ test execution and result
 
 ## Demo Sanity Check (This Repo)
 
-Use the demo test `DemoTestByJonnyzzz` in `com.jonnyzzz.intellij.mcp.ocr` to verify the full flow:
+Use the demo test `DemoTestByJonnyzzz` in `com.jonnyzzz.mcpSteroid.ocr` to verify the full flow:
 
 1. Create or select a run configuration for `DemoTestByJonnyzzz`
    - Add VM option: `-Dmcp.demo.by.jonnyzzz=true` (the test is skipped otherwise)

@@ -1,13 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.intellij.mcp.execution
+package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.intellij.mcp.mcp.ContentItem
-import com.jonnyzzz.intellij.mcp.server.NoOpProgressReporter
-import com.jonnyzzz.intellij.mcp.setSystemPropertyForTest
-import com.jonnyzzz.intellij.mcp.testExecParams
+import com.jonnyzzz.mcpSteroid.mcp.ContentItem
+import com.jonnyzzz.mcpSteroid.server.NoOpProgressReporter
+import com.jonnyzzz.mcpSteroid.setSystemPropertyForTest
+import com.jonnyzzz.mcpSteroid.testExecParams
 import kotlin.time.Duration.Companion.seconds
 
 class ScriptExecutionAvailabilityTest : BasePlatformTestCase() {

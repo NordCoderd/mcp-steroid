@@ -681,9 +681,9 @@ The Kotlin plugin supports two extension points for script definitions:
 <extensions defaultExtensionNs="org.jetbrains.kotlin">
     <scriptDefinitionsSource
             id="McpSteroidScriptDefinitionsSource"
-            implementation="com.jonnyzzz.intellij.mcp.script.McpSteroidScriptDefinitionsSource"/>
+            implementation="com.jonnyzzz.mcpSteroid.script.McpSteroidScriptDefinitionsSource"/>
     <scriptDefinitionsProvider
-            implementation="com.jonnyzzz.intellij.mcp.script.McpSteroidScriptDefinitionsProvider"/>
+            implementation="com.jonnyzzz.mcpSteroid.script.McpSteroidScriptDefinitionsProvider"/>
 </extensions>
 ```
 

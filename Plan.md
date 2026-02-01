@@ -113,7 +113,7 @@ dependencies {
 
 ```xml
 <idea-plugin>
-    <id>com.jonnyzzz.intellij.mcp-steroid</id>
+    <id>com.jonnyzzz.mcpSteroid-steroid</id>
     <name>IntelliJ MCP Steroid</name>
 
     <depends>com.intellij.modules.platform</depends>
@@ -123,11 +123,11 @@ dependencies {
     <extensions defaultExtensionNs="com.intellij">
         <!-- Review panel -->
         <editorNotificationProvider
-            implementation="com.jonnyzzz.intellij.mcp.review.McpReviewNotificationProvider"/>
+            implementation="com.jonnyzzz.mcpSteroid.review.McpReviewNotificationProvider"/>
 
         <!-- Project services -->
-        <projectService serviceImplementation="com.jonnyzzz.intellij.mcp.execution.ExecutionManager"/>
-        <projectService serviceImplementation="com.jonnyzzz.intellij.mcp.storage.ExecutionStorage"/>
+        <projectService serviceImplementation="com.jonnyzzz.mcpSteroid.execution.ExecutionManager"/>
+        <projectService serviceImplementation="com.jonnyzzz.mcpSteroid.storage.ExecutionStorage"/>
 
         <!-- Registry keys -->
         <registryKey key="mcp.steroids.review.mode" defaultValue="ALWAYS"
@@ -139,7 +139,7 @@ dependencies {
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij.mcpServer">
-        <mcpToolset implementation="com.jonnyzzz.intellij.mcp.SteroidsMcpToolset"/>
+        <mcpToolset implementation="com.jonnyzzz.mcpSteroid.SteroidsMcpToolset"/>
     </extensions>
 </idea-plugin>
 ```
