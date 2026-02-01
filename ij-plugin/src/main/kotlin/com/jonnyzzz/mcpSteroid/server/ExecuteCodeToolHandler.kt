@@ -13,6 +13,7 @@ import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallContext
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.updates.AnalyticsBeacon
 import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import kotlinx.serialization.json.*
 
@@ -174,6 +175,10 @@ class ExecuteCodeToolHandler : McpRegistrar {
         val result = project
             .service<ExecutionManager>()
             .executeWithProgress(execCodeParams)
+
+        AnalyticsBeacon.getInstance().send(
+            "tool-execute"
+        )
 
         return result
     }
