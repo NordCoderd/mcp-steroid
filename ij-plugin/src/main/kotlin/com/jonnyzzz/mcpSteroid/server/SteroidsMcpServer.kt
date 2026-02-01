@@ -9,6 +9,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
+import com.jonnyzzz.mcpSteroid.PluginDescriptorProvider
 import com.jonnyzzz.mcpSteroid.mcp.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -38,7 +39,7 @@ class SteroidsMcpServer(
     private val portRef = AtomicReference(0)
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob() + Dispatchers.IO)
     private val startupLock = ReentrantLock()
-    private val pluginVersion = com.jonnyzzz.mcpSteroid.PluginDescriptorProvider.getInstance().version
+    private val pluginVersion get() = PluginDescriptorProvider.getInstance().version
 
     val port: Int get() = portRef.get()
     val mcpUrl: String get() = "http://localhost:$port/mcp"
@@ -51,12 +52,17 @@ class SteroidsMcpServer(
 
     private val mcpServer = McpServerCore(
         serverInfo = ServerInfo(
-            name = "intellij-mcp-steroid",
-            version = pluginVersion
+            name = "mcp-steroid",
+            version = pluginVersion,
         ),
+        instructions = """
+             Use this MCP to access IntelliJ-based IDE and manipulate the code like a professional developer.
+             📖 **COMPLETE GUIDE**: mcp-steroid://coding-with-intellij
+        """.trimIndent(),
         capabilities = ServerCapabilities(
-            tools = ToolsCapability(listChanged = false),
-            resources = ResourcesCapability(subscribe = false, listChanged = false)
+            tools = ToolsCapability(listChanged = true),
+            resources = ResourcesCapability(subscribe = true, listChanged = true),
+            prompts = null,
         )
     )
 
