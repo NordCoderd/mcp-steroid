@@ -29,7 +29,9 @@ Review the log file for specific problem.
 ## Slack Community
 
 [DM Eugene](https://linkedin.com/in/jonnyzzz) to get invite to the Slack community
-[MCP-Steroid Community](https://mcp-steroidcommunity.slack.com) 
+[MCP-Steroid Community](https://mcp-steroid.slack.com) 
+
+Use the [Invite Link](https://join.slack.com/t/mcp-steroid/shared_invite/zt-3p3oq91kx-BXJng8GSXveqncFVYWUcpQ)
 
 That is the best place to discuss the plugin, ideas, features.
 
