@@ -24,6 +24,7 @@ import java.net.BindException
 import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.ReentrantLock
+import kotlin.concurrent.withLock
 
 /**
  * MCP Server application service.
@@ -71,8 +72,7 @@ class SteroidsMcpServer(
         if (port > 0) return
 
         // Synchronize startup to handle concurrent calls from multiple projects
-        startupLock.lock()
-        try {
+        startupLock.withLock {
             // Double-check after acquiring lock
             if (port > 0) return
 
@@ -95,8 +95,6 @@ class SteroidsMcpServer(
                 log.info("Note: If you restart IntelliJ, connected MCP clients (Claude CLI, etc.) will need to reconnect.")
                 log.info("      Client should re-run: claude mcp add --transport http intellij-steroid $mcpUrl")
             }
-        } finally {
-            startupLock.unlock()
         }
     }
 
