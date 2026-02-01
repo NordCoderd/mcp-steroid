@@ -1,5 +1,5 @@
 <idea-plugin>
-    <id>com.jonnyzzz.intellij.mcp-steroid</id>
+    <id>com.jonnyzzz.mcp-steroid</id>
     <name>MCP Steroid</name>
     <vendor>jonnyzzz.com</vendor>
 
@@ -8,7 +8,7 @@
 
     <p><b>IntelliJ platform works for AI agents as great as for human developers.</b></p>
 
-    <p>MCP Steroid is an independent research project by Eugene Petrenko (jonnyzzz). Not affiliated with, endorsed by, or supported by JetBrains s.r.o.</p>
+    <p>MCP Steroid is an independent research project by Eugene Petrenko (<a href="https://jonnyzz.com">@jonnyzzz</a>). Not affiliated with, endorsed by, or supported by JetBrains s.r.o.</p>
 
     <h3>What You Get</h3>
     <ul>
@@ -53,7 +53,7 @@
     </extensionPoints>
 
     <!-- MCP tool and resource registrars -->
-    <extensions defaultExtensionNs="com.jonnyzzz.intellij.mcp-steroid">
+    <extensions defaultExtensionNs="com.jonnyzzz.mcp-steroid">
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ListProjectsToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ListWindowsToolHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.intellij.mcp.server.ExecuteCodeToolHandler"/>
@@ -87,11 +87,6 @@
         <!-- Update checker notification group -->
         <notificationGroup id="jonnyzzz.mcp.steroid.updates"
                            displayType="BALLOON"/>
-
-        <!-- Demo Mode overlay service (project-level) -->
-        <projectService
-            serviceImplementation="com.jonnyzzz.intellij.mcp.demo.DemoModeService"
-            preload="true"/>
 
         <!-- Review panel notification -->
         <editorNotificationProvider

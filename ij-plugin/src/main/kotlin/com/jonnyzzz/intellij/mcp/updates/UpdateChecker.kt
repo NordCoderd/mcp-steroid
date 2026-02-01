@@ -5,8 +5,6 @@ import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationInfo
-import com.intellij.openapi.application.ApplicationManager
-import com.intellij.openapi.application.EDT
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
@@ -14,7 +12,6 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.io.HttpRequests
 import com.jonnyzzz.intellij.mcp.PluginDescriptorProvider
 import kotlinx.coroutines.*
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -135,7 +132,11 @@ class UpdateChecker(
         scope.cancel()
     }
 
+    private val updateIsStarted = AtomicBoolean(false)
+
     fun startUpdates() {
+        if (!updateIsStarted.compareAndSet(false, true)) return
+
         scope.launch {
             // Initial delay: wait a bit for IDE to fully start
             delay(30.seconds)

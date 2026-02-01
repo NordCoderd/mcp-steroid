@@ -88,9 +88,6 @@ class SteroidsMcpServer(
                 log.info("MCP Steroid server started on $mcpUrl")
                 log.info("Note: If you restart IntelliJ, connected MCP clients (Claude CLI, etc.) will need to reconnect.")
                 log.info("      Client should re-run: claude mcp add --transport http intellij-steroid $mcpUrl")
-
-                // Write server URL to user home for easy discovery
-                ServerUrlWriter.getInstance().writeServerUrlToUserHome(mcpUrl)
             }
         } finally {
             startupLock.unlock()

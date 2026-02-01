@@ -17,6 +17,6 @@ interface McpRegistrar {
 
     companion object {
         val EP_NAME: ExtensionPointName<McpRegistrar> =
-            ExtensionPointName.create("com.jonnyzzz.intellij.mcp-steroid.mcpRegistrar")
+            ExtensionPointName.create("com.jonnyzzz.mcp-steroid.mcpRegistrar")
     }
 }

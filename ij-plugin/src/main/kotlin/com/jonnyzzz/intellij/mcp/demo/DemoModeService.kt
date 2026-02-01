@@ -15,6 +15,7 @@ import kotlinx.coroutines.*
 import java.awt.Frame
 import java.awt.geom.RoundRectangle2D
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 import javax.swing.JWindow
 
 /**
@@ -38,7 +39,11 @@ class DemoModeService(
     // Track which executions are being displayed (thread-safe)
     private val displayedExecutions: MutableSet<ExecutionId> = ConcurrentHashMap.newKeySet()
 
-    init {
+    private val notificationsAreStarted = AtomicBoolean(false)
+
+    fun startDemoNotifications() {
+        if (!notificationsAreStarted.compareAndSet(false, true)) return
+
         // Subscribe to execution events via message bus
         val connection = ApplicationManager.getApplication().messageBus.connect(this)
         connection.subscribe(EXECUTION_EVENTS_TOPIC, object : ExecutionEventListener {

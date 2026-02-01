@@ -3,6 +3,8 @@ package com.jonnyzzz.intellij.mcp.server
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity
+import com.intellij.openapi.startup.StartupActivity
+import com.jonnyzzz.intellij.mcp.demo.DemoModeService
 import com.jonnyzzz.intellij.mcp.updates.UpdateChecker
 
 /**
@@ -14,17 +16,13 @@ class SteroidsMcpServerStartupActivity : ProjectActivity {
     override suspend fun execute(project: Project) {
         // Accessing the service triggers initialization if not already done
         val server = SteroidsMcpServer.getInstance()
-
         server.startServerIfNeeded()
 
-        // Write the server URL to this project's .idea folder
-        ServerUrlWriter.getInstance()
+        ServerUrlWriter.getInstance().writeServerUrlToUserHome(server.mcpUrl)
         IdeaDescriptionWriter.getInstance().writeDescriptionFile(project, server.mcpUrl)
 
-        // Write the description file to .idea/mcp-steroid.md
-        IdeaDescriptionWriter.getInstance().writeDescriptionFile(project, server.mcpUrl)
-
-        // Initialize update checker (runs periodic checks for new versions)
         UpdateChecker.getInstance().startUpdates()
+
+        DemoModeService.getInstance(project).startDemoNotifications()
     }
 }
