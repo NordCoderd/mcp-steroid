@@ -36,9 +36,17 @@ disableKinds = ['taxonomy', 'term']
     url = "https://www.youtube.com/playlist?list=PLitZWClhc4Qgz3w8qrtctMR_lpIc81n0f"
     weight = 3
   [[menus.main]]
+    name = "Slack Community"
+    url = "https://mcp-steroid.slack.com"
+    weight = 4
+  [[menus.main]]
+    name = "GitHub Issues"
+    url = "https://github.com/jonnyzzz/mcp-steroid/issues"
+    weight = 5
+  [[menus.main]]
     name = "GitHub"
     url = "https://github.com/jonnyzzz/mcp-steroid"
-    weight = 4
+    weight = 6
 
 [params]
   description = "AI agents can finally SEE your JetBrains IDE - not just read code. Model Context Protocol server bringing visual understanding and full IDE control to AI agents across IntelliJ IDEA, Rider, Android Studio, and more."
