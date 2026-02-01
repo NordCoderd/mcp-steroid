@@ -84,6 +84,12 @@ class UpdateChecker(
         if (!currentVersion.startsWith(remoteVersion)) {
             log.info("MCP Steroid plugin update available: $remoteVersion (current: $currentVersion)")
 
+            // Track update detection
+            AnalyticsBeacon.getInstance().send("update-available", mapOf(
+                "currentVersion" to currentVersion,
+                "newVersion" to remoteVersion
+            ))
+
             // Show notification only once per IDE session
             if (notificationShown.compareAndSet(false, true)) {
                 showUpdateNotification(currentVersion, remoteVersion)

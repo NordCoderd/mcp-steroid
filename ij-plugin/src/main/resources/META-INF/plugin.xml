@@ -130,6 +130,9 @@
         <registryKey key="mcp.steroid.idea.description.enabled" defaultValue="true"
             description="Generate .idea/mcp-steroid.md description file in projects"/>
 
+        <registryKey key="mcp.steroid.analytics.enabled" defaultValue="true"
+            description="Toggles minimalistic analytics from the plugin"/>
+
         <!-- Start MCP server when IDE is ready -->
         <postStartupActivity
                 implementation="com.jonnyzzz.mcpSteroid.server.SteroidsMcpServerStartupActivity"/>
