@@ -170,7 +170,7 @@ intellijPlatform {
     }
     buildSearchableOptions = false
     pluginConfiguration {
-        name = "IntelliJ MCP Steroid"
+        name = "MCP Steroid"
         version = project.version.toString()
 
         ideaVersion {
