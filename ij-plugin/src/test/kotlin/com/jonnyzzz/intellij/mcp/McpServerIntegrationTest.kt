@@ -1250,6 +1250,6 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertEquals("text/markdown", content.mimeType)
         assertNotNull("Resource should have text content", content.text)
         assertTrue("Content should contain SKILL.md content", content.text!!.contains("IntelliJ MCP Steroid"))
-        assertTrue("Content should contain quickstart", content.text!!.contains("Quickstart"))
+        assertTrue("Content should contain quickstart", content.text.contains("Quickstart"))
     }
 }
