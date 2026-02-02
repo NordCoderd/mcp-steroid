@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid
 
 import com.intellij.openapi.Disposable
+import com.jetbrains.rd.util.assert
+import com.jonnyzzz.mcpSteroid.server.IdeaDescriptionWriter
 import java.io.File
 
 /**
@@ -19,12 +21,12 @@ class DockerCodexSession(
     fun toAiSession(): AiAgentSession = this
 
     fun registerMcp(mcpUrl: String, mcpName: String) = apply {
-        runInContainer(
-            "mcp",
-            "add",
-            mcpName,
-            "--url", mcpUrl,
-        )
+        var command = IdeaDescriptionWriter.getInstance().codexMcpAddCommand(mcpUrl, mcpName)
+            .split(" ")
+
+        assert(command[0] == "codex")
+        command = command.drop(1)
+        runInContainer(args = command.toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput("MCP server registration")
     }

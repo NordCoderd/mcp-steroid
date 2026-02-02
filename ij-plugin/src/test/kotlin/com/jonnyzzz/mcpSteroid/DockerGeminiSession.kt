@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid
 
 import com.intellij.openapi.Disposable
+import com.jetbrains.rd.util.assert
+import com.jonnyzzz.mcpSteroid.server.IdeaDescriptionWriter
 import java.io.File
 
 /**
@@ -10,18 +12,18 @@ import java.io.File
 class DockerGeminiSession(
     val session: DockerSession,
     private val apiKey: String,
-    private val debug: Boolean = true,
+    private val debug: Boolean = false,
 ) : AiAgentSession {
 
     fun registerMcp(mcpUrl: String, mcpName: String) = apply {
-        runInContainer(
-            "mcp",
-            "add",
-            mcpName,
-            "--type", "http",
-            "--trust",
-            mcpUrl,
-        )
+        var command = IdeaDescriptionWriter.getInstance().geminiMcpAddCommand(mcpUrl, mcpName)
+            .split(" ")
+
+        assert(command[0] == "gemini")
+        command = command.drop(1)
+        command += "--trust"
+
+        runInContainer(args = command.toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput(message = "MCP server registration")
     }

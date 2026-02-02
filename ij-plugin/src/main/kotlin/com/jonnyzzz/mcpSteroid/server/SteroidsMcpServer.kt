@@ -9,7 +9,6 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
-import com.jonnyzzz.mcpSteroid.PluginDescriptorProvider
 import com.jonnyzzz.mcpSteroid.mcp.*
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -20,6 +19,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.sse.*
 import kotlinx.coroutines.*
+import org.jetbrains.annotations.TestOnly
 import java.net.BindException
 import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicReference
@@ -40,7 +40,7 @@ class SteroidsMcpServer(
     private val portRef = AtomicReference(0)
     private val scope = CoroutineScope(parentScope.coroutineContext + SupervisorJob() + Dispatchers.IO)
     private val startupLock = ReentrantLock()
-    private val pluginVersion get() = PluginDescriptorProvider.getInstance().version
+    private val pluginVersion = com.jonnyzzz.mcpSteroid.PluginDescriptorProvider.getInstance().version
 
     val port: Int get() = portRef.get()
     val mcpUrl: String get() = "http://localhost:$port/mcp"
@@ -61,9 +61,8 @@ class SteroidsMcpServer(
              📖 **COMPLETE GUIDE**: mcp-steroid://coding-with-intellij
         """.trimIndent(),
         capabilities = ServerCapabilities(
-            tools = ToolsCapability(listChanged = true),
-            resources = ResourcesCapability(subscribe = true, listChanged = true),
-            prompts = null,
+            tools = ToolsCapability(listChanged = false),
+            resources = ResourcesCapability(subscribe = false, listChanged = false)
         )
     )
 
@@ -249,7 +248,7 @@ class SteroidsMcpServer(
         return """
             {
                 "mcpServers": {
-                    "intellij-mcp-steroid": {
+                    "mcp-steroid": {
                         "url": "$scheme://$host:$port/mcp"
                     }
                 }
@@ -261,6 +260,15 @@ class SteroidsMcpServer(
         scope.cancel()
         serverRef.get()?.stop(1000, 2000)
         log.info("MCP Steroid server stopped")
+    }
+
+    @TestOnly
+    @Suppress("unused")
+    fun forgetAllForTest() {
+        //TODO: We need to make sure all connections are stopped.
+        val server = serverRef.get()?: return
+        server.reload()
+        getServer().sessionManager.forgetAllSessionsForTest()
     }
 
     companion object {
