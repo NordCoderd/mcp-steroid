@@ -44,6 +44,7 @@ class ServerUrlWriter : Disposable {
         val file = userHome.resolve(".$pid.mcp-steroid")
 
         val content = buildMarkerContent(serverUrl)
+        log.info("Writing MCP Steroid is ready\n$content")
 
         try {
             Files.writeString(file, content)
