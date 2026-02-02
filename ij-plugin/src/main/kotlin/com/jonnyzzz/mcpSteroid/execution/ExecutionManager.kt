@@ -117,24 +117,22 @@ class ExecutionManager(
         fun build() = responseBuilder.build()
 
         override fun logMessage(message: String) {
-            val text = "LOG: $message"
-            responseBuilder.addTextContent(text)
-            mcpProgress.report(text)
+            responseBuilder.addTextContent(message)
+            mcpProgress.report(message)
             // Broadcast output event for Demo Mode
             executionEventBroadcaster.onOutput(executionId, message)
             innerScope.launch {
-                project.executionStorage.appendExecutionEvent(executionId, text)
+                project.executionStorage.appendExecutionEvent(executionId, message)
             }
         }
 
         override fun logProgress(message: String) {
-            val text = "PROGRESS: $message"
-            responseBuilder.addTextContent(text)
-            mcpProgress.report(text)
+            responseBuilder.addTextContent(message)
+            mcpProgress.report(message)
             // Broadcast progress event for Demo Mode
             executionEventBroadcaster.onProgress(executionId, message)
             innerScope.launch {
-                project.executionStorage.appendExecutionEvent(executionId, text)
+                project.executionStorage.appendExecutionEvent(executionId, message)
             }
         }
 
@@ -149,11 +147,11 @@ class ExecutionManager(
         }
 
         override fun logException(message: String, throwable: Throwable) {
-            val text = "EXCEPTION: $message: ${throwable.message}\n${throwable.stackTraceToString()}"
+            val text = "ERROR: $message: ${throwable.message}\n${throwable.stackTraceToString()}"
             responseBuilder.addTextContent(text)
             mcpProgress.report(text)
 
-            // Add error-specific hint with MCP resource hints
+            // Add an error-specific hint with MCP resource hints
             val hint = SkillReference.getInstance().errorHint(throwable.message ?: message)
             responseBuilder.addTextContent("HINT: $hint")
 
