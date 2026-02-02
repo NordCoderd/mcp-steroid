@@ -62,6 +62,7 @@ class SteroidsMcpServer(
         """.trimIndent(),
         capabilities = ServerCapabilities(
             tools = ToolsCapability(listChanged = false),
+            prompts = PromptsCapability(listChanged = false),
             resources = ResourcesCapability(subscribe = false, listChanged = false)
         )
     )

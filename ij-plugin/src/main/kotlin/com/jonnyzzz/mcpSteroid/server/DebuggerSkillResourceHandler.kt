@@ -7,9 +7,10 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
  * Handler for the IntelliJ Debugger skill guide resource.
  */
 class DebuggerSkillResourceHandler : McpRegistrar {
-    private val SKILL_RESOURCE_PATH = "/skill/DEBUGGER_SKILL.md"
-    private val resourceUri = "mcp-steroid://skill/debugger-guide"
-    private val resourceName = "IntelliJ Debugger Skill Guide"
+    private val descriptor = skillResources.debugger
+    private val skillResourcePath = descriptor.resourcePath
+    private val resourceUri = descriptor.resourceUri
+    private val resourceName = descriptor.resourceName
     private val resourceDescription = """
         Debugger-focused guide for running debug sessions and inspecting threads.
 
@@ -19,16 +20,16 @@ class DebuggerSkillResourceHandler : McpRegistrar {
 
     /** Cached skill content - validated at load time */
     private val skillContent: String by lazy {
-        javaClass.getResourceAsStream(SKILL_RESOURCE_PATH)
+        javaClass.getResourceAsStream(skillResourcePath)
             ?.bufferedReader()
             ?.readText()
-            ?: error("Debugger skill resource not found: $SKILL_RESOURCE_PATH")
+            ?: error("Debugger skill resource not found: $skillResourcePath")
     }
 
     override fun register(server: McpServerCore) {
         // Validate resource exists during registration (fail-fast)
-        require(javaClass.getResource(SKILL_RESOURCE_PATH) != null) {
-            "Debugger skill resource missing from JAR: $SKILL_RESOURCE_PATH"
+        require(javaClass.getResource(skillResourcePath) != null) {
+            "Debugger skill resource missing from JAR: $skillResourcePath"
         }
 
         server.resourceRegistry.registerResource(

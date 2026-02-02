@@ -7,10 +7,11 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
  * Handler for the IntelliJ Test Runner skill guide resource.
  */
 class TestSkillResourceHandler : McpRegistrar {
-    private val SKILL_RESOURCE_PATH = "/skill/TEST_SKILL.md"
+    private val descriptor = skillResources.test
+    private val skillResourcePath = descriptor.resourcePath
 
-    private val resourceUri = "mcp-steroid://skill/test-runner-guide"
-    private val resourceName = "IntelliJ Test Runner Skill Guide"
+    private val resourceUri = descriptor.resourceUri
+    private val resourceName = descriptor.resourceName
     private val resourceDescription = """
         Test execution and result inspection guide for running tests and analyzing results.
 
@@ -20,16 +21,16 @@ class TestSkillResourceHandler : McpRegistrar {
 
     /** Cached skill content - validated at load time */
     private val skillContent: String by lazy {
-        javaClass.getResourceAsStream(SKILL_RESOURCE_PATH)
+        javaClass.getResourceAsStream(skillResourcePath)
             ?.bufferedReader()
             ?.readText()
-            ?: error("Test skill resource not found: $SKILL_RESOURCE_PATH")
+            ?: error("Test skill resource not found: $skillResourcePath")
     }
 
     override fun register(server: McpServerCore) {
         // Validate resource exists during registration (fail-fast)
-        require(javaClass.getResource(SKILL_RESOURCE_PATH) != null) {
-            "Test skill resource missing from JAR: $SKILL_RESOURCE_PATH"
+        require(javaClass.getResource(skillResourcePath) != null) {
+            "Test skill resource missing from JAR: $skillResourcePath"
         }
 
         server.resourceRegistry.registerResource(

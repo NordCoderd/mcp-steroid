@@ -17,6 +17,7 @@ class McpServerCore(
     val sessionManager = McpSessionManager()
     val toolRegistry = McpToolRegistry()
     val resourceRegistry = McpResourceRegistry()
+    val promptRegistry = McpPromptRegistry()
 
     /**
      * Handle an incoming JSON-RPC message and return a response (if applicable).
@@ -101,6 +102,8 @@ class McpServerCore(
             McpMethods.PING -> handlePing(id)
             McpMethods.TOOLS_LIST -> handleToolsList(id)
             McpMethods.TOOLS_CALL -> handleToolsCall(id, params, session)
+            McpMethods.PROMPTS_LIST -> handlePromptsList(id, params)
+            McpMethods.PROMPTS_GET -> handlePromptsGet(id, params)
             McpMethods.RESOURCES_LIST -> handleResourcesList(id)
             McpMethods.RESOURCES_READ -> handleResourcesRead(id, params)
             else -> encodeError(id, JsonRpcErrorCodes.METHOD_NOT_FOUND, "Method not found: $method")
@@ -168,6 +171,36 @@ class McpServerCore(
     private fun handleResourcesList(id: JsonElement): String {
         val resources = resourceRegistry.listResources()
         val result = ResourcesListResult(resources = resources)
+        return encodeResult(id, McpJson.encodeToJsonElement(result))
+    }
+
+    private fun handlePromptsList(id: JsonElement, params: JsonObject?): String {
+        if (params != null) {
+            try {
+                McpJson.decodeFromJsonElement<PromptsListParams>(params)
+            } catch (e: Exception) {
+                return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Invalid prompts list params: ${e.message}")
+            }
+        }
+        val prompts = promptRegistry.listPrompts()
+        val result = PromptsListResult(prompts = prompts)
+        return encodeResult(id, McpJson.encodeToJsonElement(result))
+    }
+
+    private fun handlePromptsGet(id: JsonElement, params: JsonObject?): String {
+        if (params == null) {
+            return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Missing prompt get params")
+        }
+
+        val getParams = try {
+            McpJson.decodeFromJsonElement<PromptGetParams>(params)
+        } catch (e: Exception) {
+            return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Invalid prompt get params: ${e.message}")
+        }
+
+        val result = promptRegistry.getPrompt(getParams)
+            ?: return encodeError(id, JsonRpcErrorCodes.INVALID_PARAMS, "Prompt not found: ${getParams.name}")
+
         return encodeResult(id, McpJson.encodeToJsonElement(result))
     }
 

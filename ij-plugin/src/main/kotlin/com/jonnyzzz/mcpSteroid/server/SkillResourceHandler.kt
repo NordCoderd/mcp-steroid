@@ -10,8 +10,9 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
  * Serves the SKILL.md content as an MCP resource.
  */
 class SkillResourceHandler : McpRegistrar {
-    val resourceUri = "mcp-steroid://skill/intellij-api-poweruser-guide"
-    val resourceName = "IntelliJ API Power User Guide"
+    private val descriptor = skillResources.main
+    val resourceUri = descriptor.resourceUri
+    val resourceName = descriptor.resourceName
 
     val resourceDescription = """
         🚀 RECOMMENDED: Read this guide to become an IntelliJ API power user!
@@ -67,4 +68,3 @@ class SkillResource {
 }
 
 inline val skillResourceHandler: SkillResource get() = service()
-
