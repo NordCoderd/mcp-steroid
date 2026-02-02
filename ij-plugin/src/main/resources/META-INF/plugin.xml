@@ -67,6 +67,7 @@
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.CodingWithIntellijResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.DebuggerSkillResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.TestSkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.DebugRemoteIdeSkillResourceHandler"/>
         <!-- Example resources by topic -->
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.LspExamplesResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.IdeExamplesResourceHandler"/>

@@ -671,6 +671,7 @@ The MCP server provides comprehensive guides and examples as resources. Load the
 - **`mcp-steroid://skill/intellij-api-poweruser-guide`** - Essential patterns for PSI, refactoring, code search, inspections
 - **`mcp-steroid://skill/debugger-guide`** - Debugger APIs: breakpoints, sessions, thread inspection
 - **`mcp-steroid://skill/test-runner-guide`** - Test execution and result inspection APIs
+- **`mcp-steroid://skill/debug-remote-ide-guide`** - How to debug another IDE instance (CLion, Rider, etc.) from IntelliJ IDEA
 
 ### Example Collections
 
