@@ -68,6 +68,13 @@ This plugin implements the [Agent Skills](https://agentskills.io) protocol, maki
 - `$MCP_BASE_URL/skill.md` - Returns SKILL.md content
 - `$MCP_BASE_URL/SKILL.md` - Returns SKILL.md content
 
+### MCP Prompts (Skills)
+
+Agent Skills are also exposed via MCP prompts:
+
+- `prompts/list` - lists bundled skill prompts
+- `prompts/get` - returns skill content as a prompt message
+
 ### Setting Up Agent Skills in Any Project
 
 To make the IntelliJ MCP Steroid skill available in your project:
