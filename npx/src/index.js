@@ -879,7 +879,7 @@ function jsonRpcError(id, code, message) {
 
 function createServerInfo(config) {
   return {
-    name: "intellij-mcp-steroid-proxy",
+    name: "mcp-steroid-proxy",
     version: config.version || "0.1.0"
   };
 }
@@ -974,7 +974,7 @@ function createProxyServer(registry, traffic) {
     if (req.url === "/.well-known/mcp.json") {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({
-        name: "intellij-mcp-steroid-proxy",
+        name: "mcp-steroid-proxy",
         version: registry.config.version || "0.1.0",
         endpoint: `http://${registry.config.server.host}:${registry.config.server.port}/mcp`
       }));
@@ -992,7 +992,7 @@ function createProxyServer(registry, traffic) {
       if (!accept || acceptsJson(accept)) {
         res.writeHead(200, { "Content-Type": "application/json" });
         res.end(JSON.stringify({
-          name: "intellij-mcp-steroid-proxy",
+          name: "mcp-steroid-proxy",
           version: registry.config.version || "0.1.0",
           status: "available"
         }));

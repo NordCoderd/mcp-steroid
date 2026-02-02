@@ -66,7 +66,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertNull("Initialize should not return error", initRpc.error)
         val initResult = McpJson.decodeFromJsonElement<InitializeResult>(initRpc.result!!)
         assertEquals(MCP_PROTOCOL_VERSION, initResult.protocolVersion)
-        assertEquals("intellij-mcp-steroid", initResult.serverInfo.name)
+        assertEquals("mcp-steroid", initResult.serverInfo.name)
 
         val toolsListResponse = client.post(server.mcpUrl) {
             contentType(ContentType.Application.Json)
@@ -338,7 +338,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val body = response.bodyAsText()
         assertTrue(
             "Response should contain server name",
-            body.contains("intellij-mcp-steroid")
+            body.contains("mcp-steroid")
         )
         assertTrue(
             "Response should indicate server is available",
@@ -402,7 +402,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
 
         val initResult = McpJson.decodeFromJsonElement<InitializeResult>(rpcResponse.result!!)
         assertEquals(MCP_PROTOCOL_VERSION, initResult.protocolVersion)
-        assertEquals("intellij-mcp-steroid", initResult.serverInfo.name)
+        assertEquals("mcp-steroid", initResult.serverInfo.name)
         assertNotNull("Server should have tools capability", initResult.capabilities.tools)
     }
 
@@ -462,7 +462,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
 
         val initResult = McpJson.decodeFromJsonElement<InitializeResult>(rpcResponse.result!!)
         assertEquals(MCP_PROTOCOL_VERSION, initResult.protocolVersion)
-        assertEquals("intellij-mcp-steroid", initResult.serverInfo.name)
+        assertEquals("mcp-steroid", initResult.serverInfo.name)
     }
 
     /**

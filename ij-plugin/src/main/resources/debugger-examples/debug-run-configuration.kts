@@ -17,7 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 
-val configurationName = "intellij-mcp-steroids [test]"
+val configurationName = "mcp-steroids [test]"
 val runManager = RunManager.getInstance(project)
 val settings = runManager.allSettings.firstOrNull { it.name == configurationName }
     ?: error("Run configuration not found: $configurationName")
