@@ -52,6 +52,7 @@ object JsonRpcErrorCodes {
     const val INVALID_REQUEST = -32600
     const val METHOD_NOT_FOUND = -32601
     const val INVALID_PARAMS = -32602
+    @Suppress("unused")
     const val INTERNAL_ERROR = -32603
 }
 
@@ -136,6 +137,7 @@ data class Tool(
     val outputSchema: JsonObject? = null,
 )
 
+@Suppress("unused")
 @Serializable
 data class ToolsListParams(
     val cursor: String? = null,
@@ -160,7 +162,7 @@ data class ToolCallParams(
 data class ToolCallResult(
     val content: List<ContentItem>,
     val isError: Boolean = false,
-    //NOTE: structured result makes LLM ignore all content's and thus it gets blind
+    // NOTE: Structured results make the LLM ignore all content, so it gets blind.
     //val structuredContent: JsonElement? = null,
 )
 
@@ -210,7 +212,7 @@ data class ProgressParams(
 
 /**
  * Parameters for sampling/createMessage request.
- * Server sends this to client to request LLM completion.
+ * Server sends this to the client to request LLM completion.
  * Per MCP 2025-11-25 specification.
  */
 @Serializable
@@ -282,6 +284,7 @@ data class Resource(
     val mimeType: String? = null,
 )
 
+@Suppress("unused")
 @Serializable
 data class ResourcesListParams(
     val cursor: String? = null,
@@ -311,6 +314,90 @@ data class ResourceContent(
     val blob: String? = null,
 )
 
+// ==================== MCP Prompts ====================
+
+@Serializable
+data class PromptArgument(
+    val name: String,
+    val description: String? = null,
+    val required: Boolean? = null,
+)
+
+@Serializable
+data class Icon(
+    val src: String,
+    val mimeType: String? = null,
+    val sizes: List<String>? = null,
+)
+
+
+@Serializable
+data class Prompt(
+    val name: String,
+    val title: String? = null,
+    val description: String? = null,
+    val icons: List<Icon>? = null,
+    val arguments: List<PromptArgument>? = null,
+)
+
+@Serializable
+data class PromptsListParams(
+    val cursor: String? = null,
+)
+
+@Serializable
+data class PromptsListResult(
+    val prompts: List<Prompt>,
+    val nextCursor: String? = null,
+)
+
+@Serializable
+data class PromptGetParams(
+    val name: String,
+    val arguments: Map<String, String>? = null,
+)
+
+@Serializable
+data class PromptMessage(
+    val role: String, // "user" | "assistant"
+    val content: PromptContent,
+)
+
+@Serializable
+sealed class PromptContent {
+    @Serializable
+    @SerialName("text")
+    data class Text(
+        val text: String,
+    ) : PromptContent()
+
+    @Serializable
+    @SerialName("image")
+    data class Image(
+        val data: String,
+        val mimeType: String,
+    ) : PromptContent()
+
+    @Serializable
+    @SerialName("audio")
+    data class Audio(
+        val data: String,
+        val mimeType: String,
+    ) : PromptContent()
+
+    @Serializable
+    @SerialName("resource")
+    data class Resource(
+        val resource: EmbeddedResource,
+    ) : PromptContent()
+}
+
+@Serializable
+data class PromptGetResult(
+    val description: String? = null,
+    val messages: List<PromptMessage>,
+)
+
 // ==================== MCP Roots ====================
 
 /**
@@ -335,11 +422,16 @@ object McpMethods {
     const val INITIALIZED = "notifications/initialized"
     const val TOOLS_LIST = "tools/list"
     const val TOOLS_CALL = "tools/call"
+    const val PROMPTS_LIST = "prompts/list"
+    const val PROMPTS_GET = "prompts/get"
     const val RESOURCES_LIST = "resources/list"
     const val RESOURCES_READ = "resources/read"
     const val PROGRESS = "notifications/progress"
     const val TOOLS_LIST_CHANGED = "notifications/tools/list_changed"
+    @Suppress("unused")
+    const val PROMPTS_LIST_CHANGED = "notifications/prompts/list_changed"
     const val ROOTS_LIST = "roots/list"
+    @Suppress("unused")
     const val ROOTS_LIST_CHANGED = "notifications/roots/list_changed"
     const val PING = "ping"
     const val SAMPLING_CREATE_MESSAGE = "sampling/createMessage"

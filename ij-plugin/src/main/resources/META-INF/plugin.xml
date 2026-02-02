@@ -64,6 +64,7 @@
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.OpenProjectToolHandler"/>
         <!-- Main skill guides -->
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.SkillResourceHandler"/>
+        <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.SkillPromptRegistrar"/>
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.CodingWithIntellijResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.DebuggerSkillResourceHandler"/>
         <mcpRegistrar implementation="com.jonnyzzz.mcpSteroid.server.TestSkillResourceHandler"/>
