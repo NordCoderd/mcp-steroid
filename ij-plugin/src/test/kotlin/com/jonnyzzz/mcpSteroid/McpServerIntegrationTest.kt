@@ -23,9 +23,10 @@ import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
 /**
- * Integration tests for MCP Server.
- * Verifies MCP HTTP handshake and tool flows against the real SteroidsMcpServer.
+ * Integration tests for the MCP server.
+ * Verifies the MCP HTTP handshake and tool flows against the real SteroidsMcpServer.
  */
+@Suppress("GrazieInspection", "GrazieInspectionRunner")
 class McpServerIntegrationTest : BasePlatformTestCase() {
 
     private lateinit var client: HttpClient
@@ -60,7 +61,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
 
         assertEquals(HttpStatusCode.OK, initResponse.status)
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
-        assertNotNull("Server must issue MCP session id", sessionId)
+        assertNotNull("Server must issue an MCP session ID", sessionId)
 
         val initRpc = McpJson.decodeFromString<JsonRpcResponse>(initResponse.bodyAsText())
         assertNull("Initialize should not return error", initRpc.error)
@@ -81,7 +82,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val toolsList = McpJson.decodeFromJsonElement<ToolsListResult>(toolsRpc.result!!)
         val toolNames = toolsList.tools.map { it.name }.toSet()
         assertTrue(
-            "steroid tools should be advertised",
+            "Steroid tools should be advertised",
             toolNames.containsAll(setOf("steroid_list_projects", "steroid_list_windows", "steroid_execute_code"))
         )
 
@@ -103,7 +104,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertTrue("IDE version should be reported", projects.ide.version.isNotBlank())
         assertTrue("IDE build should be reported", projects.ide.build.isNotBlank())
         assertTrue(
-            "Current project should be discoverable via MCP tool",
+            "Current project should be discoverable via the MCP tool",
             projects.projects.any { it.name == project.name }
         )
 
@@ -545,8 +546,8 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
-     * This test verifies server behavior after restarting IntelliJ IDEA.
-     * When a client sends an unknown session ID (e.g., after an IDE restart),
+     * This test verifies server behavior after IntelliJ IDEA restarts.
+     * When a client sends an unknown session ID (for example, after an IDE restart),
      * the server should create a new session instead of rejecting the request.
      */
     fun testServerRestartHandling(): Unit = timeoutRunBlocking(30.seconds) {
@@ -1122,7 +1123,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
-     * This test verifies that MCP execute_code can read a system property from the test JVM.
+     * This test verifies that MCP execute_code can read a system property in the test JVM.
      * This verifies the MCP server runs in the same JVM and can access system properties.
      */
     fun testSystemPropertyCanBeReadViaMcp(): Unit = timeoutRunBlocking(30.seconds) {
@@ -1252,4 +1253,63 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertTrue("Content should contain SKILL.md content", content.text!!.contains("IntelliJ MCP Steroid"))
         assertTrue("Content should contain quickstart", content.text.contains("Quickstart"))
     }
+
+    /**
+     * Tests that MCP prompts expose Agent Skills and can be retrieved.
+     */
+    fun testPromptsListAndGetForSkills(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Initialize session
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+        val listResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":"prompts-list","method":"prompts/list"}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, listResponse.status)
+        val listRpc = McpJson.decodeFromString<JsonRpcResponse>(listResponse.bodyAsText())
+        assertNull("prompts/list should succeed", listRpc.error)
+
+        val promptsList = McpJson.decodeFromJsonElement<PromptsListResult>(listRpc.result!!)
+        val mainPrompt = promptsList.prompts.find { it.name == "intellij-mcp-steroid" }
+        assertNotNull("Should expose main skill prompt", mainPrompt)
+        assertEquals("IntelliJ API Power User Guide", mainPrompt!!.title)
+
+        val getResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(buildJsonObject {
+                put("jsonrpc", "2.0")
+                put("id", "prompts-get")
+                put("method", "prompts/get")
+                putJsonObject("params") {
+                    put("name", "intellij-mcp-steroid")
+                }
+            }.toString())
+        }
+
+        assertEquals(HttpStatusCode.OK, getResponse.status)
+        val getRpc = McpJson.decodeFromString<JsonRpcResponse>(getResponse.bodyAsText())
+        assertNull("prompts/get should succeed", getRpc.error)
+
+        val getResult = McpJson.decodeFromJsonElement<PromptGetResult>(getRpc.result!!)
+        assertEquals(1, getResult.messages.size)
+        val message = getResult.messages.first()
+        assertEquals("user", message.role)
+        val content = message.content as PromptContent.Text
+        assertTrue(content.text.contains("IntelliJ MCP Steroid"))
+        assertFalse(content.text.trimStart().startsWith("---"))
+    }
+
 }

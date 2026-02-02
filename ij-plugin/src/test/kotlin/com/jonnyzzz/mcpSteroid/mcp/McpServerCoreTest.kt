@@ -271,4 +271,51 @@ class McpServerCoreTest {
         val response = McpJson.decodeFromString<JsonRpcResponse>(responseJson!!)
         assertEquals("request-abc", response.id.jsonPrimitive.content)
     }
+
+    @Test
+    fun `test prompts list and get`() = runBlocking {
+        server.promptRegistry.registerPrompt(
+            prompt = Prompt(
+                name = "intellij-mcp-steroid",
+                title = "IntelliJ API Power User Guide",
+                description = "Test prompt description",
+            ),
+        ) {
+            PromptGetResult(
+                description = "Test prompt description",
+                messages = listOf(
+                    PromptMessage(
+                        role = "user",
+                        content = PromptContent.Text("Prompt body text")
+                    )
+                )
+            )
+        }
+
+        val listRequest = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"prompts/list\"}"
+        val listResponseJson = server.handleMessage(listRequest, session)
+        assertNotNull(listResponseJson)
+
+        val listResponse = McpJson.decodeFromString<JsonRpcResponse>(listResponseJson!!)
+        assertNull(listResponse.error)
+        val listResult = McpJson.decodeFromJsonElement<PromptsListResult>(listResponse.result!!)
+        assertTrue(listResult.prompts.any { it.name == "intellij-mcp-steroid" })
+
+        val getRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 2)
+            put("method", "prompts/get")
+            putJsonObject("params") {
+                put("name", "intellij-mcp-steroid")
+            }
+        }
+
+        val getResponseJson = server.handleMessage(getRequest.toString(), session)
+        assertNotNull(getResponseJson)
+
+        val getResponse = McpJson.decodeFromString<JsonRpcResponse>(getResponseJson!!)
+        assertNull(getResponse.error)
+        val getResult = McpJson.decodeFromJsonElement<PromptGetResult>(getResponse.result!!)
+        assertEquals(1, getResult.messages.size)
+    }
 }

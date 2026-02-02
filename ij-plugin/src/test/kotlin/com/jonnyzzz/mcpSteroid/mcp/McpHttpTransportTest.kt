@@ -20,8 +20,9 @@ import java.net.ServerSocket
 
 /**
  * Integration tests for McpHttpTransport.
- * Tests the full HTTP transport layer with Ktor server.
+ * Tests the full HTTP transport layer with a Ktor server.
  */
+@Suppress("GrazieInspection", "GrazieInspectionRunner", "UastIncorrectHttpHeaderInspection")
 class McpHttpTransportTest {
     private lateinit var server: EmbeddedServer<*, *>
     private lateinit var mcpServer: McpServerCore
@@ -66,6 +67,25 @@ class McpHttpTransportTest {
             contentProvider = { "Test resource content" }
         )
 
+        // Register a test prompt
+        mcpServer.promptRegistry.registerPrompt(
+            prompt = Prompt(
+                name = "test_prompt",
+                title = "Test Prompt",
+                description = "Test prompt description",
+            ),
+        ) {
+            PromptGetResult(
+                description = "Test prompt description",
+                messages = listOf(
+                    PromptMessage(
+                        role = "user",
+                        content = PromptContent.Text("Test prompt body")
+                    )
+                )
+            )
+        }
+
         server = embeddedServer(CIO, port = port) {
             install(SSE)
             routing {
@@ -109,9 +129,9 @@ class McpHttpTransportTest {
 
         assertEquals(HttpStatusCode.OK, response.status)
 
-        // Should have session header
+        // Should include the session header.
         val sessionId = response.headers[McpHttpTransport.SESSION_HEADER]
-        assertNotNull("Should return session ID", sessionId)
+        assertNotNull("Should return a session ID", sessionId)
 
         // Parse response
         val body = response.bodyAsText()
@@ -125,7 +145,7 @@ class McpHttpTransportTest {
 
     @Test
     fun `test POST with existing session ID reuses session`() = runBlocking {
-        // First request creates session
+        // First request creates a session.
         val initRequest = buildJsonObject {
             put("jsonrpc", "2.0")
             put("id", 1)
@@ -149,7 +169,7 @@ class McpHttpTransportTest {
         val sessionId = firstResponse.headers[McpHttpTransport.SESSION_HEADER]
         assertNotNull(sessionId)
 
-        // Second request with session ID
+        // Second request uses the session ID.
         val pingRequest = """{"jsonrpc":"2.0","id":2,"method":"ping"}"""
 
         val secondResponse = client.post("http://localhost:$port/mcp") {
@@ -186,7 +206,7 @@ class McpHttpTransportTest {
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
 
-        // Then list tools
+        // List tools next.
         val listRequest = """{"jsonrpc":"2.0","id":2,"method":"tools/list"}"""
 
         val response = client.post("http://localhost:$port/mcp") {
@@ -203,7 +223,7 @@ class McpHttpTransportTest {
         assertNull(jsonResponse.error)
 
         val result = McpJson.decodeFromJsonElement<ToolsListResult>(jsonResponse.result!!)
-        assertTrue("Should have at least one tool", result.tools.isNotEmpty())
+        assertTrue("Should have at least one tool available", result.tools.isNotEmpty())
         assertEquals("test_echo", result.tools[0].name)
     }
 
@@ -231,7 +251,7 @@ class McpHttpTransportTest {
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
 
-        // Then call tool
+        // Call the tool next.
         val callRequest = buildJsonObject {
             put("jsonrpc", "2.0")
             put("id", 2)
@@ -285,7 +305,7 @@ class McpHttpTransportTest {
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
 
-        // Send notification (no id)
+        // Send a notification (no id).
         val notification = """{"jsonrpc":"2.0","method":"notifications/initialized"}"""
 
         val response = client.post("http://localhost:$port/mcp") {
@@ -311,7 +331,7 @@ class McpHttpTransportTest {
 
     @Test
     fun `test POST with unknown session creates new session`() = runBlocking {
-        // Server should create a new session for unknown session IDs (supports IDE restart)
+        // Server should create a new session for unknown session IDs (supports IDE restarts).
         val request = """{"jsonrpc":"2.0","id":1,"method":"tools/list"}"""
 
         val response = client.post("http://localhost:$port/mcp") {
@@ -326,16 +346,16 @@ class McpHttpTransportTest {
 
         // Server should return a new session ID
         val newSessionId = response.headers[McpHttpTransport.SESSION_HEADER]
-        assertNotNull("Server should return new session ID", newSessionId)
+        assertNotNull("Server should return a new session ID", newSessionId)
         assertNotEquals("unknown-session-id", newSessionId)
         val notice = response.headers[McpHttpTransport.SESSION_NOTICE_HEADER]
-        assertNotNull("Server should return session notice for unknown session", notice)
-        assertTrue("Session notice should mention unknown session", notice!!.contains("Unknown session"))
+        assertNotNull("Server should return a session notice for an unknown session", notice)
+        assertTrue("Session notice should mention the unknown session", notice!!.contains("Unknown session"))
     }
 
     @Test
     fun `test DELETE terminates session`() = runBlocking {
-        // First create a session via initialize
+        // First create a session by sending an initialization request.
         val initRequest = buildJsonObject {
             put("jsonrpc", "2.0")
             put("id", 1)
@@ -378,11 +398,11 @@ class McpHttpTransportTest {
 
         // Server should return a new session ID
         val newSessionId = afterDeleteResponse.headers[McpHttpTransport.SESSION_HEADER]
-        assertNotNull("Server should return new session ID after deleted session", newSessionId)
-        assertNotEquals(sessionId, newSessionId, "New session ID should be different")
+        assertNotNull("Server should return a new session ID after a deleted session", newSessionId)
+        assertNotEquals(sessionId, newSessionId, "The new session ID should be different")
         val notice = afterDeleteResponse.headers[McpHttpTransport.SESSION_NOTICE_HEADER]
-        assertNotNull("Server should return session notice after deleted session", notice)
-        assertTrue("Session notice should mention unknown session", notice!!.contains("Unknown session"))
+        assertNotNull("Server should return a session notice after a deleted session", notice)
+        assertTrue("Session notice should mention the unknown session", notice!!.contains("Unknown session"))
     }
 
     @Test
@@ -416,7 +436,7 @@ class McpHttpTransportTest {
         }
         val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
 
-        // Send batch request
+        // Send a batch request.
         val batchRequest = """[
             {"jsonrpc":"2.0","id":1,"method":"ping"},
             {"jsonrpc":"2.0","id":2,"method":"tools/list"}
@@ -440,21 +460,21 @@ class McpHttpTransportTest {
 
     @Test
     fun `test GET with Accept text event-stream returns 405 Method Not Allowed`() = runBlocking {
-        // Per MCP spec, client MUST include Accept: text/event-stream
-        // Server returns 405 if it doesn't support SSE
+        // Per the MCP spec, the client MUST include the Accept: text/event-stream header.
+        // The server returns 405 if it doesn't support SSE.
         val response = client.get("http://localhost:$port/mcp") {
             header(HttpHeaders.Accept, "text/event-stream")
         }
 
-        // The response should complete immediately with 405 (SSE not supported)
+        // The response should complete immediately with 405 (SSE not supported).
         assertEquals(HttpStatusCode.MethodNotAllowed, response.status)
     }
 
     @Test
     fun `test GET without Accept header returns server info`() = runBlocking {
-        // When no Accept header is provided, HTTP default is */*, accept anything
-        // Ktor client adds Accept: */* by default
-        // Server returns server info for availability checks
+        // When no Accept header is provided, the HTTP default is */* (wildcard).
+        // The Ktor client adds Accept: */* by default.
+        // The server returns server info for availability checks.
         val response = client.get("http://localhost:$port/mcp")
 
         assertEquals(HttpStatusCode.OK, response.status)
@@ -463,7 +483,7 @@ class McpHttpTransportTest {
 
     @Test
     fun `test GET with application json Accept header returns server info`() = runBlocking {
-        // GET with Accept: application/json returns server info for availability checks
+        // GET with Accept: application/json returns server info for availability checks.
         val response = client.get("http://localhost:$port/mcp") {
             header(HttpHeaders.Accept, "application/json")
         }
@@ -474,7 +494,7 @@ class McpHttpTransportTest {
 
     @Test
     fun `test GET with wildcard Accept returns server info`() = runBlocking {
-        // Wildcard Accept (*/*) returns server info for availability checks
+        // Wildcard Accept (*/*) returns server info for availability checks.
         val response = client.get("http://localhost:$port/mcp") {
             header(HttpHeaders.Accept, "*/*")
         }
@@ -485,8 +505,8 @@ class McpHttpTransportTest {
 
     @Test
     fun `test GET with combined Accept header returns server info`() = runBlocking {
-        // MCP clients (like Claude CLI) send: Accept: application/json, text/event-stream
-        // When JSON is acceptable, return server info for availability checks
+        // MCP clients (like Claude CLI) send the header: Accept: application/json, text/event-stream.
+        // When JSON is acceptable, return server info for availability checks.
         val response = client.get("http://localhost:$port/mcp") {
             header(HttpHeaders.Accept, "application/json, text/event-stream")
         }
@@ -551,47 +571,66 @@ class McpHttpTransportTest {
         )
     }
 
-    @Test
-    fun `test POST prompts list returns METHOD_NOT_FOUND`() = runBlocking {
-        val initRequest = buildJsonObject {
-            put("jsonrpc", "2.0")
-            put("id", 1)
-            put("method", "initialize")
-            putJsonObject("params") {
-                put("protocolVersion", MCP_PROTOCOL_VERSION)
-                putJsonObject("capabilities") {}
-                putJsonObject("clientInfo") {
-                    put("name", "test-client")
-                    put("version", "1.0.0")
-                }
+@Test
+fun `test POST prompts list returns prompts`() = runBlocking {
+    val initRequest = buildJsonObject {
+        put("jsonrpc", "2.0")
+        put("id", 1)
+        put("method", "initialize")
+        putJsonObject("params") {
+            put("protocolVersion", MCP_PROTOCOL_VERSION)
+            putJsonObject("capabilities") {}
+            putJsonObject("clientInfo") {
+                put("name", "test-client")
+                put("version", "1.0.0")
             }
         }
-
-        val initResponse = client.post("http://localhost:$port/mcp") {
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Application.Json)
-            setBody(initRequest.toString())
-        }
-        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
-
-        // Call prompts/list which is not implemented
-        val promptsRequest = """{"jsonrpc":"2.0","id":2,"method":"prompts/list"}"""
-
-        val response = client.post("http://localhost:$port/mcp") {
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Application.Json)
-            header(McpHttpTransport.SESSION_HEADER, sessionId)
-            setBody(promptsRequest)
-        }
-
-        assertEquals(HttpStatusCode.OK, response.status)
-
-        val body = response.bodyAsText()
-        val jsonResponse = McpJson.decodeFromString<JsonRpcResponse>(body)
-
-        assertNotNull("Should have error for unimplemented method", jsonResponse.error)
-        assertEquals(JsonRpcErrorCodes.METHOD_NOT_FOUND, jsonResponse.error?.code)
     }
+
+    val initResponse = client.post("http://localhost:$port/mcp") {
+        contentType(ContentType.Application.Json)
+        accept(ContentType.Application.Json)
+        setBody(initRequest.toString())
+    }
+    val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+
+    val listRequest = "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"prompts/list\"}"
+    val listResponse = client.post("http://localhost:$port/mcp") {
+        contentType(ContentType.Application.Json)
+        accept(ContentType.Application.Json)
+        header(McpHttpTransport.SESSION_HEADER, sessionId)
+        setBody(listRequest)
+    }
+
+    assertEquals(HttpStatusCode.OK, listResponse.status)
+    val listRpc = McpJson.decodeFromString<JsonRpcResponse>(listResponse.bodyAsText())
+    assertNull("prompts/list should succeed", listRpc.error)
+
+    val promptsList = McpJson.decodeFromJsonElement<PromptsListResult>(listRpc.result!!)
+    assertTrue(promptsList.prompts.any { it.name == "test_prompt" })
+
+    val getRequest = buildJsonObject {
+        put("jsonrpc", "2.0")
+        put("id", 3)
+        put("method", "prompts/get")
+        putJsonObject("params") {
+            put("name", "test_prompt")
+        }
+    }
+
+    val getResponse = client.post("http://localhost:$port/mcp") {
+        contentType(ContentType.Application.Json)
+        accept(ContentType.Application.Json)
+        header(McpHttpTransport.SESSION_HEADER, sessionId)
+        setBody(getRequest.toString())
+    }
+
+    assertEquals(HttpStatusCode.OK, getResponse.status)
+    val getRpc = McpJson.decodeFromString<JsonRpcResponse>(getResponse.bodyAsText())
+    assertNull("prompts/get should succeed", getRpc.error)
+    val getResult = McpJson.decodeFromJsonElement<PromptGetResult>(getRpc.result!!)
+    assertEquals(1, getResult.messages.size)
+}
 
     @Test
     fun `test POST resources list returns resources`() = runBlocking {

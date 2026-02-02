@@ -235,4 +235,51 @@ class McpProtocolTest {
         assertEquals(McpMethods.INITIALIZED, decoded.method)
         assertNull(decoded.params)
     }
+
+    @Test
+    fun `test Prompt serialization with icons`() {
+        val prompt = Prompt(
+            name = "test-prompt",
+            title = "Test Prompt",
+            description = "Description",
+            icons = listOf(
+                Icon(
+                    src = "https://example.com/icon.png",
+                    mimeType = "image/png",
+                    sizes = listOf("64x64"),
+                )
+            )
+        )
+
+        val json = McpJson.encodeToString(Prompt.serializer(), prompt)
+        val decoded = McpJson.decodeFromString<Prompt>(json)
+        assertEquals("test-prompt", decoded.name)
+        assertEquals(1, decoded.icons?.size)
+        assertEquals("https://example.com/icon.png", decoded.icons?.first()?.src)
+        assertEquals(listOf("64x64"), decoded.icons?.first()?.sizes)
+    }
+
+    @Test
+    fun `test PromptContent Image serialization`() {
+        val image = PromptContent.Image(data = "base64", mimeType = "image/png")
+        val json = McpJson.encodeToString(PromptContent.serializer(), image)
+        val decoded = McpJson.decodeFromString<PromptContent>(json)
+        assertTrue(decoded is PromptContent.Image)
+    }
+
+    @Test
+    fun `test PromptContent Audio serialization`() {
+        val audio = PromptContent.Audio(data = "base64", mimeType = "audio/mpeg")
+        val json = McpJson.encodeToString(PromptContent.serializer(), audio)
+        val decoded = McpJson.decodeFromString<PromptContent>(json)
+        assertTrue(decoded is PromptContent.Audio)
+    }
+
+    @Test
+    fun `test PromptContent Resource serialization`() {
+        val resource = PromptContent.Resource(resource = EmbeddedResource(uri = "mcp://resource"))
+        val json = McpJson.encodeToString(PromptContent.serializer(), resource)
+        val decoded = McpJson.decodeFromString<PromptContent>(json)
+        assertTrue(decoded is PromptContent.Resource)
+    }
 }
