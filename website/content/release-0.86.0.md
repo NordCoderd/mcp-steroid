@@ -73,15 +73,29 @@ The folder contains execution logs and metadata that help us understand how the 
 
 ## Supported AI Agents
 
-| Agent               | Connection Method                                        |
-|---------------------|----------------------------------------------------------|
-| **Claude Code CLI** | `claude mcp add --transport http mcp-steroid <URL>`      |
-| **Codex CLI**       | `codex mcp add intellij --url <URL>`                     |
-| **Gemini CLI**      | `gemini mcp add intellij-steroid <URL> --transport http` |
-| **Cursor**          | JSON config in `mcpServers` section                      |
-| **Any MCP Client**  | HTTP transport at server URL                             |
+| Agent               | Connection Method                                   |
+|---------------------|-----------------------------------------------------|
+| **Claude Code CLI** | `claude mcp add --transport http steroid <URL>`     |
+| **Codex CLI**       | `codex mcp add steroid --url <URL>`                 |
+| **Gemini CLI**      | `gemini mcp add mcp-steroid <URL> --transport http` |
+| **Cursor**          | JSON config in `mcpServers` section                 |
+| **Any MCP Client**  | HTTP transport at server URL                        |
 
-Prompt your AI Agent to use IntelliJ, explicitly. Ask what does it see in your IntelliJ to start with.
+Prompt your AI Agent to use IntelliJ, explicitly. Ask what it sees in your IntelliJ to start with.
+
+
+This is what `mcpServers` JSON may look like:
+```json
+{
+  "mcpServers": {
+    "mcp-steroid": {
+      "type": "http",
+      "url": "<URL>"
+    }
+  }
+}
+```
+
 
 ## Notable Features in v0.86.0
 
