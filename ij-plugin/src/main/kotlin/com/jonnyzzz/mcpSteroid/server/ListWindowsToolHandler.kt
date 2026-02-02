@@ -127,9 +127,9 @@ class ListWindowsToolHandler : McpRegistrar {
 
         val response = ListWindowsResponse(
             windows = windowInfos,
-            backgroundTasks = progressTasks.ifEmpty { null }
+            backgroundTasks = progressTasks,
         )
-        val json = McpJson.encodeToString(ListWindowsResponse.serializer(), response)
+        val json = McpJson.encodeToString(response)
         return ToolCallResult(
             content = listOf(ContentItem.Text(text = json))
         )
@@ -138,9 +138,11 @@ class ListWindowsToolHandler : McpRegistrar {
 
 @Serializable
 data class ListWindowsResponse(
+    val ide: IdeInfo = IdeInfo.ofApplication(),
+    val pid: Long = ProcessHandle.current().pid(),
+
     val windows: List<WindowInfo>,
-    /** List of background tasks currently running in the IDE (null if none) */
-    val backgroundTasks: List<ProgressTaskInfo>? = null
+    val backgroundTasks: List<ProgressTaskInfo>,
 )
 
 @Serializable

@@ -53,16 +53,10 @@ class ListProjectsToolHandler : McpRegistrar {
             )
         }
 
-        val appInfo = ApplicationInfo.getInstance()
         val response = ListProjectsResponse(
-            ide = IdeInfo(
-                name = appInfo.fullApplicationName,
-                version = appInfo.fullVersion,
-                build = appInfo.build.asString()
-            ),
             projects = projects
         )
-        val json = McpJson.encodeToString(ListProjectsResponse.serializer(), response)
+        val json = McpJson.encodeToString(response)
 
         return ToolCallResult(
             content = listOf(ContentItem.Text(text = json))
@@ -72,16 +66,11 @@ class ListProjectsToolHandler : McpRegistrar {
 
 @Serializable
 data class ListProjectsResponse(
-    val ide: IdeInfo,
+    val ide: IdeInfo = IdeInfo.ofApplication(),
+    val pid: Long = ProcessHandle.current().pid(),
     val projects: List<ProjectInfo>
 )
 
-@Serializable
-data class IdeInfo(
-    val name: String,
-    val version: String,
-    val build: String
-)
 
 @Serializable
 data class ProjectInfo(
