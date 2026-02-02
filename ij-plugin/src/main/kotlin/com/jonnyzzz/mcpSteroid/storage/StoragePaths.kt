@@ -46,14 +46,14 @@ class StoragePaths(private val project: Project) {
      * Can be overridden via registry key "mcp.steroid.storage.path".
      */
     fun getGetMcpRunDir(): Path {
-        val customPath = Registry.stringValue("mcp.steroid.storage.path")
         val path = run {
+            val customPath = Registry.stringValue("mcp.steroid.storage.path")
             if (customPath.isNotBlank()) {
                 return@run Path.of(customPath)
             }
 
             val base = resolveDotIdeaFolder(project) ?: PathManager.getTempDir().resolve("mcp-steroid")
-            base.resolve("mcp-steroid")
+            return@run base.resolve("mcp-steroid")
         }
 
         Files.createDirectories(path)
