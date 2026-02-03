@@ -39,7 +39,7 @@ This IntelliJ plugin exposes IDE APIs to LLM agents via Kotlin script execution.
 
 ## MCP Server Integration
 
-This plugin runs its own standalone MCP server using the [Kotlin MCP SDK](https://github.com/modelcontextprotocol/kotlin-sdk) with Ktor for HTTP transport:
+This plugin runs its own standalone MCP server (internal implementation aligned with the 2025-11-25 spec) using Ktor for HTTP transport:
 
 - **Transport**: HTTP at `<server-url>/mcp` with CORS support
 - **Host/port**: Configurable via `mcp.steroid.server.host` and `mcp.steroid.server.port`
@@ -67,6 +67,7 @@ This plugin implements the [Agent Skills](https://agentskills.io) protocol, maki
 - `$MCP_BASE_URL/` - Returns SKILL.md content
 - `$MCP_BASE_URL/skill.md` - Returns SKILL.md content
 - `$MCP_BASE_URL/SKILL.md` - Returns SKILL.md content
+- `resources/list` - Skills are also exposed under the `skill/` resource prefix for compatibility
 
 ### MCP Prompts (Skills)
 
@@ -79,13 +80,13 @@ Agent Skills are also exposed via MCP prompts:
 
 To make the IntelliJ MCP Steroid skill available in your project:
 
-**Option 1: Symlink to SKILL.md (Recommended)**
+**Option 1: Symlink to the bundled SKILL.md (Recommended)**
 
 ```bash
 # From your project root, create a symlink to the skill
 # This requires the MCP Steroid plugin repository to be cloned locally
 
-ln -s /path/to/intellij-mcp-steroids/SKILL.md SKILL.md
+ln -s /path/to/intellij-mcp-steroid/src/main/resources/skill/SKILL.md SKILL.md
 ```
 
 **Option 2: Download SKILL.md from the running server**
@@ -295,12 +296,6 @@ Lists all open projects in the IDE and reports IDE metadata.
   ]
 }
 ```
-
-### `steroid_capabilities`
-Lists IDE capabilities such as installed plugins and registered languages.
-
-**Parameters**:
-- `include_disabled_plugins` (optional): Include disabled plugins in the response (default: false)
 
 ### `steroid_list_windows`
 List open IDE windows and their associated projects. Some windows may not be tied to a project and a project can have multiple windows.
@@ -531,7 +526,7 @@ The context is disposed automatically:
 5. **Script Execution** (`ScriptExecutor`):
    - Runs inside `coroutineScope { withContext(Dispatchers.IO) { withTimeout { } } }`
    - Script body runs inside a single execution block
-   - Progress messages sent via MCP progress notifications (throttled to 1/second)
+   - Progress messages sent via MCP progress notifications when tools emit them
    - Context is disposed when execution completes
 6. **Response**: Output returned directly in MCP tool response
 7. **Cleanup**: Disposable disposed via `Disposer.dispose()`, resources cleaned up
@@ -560,16 +555,19 @@ After script execution completes:
 
 **Storage Structure** (append-only - files are never deleted, used for logging/debugging):
 ```
-.idea/mcp-run/
-├── 20241210T143025-my_task/              # execution_id as directory
-│   ├── script.kts                         # Submitted code
-│   ├── params.json                        # Execution parameters
-│   ├── reason.txt                         # Human readable reason
-│   ├── execution-id.txt                   # Execution ID
-│   ├── output.jsonl                       # Output log (JSON lines, append-only)
-│   ├── error.txt                          # Error message (if failed)
-│   ├── review.kts                         # Code shown for review (may have user edits)
-│   └── kotlinc.txt                        # Compiler output (if any)
+.idea/mcp-steroid/
+├── eid_20241210T143025-my_task/           # execution_id as directory
+│   ├── project.txt                         # Project name + path
+│   ├── tool.json                           # Tool metadata (name/args/taskId)
+│   ├── script.kts                          # Submitted code
+│   ├── params.json                         # Execution parameters
+│   ├── reason.txt                          # Human readable reason
+│   ├── execution-id.txt                    # Execution ID
+│   ├── script-wrapped.kts                  # Wrapped script body (if stored)
+│   ├── output.jsonl                        # Output log (JSON lines, append-only)
+│   ├── error.txt                           # Error message (if failed)
+│   ├── review.kts                          # Code shown for review (may have user edits)
+│   └── compiled/                           # Compiler output (if any)
 ```
 
 **Server URL file**:
@@ -577,7 +575,7 @@ After script execution completes:
 .idea/mcp-steroid.md                     # Contains MCP server URL (read this file; do not assume a port)
 ```
 
-**Execution ID Format**: `{YYYYMMDD}T{HHMMSS}-{task-id}`
+**Execution ID Format**: `eid_{YYYYMMDD}T{HHMMSS}-{task-id}`
 - Timestamp: ISO-like format without timezone
 - Task ID: sanitized version of the task_id parameter
 
@@ -827,13 +825,15 @@ See [integration-test/README.md](integration-test/README.md) for details.
 ## Configuration
 
 - `build.gradle.kts`: Build configuration
-- `gradle.properties`: IntelliJ platform version
+- `gradle.properties`: Gradle JVM args and caching settings
 - `settings.gradle.kts`: Project name
 
 ## Documentation
 
-- [SKILL.md](SKILL.md) - Agent Skills documentation (for AI agents)
-- [CLAUDE.md](CLAUDE.md) - Guidance for Claude Code
-- [Plan.md](Plan.md) - Implementation plan
-- [Suggestions.md](Suggestions.md) - Design suggestions
-- [Discussions.md](Discussions.md) - Design decisions
+- [docs/root/CLAUDE.md](docs/root/CLAUDE.md) - Contributor guidance and architecture notes
+- [docs/root/NOTES.md](docs/root/NOTES.md) - Working memory and primary references
+- [docs/guides/AGENT-STEROID-GUIDE.md](docs/guides/AGENT-STEROID-GUIDE.md) - IntelliJ API usage guide for agents
+- [src/main/resources/skill/SKILL.md](src/main/resources/skill/SKILL.md) - Agent Skills documentation (served at `/skill.md`)
+- [docs/archive/Plan.md](docs/archive/Plan.md) - Implementation plan (archived)
+- [docs/future/DEFERRED-FEATURES.md](docs/future/DEFERRED-FEATURES.md) - Design suggestions and deferred work
+- [docs/archive/Discussions.md](docs/archive/Discussions.md) - Design decisions (archived)
