@@ -1,5 +1,7 @@
 # Design Discussions
 
+> Archived on 2026-02-03 after moving from repository root. Content reflects early discussions and may reference historical paths.
+
 This file captures the design discussions and decisions made for the MCP server implementation.
 
 ---
