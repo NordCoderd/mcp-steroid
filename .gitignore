@@ -30,7 +30,6 @@ Thumbs.db
 integration-test/tmp/
 integration-test/*.tmp
 docs/runs/
-runs/
 
 .gradle-local
 .kotlin
