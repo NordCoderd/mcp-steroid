@@ -12,7 +12,10 @@ data class SkillDescriptor(
     val resourcePath: String,
     val resourceUri: String,
     val resourceName: String,
-)
+) {
+    val legacyResourceUri: String
+        get() = "mcp-steroid://$resourcePath"
+}
 
 @Service(Service.Level.APP)
 class SkillResources {

@@ -9,7 +9,6 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 class DebuggerSkillResourceHandler : McpRegistrar {
     private val descriptor = skillResources.debugger
     private val skillResourcePath = descriptor.resourcePath
-    private val resourceUri = descriptor.resourceUri
     private val resourceName = descriptor.resourceName
     private val resourceDescription = """
         Debugger-focused guide for running debug sessions and inspecting threads.
@@ -32,11 +31,11 @@ class DebuggerSkillResourceHandler : McpRegistrar {
             "Debugger skill resource missing from JAR: $skillResourcePath"
         }
 
-        server.resourceRegistry.registerResource(
-            uri = resourceUri,
+        registerSkillResource(
+            server = server,
+            descriptor = descriptor,
             name = resourceName,
             description = resourceDescription,
-            mimeType = "text/markdown",
             contentProvider = ::loadSkillMd
         )
     }

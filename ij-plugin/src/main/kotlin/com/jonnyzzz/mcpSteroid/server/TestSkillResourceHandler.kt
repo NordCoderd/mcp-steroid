@@ -9,8 +9,6 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 class TestSkillResourceHandler : McpRegistrar {
     private val descriptor = skillResources.test
     private val skillResourcePath = descriptor.resourcePath
-
-    private val resourceUri = descriptor.resourceUri
     private val resourceName = descriptor.resourceName
     private val resourceDescription = """
         Test execution and result inspection guide for running tests and analyzing results.
@@ -33,11 +31,11 @@ class TestSkillResourceHandler : McpRegistrar {
             "Test skill resource missing from JAR: $skillResourcePath"
         }
 
-        server.resourceRegistry.registerResource(
-            uri = resourceUri,
+        registerSkillResource(
+            server = server,
+            descriptor = descriptor,
             name = resourceName,
             description = resourceDescription,
-            mimeType = "text/markdown",
             contentProvider = ::loadSkillMd
         )
     }

@@ -12,7 +12,6 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 class DebugRemoteIdeSkillResourceHandler : McpRegistrar {
     private val descriptor = skillResources.debugRemote
     private val skillResourcePath = descriptor.resourcePath
-    private val resourceUri = descriptor.resourceUri
     private val resourceName = descriptor.resourceName
     private val resourceDescription = """
         Guide for AI agents on debugging IntelliJ-based IDEs (CLion, Rider, etc.)
@@ -38,11 +37,11 @@ class DebugRemoteIdeSkillResourceHandler : McpRegistrar {
             "Debug Remote IDE skill resource missing from JAR: $skillResourcePath"
         }
 
-        server.resourceRegistry.registerResource(
-            uri = resourceUri,
+        registerSkillResource(
+            server = server,
+            descriptor = descriptor,
             name = resourceName,
             description = resourceDescription,
-            mimeType = "text/markdown",
             contentProvider = ::loadSkillMd
         )
     }

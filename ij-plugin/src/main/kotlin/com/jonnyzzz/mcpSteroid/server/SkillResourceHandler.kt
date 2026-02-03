@@ -11,7 +11,6 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
  */
 class SkillResourceHandler : McpRegistrar {
     private val descriptor = skillResources.main
-    val resourceUri = descriptor.resourceUri
     val resourceName = descriptor.resourceName
 
     val resourceDescription = """
@@ -29,11 +28,11 @@ class SkillResourceHandler : McpRegistrar {
     """.trimIndent()
 
     override fun register(server: McpServerCore) {
-        server.resourceRegistry.registerResource(
-            uri = resourceUri,
+        registerSkillResource(
+            server = server,
+            descriptor = descriptor,
             name = resourceName,
             description = resourceDescription,
-            mimeType = "text/markdown",
             contentProvider = { skillResourceHandler.loadSkillMd() }
         )
     }
