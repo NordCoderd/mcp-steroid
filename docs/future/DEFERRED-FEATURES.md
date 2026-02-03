@@ -1,5 +1,7 @@
 # Suggestions and Future Considerations
 
+> Moved from repository root on 2026-02-03 for organization.
+
 This document captures design suggestions and future considerations that are **not yet implemented** or **deferred to later versions**.
 
 ---
@@ -18,7 +20,7 @@ Named storage slots for persisting data between script executions.
 - `readSlot(name): String?`
 - `writeSlot(name, value: String)`
 
-**Storage**: `.idea/mcp-run/slots/<slot-name>.txt`
+**Storage**: `.idea/mcp-steroid/slots/<slot-name>.txt`
 
 ### Dynamic Commands
 
@@ -36,8 +38,8 @@ Scripts can register new MCP commands that persist during IDE session.
 
 ### Streaming Output
 
-Currently using synchronous request-response model.
-Future consideration: Add SSE streaming for real-time output during long executions.
+Currently using synchronous request-response model (HTTP + SSE transport).
+Future consideration: Add streaming output for long executions.
 
 ---
 
