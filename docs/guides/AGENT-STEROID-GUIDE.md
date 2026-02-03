@@ -589,7 +589,7 @@ println("Created src/Example.cs")
 
 ### Further Reading
 
-- [C# Examples for Rider](docs/rider-integration/CSHARP-EXAMPLES.md)
+- [C# Examples for Rider](../rider-integration/CSHARP-EXAMPLES.md)
 - [Rider Plugin Development](https://plugins.jetbrains.com/docs/intellij/rider.html)
 
 ## Error Handling
