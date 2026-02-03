@@ -1,5 +1,7 @@
 # Implementation Plan
 
+> Archived on 2026-02-03 after moving from repository root. Refer to `docs/root/CLAUDE.md` and `README.md` for current guidance.
+
 This plan reflects decisions from [Discussions.md](Discussions.md).
 
 **Target Version**: IntelliJ 2025.3+ (sinceBuild: 252.1)
@@ -44,9 +46,9 @@ These items extend V1 without changing the core execution model.
 
 ### MCP Integration
 
-Uses standalone Kotlin MCP SDK with Ktor HTTP transport. The server runs independently of IntelliJ's built-in MCP plugin.
+Uses an internal MCP implementation aligned with the 2025-11-25 spec and Ktor HTTP transport. The server runs independently of IntelliJ's built-in MCP plugin.
 
-**See**: [`src/main/kotlin/com/jonnyzzz/intellij/mcp/server/`](src/main/kotlin/com/jonnyzzz/intellij/mcp/server/)
+**See**: [`src/main/kotlin/com/jonnyzzz/mcpSteroid/server/`](../../src/main/kotlin/com/jonnyzzz/mcpSteroid/server/)
 
 Key files:
 - `SteroidsMcpServer.kt` - Ktor-based MCP server
