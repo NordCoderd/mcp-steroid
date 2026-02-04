@@ -80,6 +80,79 @@ kotlin {
 
 val generatedSourcesPath = layout.buildDirectory.dir("generated/kotlin")
 
+
+val compilePrompts by tasks.registering {
+    val inputDir = layout.projectDirectory.dir("src/main/prompts")
+    val outputDir = generatedSourcesPath.map { it.dir("prompts") }
+    inputs.dir(inputDir)
+    outputs.dir(outputDir)
+
+    doFirst {
+        delete(outputDir)
+        mkdir(outputDir)
+
+        val inputFile = inputDir.asFile
+        val outputFile = outputDir.get().asFile
+        outputFile.mkdirs()
+
+        val allInputFiles = inputFile
+            .walkTopDown()
+            .filter { it.isFile }
+            .map {  it to outputFile.resolve(it.nameWithoutExtension + ".kt") }
+
+        val allPromptClasses = mutableListOf<String>()
+        for ((src, dest) in allInputFiles) {
+            val content = src.readText()
+
+            val factor = Random.nextInt(10000) + 11234
+            val packedContent = content
+                .map { it.code * factor }
+                .joinToString("") { "\n                       yield($it)" }
+
+            val className = "Prompt${src.nameWithoutExtension.capitalize()}"
+            allPromptClasses += className
+
+            dest.writeText("""
+                package com.jonnyzzz.mcpSteroid.prompts
+                
+                import com.intellij.openapi.components.Service
+                
+                //GENERATED FILE - DO NOT EDIT
+                
+                @Service(Service.Level.APP)
+                class $className {
+                  fun readResource() : String {
+                     return sequence {$packedContent
+                     }.map { it / $factor }.toList().reversed().joinToString("")  
+                  }
+                }
+                
+                """.trimIndent()
+            )
+        }
+
+        val servicesList = allPromptClasses.joinToString("") {
+            "\n                    yield(service<$it>())"
+        }
+
+        outputFile.resolve("AllPrompts.kt").writeText("""
+            package com.jonnyzzz.mcpSteroid.prompts
+            
+            import com.intellij.openapi.components.Service
+            import com.intellij.openapi.components.service
+            
+            //GENERATED FILE - DO NOT EDIT
+
+            @Service(Service.Level.APP)
+            class AllPrompts {
+              val all get () = sequence {$servicesList
+              }
+            }
+            
+            """.trimIndent())
+    }
+}
+
 // Generate metadata with encoded version and time bomb
 val generateMetadata by tasks.registering {
     group = "build"
@@ -160,6 +233,7 @@ kotlin.sourceSets.main {
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     dependsOn(generateMetadata)
+    dependsOn(compilePrompts)
 }
 
 intellijPlatform {
