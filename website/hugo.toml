@@ -1,0 +1,102 @@
+# Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com)
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+baseURL = 'https://mcp-steroid.jonnyzzz.com/'
+languageCode = 'en-us'
+title = 'MCP Steroid - Give AI the whole IDE, not just the files'
+disableKinds = ['taxonomy', 'term']
+
+[markup]
+  [markup.goldmark]
+    [markup.goldmark.renderer]
+      unsafe = true
+
+[menus]
+  [[menus.main]]
+    name = "Home"
+    url = "/"
+    weight = 1
+  [[menus.main]]
+    name = "Docs"
+    url = "/docs/"
+    weight = 2
+  [[menus.main]]
+    name = "Videos"
+    url = "https://www.youtube.com/playlist?list=PLitZWClhc4Qgz3w8qrtctMR_lpIc81n0f"
+    weight = 3
+  [[menus.main]]
+    name = "Slack Community"
+    url = "https://mcp-steroid.slack.com"
+    weight = 4
+  [[menus.main]]
+    name = "GitHub Issues"
+    url = "https://github.com/jonnyzzz/mcp-steroid/issues"
+    weight = 5
+  [[menus.main]]
+    name = "GitHub"
+    url = "https://github.com/jonnyzzz/mcp-steroid"
+    weight = 6
+
+[params]
+  description = "MCP Steroid is a Model Context Protocol server for JetBrains IDEs. It exposes IntelliJ Platform APIs, visual state, and runtime environment to any MCP-compatible AI agent via Kotlin code execution and screenshot capture."
+  playlistUrl = "https://www.youtube.com/playlist?list=PLitZWClhc4Qgz3w8qrtctMR_lpIc81n0f"
+  githubUrl = "https://github.com/jonnyzzz/mcp-steroid"
+  githubIssuesUrl = "https://github.com/jonnyzzz/mcp-steroid/issues"
+  youtubeChannel = "https://youtube.com/@jonnyzzz"
+  # Version is read from ../VERSION file during build (see Makefile)
+  version = "0.86.0"
+
+[[params.whatsnew]]
+  date = "2026-01-30"
+  text = "Website launched at mcp-steroid.jonnyzzz.com"
+
+[[params.whatsnew]]
+  date = "2026-01-29"
+  text = "Supported IntelliJ-based IDEs, including Rider, Android Studio, and GoLand"
+
+[[params.featuredVideos]]
+  id = "6ByedA15n8Q"
+  title = "CodeDozer Demo 5"
+  meta = "Most popular demo"
+  duration = "1:00"
+
+[[params.featuredVideos]]
+  id = "8MjogrpfXLU"
+  title = "CodeDozer & IntelliJ Debugger"
+  meta = "Debugger integration"
+  duration = "8:25"
+
+[[params.featuredVideos]]
+  id = "JGcRk7Y3-Z8"
+  title = "Now we call tasks in IntelliJ"
+  meta = "Task execution demo"
+  duration = "2:21"
+
+[[params.featuredVideos]]
+  id = "ibc0saTT06M"
+  title = "Real Work in Monorepo Part 2"
+  meta = "Deep dive demo"
+  duration = "18:37"
+
+[[params.featuredVideos]]
+  id = "QIl57FrAJtk"
+  title = "Cursor Talks with IntelliJ"
+  meta = "Cursor integration"
+  duration = "0:44"
+
+[[params.featuredVideos]]
+  id = "JNtYCWlRYak"
+  title = "Antigravity Mandelbrot Window"
+  meta = "Visual demo"
+  duration = "0:39"
