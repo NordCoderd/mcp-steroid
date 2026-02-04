@@ -10,14 +10,12 @@ _build:
 <p><strong>Welcome to the MCP Steroid Preview!</strong> Congratulations on getting early access to the plugin. We're excited to have you as part of our preview program!</p>
 </div>
 
-**Release Date:** February 1, 2026
-
 ## Preview Release
 
 This is an **early preview version** of MCP Steroid. Thank you for helping us test and improve the plugin!
 
 <div class="warning">
-<p><strong>Important:</strong> This preview build will expire on <strong>February 11, 2026</strong> (10 days after release). After expiration, you'll need to obtain a new build to continue using the plugin.</p>
+<p><strong>Important:</strong> This preview build will expire in <strong>10 days</strong>. After expiration, you'll need to obtain a new build to continue using the plugin.</p>
 </div>
 
 Not, this plugin is only tested to run on macOS. 
@@ -43,8 +41,6 @@ Download the latest plugin build from GitHub Releases:
 
 - **[The Release on GitHub](https://github.com/jonnyzzz/mcp-steroid/releases/tag/0.86.0-SNAPSHOT-2026-02-01-20-29-4ad98c4)**
 - [v0.86.0-SNAPSHOT (2026-02-01).zip](https://github.com/jonnyzzz/mcp-steroid/releases/tag/0.86.0-SNAPSHOT-2026-02-01-20-29-4ad98c4) - Current preview plugin build
-
-**[End User License Agreement (EULA)](/LICENSE)** - By downloading and using this plugin, you agree to the terms of the EULA.
 
 ### Installation
 
