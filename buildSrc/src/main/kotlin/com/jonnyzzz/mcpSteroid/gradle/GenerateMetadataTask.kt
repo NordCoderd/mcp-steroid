@@ -30,7 +30,7 @@ abstract class GenerateMetadataTask : DefaultTask() {
 
     @TaskAction
     fun generate() {
-        val baseMagic = Random.nextInt().absoluteValue % 19456
+        val baseMagic = (Random.nextInt().absoluteValue + 237) % 19456
 
         fun String.toEncodedSequence(): List<Int> {
             return reversed().map { it.code * baseMagic }

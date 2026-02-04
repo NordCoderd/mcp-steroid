@@ -16,6 +16,7 @@ import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import kotlin.math.absoluteValue
 import kotlin.random.Random
 
 abstract class CompilePromptsTask : DefaultTask() {
@@ -42,7 +43,7 @@ abstract class CompilePromptsTask : DefaultTask() {
             .filter { it.isFile }
             .forEach { src ->
                 val content = src.readText()
-                val factor = Random.nextInt(10000) + 11234
+                val factor = Random.nextInt(10000).absoluteValue + 11234
 
                 val packedContent = content
                     .map { it.code * factor }
