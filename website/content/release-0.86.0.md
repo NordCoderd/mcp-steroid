@@ -42,6 +42,8 @@ Download the latest plugin build from GitHub Releases:
 - **[The Release on GitHub](https://github.com/jonnyzzz/mcp-steroid/releases/tag/0.86.0-SNAPSHOT-2026-02-01-20-29-4ad98c4)**
 - [v0.86.0-SNAPSHOT (2026-02-01).zip](https://github.com/jonnyzzz/mcp-steroid/releases/tag/0.86.0-SNAPSHOT-2026-02-01-20-29-4ad98c4) - Current preview plugin build
 
+**[End User License Agreement (EULA)](/LICENSE)** - By downloading and using this plugin, you agree to the terms of the EULA.
+
 ### Installation
 
 1. Download the `.zip` file from the GitHub release above
