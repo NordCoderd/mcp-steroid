@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.gradle
 
 import com.squareup.kotlinpoet.AnnotationSpec
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
@@ -39,64 +41,74 @@ abstract class GenerateMetadataTask : DefaultTask() {
             .format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
         val timeBombCodes = timeBomb.toEncodedSequence()
 
-        val versionYields = versionCodes.joinToString("\n") { "yield($it)" }
-        val timeBombYields = timeBombCodes.joinToString("\n") { "yield($it)" }
+        val localDate = ClassName("java.time", "LocalDate")
+        val dateTimeFormatter = ClassName("java.time.format", "DateTimeFormatter")
 
         val suppressAnnotation = AnnotationSpec.builder(Suppress::class)
             .addMember("%S, %S, %S", "MagicNumber", "unused", "NOTHING_TO_INLINE")
+            .build()
+
+        val versionSequenceBody = CodeBlock.builder()
+            .apply {
+                versionCodes.forEach { code ->
+                    addStatement("yield(%L)", code)
+                }
+            }
             .build()
 
         val getPluginVersionFun = FunSpec.builder("getPluginVersion")
             .addModifiers(KModifier.INLINE)
             .returns(String::class)
             .addKdoc("Plugin version (encoded)")
-            .addCode("""
-                |return sequence {
-                |    $versionYields
-                |}.map { it / $baseMagic }.toList().reversed().map { it.toChar() }.joinToString("")
-            """.trimMargin())
+            .addStatement(
+                "return sequence { %L }.map { it / %L }.toList().reversed().map { it.toChar() }.joinToString(%S)",
+                versionSequenceBody,
+                baseMagic,
+                ""
+            )
+            .build()
+
+        val timeBombSequenceBody = CodeBlock.builder()
+            .apply {
+                timeBombCodes.forEach { code ->
+                    addStatement("yield(%L)", code)
+                }
+            }
             .build()
 
         val getTimeBombExpirationFun = FunSpec.builder("getTimeBombExpiration")
             .addModifiers(KModifier.INLINE)
             .returns(String::class)
             .addKdoc("Time bomb expiration date (encoded)")
-            .addCode("""
-                |return sequence {
-                |    $timeBombYields
-                |}.map { it / $baseMagic }.toList().reversed().map { it.toChar() }.joinToString("")
-            """.trimMargin())
+            .addStatement(
+                "return sequence { %L }.map { it / %L }.toList().reversed().map { it.toChar() }.joinToString(%S)",
+                timeBombSequenceBody,
+                baseMagic,
+                ""
+            )
             .build()
 
         val isTimeBombExpiredFun = FunSpec.builder("isTimeBombExpired")
             .addModifiers(KModifier.INLINE)
             .returns(Boolean::class)
-            .addKdoc("""
-                |Check if time bomb has expired
-                |@return true if the plugin is expired and should not function
-            """.trimMargin())
-            .addCode("""
-                |val expiration = getTimeBombExpiration()
-                |val now = java.time.LocalDate.now()
-                |val expirationDate = java.time.LocalDate.parse(
-                |    expiration,
-                |    java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
-                |)
-                |return now.isAfter(expirationDate)
-            """.trimMargin())
+            .addKdoc("Check if time bomb has expired\n@return true if the plugin is expired and should not function")
+            .addStatement("val expiration = getTimeBombExpiration()")
+            .addStatement("val now = %T.now()", localDate)
+            .addStatement(
+                "val expirationDate = %T.parse(expiration, %T.ofPattern(%S))",
+                localDate,
+                dateTimeFormatter,
+                "yyyy-MM-dd"
+            )
+            .addStatement("return now.isAfter(expirationDate)")
             .build()
 
         val validateTimeBombFun = FunSpec.builder("validateTimeBomb")
             .addModifiers(KModifier.INLINE)
-            .addKdoc("""
-                |Validate time bomb and throw exception if expired
-                |@throws IllegalStateException if the plugin build has expired
-            """.trimMargin())
-            .addCode("""
-                |if (isTimeBombExpired()) {
-                |    throw IllegalStateException("This plugin build has expired, please update")
-                |}
-            """.trimMargin())
+            .addKdoc("Validate time bomb and throw exception if expired\n@throws IllegalStateException if the plugin build has expired")
+            .beginControlFlow("if (isTimeBombExpired())")
+            .addStatement("throw %T(%S)", IllegalStateException::class, "This plugin build has expired, please update")
+            .endControlFlow()
             .build()
 
         val fileSpec = FileSpec.builder("com.jonnyzzz.mcpSteroid", "PluginMetadata")

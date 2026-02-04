@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.gradle
 import com.squareup.kotlinpoet.ANY
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
@@ -50,15 +51,22 @@ abstract class CompilePromptsTask : DefaultTask() {
                 val classType = ClassName(packageName, className)
                 allPromptClasses += classType
 
-                val yieldStatements = packedContent.joinToString("\n") { "yield($it)" }
+                val sequenceBody = CodeBlock.builder()
+                    .apply {
+                        packedContent.forEach { code ->
+                            addStatement("yield(%L)", code)
+                        }
+                    }
+                    .build()
 
                 val readResourceFun = FunSpec.builder("readResource")
                     .returns(String::class)
-                    .addCode("""
-                        |return sequence {
-                        |    $yieldStatements
-                        |}.map { it / $factor }.toList().reversed().joinToString("")
-                    """.trimMargin())
+                    .addStatement(
+                        "return sequence { %L }.map { it / %L }.toList().reversed().joinToString(%S)",
+                        sequenceBody,
+                        factor,
+                        ""
+                    )
                     .build()
 
                 val typeSpec = TypeSpec.classBuilder(className)
@@ -79,20 +87,20 @@ abstract class CompilePromptsTask : DefaultTask() {
             }
 
         // Generate AllPrompts aggregator class
-        val yieldStatements = allPromptClasses.joinToString("\n") {
-            "yield(service<${it.simpleName}>())"
-        }
+        val sequenceBody = CodeBlock.builder()
+            .apply {
+                allPromptClasses.forEach { classType ->
+                    addStatement("yield(service<%T>())", classType)
+                }
+            }
+            .build()
 
         val sequenceOfAny = Sequence::class.asClassName().parameterizedBy(ANY)
 
         val allProperty = PropertySpec.builder("all", sequenceOfAny)
             .getter(
                 FunSpec.getterBuilder()
-                    .addCode("""
-                        |return sequence {
-                        |    $yieldStatements
-                        |}
-                    """.trimMargin())
+                    .addStatement("return sequence { %L }", sequenceBody)
                     .build()
             )
             .build()
