@@ -1,6 +1,15 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.gradle
 
+import com.squareup.kotlinpoet.ANY
+import com.squareup.kotlinpoet.AnnotationSpec
+import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FileSpec
+import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.PropertySpec
+import com.squareup.kotlinpoet.TypeSpec
+import com.squareup.kotlinpoet.asClassName
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.InputDirectory
@@ -22,63 +31,88 @@ abstract class CompilePromptsTask : DefaultTask() {
         project.delete(outputRoot)
         outputRoot.mkdirs()
 
-        val allPromptClasses = mutableListOf<String>()
+        val packageName = "com.jonnyzzz.mcpSteroid.prompts"
+        val serviceAnnotation = ClassName("com.intellij.openapi.components", "Service")
+
+        val allPromptClasses = mutableListOf<ClassName>()
+
         inputRoot
             .walkTopDown()
             .filter { it.isFile }
             .forEach { src ->
-                val dest = outputRoot.resolve(src.nameWithoutExtension + ".kt")
                 val content = src.readText()
-
                 val factor = Random.nextInt(10000) + 11234
+
                 val packedContent = content
                     .map { it.code * factor }
-                    .joinToString("") { "\n                       yield($it)" }
 
                 val className = "Prompt" + src.nameWithoutExtension.toPromptClassName()
-                allPromptClasses += className
+                val classType = ClassName(packageName, className)
+                allPromptClasses += classType
 
-                dest.writeText(
-                    """
-                    package com.jonnyzzz.mcpSteroid.prompts
+                val yieldStatements = packedContent.joinToString("\n") { "yield($it)" }
 
-                    import com.intellij.openapi.components.Service
+                val readResourceFun = FunSpec.builder("readResource")
+                    .returns(String::class)
+                    .addCode("""
+                        |return sequence {
+                        |    $yieldStatements
+                        |}.map { it / $factor }.toList().reversed().joinToString("")
+                    """.trimMargin())
+                    .build()
 
-                    //GENERATED FILE - DO NOT EDIT
+                val typeSpec = TypeSpec.classBuilder(className)
+                    .addAnnotation(
+                        AnnotationSpec.builder(serviceAnnotation)
+                            .addMember("%T.Level.APP", serviceAnnotation)
+                            .build()
+                    )
+                    .addFunction(readResourceFun)
+                    .build()
 
-                    @Service(Service.Level.APP)
-                    class $className {
-                      fun readResource() : String {
-                         return sequence {$packedContent
-                         }.map { it / $factor }.toList().reversed().joinToString("")
-                      }
-                    }
+                val fileSpec = FileSpec.builder(packageName, className)
+                    .addFileComment("GENERATED FILE - DO NOT EDIT")
+                    .addType(typeSpec)
+                    .build()
 
-                    """.trimIndent()
-                )
+                outputRoot.resolve("$className.kt").writeText(fileSpec.toString())
             }
 
-        val servicesList = allPromptClasses.joinToString("") {
-            "\n                    yield(service<$it>())"
+        // Generate AllPrompts aggregator class
+        val yieldStatements = allPromptClasses.joinToString("\n") {
+            "yield(service<${it.simpleName}>())"
         }
 
-        outputRoot.resolve("AllPrompts.kt").writeText(
-            """
-            package com.jonnyzzz.mcpSteroid.prompts
+        val sequenceOfAny = Sequence::class.asClassName().parameterizedBy(ANY)
 
-            import com.intellij.openapi.components.Service
-            import com.intellij.openapi.components.service
+        val allProperty = PropertySpec.builder("all", sequenceOfAny)
+            .getter(
+                FunSpec.getterBuilder()
+                    .addCode("""
+                        |return sequence {
+                        |    $yieldStatements
+                        |}
+                    """.trimMargin())
+                    .build()
+            )
+            .build()
 
-            //GENERATED FILE - DO NOT EDIT
+        val allPromptsType = TypeSpec.classBuilder("AllPrompts")
+            .addAnnotation(
+                AnnotationSpec.builder(serviceAnnotation)
+                    .addMember("%T.Level.APP", serviceAnnotation)
+                    .build()
+            )
+            .addProperty(allProperty)
+            .build()
 
-            @Service(Service.Level.APP)
-            class AllPrompts {
-              val all get () = sequence {$servicesList
-              }
-            }
+        val allPromptsFile = FileSpec.builder(packageName, "AllPrompts")
+            .addFileComment("GENERATED FILE - DO NOT EDIT")
+            .addImport("com.intellij.openapi.components", "service")
+            .addType(allPromptsType)
+            .build()
 
-            """.trimIndent()
-        )
+        outputRoot.resolve("AllPrompts.kt").writeText(allPromptsFile.toString())
     }
 }
 

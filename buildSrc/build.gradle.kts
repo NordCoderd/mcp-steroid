@@ -2,12 +2,12 @@ plugins {
     `kotlin-dsl`
 }
 
-dependencies {
-    implementation(gradleApi())
-
-}
-
 repositories {
     mavenCentral()
     gradlePluginPortal()
+}
+
+dependencies {
+    implementation(gradleApi())
+    implementation("com.squareup:kotlinpoet:2.2.0")
 }
