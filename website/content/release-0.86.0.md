@@ -10,12 +10,14 @@ _build:
 <p><strong>Welcome to the MCP Steroid Preview!</strong> Congratulations on getting early access to the plugin. We're excited to have you as part of our preview program!</p>
 </div>
 
+**Release Date:** February 1, 2026
+
 ## Preview Release
 
 This is an **early preview version** of MCP Steroid. Thank you for helping us test and improve the plugin!
 
 <div class="warning">
-<p><strong>Important:</strong> This preview build will expire in <strong>10 days</strong>. After expiration, you'll need to obtain a new build to continue using the plugin.</p>
+<p><strong>Important:</strong> This preview build will expire on <strong>February 11, 2026</strong> (10 days after release). After expiration, you'll need to obtain a new build to continue using the plugin.</p>
 </div>
 
 Not, this plugin is only tested to run on macOS. 
