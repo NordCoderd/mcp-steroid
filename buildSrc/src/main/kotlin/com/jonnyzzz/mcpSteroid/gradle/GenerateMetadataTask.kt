@@ -3,10 +3,10 @@ package com.jonnyzzz.mcpSteroid.gradle
 
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
+import com.squareup.kotlinpoet.buildCodeBlock
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.Property
@@ -48,44 +48,32 @@ abstract class GenerateMetadataTask : DefaultTask() {
             .addMember("%S, %S, %S", "MagicNumber", "unused", "NOTHING_TO_INLINE")
             .build()
 
-        val versionSequenceBody = CodeBlock.builder()
-            .apply {
-                versionCodes.forEach { code ->
-                    addStatement("yield(%L)", code)
-                }
-            }
-            .build()
-
         val getPluginVersionFun = FunSpec.builder("getPluginVersion")
             .addModifiers(KModifier.INLINE)
             .returns(String::class)
             .addKdoc("Plugin version (encoded)")
-            .addStatement(
-                "return sequence { %L }.map { it / %L }.toList().reversed().map { it.toChar() }.joinToString(%S)",
-                versionSequenceBody,
-                baseMagic,
-                ""
-            )
-            .build()
-
-        val timeBombSequenceBody = CodeBlock.builder()
-            .apply {
-                timeBombCodes.forEach { code ->
+            .addCode(buildCodeBlock {
+                beginControlFlow("return sequence")
+                versionCodes.forEach { code ->
                     addStatement("yield(%L)", code)
                 }
-            }
+                unindent()
+                add("}.map { it / %L }.toList().reversed().map { it.toChar() }.joinToString(%S)\n", baseMagic, "")
+            })
             .build()
 
         val getTimeBombExpirationFun = FunSpec.builder("getTimeBombExpiration")
             .addModifiers(KModifier.INLINE)
             .returns(String::class)
             .addKdoc("Time bomb expiration date (encoded)")
-            .addStatement(
-                "return sequence { %L }.map { it / %L }.toList().reversed().map { it.toChar() }.joinToString(%S)",
-                timeBombSequenceBody,
-                baseMagic,
-                ""
-            )
+            .addCode(buildCodeBlock {
+                beginControlFlow("return sequence")
+                timeBombCodes.forEach { code ->
+                    addStatement("yield(%L)", code)
+                }
+                unindent()
+                add("}.map { it / %L }.toList().reversed().map { it.toChar() }.joinToString(%S)\n", baseMagic, "")
+            })
             .build()
 
         val isTimeBombExpiredFun = FunSpec.builder("isTimeBombExpired")

@@ -4,13 +4,14 @@ package com.jonnyzzz.mcpSteroid.gradle
 import com.squareup.kotlinpoet.ANY
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
+import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.buildCodeBlock
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.InputDirectory
@@ -45,29 +46,22 @@ abstract class CompilePromptsTask : DefaultTask() {
                 val content = src.readText()
                 val factor = Random.nextInt(10000).absoluteValue + 11234
 
-                val packedContent = content
-                    .map { it.code * factor }
+                val packedContent = content.map { it.code * factor }
 
                 val className = "Prompt" + src.nameWithoutExtension.toPromptClassName()
                 val classType = ClassName(packageName, className)
                 allPromptClasses += classType
 
-                val sequenceBody = CodeBlock.builder()
-                    .apply {
+                val readResourceFun = FunSpec.builder("readResource")
+                    .returns(String::class)
+                    .addCode(buildCodeBlock {
+                        beginControlFlow("return sequence")
                         packedContent.forEach { code ->
                             addStatement("yield(%L)", code)
                         }
-                    }
-                    .build()
-
-                val readResourceFun = FunSpec.builder("readResource")
-                    .returns(String::class)
-                    .addStatement(
-                        "return sequence { %L }.map { it / %L }.toList().reversed().joinToString(%S)",
-                        sequenceBody,
-                        factor,
-                        ""
-                    )
+                        unindent()
+                        add("}.map { it / %L }.toList().reversed().joinToString(%S)\n", factor, "")
+                    })
                     .build()
 
                 val typeSpec = TypeSpec.classBuilder(className)
@@ -88,20 +82,19 @@ abstract class CompilePromptsTask : DefaultTask() {
             }
 
         // Generate AllPrompts aggregator class
-        val sequenceBody = CodeBlock.builder()
-            .apply {
-                allPromptClasses.forEach { classType ->
-                    addStatement("yield(service<%T>())", classType)
-                }
-            }
-            .build()
-
         val sequenceOfAny = Sequence::class.asClassName().parameterizedBy(ANY)
+        val serviceMember = MemberName("com.intellij.openapi.components", "service")
 
         val allProperty = PropertySpec.builder("all", sequenceOfAny)
             .getter(
                 FunSpec.getterBuilder()
-                    .addStatement("return sequence { %L }", sequenceBody)
+                    .addCode(buildCodeBlock {
+                        beginControlFlow("return sequence")
+                        allPromptClasses.forEach { classType ->
+                            addStatement("yield(%M<%T>())", serviceMember, classType)
+                        }
+                        endControlFlow()
+                    })
                     .build()
             )
             .build()
@@ -117,7 +110,6 @@ abstract class CompilePromptsTask : DefaultTask() {
 
         val allPromptsFile = FileSpec.builder(packageName, "AllPrompts")
             .addFileComment("GENERATED FILE - DO NOT EDIT")
-            .addImport("com.intellij.openapi.components", "service")
             .addType(allPromptsType)
             .build()
 
@@ -125,6 +117,7 @@ abstract class CompilePromptsTask : DefaultTask() {
     }
 }
 
-private fun String.toPromptClassName(): String = replaceFirstChar {
-    if (it.isLowerCase()) it.titlecase() else it.toString()
-}
+private fun String.toPromptClassName() = split("-", "_")
+    .joinToString("") { it.titleCase() }
+
+private fun String.titleCase() = replaceFirstChar { it.titlecase() }
