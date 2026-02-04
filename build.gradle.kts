@@ -25,8 +25,6 @@ val gitHash = providers.exec {
 }.standardOutput.asText.get().trim()
 version = "$baseVersion-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}-$gitHash"
 
-// Time bomb - 10 days from now (date only for better caching)
-val TIME_BOMB = LocalDateTime.now().plusDays(10).format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
 
 repositories {
     mavenCentral()
@@ -92,7 +90,7 @@ val generateMetadata by tasks.registering(GenerateMetadataTask::class) {
     description = "Generate plugin metadata with version and time bomb"
 
     versionString.set(version.toString())
-    timeBomb.set(TIME_BOMB)
+    timeBombDays.set(10)
     outputFile.set(generatedSourcesPath.map { it.file("PluginMetadata.kt") })
 
     outputs.upToDateWhen { false }
