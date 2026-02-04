@@ -110,6 +110,45 @@ class KotlincCommandLineBuilderIntegrationTest : BasePlatformTestCase() {
         }
     }
 
+    fun testCompilesJarWithClasspathArgFile(): Unit = timeoutRunBlocking(90.seconds) {
+        val root = Files.createTempDirectory("kotlinc-argfile")
+        val outputJar = root.resolve("out/argfile.jar")
+        val classpathEntry = classpathEntryFromResource(KotlincCommandLineBuilderIntegrationTest::class.java)
+        val classpathDir = if (Files.isDirectory(classpathEntry)) {
+            classpathEntry
+        } else {
+            createClassDirectory(root, KotlincCommandLineBuilderIntegrationTest::class.java)
+        }
+        val source = root.resolve("Main.kt")
+        Files.writeString(
+            source,
+            """
+            import ${KotlincCommandLineBuilderIntegrationTest::class.java.name}
+
+            fun main(): String = ${KotlincCommandLineBuilderIntegrationTest::class.java.name}::class.java.name
+            """.trimIndent(),
+            StandardCharsets.UTF_8,
+        )
+
+        val argFile = root.resolve("kotlinc.args")
+        val commandLine = KotlincCommandLineBuilder(outputJar)
+            .addSource(source)
+            .addClasspathEntry(classpathDir)
+            .withClasspathArgFile(argFile)
+            .build()
+
+        assertTrue("Expected argfile to be created at $argFile", Files.exists(argFile))
+        assertTrue(commandLine.args.any { it == "@${argFile.toAbsolutePath()}" })
+        assertFalse("Expected -classpath to be omitted from command line when using argfile", commandLine.args.contains("-classpath"))
+
+        kotlincProcessClient.kotlinc(commandLine.args)
+
+        assertTrue("Expected output jar at ${commandLine.outputJar}", Files.exists(commandLine.outputJar))
+        ZipFile(commandLine.outputJar.toFile()).use { zip ->
+            assertNotNull("Expected MainKt.class in jar", zip.getEntry("MainKt.class"))
+        }
+    }
+
     private fun ideClasspathEntries(): List<Path> {
         val entries = scriptClassLoaderFactory.ideClasspath()
         assertTrue("Expected ideClasspath to contain entries", entries.isNotEmpty())

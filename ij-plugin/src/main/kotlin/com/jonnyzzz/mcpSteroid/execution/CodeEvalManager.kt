@@ -60,10 +60,12 @@ class CodeEvalManager(
             inputKt.writeText(wrappedCode.code)
 
             (compilerDir / "classpath.txt").writeLines(compileClasspath.map { it.toString() })
+            val classpathArgsFile = compilerDir / "kotlinc.args"
 
             val cmd = KotlincCommandLine
                 .builder(outputJar)
                 .withNoStdLib(true)
+                .withClasspathArgFile(classpathArgsFile)
                 .addClasspathEntries(compileClasspath)
                 .addSource(inputKt)
                 .build()
