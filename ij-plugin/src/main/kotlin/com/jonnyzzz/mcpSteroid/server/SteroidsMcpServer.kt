@@ -5,9 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
-import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.mcpSteroid.mcp.*
 import io.ktor.http.*
@@ -112,8 +110,9 @@ class SteroidsMcpServer(
             return tryStartServer(bindHost, freePort)
         }
 
+        val portRetries = 10
         // Try configured port and subsequent ports
-        for (attempt in 0 until MAX_PORT_RETRIES) {
+        for (attempt in 0 until portRetries) {
             val portToTry = configuredPort + attempt
             val result = tryStartServer(bindHost, portToTry)
             if (result > 0) {
@@ -124,7 +123,7 @@ class SteroidsMcpServer(
             }
         }
 
-        log.error("Failed to start MCP server: all ports from $configuredPort to ${configuredPort + MAX_PORT_RETRIES - 1} are busy")
+        log.warn("Failed to start MCP server: all ports from $configuredPort to ${configuredPort + portRetries - 1} are busy")
         return 0
     }
 
@@ -272,26 +271,23 @@ class SteroidsMcpServer(
         getServer().sessionManager.forgetAllSessionsForTest()
     }
 
-    companion object {
-        private const val MAX_PORT_RETRIES = 10
+    private val requestLoggingPlugin get() = createApplicationPlugin("SteroidsMcpRequestLogger") {
+        onCall { call ->
+            val startedAt = System.nanoTime()
+            val method = call.request.httpMethod.value
+            val uri = call.request.uri
+            val remoteHost = call.request.local.remoteHost
+            log.info("[MCP-HTTP] <- $method $uri from $remoteHost")
 
-        private val requestLoggingPlugin = createApplicationPlugin("SteroidsMcpRequestLogger") {
-            val logger = Logger.getInstance(SteroidsMcpServer::class.java)
-            onCall { call ->
-                val startedAt = System.nanoTime()
-                val method = call.request.httpMethod.value
-                val uri = call.request.uri
-                val remoteHost = call.request.local.remoteHost
-                logger.info("[MCP-HTTP] <- $method $uri from $remoteHost")
-
-                call.response.pipeline.intercept(ApplicationSendPipeline.After) {
-                    val status = call.response.status() ?: HttpStatusCode.OK
-                    val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
-                    logger.info("[MCP-HTTP] -> ${status.value} ${status.description} for $method $uri in ${elapsedMs}ms")
-                }
+            call.response.pipeline.intercept(ApplicationSendPipeline.After) {
+                val status = call.response.status() ?: HttpStatusCode.OK
+                val elapsedMs = (System.nanoTime() - startedAt) / 1_000_000
+                log.info("[MCP-HTTP] -> ${status.value} ${status.description} for $method $uri in ${elapsedMs}ms")
             }
         }
+    }
 
+    companion object {
         fun getInstance(): SteroidsMcpServer = ApplicationManager.getApplication().service()
     }
 }
