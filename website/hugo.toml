@@ -49,7 +49,7 @@ disableKinds = ['taxonomy', 'term']
     weight = 6
 
 [params]
-  description = "AI agents can finally SEE your JetBrains IDE - not just read code. Model Context Protocol server bringing visual understanding and full IDE control to AI agents across IntelliJ IDEA, Rider, Android Studio, and more."
+  description = "MCP Steroid is a Model Context Protocol server for JetBrains IDEs. It exposes IntelliJ Platform APIs, visual state, and runtime environment to any AI agent via Kotlin code execution and screenshot capture."
   playlistUrl = "https://www.youtube.com/playlist?list=PLitZWClhc4Qgz3w8qrtctMR_lpIc81n0f"
   githubUrl = "https://github.com/jonnyzzz/mcp-steroid"
   githubIssuesUrl = "https://github.com/jonnyzzz/mcp-steroid/issues"
