@@ -194,6 +194,10 @@ listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
         from(downloadKotlinc) {
             into(intellijPlatform.projectName)
         }
+        // Include LICENSE file in plugin root
+        from(layout.projectDirectory.file("website/static/LICENSE")) {
+            into(intellijPlatform.projectName)
+        }
     }
 }
 
@@ -238,6 +242,9 @@ val verifyBundledLibraries by tasks.registering {
 
         // Assert expected libraries - update this list when dependencies change
         val expectedFiles = sortedSetOf(
+            // LICENSE file
+            "LICENSE",
+
             //our binaires
             "lib/mcp-steroid-${project.version}.jar",
             "lib/ocr-common-${project.version}.jar",
