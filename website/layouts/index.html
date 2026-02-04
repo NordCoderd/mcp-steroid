@@ -39,8 +39,14 @@
     .tagline {
         font-size: 1.2rem;
         color: var(--color-tertiary);
-        margin-bottom: 2rem;
+        margin-bottom: 1rem;
         line-height: 1.6;
+    }
+    .proof-strip {
+        font-size: 0.9rem;
+        color: var(--color-quaternary);
+        margin-bottom: 2rem;
+        letter-spacing: 0.5px;
     }
     .cta-buttons {
         display: flex;
@@ -352,24 +358,24 @@
 {{ define "main" }}
 <div class="hero">
     <img src="{{ "pluginIcon.svg" | relURL }}" alt="MCP Steroid Logo" class="logo">
-    <h1>MCP Steroid</h1>
+    <h1>Give AI the whole IDE, not just the files.</h1>
     <span class="version-badge">v{{ .Site.Params.version }}</span>
     <p class="tagline">
-        Give AI the whole IDE, not just the files<br><br>
-        AI agents can finally SEE your IDE - not just read code. The only MCP server with visual understanding and full control of IntelliJ IDEA, Rider, Android Studio, and all JetBrains IDEs through the Model Context Protocol.
+        MCP Steroid is a Model Context Protocol server for JetBrains IDEs. It exposes IntelliJ Platform APIs, visual state, and runtime environment to any AI agent via Kotlin code execution and screenshot capture.
     </p>
+    <p class="proof-strip">9 MCP tools - 58 MCP resources - Human review by default</p>
     <div class="cta-buttons">
         <a href="https://linkedin.com/in/jonnyzzz" class="btn btn-primary" target="_blank" rel="noopener">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
             </svg>
-            Get Trial Access on LinkedIn
+            Get Early Access
         </a>
-        <a href="{{ "/docs/" | relURL }}" class="btn btn-secondary">
+        <a href="{{ .Site.Params.playlistUrl }}" class="btn btn-secondary" target="_blank" rel="noopener">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+                <path d="M8 5v14l11-7z"/>
             </svg>
-            Documentation
+            Watch Demos
         </a>
         <a href="{{ .Site.Params.githubUrl }}" class="btn btn-secondary" target="_blank" rel="noopener">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
@@ -381,29 +387,34 @@
 </div>
 
 <section class="about-section">
-    <h2>About the MCP Server</h2>
+    <h2>The Problem</h2>
     <div class="about-content">
         <p>
-            MCP Steroid is a Model Context Protocol server for JetBrains IDEs, packaged as a plugin.
-            It exposes IDE APIs, visual state, and runtime environment to ANY AI agent through Kotlin code execution and screenshot capture.
+            AI coding tools only read and write files. They cannot see or control the IDE, run refactorings, or debug with real runtime context.
         </p>
+    </div>
+</section>
+
+<section class="about-section">
+    <h2>The Solution</h2>
+    <div class="about-content">
         <p>
-            Unlike traditional code assistants that only see text, MCP Steroid lets agents SEE your IDE:
-            dialogs, toolbars, debugger state, test results, and visual elements. Agents can take screenshots,
-            interact with UI, execute tests, run refactorings, and control the full IDE programmatically.
+            MCP Steroid connects any MCP client to IntelliJ-based IDEs so agents can use real IDE capabilities, not just files.
         </p>
-        <p>
-            Works with Claude, GPT, Gemini, Llama, and any MCP-compatible client.
-            No vendor lock-in &mdash; open standard protocol.
-        </p>
+    </div>
+</section>
+
+<section class="about-section">
+    <h2>Capabilities</h2>
+    <div class="about-content">
         <ul class="features-list">
-            <li>Visual Understanding: Screenshot capture, UI interaction, modal dialog detection</li>
-            <li>Full IDE Control: Execute any IntelliJ API via Kotlin code - refactorings, tests, debugger, VFS</li>
-            <li>All JetBrains IDEs: IntelliJ IDEA, Rider (C#), Android Studio, GoLand, PyCharm, WebStorm, and more</li>
-            <li>9 MCP tools and 58 MCP resources exposed from IDE runtime</li>
-            <li>Human review by default (configurable ALWAYS/TRUSTED/NEVER modes)</li>
+            <li>Visual understanding: screenshot capture, UI interaction, modal dialog detection</li>
+            <li>Full IDE control: refactorings, inspections, tests, debugger actions</li>
+            <li>IntelliJ Platform access: PSI and project model queries via Kotlin code execution</li>
+            <li>Human review modes: ALWAYS, TRUSTED, NEVER</li>
+            <li>Standard MCP protocol: no vendor lock-in</li>
         </ul>
-        <p>Works with Claude, GPT, Gemini, Llama, and ANY MCP client:</p>
+        <p>Works with any MCP-compatible client:</p>
         <div class="agents-list">
             <span class="agent-badge">Claude</span>
             <span class="agent-badge">GPT</span>
@@ -418,15 +429,30 @@
 </section>
 
 <section class="about-section">
+    <h2>Supported IDEs</h2>
+    <div class="about-content">
+        <div class="agents-list">
+            <span class="agent-badge">IntelliJ IDEA</span>
+            <span class="agent-badge">Rider</span>
+            <span class="agent-badge">Android Studio</span>
+            <span class="agent-badge">GoLand</span>
+            <span class="agent-badge">PyCharm</span>
+            <span class="agent-badge">WebStorm</span>
+            <span class="agent-badge">Other IntelliJ-based IDEs</span>
+        </div>
+    </div>
+</section>
+
+<section class="about-section">
     <h2>Learn More</h2>
     <div class="about-content">
         <p>
             Modern AI-driven development requires agents to interact programmatically with your IDE. Learn more about the principles and practices behind MCP Steroid:
         </p>
         <ul class="features-list">
-            <li><a href="https://jonnyzzz.com/blog/2026/01/27/coding-in-english-with-ai/" target="_blank" rel="noopener" style="color: #a0a0ff; text-decoration: none;">Coding in English with AI</a> &mdash; How natural language becomes your development interface</li>
-            <li><a href="https://jonnyzzz.com/blog/2026/01/30/orchestrating-ai-fleets/" target="_blank" rel="noopener" style="color: #a0a0ff; text-decoration: none;">Orchestrating AI Fleets</a> &mdash; When agents manage agents to accomplish complex tasks</li>
-            <li><a href="https://jonnyzzz.com/blog/2026/01/24/16-ai-agents-documentation-refactor/" target="_blank" rel="noopener" style="color: #a0a0ff; text-decoration: none;">How 16 AI Agents Fixed Our Documentation Problem</a> &mdash; Real-world case study of agent-driven improvement</li>
+            <li><a href="https://jonnyzzz.com/blog/2026/01/27/coding-in-english-with-ai/" target="_blank" rel="noopener" style="color: #a0a0ff; text-decoration: none;">Coding in English with AI</a> -- How natural language becomes your development interface</li>
+            <li><a href="https://jonnyzzz.com/blog/2026/01/30/orchestrating-ai-fleets/" target="_blank" rel="noopener" style="color: #a0a0ff; text-decoration: none;">Orchestrating AI Fleets</a> -- When agents manage agents to accomplish complex tasks</li>
+            <li><a href="https://jonnyzzz.com/blog/2026/01/24/16-ai-agents-documentation-refactor/" target="_blank" rel="noopener" style="color: #a0a0ff; text-decoration: none;">How 16 AI Agents Fixed Our Documentation Problem</a> -- Real-world case study of agent-driven improvement</li>
         </ul>
     </div>
 </section>
@@ -476,13 +502,13 @@
     <div class="cta-card">
         <h3>Want to Try MCP Steroid?</h3>
         <p>
-            The MCP Server (packaged as an IntelliJ plugin) is currently in early access. Message Eugene Petrenko on LinkedIn to get access to the latest build and join the community of early adopters.
+            MCP Steroid is currently in early access. Message Eugene Petrenko on LinkedIn to get access to the latest build.
         </p>
         <a href="https://linkedin.com/in/jonnyzzz" class="btn btn-primary" target="_blank" rel="noopener">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
             </svg>
-            Message on LinkedIn
+            Get Early Access
         </a>
     </div>
 </section>
