@@ -1,17 +1,20 @@
 # Gradle
 .gradle/
 .gradle*/
+.kotlin
+*.kotlin_module
 build/
 
 # IntelliJ IDEA
 .idea/
+!.idea/dictionaries
+
 out/
 .intellijPlatform/
 
 .vscode
 
-# Kotlin
-*.kotlin_module
+.playwright-mcp
 
 # OS
 .DS_Store,
@@ -24,10 +27,3 @@ Thumbs.db
 integration-test/tmp/
 integration-test/*.tmp
 docs/runs/
-
-.gradle-local
-.kotlin
-
-# Website public repository checkout
-website/mcp-steroid-public/
-website/.hugo_build.lock
