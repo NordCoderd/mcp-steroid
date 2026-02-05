@@ -1,19 +1,19 @@
-/**
- * IDE: Demo Debug Test (End-to-end)
- *
- * End-to-end demo that creates a debug run configuration for DemoTestByJonnyzzz, runs it in Debug mode, resumes if paused, waits for completion, and prints results.
- *
- * IntelliJ API used:
- * - RunManager, JUnitConfiguration
- * - ProgramRunnerUtil, ExecutorRegistry, DefaultDebugExecutor
- * - XDebuggerManager
- * - RunContentManager, SMTRunnerConsoleView
- *
- * Expected: DemoTestByJonnyzzz fails (intentional)
- * Cleanup:
- * - When you no longer need debugging, stop sessions on EDT:
- *   withContext(Dispatchers.EDT) { XDebuggerManager.getInstance(project).debugSessions.forEach { it.stop() } }
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.ProgramRunnerUtil
@@ -141,22 +141,3 @@ if (root != null) {
 }
 
 println("Note: DemoTestByJonnyzzz is intentionally broken; failure is expected.")
-
-/**
- * ## See Also
- *
- * Related IDE operations:
- * - [Run Configuration](mcp-steroid://ide/run-configuration) - List and execute run configs
- * 
- * Related debugger operations:
- * - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging
- * - [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause/resume/stop
- * 
- * Related test operations:
- * - [Run Tests](mcp-steroid://test/run-tests) - Execute test configuration
- * - [Inspect Test Results](mcp-steroid://test/inspect-test-results) - Access test results
- * 
- * Overview resources:
- * - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE operations
- * - [Test Examples Overview](mcp-steroid://test/overview) - Test workflows
- */
