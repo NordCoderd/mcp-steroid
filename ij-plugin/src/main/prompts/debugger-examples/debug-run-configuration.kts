@@ -1,14 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
