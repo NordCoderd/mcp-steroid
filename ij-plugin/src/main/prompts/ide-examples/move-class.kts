@@ -1,25 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
 import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.PsiManager
