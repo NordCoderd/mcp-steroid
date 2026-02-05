@@ -1,23 +1,23 @@
-/**
- * LSP: textDocument/rename - Rename Symbol
- *
- * This example demonstrates how to rename a symbol across the project,
- * similar to Shift+F6 in IDEs.
- *
- * IntelliJ API used:
- * - RefactoringFactory.createRename() - Create rename refactoring
- * - RenamePsiElementProcessor - Handle language-specific rename logic
- * - RenameHandler - IDE's rename infrastructure
- *
- * Parameters to customize:
- * - filePath: Path to file containing the symbol
- * - line/column: Position of the symbol to rename
- * - newName: The new name for the symbol
- *
- * Output: Preview of rename changes (or performs rename if dryRun=false)
- *
- * WARNING: This modifies code. Use dryRun=true to preview changes first.
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -132,21 +132,3 @@ WriteCommandAction.runWriteCommandAction(project) {
 println(analysis)
 println()
 println("Rename completed: $newName")
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- *
- * IDE power operations:
- * - [Change Signature](mcp-steroid://ide/change-signature) - Add/reorder parameters
- * - [Move Class](mcp-steroid://ide/move-class) - Move classes between packages
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
