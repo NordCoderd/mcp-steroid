@@ -1,20 +1,20 @@
-/**
- * IDE: Generate Overrides / Implementations
- *
- * This example generates an override/implementation method in a class,
- * similar to "Code | Implement Methods" or "Code | Override Methods".
- *
- * IntelliJ API used:
- * - OverrideImplementUtil
- * - GenerateMembersUtil
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file containing the target class
- * - baseMethodName: Method name to implement/override
- * - dryRun: Preview only (no changes)
- *
- * Output: Summary of generated methods
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.command.WriteCommandAction
@@ -89,21 +89,3 @@ WriteCommandAction.runWriteCommandAction(project) {
 }
 
 println("Generated override(s) in class: $className")
-
-/**
- * ## See Also
- *
- * Related IDE operations:
- * - [Generate Constructor](mcp-steroid://ide/generate-constructor) - Create constructors from fields
- * - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find class inheritors
- * - [Extract Interface](mcp-steroid://ide/extract-interface) - Create interface from class
- * - [Pull Up Members](mcp-steroid://ide/pull-up-members) - Move members to base class
- *
- * Related LSP operations:
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
- *
- * Overview resources:
- * - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE power operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
