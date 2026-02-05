@@ -106,6 +106,12 @@ kotlin.sourceSets.test {
     kotlin.srcDir(generatedTestSourcesPath)
 }
 
+sourceSets {
+    val prompts by registering {
+        this.allSource.srcDir("src/main/prompts")
+    }
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     dependsOn(generateMetadata)
     dependsOn(compilePrompts)
