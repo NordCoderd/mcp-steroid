@@ -1,13 +1,13 @@
-// Open Project via IntelliJ APIs
 //
-// This script demonstrates how to open a project programmatically using
-// IntelliJ Platform APIs. Use this for advanced scenarios where you need
-// more control over the project opening process.
 //
-// IMPORTANT: This code runs in a background coroutine. The project opening
-// is asynchronous, so the script will return before the project is fully loaded.
 //
-// To use: Adapt the projectPath variable to your project location.
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.trustedProjects.TrustedProjects
@@ -77,21 +77,3 @@ println("\nCurrently open projects:")
 com.intellij.openapi.project.ProjectManager.getInstance().openProjects.forEach { proj ->
     println("  - ${proj.name} (${proj.basePath})")
 }
-
-/**
- * ## See Also
- *
- * Related project opening operations:
- * - [Open Project Overview](mcp-steroid://open-project/overview) - Complete opening guide
- * - [Open Trusted](mcp-steroid://open-project/open-trusted) - Auto-trust project opening
- * - [Open with Dialogs](mcp-steroid://open-project/open-with-dialogs) - Interactive dialog handling
- *
- * Related MCP tools:
- * - `steroid_open_project` - Tool for opening projects via MCP
- * - `steroid_list_projects` - List all open projects
- * - `steroid_list_windows` - Check project initialization status
- *
- * Overview resources:
- * - [Open Project Examples Overview](mcp-steroid://open-project/overview) - All project opening workflows
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
