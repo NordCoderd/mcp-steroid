@@ -1,11 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
