@@ -27,7 +27,7 @@ internal fun registerSkillResource(
 }
 
 private fun buildLegacyDescription(description: String?, descriptor: SkillDescriptor): String? {
-    val legacyHint = "Legacy alias for ${descriptor.resourcePath}"
+    val legacyHint = "Legacy alias for ${descriptor.id}"
     return when {
         description.isNullOrBlank() -> legacyHint
         else -> "$description\n\n$legacyHint"

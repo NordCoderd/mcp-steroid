@@ -19,9 +19,6 @@ data class SkillDocument(
 
 @Service(Service.Level.APP)
 class SkillCatalog {
-    private val skillResource: SkillResource
-        get() = service()
-
     private val skills: List<SkillDocument> by lazy {
         skillResources.all.map { descriptor -> loadSkill(descriptor) }
     }
@@ -33,7 +30,7 @@ class SkillCatalog {
     }
 
     private fun loadSkill(descriptor: SkillDescriptor): SkillDocument {
-        val content = loadSkillContent(descriptor)
+        val content = descriptor.contentProvider()
         val parsed = parseSkillFrontmatter(content)
         val promptName = parsed.frontmatter?.name?.takeIf { it.isNotBlank() } ?: descriptor.id
         val description = parsed.frontmatter?.description
@@ -45,18 +42,6 @@ class SkillCatalog {
             contentWithoutFrontmatter = parsed.body,
         )
     }
-
-    private fun loadSkillContent(descriptor: SkillDescriptor): String {
-        if (descriptor == skillResources.main) {
-            return skillResource.loadSkillMd()
-        }
-
-        return javaClass.getResourceAsStream(descriptor.resourcePath)
-            ?.bufferedReader()
-            ?.readText()
-            ?: error("Skill resource not found: ${descriptor.resourcePath}")
-    }
-
 }
 
 internal data class FrontmatterParseResult(

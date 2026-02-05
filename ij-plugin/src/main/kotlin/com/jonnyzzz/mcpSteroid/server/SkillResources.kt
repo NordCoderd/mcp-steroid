@@ -3,48 +3,50 @@ package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.jonnyzzz.mcpSteroid.prompts.*
 
 /**
  * Central registry of bundled Agent Skill resources.
  */
 data class SkillDescriptor(
     val id: String,
-    val resourcePath: String,
     val resourceUri: String,
     val resourceName: String,
+    val contentProvider: () -> String,
 ) {
+    /** Legacy URI for backwards compatibility */
     val legacyResourceUri: String
-        get() = "mcp-steroid://$resourcePath"
+        get() = "mcp-steroid://skill/$id"
 }
 
 @Service(Service.Level.APP)
 class SkillResources {
     val main = SkillDescriptor(
         id = "intellij-api-poweruser-guide",
-        resourcePath = "/skill/SKILL.md",
         resourceUri = "mcp-steroid://skill/intellij-api-poweruser-guide",
         resourceName = "IntelliJ API Power User Guide",
+        contentProvider = { skillResourceHandler.loadSkillMd() },
     )
 
     val debugger = SkillDescriptor(
         id = "debugger-guide",
-        resourcePath = "/skill/DEBUGGER_SKILL.md",
         resourceUri = "mcp-steroid://skill/debugger-guide",
         resourceName = "IntelliJ Debugger Skill Guide",
+        contentProvider = { promptFactory.renderPrompt<PromptDEBUGGERSKILL>() },
     )
 
     val test = SkillDescriptor(
         id = "test-runner-guide",
-        resourcePath = "/skill/TEST_SKILL.md",
         resourceUri = "mcp-steroid://skill/test-runner-guide",
         resourceName = "IntelliJ Test Runner Skill Guide",
+        contentProvider = { promptFactory.renderPrompt<PromptTESTSKILL>() },
     )
 
     val debugRemote = SkillDescriptor(
         id = "debug-remote-ide-guide",
-        resourcePath = "/skill/DEBUG_REMOTE_IDE_SKILL.md",
         resourceUri = "mcp-steroid://skill/debug-remote-ide-guide",
         resourceName = "How to Debug Another IDE Instance",
+        contentProvider = { promptFactory.renderPrompt<PromptDEBUGREMOTEIDESKILL>() },
     )
 
     val all = listOf(main, debugger, test, debugRemote)
