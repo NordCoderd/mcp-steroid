@@ -8,6 +8,8 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.mcpSteroid.mcp.*
+import com.jonnyzzz.mcpSteroid.prompts.PromptMcpSteroidInfo
+import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -54,14 +56,11 @@ class SteroidsMcpServer(
             name = "mcp-steroid",
             version = pluginVersion,
         ),
-        instructions = """
-             Use this MCP to access IntelliJ-based IDE and manipulate the code like a professional developer.
-             📖 **COMPLETE GUIDE**: mcp-steroid://coding-with-intellij
-        """.trimIndent(),
+        instructions = promptFactory.renderPrompt<PromptMcpSteroidInfo>(),
         capabilities = ServerCapabilities(
-            tools = ToolsCapability(listChanged = false),
-            prompts = PromptsCapability(listChanged = false),
-            resources = ResourcesCapability(subscribe = false, listChanged = false)
+            tools = ToolsCapability(listChanged = true),
+            prompts = PromptsCapability(listChanged = true),
+            resources = ResourcesCapability(subscribe = false, listChanged = true)
         )
     )
 

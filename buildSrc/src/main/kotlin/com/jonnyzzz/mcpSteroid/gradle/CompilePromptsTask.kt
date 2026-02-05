@@ -1,22 +1,19 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.gradle
 
-import com.squareup.kotlinpoet.ANY
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.MemberName
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.buildCodeBlock
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import java.io.File
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 
@@ -27,97 +24,55 @@ abstract class CompilePromptsTask : DefaultTask() {
     @get:OutputDirectory
     abstract val outputDir: DirectoryProperty
 
+    @get:OutputDirectory
+    abstract val testOutputDir: DirectoryProperty
+
     @TaskAction
     fun generate() {
         val inputRoot = inputDir.get().asFile
         val outputRoot = outputDir.get().asFile
-        project.delete(outputRoot)
-        outputRoot.mkdirs()
+        val testOutputRoot = testOutputDir.get().asFile
+        project.delete(outputRoot, testOutputRoot)
+        project.mkdir(outputRoot)
+        project.mkdir(testOutputRoot)
 
-        val packageName = "com.jonnyzzz.mcpSteroid.prompts"
-        val serviceAnnotation = ClassName("com.intellij.openapi.components", "Service")
+        val ctx = PromptGenerationContext(inputRoot, outputRoot, testOutputRoot)
 
-        val allPromptClasses = mutableListOf<ClassName>()
-
-        inputRoot
+        val allPromptClasses = inputRoot
             .walkTopDown()
             .filter { it.isFile }
-            .forEach { src ->
-                val content = src.readText()
-                val factor = Random.nextInt(10000).absoluteValue + 11234
+            .map { src -> ctx.geratePromptClazz(src) }
 
-                val packedContent = content.map { it.code * factor }
+        ctx.run {
+            val allProperty = PropertySpec.builder("all", sequenceOfAny)
+                .getter(
+                    FunSpec.getterBuilder()
+                        .addCode(buildCodeBlock {
+                            beginControlFlow("return sequence")
+                            allPromptClasses.forEach { classType ->
+                                addStatement("yield(%M<%T>())", serviceMember, classType)
+                            }
+                            endControlFlow()
+                        })
+                        .build()
+                )
+                .build()
 
-                val className = "Prompt" + src.nameWithoutExtension.toPromptClassName()
-                val classType = ClassName(packageName, className)
-                allPromptClasses += classType
+            val allPromptsType = TypeSpec.classBuilder("AllPrompts")
+                .addAnnotation(
+                    AnnotationSpec.builder(serviceAnnotation)
+                        .addMember("%T.Level.APP", serviceAnnotation)
+                        .build()
+                )
+                .addProperty(allProperty)
+                .build()
 
-                val readResourceFun = FunSpec.builder("readResource")
-                    .returns(String::class)
-                    .addCode(buildCodeBlock {
-                        beginControlFlow("return sequence")
-                        packedContent.forEach { code ->
-                            addStatement("yield(%L)", code)
-                        }
-                        unindent()
-                        add("}.map { it / %L }.toList().reversed().joinToString(%S)\n", factor, "")
-                    })
-                    .build()
+            val allPromptsFile = FileSpec.builder(packageName, "AllPrompts")
+                .addFileComment("GENERATED FILE - DO NOT EDIT")
+                .addType(allPromptsType)
+                .build()
 
-                val typeSpec = TypeSpec.classBuilder(className)
-                    .addAnnotation(
-                        AnnotationSpec.builder(serviceAnnotation)
-                            .addMember("%T.Level.APP", serviceAnnotation)
-                            .build()
-                    )
-                    .addFunction(readResourceFun)
-                    .build()
-
-                val fileSpec = FileSpec.builder(packageName, className)
-                    .addFileComment("GENERATED FILE - DO NOT EDIT")
-                    .addType(typeSpec)
-                    .build()
-
-                outputRoot.resolve("$className.kt").writeText(fileSpec.toString())
-            }
-
-        // Generate AllPrompts aggregator class
-        val sequenceOfAny = Sequence::class.asClassName().parameterizedBy(ANY)
-        val serviceMember = MemberName("com.intellij.openapi.components", "service")
-
-        val allProperty = PropertySpec.builder("all", sequenceOfAny)
-            .getter(
-                FunSpec.getterBuilder()
-                    .addCode(buildCodeBlock {
-                        beginControlFlow("return sequence")
-                        allPromptClasses.forEach { classType ->
-                            addStatement("yield(%M<%T>())", serviceMember, classType)
-                        }
-                        endControlFlow()
-                    })
-                    .build()
-            )
-            .build()
-
-        val allPromptsType = TypeSpec.classBuilder("AllPrompts")
-            .addAnnotation(
-                AnnotationSpec.builder(serviceAnnotation)
-                    .addMember("%T.Level.APP", serviceAnnotation)
-                    .build()
-            )
-            .addProperty(allProperty)
-            .build()
-
-        val allPromptsFile = FileSpec.builder(packageName, "AllPrompts")
-            .addFileComment("GENERATED FILE - DO NOT EDIT")
-            .addType(allPromptsType)
-            .build()
-
-        outputRoot.resolve("AllPrompts.kt").writeText(allPromptsFile.toString())
+            outputRoot.resolve("AllPrompts.kt").writeText(allPromptsFile.toString())
+        }
     }
 }
-
-private fun String.toPromptClassName() = split("-", "_")
-    .joinToString("") { it.titleCase() }
-
-private fun String.titleCase() = replaceFirstChar { it.titlecase() }

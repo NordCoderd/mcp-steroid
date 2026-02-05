@@ -77,11 +77,13 @@ kotlin {
 }
 
 val generatedSourcesPath = layout.buildDirectory.dir("generated/kotlin")
+val generatedTestSourcesPath = layout.buildDirectory.dir("generated/kotlin-test")
 
 
 val compilePrompts by tasks.registering(CompilePromptsTask::class) {
     inputDir.set(layout.projectDirectory.dir("src/main/prompts"))
     outputDir.set(generatedSourcesPath.map { it.dir("prompts") })
+    testOutputDir.set(generatedTestSourcesPath.map { it.dir("prompts") })
 }
 
 // Generate metadata with encoded version and time bomb
@@ -99,6 +101,9 @@ val generateMetadata by tasks.registering(GenerateMetadataTask::class) {
 // Add generated sources to main source set and make kotlin compilation depend on it
 kotlin.sourceSets.main {
     kotlin.srcDir(generatedSourcesPath)
+}
+kotlin.sourceSets.test {
+    kotlin.srcDir(generatedTestSourcesPath)
 }
 
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
