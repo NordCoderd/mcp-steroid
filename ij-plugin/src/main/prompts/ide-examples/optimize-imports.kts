@@ -1,18 +1,18 @@
-/**
- * IDE: Optimize Imports
- *
- * This example removes unused imports and sorts remaining ones,
- * similar to "Code | Optimize Imports".
- *
- * IntelliJ API used:
- * - JavaCodeStyleManager.optimizeImports()
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - dryRun: Preview only (no changes)
- *
- * Output: Diff summary or confirmation
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.command.WriteCommandAction
@@ -92,21 +92,3 @@ WriteCommandAction.runWriteCommandAction(project) {
 }
 
 println("Optimized imports for: $filePath")
-
-/**
- * ## See Also
- *
- * Related IDE operations:
- * - [Inspect and Fix](mcp-steroid://ide/inspect-and-fix) - Run inspection and apply fix
- * - [Inspection Summary](mcp-steroid://ide/inspection-summary) - List enabled inspections
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- * - [Formatting](mcp-steroid://lsp/formatting) - Format entire document
- *
- * Related LSP operations:
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- *
- * Overview resources:
- * - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE power operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
