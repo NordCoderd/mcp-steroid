@@ -1,19 +1,19 @@
-/**
- * LSP: textDocument/references - Find All References
- *
- * This example demonstrates how to find all references to a symbol,
- * similar to "Find Usages" (Alt+F7) in IDEs.
- *
- * IntelliJ API used:
- * - ReferencesSearch.search() - Find all references to a PSI element
- * - PsiReference.getElement() - Get the referencing element
- *
- * Parameters to customize:
- * - filePath: Path to file containing the symbol definition
- * - line/column: Position of the symbol to find references for
- *
- * Output: List of all reference locations
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.PsiDocumentManager
@@ -90,21 +90,3 @@ val result = readAction {
 }
 
 println(result)
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Workspace Symbol](mcp-steroid://lsp/workspace-symbol) - Search symbols across workspace
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in document
- * - [Hover](mcp-steroid://lsp/hover) - Get documentation/type info
- *
- * IDE power operations:
- * - [Call Hierarchy](mcp-steroid://ide/call-hierarchy) - Find method callers
- * - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find inheritors and overrides
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
