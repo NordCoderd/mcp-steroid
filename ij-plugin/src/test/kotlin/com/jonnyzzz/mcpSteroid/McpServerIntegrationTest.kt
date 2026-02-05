@@ -1224,7 +1224,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertEquals("text/markdown", skillResource!!.mimeType)
         assertTrue("Resource should have catchy description", skillResource.description?.contains("RECOMMENDED") == true)
         val legacySkillResource = resourcesList.resources.find {
-            it.uri.contains("/skill/") && it.uri.endsWith("SKILL.md")
+            it.uri.contains("/skill/") && it.name.contains("(legacy)")
         }
         assertNotNull("Should expose legacy skill resource under /skill", legacySkillResource)
 
