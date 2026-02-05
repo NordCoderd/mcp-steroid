@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
+import com.jonnyzzz.mcpSteroid.prompts.PromptRegistry
 
 /**
  * Handler for test execution and inspection examples as MCP resources.
@@ -78,23 +79,23 @@ class TestExamplesResourceHandler : McpRegistrar {
     }
 
     /**
-     * Validate all test example resources exist in the JAR.
+     * Validate all test example resources exist in PromptRegistry.
      * Called during registration to fail fast if resources are missing.
      */
     private fun validateResourcesExist() {
-        // Validate overview
-        val overviewPath = "$RESOURCE_DIR/$OVERVIEW_FILE"
-        require(javaClass.getResource(overviewPath) != null) {
-            "Test overview resource missing from JAR: $overviewPath"
+        // Validate overview (use path without leading slash for PromptRegistry)
+        val overviewPath = RESOURCE_DIR.removePrefix("/") + "/$OVERVIEW_FILE"
+        require(PromptRegistry.contains(overviewPath)) {
+            "Test overview resource missing: $overviewPath"
         }
 
         // Validate all example files
         val missingFiles = EXAMPLE_FILES
-            .map { "$RESOURCE_DIR/$it" }
-            .filter { javaClass.getResource(it) == null }
+            .map { RESOURCE_DIR.removePrefix("/") + "/$it" }
+            .filter { !PromptRegistry.contains(it) }
 
         require(missingFiles.isEmpty()) {
-            "Test example resources missing from JAR: ${missingFiles.joinToString()}"
+            "Test example resources missing: ${missingFiles.joinToString()}"
         }
     }
 }
