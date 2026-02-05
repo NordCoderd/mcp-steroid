@@ -1,11 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
 import com.intellij.openapi.application.EDT
 import com.intellij.xdebugger.XDebuggerManager
 import kotlinx.coroutines.Dispatchers
