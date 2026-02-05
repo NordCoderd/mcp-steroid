@@ -1,21 +1,21 @@
-/**
- * LSP: textDocument/definition - Go to Definition
- *
- * This example demonstrates how to find the definition of a symbol
- * at a specific position in a file, similar to Ctrl+Click or F12 in IDEs.
- *
- * IntelliJ API used:
- * - PsiManager.findFile() - Get PSI tree for a file
- * - PsiFile.findElementAt() - Find element at offset
- * - PsiElement.references / PsiReference.resolve() - Follow reference to definition
- * - GotoDeclarationHandler - IDE's "Go to Declaration" infrastructure
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - offset: Character offset in the file (0-based)
- *
- * Output: Definition location (file path and line number)
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -93,21 +93,3 @@ val result = readAction {
 }
 
 println(result)
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
- * - [Hover](mcp-steroid://lsp/hover) - Get documentation/type info
- * - [Workspace Symbol](mcp-steroid://lsp/workspace-symbol) - Search symbols across workspace
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in document
- *
- * IDE power operations:
- * - [Call Hierarchy](mcp-steroid://ide/call-hierarchy) - Find method callers
- * - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find class inheritors
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
