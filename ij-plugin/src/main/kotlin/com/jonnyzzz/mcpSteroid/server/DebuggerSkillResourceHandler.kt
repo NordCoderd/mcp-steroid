@@ -2,8 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptDebuggerSkill
-import com.jonnyzzz.mcpSteroid.prompts.promptFactory
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.DebuggerSkillPrompt
 
 /**
  * Handler for the IntelliJ Debugger skill guide resource.
@@ -24,9 +23,9 @@ class DebuggerSkillResourceHandler : McpRegistrar {
             descriptor = descriptor,
             name = resourceName,
             description = resourceDescription,
-            contentProvider = ::loadSkillMd
+            contentProvider = {
+                DebuggerSkillPrompt().readPrompt()
+            }
         )
     }
-
-    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptDebuggerSkill>()
 }

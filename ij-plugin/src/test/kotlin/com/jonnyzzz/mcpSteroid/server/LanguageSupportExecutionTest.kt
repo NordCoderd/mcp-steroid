@@ -12,6 +12,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.execution.ExecutionManager
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.prompts.generated.lspExamples.LspExamplesIndex
 import com.jonnyzzz.mcpSteroid.setSystemPropertyForTest
 import com.jonnyzzz.mcpSteroid.testExecParams
 import kotlinx.coroutines.Dispatchers
@@ -21,6 +22,7 @@ import kotlin.time.Duration.Companion.seconds
 
 class LanguageSupportExecutionTest : BasePlatformTestCase() {
     private val handler = LspExamplesResourceHandler()
+    val index = LspExamplesIndex()
     private lateinit var samples: List<LanguageSample>
 
     override fun runInDispatchThread(): Boolean = false
@@ -45,7 +47,7 @@ class LanguageSupportExecutionTest : BasePlatformTestCase() {
     fun testLanguageSupportViaGoToDefinition(): Unit = timeoutRunBlocking(120.seconds) {
         val available = resolveAvailableSpecs()
 
-        val raw = handler.loadExample("/lsp-examples/go-to-definition.kts")
+        val raw = index.goToDefinitionKts.kts.readPrompt()
         for (sample in samples.filter { it.spec in available }) {
             val code = configureExample(
                 raw,

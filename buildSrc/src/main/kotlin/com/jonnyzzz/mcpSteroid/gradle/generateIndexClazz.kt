@@ -13,29 +13,36 @@ import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.buildCodeBlock
 import kotlin.reflect.KClass
 
-data class GeneratedPromptIndexClazz(
+data class GeneratedIndexClazz(
     val folder: String,
     val clazzName: ClassName,
 )
 
-fun PromptGenerationContext.generatePromptIndexClazz(
+fun PromptGenerationContext.generateIndexClazz(
     folder: String,
     prompts: List<GeneratedPromptClazz>,
     articles: List<GeneratedArticleClazz>,
-): GeneratedPromptIndexClazz {
+): GeneratedIndexClazz {
 
     println("generate prompt index $folder: ${prompts.joinToString { it.folder }}")
 
     val classType = run {
         val clazzName = if (folder.isEmpty()) "Root" else folder.toPromptClassName()
-        ClassName(packageName + ".index", "PromptIndex" + clazzName)
+        val packageName = (articles.flatMap { it.article } + prompts).map { it.clazzName.packageName }.distinct().single()
+        ClassName(packageName, clazzName + "Index")
     }
 
     val kclassType = KClass::class.asClassName().parameterizedBy(
         WildcardTypeName.producerOf(promptBaseClass)
     )
 
-    val registryType = Map::class.asClassName().parameterizedBy(String::class.asClassName(), promptReaderClass)
+    val sortedPrompts = prompts
+        .sortedWith(compareBy<GeneratedPromptClazz>({ it.fileType }, { it.clazzName }))
+
+    val sortedArticles = articles
+        .sortedWith(compareBy<GeneratedArticleClazz>({ it.path }))
+
+    val registryType = Map::class.asClassName().parameterizedBy(String::class.asClassName(), promptBaseClass)
     val registryProperty = PropertySpec.builder("files", registryType)
         .addModifiers(KModifier.OVERRIDE)
         .getter(
@@ -43,8 +50,7 @@ fun PromptGenerationContext.generatePromptIndexClazz(
                 .addCode(
                     buildCodeBlock {
                         controlFlow("return buildMap") {
-                            prompts
-                                .sortedWith(compareBy<GeneratedPromptClazz>({ it.fileType }, { it.clazzName }))
+                            sortedPrompts
                                 .forEach { r ->
                                     addStatement("put(%S, %T())", r.path.removePrefix(r.folder).trim('/'), r.clazzName)
                                 }
@@ -61,8 +67,7 @@ fun PromptGenerationContext.generatePromptIndexClazz(
                 .addCode(
                     buildCodeBlock {
                         controlFlow("return buildMap") {
-                            articles
-                                .sortedWith(compareBy<GeneratedArticleClazz>({ it.path }))
+                            sortedArticles
                                 .forEach { r ->
                                     addStatement("put(%S, %T())", r.path.removePrefix(r.folder).trim('/'), r.clazzName)
                                 }
@@ -71,10 +76,24 @@ fun PromptGenerationContext.generatePromptIndexClazz(
         )
         .build()
 
+    val typedGetters = (sortedArticles + sortedPrompts).map { e ->
+        PropertySpec.builder(e.entryName, e.clazzName)
+            .getter(
+                FunSpec.getterBuilder()
+                    .addCode(
+                        buildCodeBlock {
+                            addStatement("return %T()", e.clazzName)
+                        }
+                    ).build()
+            )
+            .build()
+    }
+
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptIndexBaseClass)
         .addProperty(registryProperty)
         .addProperty(articleProperty)
+        .addProperties(typedGetters)
         .build()
 
     val fileSpec = FileSpec.builder(classType.packageName, classType.simpleName + ".kt")
@@ -83,5 +102,5 @@ fun PromptGenerationContext.generatePromptIndexClazz(
         .build()
 
     writeClazz(fileSpec, classType)
-    return GeneratedPromptIndexClazz(folder, classType)
+    return GeneratedIndexClazz(folder, classType)
 }

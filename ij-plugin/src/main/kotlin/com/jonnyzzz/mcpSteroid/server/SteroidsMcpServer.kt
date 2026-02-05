@@ -8,8 +8,8 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.mcpSteroid.mcp.*
-import com.jonnyzzz.mcpSteroid.prompts.PromptMcpSteroidInfo
-import com.jonnyzzz.mcpSteroid.prompts.promptFactory
+import com.jonnyzzz.mcpSteroid.prompts.generated.McpSteroidInfoPrompt
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPrompt
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -56,7 +56,7 @@ class SteroidsMcpServer(
             name = "mcp-steroid",
             version = pluginVersion,
         ),
-        instructions = promptFactory.renderPrompt<PromptMcpSteroidInfo>(),
+        instructions = McpSteroidInfoPrompt().readPrompt(),
         capabilities = ServerCapabilities(
             tools = ToolsCapability(listChanged = true),
             prompts = PromptsCapability(listChanged = true),
@@ -158,19 +158,19 @@ class SteroidsMcpServer(
                     get("/") {
                         call.respondText(
                             contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = skillResourceHandler.loadSkillMd()
+                            text = SkillPrompt().readPrompt()
                         )
                     }
                     get("/skill.md") {
                         call.respondText(
                             contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = skillResourceHandler.loadSkillMd()
+                            text = SkillPrompt().readPrompt()
                         )
                     }
                     get("/SKILL.md") {
                         call.respondText(
                             contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = skillResourceHandler.loadSkillMd()
+                            text = SkillPrompt().readPrompt()
                         )
                     }
                 }

@@ -20,30 +20,32 @@ data class GeneratedPromptClazz(
     val fileType: String,
     val folder: String,
     val path: String,
-    val clazzName: ClassName,
+    override val clazzName: ClassName,
     val src: File,
-) {
+) : Generated {
     val content get() = src.readText()
+
+    override val entryName: String get() = path.substringAfterLast("/").toPromptIdentifierName()
 }
 
 fun PromptGenerationContext.generatePromptClazz(
     src: File,
 ): GeneratedPromptClazz {
-    val content = src.readText()
-
     val filePropValue = src.extension
     val pathValue = src.toRelativeString(inputRoot)
     val folderValue = src.parentFile.toRelativeString(inputRoot)
 
-    val packageInfix = folderValue.trim('/')
-        .split("/")
-        .map { it.toPromptClassName().replaceFirstChar { it.lowercase() } }
-        .joinToString("") { ".$it"}
+    val classType = run {
+        val packageInfix = folderValue.trim('/')
+            .split("/")
+            .map { it.toPromptIdentifierName() }
+            .joinToString("") { ".$it" }
 
-    val className = "Prompt" + src.nameWithoutExtension.toPromptClassName()
-    val classType = ClassName(packageName + packageInfix , className)
+        val className = src.nameWithoutExtension.toPromptClassName() + "Prompt"
+        ClassName(packageName + packageInfix, className)
+    }
 
-    val readFn = content.chunked(1024).mapIndexed { index, content ->
+    val readFn = src.readText().chunked(1024).mapIndexed { index, content ->
         val factor = Random.nextInt(1000).absoluteValue + 11234
 
         val packedContent = content
@@ -108,12 +110,7 @@ fun PromptGenerationContext.generatePromptClazz(
         .initializer("%S", folderValue)
         .build()
 
-    val typeSpec = TypeSpec.classBuilder(className)
-        .addAnnotation(
-            AnnotationSpec.builder(serviceAnnotation)
-                .addMember("%T.Level.APP", serviceAnnotation)
-                .build()
-        )
+    val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptBaseClass)
         .addProperty(pathProp)
         .addProperty(folderProp)
@@ -122,31 +119,12 @@ fun PromptGenerationContext.generatePromptClazz(
         .addFunctions(readFn)
         .build()
 
-    val fileSpec = FileSpec.builder(classType.packageName, className)
+    val fileSpec = FileSpec.builder(classType)
         .addFileComment("GENERATED FILE - DO NOT EDIT")
         .addType(typeSpec)
         .build()
 
-    val testFuncSpec = FunSpec.builder("test$className")
-        .returns(Unit::class)
-        .addCode(buildCodeBlock {
-            add("val content = %T(%S).readText()\n", File::class.asClassName(), src.absolutePath)
-            add("assertEquals(content, %T().readPrompt())", classType)
-        })
-        .build()
-
-    val testTypeSpec = TypeSpec.classBuilder(className + "Test")
-        .superclass(ClassName.bestGuess("com.intellij.testFramework.fixtures.BasePlatformTestCase"))
-        .addFunction(testFuncSpec)
-        .build()
-
-    val testFileSpec = FileSpec.builder(classType.packageName, className + "Test")
-        .addFileComment("GENERATED FILE - DO NOT EDIT")
-        .addType(testTypeSpec)
-        .build()
-
     writeClazz(fileSpec, classType)
-    writeTestClazz(testFileSpec, classType)
-
     return GeneratedPromptClazz(filePropValue, folderValue, pathValue, classType, src)
 }
+

@@ -58,6 +58,8 @@ dependencies {
     implementation("io.ktor:ktor-server-cio:$ktorVersion")
     implementation("io.ktor:ktor-server-sse:$ktorVersion")
 
+    implementation("com.squareup:kotlinpoet:2.2.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
 

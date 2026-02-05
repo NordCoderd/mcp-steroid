@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.server
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.jonnyzzz.mcpSteroid.prompts.*
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillIndex
 
 /**
  * Central registry of bundled Agent Skill resources.
@@ -21,35 +22,37 @@ data class SkillDescriptor(
 
 @Service(Service.Level.APP)
 class SkillResources {
-    val main = SkillDescriptor(
+    val skillIndex get() = SkillIndex()
+
+    val main get() = SkillDescriptor(
         id = "intellij-api-poweruser-guide",
         resourceUri = "mcp-steroid://skill/intellij-api-poweruser-guide",
         resourceName = "IntelliJ API Power User Guide",
-        contentProvider = { skillResourceHandler.loadSkillMd() },
+        contentProvider = { skillIndex.skillMd.readPrompt() },
     )
 
-    val debugger = SkillDescriptor(
+    val debugger get() = SkillDescriptor(
         id = "debugger-guide",
         resourceUri = "mcp-steroid://skill/debugger-guide",
         resourceName = "IntelliJ Debugger Skill Guide",
-        contentProvider = { promptFactory.renderPrompt<PromptDebuggerSkill>() },
+        contentProvider = { skillIndex.debuggerSkillMd.readPrompt() },
     )
 
-    val test = SkillDescriptor(
+    val test get() = SkillDescriptor(
         id = "test-runner-guide",
         resourceUri = "mcp-steroid://skill/test-runner-guide",
         resourceName = "IntelliJ Test Runner Skill Guide",
-        contentProvider = { promptFactory.renderPrompt<PromptTestSkill>() },
+        contentProvider = { skillIndex.testSkillMd.readPrompt() },
     )
 
-    val debugRemote = SkillDescriptor(
+    val debugRemote get() = SkillDescriptor(
         id = "debug-remote-ide-guide",
         resourceUri = "mcp-steroid://skill/debug-remote-ide-guide",
         resourceName = "How to Debug Another IDE Instance",
-        contentProvider = { promptFactory.renderPrompt<PromptDebugRemoteIdeSkill>() },
+        contentProvider = { skillIndex.debugRemoteIdeSkillMd.readPrompt() },
     )
 
-    val all = listOf(main, debugger, test, debugRemote)
+    val all get() = listOf(main, debugger, test, debugRemote)
 
     companion object {
         fun getInstance(): SkillResources = service()

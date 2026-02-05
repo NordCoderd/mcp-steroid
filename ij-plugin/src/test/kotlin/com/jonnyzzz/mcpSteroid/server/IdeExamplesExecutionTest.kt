@@ -15,6 +15,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.execution.ExecutionManager
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.prompts.generated.ideExamples.IdeExamplesIndex
 import com.jonnyzzz.mcpSteroid.setSystemPropertyForTest
 import com.jonnyzzz.mcpSteroid.testExecParams
 import kotlinx.coroutines.Dispatchers
@@ -23,7 +24,7 @@ import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
 
 class IdeExamplesExecutionTest : BasePlatformTestCase() {
-    private val handler = IdeExamplesResourceHandler()
+    private val index = IdeExamplesIndex()
 
     private lateinit var refactorSamplePath: String
     private lateinit var importsSamplePath: String
@@ -531,7 +532,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testExtractMethodExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/extract-method.kts")
+        val raw = index.extractMethodKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -552,7 +553,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testIntroduceVariableExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/introduce-variable.kts")
+        val raw = index.introduceVariableKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -573,7 +574,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testInlineMethodExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/inline-method.kts")
+        val raw = index.inlineMethodKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -593,7 +594,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testChangeSignatureExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/change-signature.kts")
+        val raw = index.changeSignatureKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -617,7 +618,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testMoveFileExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/move-file.kts")
+        val raw = index.moveFileKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = moveSamplePath,
@@ -640,7 +641,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testSafeDeleteExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/safe-delete.kts")
+        val raw = index.safeDeleteKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = safeDeletePath,
@@ -660,7 +661,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testOptimizeImportsExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/optimize-imports.kts")
+        val raw = index.optimizeImportsKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = importsSamplePath,
@@ -678,7 +679,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testGenerateOverrideExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/generate-override.kts")
+        val raw = index.generateOverrideKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = greeterImplPath,
@@ -697,7 +698,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testInspectAndFixExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/inspect-and-fix.kts")
+        val raw = index.inspectAndFixKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = inspectionSamplePath,
@@ -715,7 +716,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testHierarchySearchExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/hierarchy-search.kts")
+        val raw = index.hierarchySearchKts.kts.readPrompt()
         val code = configureExample(
             raw,
             classFqn = "sample.BaseType",
@@ -730,7 +731,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testCallHierarchyExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/call-hierarchy.kts")
+        val raw = index.callHierarchyKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -746,13 +747,13 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testRunConfigurationExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/run-configuration.kts")
+        val raw = index.runConfigurationKts.kts.readPrompt()
         val result = executeExample("run-configuration", raw)
         assertExampleResult(result, "Run Configurations")
     }
 
     fun testPullUpMembersExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/pull-up-members.kts")
+        val raw = index.pullUpMembersKts.kts.readPrompt()
         val code = configureExample(
             raw,
             sourceClassFqn = "sample.pullup.PullUpChild",
@@ -778,7 +779,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testPushDownMembersExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/push-down-members.kts")
+        val raw = index.pushDownMembersKts.kts.readPrompt()
         val code = configureExample(
             raw,
             sourceClassFqn = "sample.pushdown.PushDownBase",
@@ -809,7 +810,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testExtractInterfaceExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/extract-interface.kts")
+        val raw = index.extractInterfaceKts.kts.readPrompt()
         val code = configureExample(
             raw,
             sourceClassFqn = "sample.extract.ExtractSource",
@@ -850,7 +851,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testMoveClassExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/move-class.kts")
+        val raw = index.moveClassKts.kts.readPrompt()
         val code = configureExample(
             raw,
             classFqn = "sample.moveclass.MoveClassSample",
@@ -873,7 +874,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testGenerateConstructorExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/generate-constructor.kts")
+        val raw = index.generateConstructorKts.kts.readPrompt()
         val code = configureExample(
             raw,
             classFqn = "sample.ConstructorSample",
@@ -891,19 +892,19 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testProjectDependenciesExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/project-dependencies.kts")
+        val raw = index.projectDependenciesKts.kts.readPrompt()
         val result = executeExample("project-dependencies", raw)
         assertExampleResult(result, "Project Dependencies")
     }
 
     fun testInspectionSummaryExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/inspection-summary.kts")
+        val raw = index.inspectionSummaryKts.kts.readPrompt()
         val result = executeExample("inspection-summary", raw)
         assertExampleResult(result, "Enabled inspections")
     }
 
     fun testProjectSearchExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/ide-examples/project-search.kts")
+        val raw = index.projectSearchKts.kts.readPrompt()
         val code = configureExample(
             raw,
             fileName = "RefactorSample.java",

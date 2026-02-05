@@ -22,7 +22,7 @@ class PromptGenerationContext(
 
     val promptBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptBase")
     val promptIndexBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptIndexBase")
-    val promptReaderClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptReader")
+    val promptRootBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptRootBase")
     val promptArticleClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "ArticleBase")
 }
 

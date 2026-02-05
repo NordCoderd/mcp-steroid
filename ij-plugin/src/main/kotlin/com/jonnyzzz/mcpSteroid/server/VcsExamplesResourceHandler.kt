@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.DynamicResourceScanner
+import com.jonnyzzz.mcpSteroid.prompts.generated.vcsExamples.VcsExamplesIndex
 
 /**
  * Handler for VCS (Version Control System) example resources.
@@ -14,43 +14,12 @@ class VcsExamplesResourceHandler : McpRegistrar {
         val id: String,
         val name: String,
         val description: String,
-        val resourceFile: String
-    )
-
-    private val examples = listOf(
-        VcsExample(
-            id = "git-annotations",
-            name = "Git Annotations (Blame)",
-            description = """
-                Get git blame/annotations for a file.
-
-                Shows how to:
-                - Get VCS for a file
-                - Use AnnotationProvider to get blame info
-                - Access line-by-line revision, author, and date
-
-                IntelliJ APIs: ProjectLevelVcsManager, AnnotationProvider, FileAnnotation
-            """.trimIndent(),
-            resourceFile = "/vcs-examples/git-annotations.kts"
-        ),
-        VcsExample(
-            id = "git-history",
-            name = "Git File History",
-            description = """
-                Get commit history for a file.
-
-                Shows how to:
-                - Create VcsHistorySession for a file
-                - Access revision list
-                - Get commit messages, authors, dates
-
-                IntelliJ APIs: VcsHistoryProvider, VcsHistorySession, VcsFileRevision
-            """.trimIndent(),
-            resourceFile = "/vcs-examples/git-history.kts"
-        )
+        val resourceFile: () -> String
     )
 
     override fun register(server: McpServerCore) {
+        val index = VcsExamplesIndex()
+
         // Register overview resource
         server.resourceRegistry.registerResource(
             uri = "mcp-steroid://vcs/overview",
@@ -65,28 +34,22 @@ class VcsExamplesResourceHandler : McpRegistrar {
                 Each example is a complete, runnable script for steroid_execute_code.
             """.trimIndent(),
             mimeType = "text/markdown",
-            contentProvider = ::loadOverview
+            contentProvider = {
+                index.vcsOverviewMd.readPrompt()
+            }
         )
 
         // Register each example as a separate resource
-        examples.forEach { example ->
+        index.articles.values.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "mcp-steroid://vcs/${example.id}",
+                uri = "mcp-steroid://vcs/${example.path}",
                 name = "VCS: ${example.name}",
                 description = example.description,
                 mimeType = "text/x-kotlin",
-                contentProvider = { loadExample(example.resourceFile) }
+                contentProvider = {
+                    example.provideMergedContent()
+                }
             )
         }
-    }
-
-    fun loadOverview(): String {
-        return DynamicResourceScanner.loadResourceContent("/vcs-examples/VCS_OVERVIEW.md")
-            ?: error("VCS_OVERVIEW.md resource is not found")
-    }
-
-    fun loadExample(resourceFile: String): String {
-        return DynamicResourceScanner.loadResourceContent(resourceFile)
-            ?: error("VCS example resource is not found: $resourceFile")
     }
 }

@@ -1,11 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptSkill
-import com.jonnyzzz.mcpSteroid.prompts.promptFactory
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPrompt
 
 /**
  * Handler for the IntelliJ API Power User Guide resource.
@@ -35,34 +32,7 @@ class SkillResourceHandler : McpRegistrar {
             descriptor = descriptor,
             name = resourceName,
             description = resourceDescription,
-            contentProvider = { skillResourceHandler.loadSkillMd() }
+            contentProvider = { SkillPrompt().readPrompt() }
         )
     }
 }
-
-@Service(Service.Level.APP)
-class SkillResource {
-    /**
-     * Load the SKILL.md content from generated prompt class.
-     * Can be used by both MCP resource and HTTP endpoints.
-     */
-    fun loadSkillMd(): String {
-        val content = promptFactory.renderPrompt<PromptSkill>()
-        return injectPluginVersion(content)
-    }
-
-    private fun injectPluginVersion(content: String): String {
-        val version = com.jonnyzzz.mcpSteroid.PluginDescriptorProvider.getInstance().version
-        val headerEnd = content.indexOf("\n---", startIndex = 3)
-        if (content.startsWith("---") && headerEnd > 0) {
-            val header = content.substring(0, headerEnd)
-            val rest = content.substring(headerEnd)
-            @Suppress("RegExpRepeatedSpace") // Intentional: matches YAML indentation
-            val updatedHeader = header.replaceFirst(Regex("(?m)^  version:.*$"), "  version: \"$version\"")
-            return updatedHeader + rest
-        }
-        return content
-    }
-}
-
-inline val skillResourceHandler: SkillResource get() = service()

@@ -2,8 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.PromptDebugRemoteIdeSkill
-import com.jonnyzzz.mcpSteroid.prompts.promptFactory
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.DebugRemoteIdeSkillPrompt
 
 /**
  * Handler for the Remote IDE Debugging skill guide resource.
@@ -30,9 +29,9 @@ class DebugRemoteIdeSkillResourceHandler : McpRegistrar {
             descriptor = descriptor,
             name = resourceName,
             description = resourceDescription,
-            contentProvider = ::loadSkillMd
+            contentProvider = {
+                DebugRemoteIdeSkillPrompt().readPrompt()
+            }
         )
     }
-
-    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptDebugRemoteIdeSkill>()
 }

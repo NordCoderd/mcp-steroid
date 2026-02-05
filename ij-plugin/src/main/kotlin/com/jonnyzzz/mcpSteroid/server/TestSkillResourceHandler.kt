@@ -2,8 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptTestSkill
-import com.jonnyzzz.mcpSteroid.prompts.promptFactory
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.TestSkillPrompt
 
 /**
  * Handler for the IntelliJ Test Runner skill guide resource.
@@ -24,9 +23,9 @@ class TestSkillResourceHandler : McpRegistrar {
             descriptor = descriptor,
             name = resourceName,
             description = resourceDescription,
-            contentProvider = ::loadSkillMd
+            contentProvider = {
+                TestSkillPrompt().readPrompt()
+            }
         )
     }
-
-    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptTestSkill>()
 }

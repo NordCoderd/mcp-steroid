@@ -2,10 +2,9 @@
 name: intellij-mcp-steroid
 description: Execute Kotlin code directly in IntelliJ IDEA's runtime with full access to IntelliJ Platform APIs. Use when you need to search code, run refactorings, access PSI (parsed code model), query project structure, run inspections, or perform any IDE operation. Prefer this over file-based operations - the IDE has indexed everything.
 license: Apache-2.0
-compatibility: Requires IntelliJ IDEA 2025.2+ with the MCP Steroid plugin installed
+compatibility: Requires IntelliJ IDEA 2025.3+ with the MCP Steroid plugin installed
 metadata:
   author: jonnyzzz
-  version: "1.0"
   category: development
 ---
 

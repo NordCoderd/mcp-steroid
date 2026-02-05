@@ -13,6 +13,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.execution.ExecutionManager
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.prompts.generated.lspExamples.LspExamplesIndex
 import com.jonnyzzz.mcpSteroid.setSystemPropertyForTest
 import com.jonnyzzz.mcpSteroid.testExecParams
 import kotlinx.coroutines.Dispatchers
@@ -21,7 +22,7 @@ import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
 
 class LspExamplesExecutionTest : BasePlatformTestCase() {
-    private val handler = LspExamplesResourceHandler()
+    private val index = LspExamplesIndex()
     private lateinit var sampleFilePath: String
     private lateinit var positions: SamplePositions
 
@@ -30,12 +31,12 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     override fun setUp() {
         super.setUp()
         setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
-        val sampleText = """
+        val sampleText = $$"""
             package sample
 
             class Greeter(val name: String) {
                 fun greet(times: Int): String {
-                    return "Hello, ${'$'}name".repeat(times)
+                    return "Hello, $name".repeat(times)
                 }
             }
 
@@ -159,7 +160,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testGoToDefinitionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/go-to-definition.kts")
+        val raw = index.goToDefinitionKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -172,7 +173,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testFindReferencesExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/find-references.kts")
+        val raw = index.findReferencesKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -185,7 +186,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testHoverExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/hover.kts")
+        val raw = index.hoverKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -198,7 +199,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testCompletionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/completion.kts")
+        val raw = index.completionKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -211,7 +212,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testDocumentSymbolsExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/document-symbols.kts")
+        val raw = index.documentSymbolsKts.kts.readPrompt()
         val code = configureExample(raw, filePath = sampleFilePath)
 
         val result = executeExample("document-symbols", code)
@@ -219,7 +220,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testRenameExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/rename.kts")
+        val raw = index.renameKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -240,7 +241,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testFormattingExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/formatting.kts")
+        val raw = index.formattingKts.kts.readPrompt()
         val code = configureExample(raw, filePath = sampleFilePath)
 
         val result = executeExample("formatting", code)
@@ -248,7 +249,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testCodeActionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/code-action.kts")
+        val raw = index.codeActionKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -261,7 +262,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testSignatureHelpExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/signature-help.kts")
+        val raw = index.signatureHelpKts.kts.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -274,7 +275,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testWorkspaceSymbolExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = handler.loadExample("/lsp-examples/workspace-symbol.kts")
+        val raw = index.workspaceSymbolKts.kts.readPrompt()
         val code = configureExample(raw, query = "Greeter")
 
         val result = executeExample("workspace-symbol", code)

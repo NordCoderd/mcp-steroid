@@ -2,8 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.PromptCodingWithIntelliJ
-import com.jonnyzzz.mcpSteroid.prompts.promptFactory
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.CodingWithIntelliJPrompt
 
 /**
  * Handler for the Coding with IntelliJ guide resource.
@@ -34,14 +33,9 @@ class CodingWithIntellijResourceHandler : McpRegistrar {
             name = resourceName,
             description = resourceDescription,
             mimeType = "text/markdown",
-            contentProvider = ::loadCodingGuide
+            contentProvider = {
+                CodingWithIntelliJPrompt().readPrompt()
+            }
         )
-    }
-
-    /**
-     * Load the CODING_WITH_INTELLIJ.md content from generated prompt class.
-     */
-    fun loadCodingGuide(): String {
-        return promptFactory.renderPrompt<PromptCodingWithIntelliJ>()
     }
 }

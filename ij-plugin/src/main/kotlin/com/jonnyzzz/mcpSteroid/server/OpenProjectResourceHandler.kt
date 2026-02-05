@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.DynamicResourceScanner
+import com.jonnyzzz.mcpSteroid.prompts.generated.openProject.OpenProjectIndex
 
 /**
  * Handler for open-project workflow resources.
@@ -19,14 +19,17 @@ class OpenProjectResourceHandler : McpRegistrar {
         val id: String,
         val name: String,
         val description: String,
-        val resourceFile: String
+        val resourceFile: () -> String
     )
 
-    val examples = listOf(
-        OpenProjectExample(
-            id = "open-trusted",
-            name = "Open Project (Trusted)",
-            description = """
+    override fun register(server: McpServerCore) {
+        val index = OpenProjectIndex()
+
+        val examples = listOf(
+            OpenProjectExample(
+                id = "open-trusted",
+                name = "Open Project (Trusted)",
+                description = """
                 Open a project with automatic trust.
 
                 This example shows how to:
@@ -36,12 +39,14 @@ class OpenProjectResourceHandler : McpRegistrar {
 
                 Best for: Projects you trust and want to open quickly.
             """.trimIndent(),
-            resourceFile = "/open-project/open-trusted.md"
-        ),
-        OpenProjectExample(
-            id = "open-with-dialogs",
-            name = "Open Project (With Dialog Handling)",
-            description = """
+                resourceFile = {
+                    index.openTrustedMd.readPrompt()
+                }
+            ),
+            OpenProjectExample(
+                id = "open-with-dialogs",
+                name = "Open Project (With Dialog Handling)",
+                description = """
                 Open a project and handle dialogs interactively.
 
                 This example shows how to:
@@ -51,12 +56,14 @@ class OpenProjectResourceHandler : McpRegistrar {
 
                 Best for: When you need to review/handle trust dialogs.
             """.trimIndent(),
-            resourceFile = "/open-project/open-with-dialogs.md"
-        ),
-        OpenProjectExample(
-            id = "open-via-code",
-            name = "Open Project (Via Code)",
-            description = """
+                resourceFile = {
+                    index.openWithDialogsMd.readPrompt()
+                }
+            ),
+            OpenProjectExample(
+                id = "open-via-code.kts",
+                name = "Open Project (Via Code)",
+                description = """
                 Open a project programmatically using IntelliJ APIs.
 
                 This example shows how to:
@@ -66,11 +73,12 @@ class OpenProjectResourceHandler : McpRegistrar {
 
                 Best for: Advanced scenarios where you need more control.
             """.trimIndent(),
-            resourceFile = "/open-project/open-via-code.kts"
+                resourceFile = {
+                    index.openViaCodeKts.provideMergedContent()
+                }
+            )
         )
-    )
 
-    override fun register(server: McpServerCore) {
         // Register overview resource
         server.resourceRegistry.registerResource(
             uri = "mcp-steroid://open-project/overview",
@@ -84,29 +92,22 @@ class OpenProjectResourceHandler : McpRegistrar {
                 Includes examples for both trusted and interactive workflows.
             """.trimIndent(),
             mimeType = "text/markdown",
-            contentProvider = ::loadOverview
+            contentProvider = {
+                index.openProjectOverviewMd.readPrompt()
+            }
+
         )
 
         // Register each example as a separate resource
         examples.forEach { example ->
-            val mimeType = if (example.resourceFile.endsWith(".kts")) "text/x-kotlin" else "text/markdown"
+            val mimeType = if (example.id.endsWith(".kts")) "text/x-kotlin" else "text/markdown"
             server.resourceRegistry.registerResource(
                 uri = "mcp-steroid://open-project/${example.id}",
                 name = "Open Project: ${example.name}",
                 description = example.description,
                 mimeType = mimeType,
-                contentProvider = { loadExample(example.resourceFile) }
+                contentProvider = { example.resourceFile() }
             )
         }
-    }
-
-    fun loadOverview(): String {
-        return DynamicResourceScanner.loadResourceContent("/open-project/OPEN_PROJECT_OVERVIEW.md")
-            ?: error("OPEN_PROJECT_OVERVIEW.md resource is not found")
-    }
-
-    fun loadExample(resourceFile: String): String {
-        return DynamicResourceScanner.loadResourceContent(resourceFile)
-            ?: error("Open project example resource is not found: $resourceFile")
     }
 }

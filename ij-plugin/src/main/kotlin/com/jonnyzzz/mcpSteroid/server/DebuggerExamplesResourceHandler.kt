@@ -2,9 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.DynamicResource
-import com.jonnyzzz.mcpSteroid.prompts.DynamicResourceScanner
-import com.jonnyzzz.mcpSteroid.prompts.generated.index.PromptIndexDebuggerExamples
+import com.jonnyzzz.mcpSteroid.prompts.generated.debuggerExamples.DebuggerExamplesIndex
 
 /**
  * Handler for debugger operation examples as MCP resources.
@@ -15,12 +13,9 @@ import com.jonnyzzz.mcpSteroid.prompts.generated.index.PromptIndexDebuggerExampl
  * KDoc comments in the .kts files.
  */
 class DebuggerExamplesResourceHandler : McpRegistrar {
-    /** Dynamically loaded examples with metadata parsed from KDoc comments */
-    val examples by lazy {
-        PromptIndexDebuggerExamples().listKotlinSources()
-    }
-
     override fun register(server: McpServerCore) {
+        val index = DebuggerExamplesIndex()
+
         server.resourceRegistry.registerResource(
             uri = "mcp-steroid://debugger/overview",
             name = "Debugger Examples Overview",
@@ -31,34 +26,21 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
                 such as breakpoints, starting debug sessions, and inspecting threads.
             """.trimIndent(),
             mimeType = "text/markdown",
-            contentProvider = ::loadOverview
+            contentProvider = {
+                index.debuggerOverviewMd.readPrompt()
+            }
         )
 
-        examples.forEach { example ->
+        index.articles.values.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "mcp-steroid://debugger/${example.key}",
+                uri = "mcp-steroid://debugger/${example.path}",
                 name = "Debugger: ${example.name}",
                 description = example.description,
                 mimeType = example.mimeType,
                 contentProvider = {
-                    DynamicResourceScanner.loadResourceContent(example.resourcePath)
-                        ?: error("Debugger example resource not found: ${example.resourcePath}")
+                    example.provideMergedContent()
                 }
             )
         }
-    }
-
-    fun loadOverview(): String {
-        return DynamicResourceScanner.loadResourceContent("$RESOURCE_DIR/$OVERVIEW_FILE")
-            ?: error("Debugger overview resource not found: $RESOURCE_DIR/$OVERVIEW_FILE")
-    }
-
-    /**
-     * Load an example resource by its file path.
-     * Used by tests for direct resource access.
-     */
-    fun loadExample(resourceFile: String): String {
-        return DynamicResourceScanner.loadResourceContent(resourceFile)
-            ?: error("Debugger example resource not found: $resourceFile")
     }
 }

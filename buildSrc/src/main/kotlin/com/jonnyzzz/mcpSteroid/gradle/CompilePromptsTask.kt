@@ -33,15 +33,23 @@ abstract class CompilePromptsTask : DefaultTask() {
             .map { src -> ctx.generatePromptClazz(src) }
             .toList()
 
-        promptClasses.groupBy { it.folder }
-            .forEach { folder, clazzes ->
+        promptClasses.forEach { clazz ->
+            ctx.generatePromptClazzTest(clazz)
+        }
+
+        val indexes = promptClasses.groupBy { it.folder }
+            .map { (folder, clazzes) ->
                 val articles = groupByArticle(clazzes)
                 val articleClasses = articles.map {
                     ctx.generateArticleClazz(folder, it)
                 }
 
-                val standaloneFiles = clazzes - articleClasses.flatMap { it.article }
-                ctx.generatePromptIndexClazz(folder, clazzes, articleClasses)
+                val usedPromptNames = articleClasses.flatMap { it.article }.map { it.path }.toSortedSet()
+                val standaloneFiles = clazzes.filter { it.path !in usedPromptNames }
+
+                ctx.generateIndexClazz(folder, standaloneFiles, articleClasses)
             }
+
+        ctx.generateIndexClazz(indexes)
     }
 }

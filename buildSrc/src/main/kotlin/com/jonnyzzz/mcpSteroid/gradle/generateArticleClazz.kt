@@ -1,20 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.gradle
 
-import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
-import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.asClassName
-import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.buildCodeBlock
-import java.io.File
-import kotlin.math.absoluteValue
-import kotlin.random.Random
 
 fun groupByArticle(promptClasses: List<GeneratedPromptClazz>): List<PromptArticle> {
     val ktsExt = ".kts"
@@ -51,9 +44,11 @@ data class PromptArticle(
 data class GeneratedArticleClazz(
     val folder: String,
     val path: String,
-    val clazzName: ClassName,
+    override val clazzName: ClassName,
     val article: PromptArticle,
-)
+) : Generated {
+    override val entryName: String get() = article.mainElement.entryName
+}
 
 fun PromptGenerationContext.generateArticleClazz(
     folder: String,
@@ -77,7 +72,8 @@ fun PromptGenerationContext.generateArticleClazz(
             })
             .build()
 
-        PropertySpec.builder(name, promptReaderClass)
+        PropertySpec.builder(name, promptBaseClass)
+            .addModifiers(KModifier.OVERRIDE)
             .getter(getter)
             .build()
     }

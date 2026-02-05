@@ -2,8 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.DynamicResource
-import com.jonnyzzz.mcpSteroid.prompts.DynamicResourceScanner
+import com.jonnyzzz.mcpSteroid.prompts.generated.ideExamples.IdeExamplesIndex
 
 /**
  * Handler for IDE power operation examples as MCP resources.
@@ -14,39 +13,9 @@ import com.jonnyzzz.mcpSteroid.prompts.DynamicResourceScanner
  * KDoc comments in the .kts files.
  */
 class IdeExamplesResourceHandler : McpRegistrar {
-    private val RESOURCE_DIR = "/ide-examples"
-
-    /** List of example file names in the ide-examples directory */
-    private val EXAMPLE_FILES = listOf(
-        "extract-method.kts",
-        "introduce-variable.kts",
-        "inline-method.kts",
-        "change-signature.kts",
-        "move-file.kts",
-        "safe-delete.kts",
-        "optimize-imports.kts",
-        "generate-override.kts",
-        "inspect-and-fix.kts",
-        "hierarchy-search.kts",
-        "call-hierarchy.kts",
-        "run-configuration.kts",
-        "demo-debug-test.kts",
-        "pull-up-members.kts",
-        "push-down-members.kts",
-        "extract-interface.kts",
-        "move-class.kts",
-        "generate-constructor.kts",
-        "project-dependencies.kts",
-        "inspection-summary.kts",
-        "project-search.kts",
-    )
-
-    /** Dynamically loaded examples with metadata parsed from KDoc comments */
-    val examples: List<DynamicResource> by lazy {
-        DynamicResourceScanner.loadResources(RESOURCE_DIR, EXAMPLE_FILES)
-    }
-
     override fun register(server: McpServerCore) {
+        val ideExamplesIndex = IdeExamplesIndex()
+
         server.resourceRegistry.registerResource(
             uri = "mcp-steroid://ide/overview",
             name = "IDE Examples Overview",
@@ -57,34 +26,21 @@ class IdeExamplesResourceHandler : McpRegistrar {
                 such as refactorings, inspections, and code generation.
             """.trimIndent(),
             mimeType = "text/markdown",
-            contentProvider = ::loadOverview
+            contentProvider = {
+                ideExamplesIndex.ideOverviewMd.readPrompt()
+            }
         )
 
-        examples.forEach { example ->
+        ideExamplesIndex.articles.values.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "mcp-steroid://ide/${example.id}",
+                uri = "mcp-steroid://ide/${example.name}",
                 name = "IDE: ${example.name}",
                 description = example.description,
                 mimeType = example.mimeType,
                 contentProvider = {
-                    DynamicResourceScanner.loadResourceContent(example.resourcePath)
-                        ?: error("IDE example resource not found: ${example.resourcePath}")
+                    example.provideMergedContent()
                 }
             )
         }
-    }
-
-    fun loadOverview(): String {
-        return DynamicResourceScanner.loadResourceContent("$RESOURCE_DIR/IDE_OVERVIEW.md")
-            ?: error("IDE_OVERVIEW.md resource is not found")
-    }
-
-    /**
-     * Load an example resource by its file path.
-     * Used by tests for direct resource access.
-     */
-    fun loadExample(resourceFile: String): String {
-        return DynamicResourceScanner.loadResourceContent(resourceFile)
-            ?: error("IDE example resource not found: $resourceFile")
     }
 }

@@ -18,9 +18,9 @@ fun CodeBlock.Builder.controlFlow(
     return this
 }
 
-private fun PromptGenerationContext.writeClazzInner(spec: FileSpec, classType: ClassName, root: File, suffix: String = "") {
-    val basePath = classType.packageName.removePrefix(packageName + ".").replace(".", "/")
-    val targetFile = root.resolve(basePath).resolve("${classType.simpleName}$suffix.kt")
+private fun PromptGenerationContext.writeClazzInner(spec: FileSpec, classType: ClassName, root: File) {
+    val basePath = classType.packageName.removePrefix(packageName).trim('.').replace(".", "/")
+    val targetFile = root.resolve(basePath).resolve("${classType.simpleName}.kt")
     targetFile.parentFile.mkdirs()
     targetFile.writeText(spec.toString())
 }
@@ -30,5 +30,5 @@ fun PromptGenerationContext.writeClazz(spec: FileSpec, classType: ClassName) {
 }
 
 fun PromptGenerationContext.writeTestClazz(spec: FileSpec, classType: ClassName) {
-    writeClazzInner(spec, classType, testOutputRoot, "Test")
+    writeClazzInner(spec, classType, testOutputRoot)
 }
