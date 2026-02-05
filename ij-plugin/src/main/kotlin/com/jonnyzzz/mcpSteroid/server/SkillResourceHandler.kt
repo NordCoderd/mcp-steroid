@@ -4,6 +4,8 @@ package com.jonnyzzz.mcpSteroid.server
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
+import com.jonnyzzz.mcpSteroid.prompts.PromptSKILL
+import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**
  * Handler for the IntelliJ API Power User Guide resource.
@@ -41,14 +43,11 @@ class SkillResourceHandler : McpRegistrar {
 @Service(Service.Level.APP)
 class SkillResource {
     /**
-     * Load the SKILL.md content from resources.
+     * Load the SKILL.md content from generated prompt class.
      * Can be used by both MCP resource and HTTP endpoints.
      */
     fun loadSkillMd(): String {
-        val content = javaClass.getResourceAsStream("/skill/SKILL.md")
-            ?.bufferedReader()
-            ?.readText()
-            ?: error("SKILL.md resource is not found")
+        val content = promptFactory.renderPrompt<PromptSKILL>()
         return injectPluginVersion(content)
     }
 
