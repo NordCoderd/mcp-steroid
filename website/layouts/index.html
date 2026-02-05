@@ -67,6 +67,11 @@
                     <div class="video-thumbnail">
                         <img src="https://img.youtube.com/vi/{{ .id }}/mqdefault.jpg" alt="{{ .title }}">
                         <span class="video-duration">{{ .duration }}</span>
+                        <div class="video-play-overlay">
+                            <svg viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M8 5v14l11-7z"/>
+                            </svg>
+                        </div>
                     </div>
                     <div class="video-info">
                         <div class="video-title">{{ .title }}</div>
