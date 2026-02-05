@@ -1,19 +1,19 @@
-/**
- * LSP: textDocument/signatureHelp - Signature Help
- *
- * This example demonstrates how to get function signature information
- * when the cursor is inside function call parentheses.
- *
- * IntelliJ API used:
- * - ParameterInfoHandler - Get parameter info for function calls
- * - PsiElement navigation to find enclosing call expression
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - line/column: Position inside function call parentheses
- *
- * Output: Function signature with parameter information
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.lang.parameterInfo.ParameterInfoHandler
 import com.intellij.lang.parameterInfo.LanguageParameterInfo
@@ -155,21 +155,3 @@ val result = readAction {
 }
 
 println(result)
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Completion](mcp-steroid://lsp/completion) - Code completion suggestions
- * - [Hover](mcp-steroid://lsp/hover) - Get documentation/type info
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in document
- *
- * IDE power operations:
- * - [Call Hierarchy](mcp-steroid://ide/call-hierarchy) - Find method callers
- * - [Change Signature](mcp-steroid://ide/change-signature) - Add/reorder parameters
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
