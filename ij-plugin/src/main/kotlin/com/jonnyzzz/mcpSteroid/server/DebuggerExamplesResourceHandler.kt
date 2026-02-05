@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
+import com.jonnyzzz.mcpSteroid.prompts.PromptRegistry
 
 /**
  * Handler for debugger operation examples as MCP resources.
@@ -75,23 +76,23 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
     }
 
     /**
-     * Validate all debugger example resources exist in the JAR.
+     * Validate all debugger example resources exist in PromptRegistry.
      * Called during registration to fail fast if resources are missing.
      */
     private fun validateResourcesExist() {
-        // Validate overview
-        val overviewPath = "$RESOURCE_DIR/$OVERVIEW_FILE"
-        require(javaClass.getResource(overviewPath) != null) {
-            "Debugger overview resource missing from JAR: $overviewPath"
+        // Validate overview (use path without leading slash for PromptRegistry)
+        val overviewPath = RESOURCE_DIR.removePrefix("/") + "/$OVERVIEW_FILE"
+        require(PromptRegistry.contains(overviewPath)) {
+            "Debugger overview resource missing: $overviewPath"
         }
 
         // Validate all example files
         val missingFiles = EXAMPLE_FILES
-            .map { "$RESOURCE_DIR/$it" }
-            .filter { javaClass.getResource(it) == null }
+            .map { RESOURCE_DIR.removePrefix("/") + "/$it" }
+            .filter { !PromptRegistry.contains(it) }
 
         require(missingFiles.isEmpty()) {
-            "Debugger example resources missing from JAR: ${missingFiles.joinToString()}"
+            "Debugger example resources missing: ${missingFiles.joinToString()}"
         }
     }
 }
