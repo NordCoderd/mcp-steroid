@@ -1,21 +1,21 @@
-/**
- * IDE: Introduce Variable
- *
- * This example extracts an expression into a new local variable,
- * similar to "Refactor | Introduce Variable".
- *
- * IntelliJ API used:
- * - IntroduceVariableHandler
- * - IntroduceVariableSettings
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - line/column: Position inside the expression
- * - newVariableName: Name for the extracted variable
- * - dryRun: Preview only (no changes)
- *
- * Output: Summary of extraction or error message
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.editor.EditorFactory
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -133,21 +133,3 @@ try {
 }
 
 println("Introduced variable: $newVariableName")
-
-/**
- * ## See Also
- *
- * Related IDE refactorings:
- * - [Extract Method](mcp-steroid://ide/extract-method) - Extract statements into new method
- * - [Inline Method](mcp-steroid://ide/inline-method) - Inline method body at call sites
- * - [Change Signature](mcp-steroid://ide/change-signature) - Add/reorder parameters
- * - [Safe Delete](mcp-steroid://ide/safe-delete) - Safely remove elements
- *
- * Related LSP operations:
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- * - [Rename](mcp-steroid://lsp/rename) - Rename symbol across project
- *
- * Overview resources:
- * - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE power operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
