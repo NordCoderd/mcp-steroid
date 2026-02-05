@@ -1,20 +1,20 @@
-/**
- * LSP: textDocument/completion - Code Completion
- *
- * This example demonstrates how to get code completion suggestions
- * at a given position, similar to pressing Ctrl+Space in the IDE.
- *
- * IntelliJ API used:
- * - CompletionService - Core completion infrastructure
- * - CompletionParameters - Parameters for completion request
- * - LookupElement - Individual completion item
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - line/column: Position to get completions for
- *
- * Output: List of completion suggestions
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.codeInsight.completion.*
 import com.intellij.codeInsight.lookup.LookupElement
@@ -94,21 +94,3 @@ val result = readAction {
 }
 
 println(result)
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Hover](mcp-steroid://lsp/hover) - Get documentation/type info
- * - [Signature Help](mcp-steroid://lsp/signature-help) - Parameter hints for function calls
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in document
- *
- * IDE power operations:
- * - [Extract Method](mcp-steroid://ide/extract-method) - Refactoring example
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
