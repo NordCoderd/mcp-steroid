@@ -3,12 +3,11 @@ package com.jonnyzzz.mcpSteroid.gradle
 
 import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
-import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
-import com.squareup.kotlinpoet.MemberName
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.asTypeName
@@ -17,13 +16,32 @@ import java.io.File
 import kotlin.math.absoluteValue
 import kotlin.random.Random
 
-fun PromptGenerationContext.geratePromptClazz(
+data class GeneratedPromptClazz(
+    val fileType: String,
+    val folder: String,
+    val path: String,
+    val clazzName: ClassName,
+    val src: File,
+) {
+    val content get() = src.readText()
+}
+
+fun PromptGenerationContext.generatePromptClazz(
     src: File,
-): ClassName {
+): GeneratedPromptClazz {
     val content = src.readText()
 
+    val filePropValue = src.extension
+    val pathValue = src.toRelativeString(inputRoot)
+    val folderValue = src.parentFile.toRelativeString(inputRoot)
+
+    val packageInfix = folderValue.trim('/')
+        .split("/")
+        .map { it.toPromptClassName().replaceFirstChar { it.lowercase() } }
+        .joinToString("") { ".$it"}
+
     val className = "Prompt" + src.nameWithoutExtension.toPromptClassName()
-    val classType = ClassName(packageName, className)
+    val classType = ClassName(packageName + packageInfix , className)
 
     val readFn = content.chunked(1024).mapIndexed { index, content ->
         val factor = Random.nextInt(1000).absoluteValue + 11234
@@ -49,7 +67,7 @@ fun PromptGenerationContext.geratePromptClazz(
 
 
     val readResourceFun = FunSpec.builder("readPromptInternal")
-        .addModifiers(KModifier.OVERRIDE, KModifier.PROTECTED)
+        .addModifiers(KModifier.OVERRIDE)
         .returns(String::class)
         .addCode(buildCodeBlock {
             controlFlow("return sequence") {
@@ -72,23 +90,42 @@ fun PromptGenerationContext.geratePromptClazz(
         })
         .build()
 
+    val fileTypeProp = PropertySpec
+        .builder("fileType", String::class.asClassName())
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", filePropValue)
+        .build()
+
+    val pathProp = PropertySpec
+        .builder("path", String::class.asClassName())
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", pathValue)
+        .build()
+
+    val folderProp = PropertySpec
+        .builder("folder", String::class.asClassName())
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", folderValue)
+        .build()
+
     val typeSpec = TypeSpec.classBuilder(className)
         .addAnnotation(
             AnnotationSpec.builder(serviceAnnotation)
                 .addMember("%T.Level.APP", serviceAnnotation)
                 .build()
         )
-        .superclass(ClassName.bestGuess("com.jonnyzzz.mcpSteroid.prompts.PromptBase"))
+        .superclass(promptBaseClass)
+        .addProperty(pathProp)
+        .addProperty(folderProp)
+        .addProperty(fileTypeProp)
         .addFunction(readResourceFun)
         .addFunctions(readFn)
         .build()
 
-    val fileSpec = FileSpec.builder(packageName, className)
+    val fileSpec = FileSpec.builder(classType.packageName, className)
         .addFileComment("GENERATED FILE - DO NOT EDIT")
         .addType(typeSpec)
         .build()
-
-    outputRoot.resolve("$className.kt").writeText(fileSpec.toString())
 
     val testFuncSpec = FunSpec.builder("test$className")
         .returns(Unit::class)
@@ -103,12 +140,13 @@ fun PromptGenerationContext.geratePromptClazz(
         .addFunction(testFuncSpec)
         .build()
 
-    val testFileSpec = FileSpec.builder(packageName, className + "Test")
+    val testFileSpec = FileSpec.builder(classType.packageName, className + "Test")
         .addFileComment("GENERATED FILE - DO NOT EDIT")
         .addType(testTypeSpec)
         .build()
 
-    testOutputRoot.resolve("${className}Test.kt").writeText(testFileSpec.toString())
+    writeClazz(fileSpec, classType)
+    writeTestClazz(testFileSpec, classType)
 
-    return classType
+    return GeneratedPromptClazz(filePropValue, folderValue, pathValue, classType, src)
 }

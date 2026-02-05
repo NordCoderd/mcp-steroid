@@ -13,11 +13,16 @@ class PromptGenerationContext(
     val outputRoot: File,
     val testOutputRoot: File,
 ) {
-    val packageName = "com.jonnyzzz.mcpSteroid.prompts"
+    val packageName = "com.jonnyzzz.mcpSteroid.prompts.generated"
     val serviceAnnotation = ClassName("com.intellij.openapi.components", "Service")
 
     // Generate AllPrompts aggregator class
     val sequenceOfAny = Sequence::class.asClassName().parameterizedBy(ANY)
     val serviceMember = MemberName("com.intellij.openapi.components", "service")
+
+    val promptBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptBase")
+    val promptIndexBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptIndexBase")
+    val promptReaderClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptReader")
+    val promptArticleClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "ArticleBase")
 }
 

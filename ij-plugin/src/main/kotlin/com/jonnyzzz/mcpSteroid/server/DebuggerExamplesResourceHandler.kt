@@ -4,7 +4,7 @@ package com.jonnyzzz.mcpSteroid.server
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.prompts.DynamicResource
 import com.jonnyzzz.mcpSteroid.prompts.DynamicResourceScanner
-import com.jonnyzzz.mcpSteroid.prompts.PromptRegistry
+import com.jonnyzzz.mcpSteroid.prompts.generated.index.PromptIndexDebuggerExamples
 
 /**
  * Handler for debugger operation examples as MCP resources.
@@ -15,27 +15,12 @@ import com.jonnyzzz.mcpSteroid.prompts.PromptRegistry
  * KDoc comments in the .kts files.
  */
 class DebuggerExamplesResourceHandler : McpRegistrar {
-    private val RESOURCE_DIR = "/debugger-examples"
-    private val OVERVIEW_FILE = "DEBUGGER_OVERVIEW.md"
-
-    private val EXAMPLE_FILES = listOf(
-        "set-line-breakpoint.kts",
-        "debug-run-configuration.kts",
-        "debug-session-control.kts",
-        "debug-list-threads.kts",
-        "debug-thread-dump.kts",
-        "demo-debug-test.kts",
-    )
-
     /** Dynamically loaded examples with metadata parsed from KDoc comments */
-    val examples: List<DynamicResource> by lazy {
-        DynamicResourceScanner.loadResources(RESOURCE_DIR, EXAMPLE_FILES)
+    val examples by lazy {
+        PromptIndexDebuggerExamples().listKotlinSources()
     }
 
     override fun register(server: McpServerCore) {
-        // Validate all resources exist during registration (fail-fast)
-        validateResourcesExist()
-
         server.resourceRegistry.registerResource(
             uri = "mcp-steroid://debugger/overview",
             name = "Debugger Examples Overview",
@@ -51,7 +36,7 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
 
         examples.forEach { example ->
             server.resourceRegistry.registerResource(
-                uri = "mcp-steroid://debugger/${example.id}",
+                uri = "mcp-steroid://debugger/${example.key}",
                 name = "Debugger: ${example.name}",
                 description = example.description,
                 mimeType = example.mimeType,
@@ -75,26 +60,5 @@ class DebuggerExamplesResourceHandler : McpRegistrar {
     fun loadExample(resourceFile: String): String {
         return DynamicResourceScanner.loadResourceContent(resourceFile)
             ?: error("Debugger example resource not found: $resourceFile")
-    }
-
-    /**
-     * Validate all debugger example resources exist in PromptRegistry.
-     * Called during registration to fail fast if resources are missing.
-     */
-    private fun validateResourcesExist() {
-        // Validate overview (use path without leading slash for PromptRegistry)
-        val overviewPath = RESOURCE_DIR.removePrefix("/") + "/$OVERVIEW_FILE"
-        require(PromptRegistry.contains(overviewPath)) {
-            "Debugger overview resource missing: $overviewPath"
-        }
-
-        // Validate all example files
-        val missingFiles = EXAMPLE_FILES
-            .map { RESOURCE_DIR.removePrefix("/") + "/$it" }
-            .filter { !PromptRegistry.contains(it) }
-
-        require(missingFiles.isEmpty()) {
-            "Debugger example resources missing: ${missingFiles.joinToString()}"
-        }
     }
 }

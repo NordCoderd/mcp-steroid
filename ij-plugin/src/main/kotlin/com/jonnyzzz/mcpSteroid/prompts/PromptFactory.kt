@@ -15,10 +15,31 @@ class PromptFactory {
 
 inline val promptFactory get() = service<PromptFactory>()
 
-sealed class PromptBase {
+abstract class ArticleBase {
+
+}
+
+abstract class PromptBase : PromptReader {
     fun readPrompt(): String {
         return readPromptInternal()
     }
 
+    abstract val fileType: String
+    abstract val folder: String
+    abstract val path: String
+
     protected abstract fun readPromptInternal(): String
+
+    override fun <T> readPrompt(action: (PromptBase) -> T): T = action(this)
 }
+
+interface PromptReader {
+    fun <T> readPrompt(action: (PromptBase) -> T): T
+}
+
+abstract class PromptIndexBase {
+    protected abstract val files: Map<String, PromptReader>
+    protected abstract val articles: Map<String, ArticleBase>
+
+}
+

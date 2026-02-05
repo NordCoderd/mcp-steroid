@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptDebugRemoteIdeSkill
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.PromptDebugRemoteIdeSkill
 import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**

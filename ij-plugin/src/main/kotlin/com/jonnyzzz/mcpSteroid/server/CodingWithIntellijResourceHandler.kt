@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptCodingWithIntelliJ
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.PromptCodingWithIntelliJ
 import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**
