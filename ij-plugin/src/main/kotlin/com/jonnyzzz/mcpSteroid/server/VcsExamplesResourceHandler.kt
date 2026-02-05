@@ -9,14 +9,6 @@ import com.jonnyzzz.mcpSteroid.prompts.generated.vcsExamples.VcsExamplesIndex
  * Provides code snippets for Git annotations, history, and other VCS operations.
  */
 class VcsExamplesResourceHandler : McpRegistrar {
-
-    data class VcsExample(
-        val id: String,
-        val name: String,
-        val description: String,
-        val resourceFile: () -> String
-    )
-
     override fun register(server: McpServerCore) {
         val index = VcsExamplesIndex()
 
