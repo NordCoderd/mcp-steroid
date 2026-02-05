@@ -1,12 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
-
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.FilePath
 import com.intellij.openapi.vcs.history.VcsHistoryProvider
