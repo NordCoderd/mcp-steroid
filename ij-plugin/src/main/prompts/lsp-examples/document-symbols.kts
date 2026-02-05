@@ -1,19 +1,19 @@
-/**
- * LSP: textDocument/documentSymbol - Document Symbols
- *
- * This example demonstrates how to list all symbols (classes, functions,
- * variables, etc.) in a document, similar to the Structure view in IDEs.
- *
- * IntelliJ API used:
- * - StructureViewBuilder - Build structure view for a file
- * - PsiTreeUtil - Navigate PSI tree
- * - PsiNamedElement - Elements with names (classes, methods, etc.)
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- *
- * Output: Hierarchical list of symbols in the document
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.lang.LanguageStructureViewBuilder
@@ -112,21 +112,3 @@ val result = readAction {
 }
 
 println(result)
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
- * - [Workspace Symbol](mcp-steroid://lsp/workspace-symbol) - Search symbols across workspace
- * - [Hover](mcp-steroid://lsp/hover) - Get documentation/type info
- *
- * IDE power operations:
- * - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find class inheritors
- * - [Call Hierarchy](mcp-steroid://ide/call-hierarchy) - Find method callers
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
