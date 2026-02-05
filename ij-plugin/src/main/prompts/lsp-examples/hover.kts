@@ -1,20 +1,20 @@
-/**
- * LSP: textDocument/hover - Hover Information
- *
- * This example demonstrates how to get documentation and type information
- * for a symbol at a given position, similar to hovering over code in the IDE.
- *
- * IntelliJ API used:
- * - DocumentationManager - Get documentation for elements
- * - PsiElement.getReference().resolve() - Find the target element
- * - TypeProvider / PsiType - Get type information
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - line/column: Position to get hover info for
- *
- * Output: Documentation and/or type information
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.lang.documentation.DocumentationProvider
 import com.intellij.lang.LanguageDocumentation
@@ -123,21 +123,3 @@ val result = readAction {
 }
 
 println(result)
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
- * - [Signature Help](mcp-steroid://lsp/signature-help) - Parameter hints for function calls
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in document
- *
- * IDE power operations:
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- * - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find inheritors
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
