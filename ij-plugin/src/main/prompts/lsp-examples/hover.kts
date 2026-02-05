@@ -1,21 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
 import com.intellij.lang.documentation.DocumentationProvider
 import com.intellij.lang.LanguageDocumentation
 import com.intellij.openapi.fileEditor.FileDocumentManager
