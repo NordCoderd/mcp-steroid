@@ -1,19 +1,19 @@
-/**
- * IDE: Inspection + Quick Fix
- *
- * This example runs a local inspection and applies a quick fix,
- * similar to "Code | Inspect Code" + Alt+Enter.
- *
- * IntelliJ API used:
- * - LocalInspectionTool.checkFile()
- * - LocalQuickFix.applyFix()
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - dryRun: Preview only (no changes)
- *
- * Output: Inspection results and fix status
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.codeInspection.CommonProblemDescriptor
 import com.intellij.codeInspection.InspectionEngine
@@ -104,21 +104,3 @@ writeAction {
 }
 
 println("Applied quick fix: $fixName")
-
-/**
- * ## See Also
- *
- * Related IDE operations:
- * - [Inspection Summary](mcp-steroid://ide/inspection-summary) - List enabled inspections
- * - [Optimize Imports](mcp-steroid://ide/optimize-imports) - Remove unused imports
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- *
- * Related LSP operations:
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- * - [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
- *
- * Overview resources:
- * - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE power operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
