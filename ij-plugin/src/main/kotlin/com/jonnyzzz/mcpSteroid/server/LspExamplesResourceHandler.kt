@@ -220,16 +220,12 @@ class LspExamplesResourceHandler : McpRegistrar {
     }
 
     fun loadOverview(): String {
-        return javaClass.getResourceAsStream("/lsp-examples/LSP_OVERVIEW.md")
-            ?.bufferedReader()
-            ?.readText()
+        return DynamicResourceScanner.loadResourceContent("/lsp-examples/LSP_OVERVIEW.md")
             ?: error("LSP_OVERVIEW.md resource is not found")
     }
 
     fun loadExample(resourceFile: String): String {
-        return javaClass.getResourceAsStream(resourceFile)
-            ?.bufferedReader()
-            ?.readText()
+        return DynamicResourceScanner.loadResourceContent(resourceFile)
             ?: error("LSP example resource is not found: $resourceFile")
     }
 }
