@@ -1,21 +1,21 @@
-/**
- * LSP: textDocument/codeAction - Code Actions / Quick Fixes
- *
- * This example demonstrates how to get available code actions (quick fixes,
- * refactorings) at a given position, similar to Alt+Enter in IDEs.
- *
- * IntelliJ API used:
- * - ShowIntentionActionsHandler - Get available intentions
- * - IntentionManager - List registered intentions
- * - LocalInspectionTool - Run inspections to find problems
- * - QuickFix - Fixes for inspection problems
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - line/column: Position to get code actions for
- *
- * Output: List of available code actions
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
@@ -152,21 +152,3 @@ val result = readAction {
 }
 
 println(result)
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Rename](mcp-steroid://lsp/rename) - Rename symbol across project
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
- * - [Hover](mcp-steroid://lsp/hover) - Get documentation/type info
- *
- * IDE power operations:
- * - [Inspect and Fix](mcp-steroid://ide/inspect-and-fix) - Run inspection and apply fix
- * - [Inspection Summary](mcp-steroid://ide/inspection-summary) - List enabled inspections
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
