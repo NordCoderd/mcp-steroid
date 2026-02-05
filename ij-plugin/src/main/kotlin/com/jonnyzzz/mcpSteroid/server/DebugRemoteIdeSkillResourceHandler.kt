@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptDEBUGREMOTEIDESKILL
+import com.jonnyzzz.mcpSteroid.prompts.PromptDebugRemoteIdeSkill
 import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**
@@ -34,5 +34,5 @@ class DebugRemoteIdeSkillResourceHandler : McpRegistrar {
         )
     }
 
-    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptDEBUGREMOTEIDESKILL>()
+    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptDebugRemoteIdeSkill>()
 }

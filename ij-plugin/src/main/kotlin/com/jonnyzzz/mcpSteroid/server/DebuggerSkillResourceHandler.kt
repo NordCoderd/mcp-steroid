@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptDEBUGGERSKILL
+import com.jonnyzzz.mcpSteroid.prompts.PromptDebuggerSkill
 import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**
@@ -28,5 +28,5 @@ class DebuggerSkillResourceHandler : McpRegistrar {
         )
     }
 
-    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptDEBUGGERSKILL>()
+    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptDebuggerSkill>()
 }

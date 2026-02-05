@@ -4,7 +4,7 @@ package com.jonnyzzz.mcpSteroid.server
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptSKILL
+import com.jonnyzzz.mcpSteroid.prompts.PromptSkill
 import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**
@@ -47,7 +47,7 @@ class SkillResource {
      * Can be used by both MCP resource and HTTP endpoints.
      */
     fun loadSkillMd(): String {
-        val content = promptFactory.renderPrompt<PromptSKILL>()
+        val content = promptFactory.renderPrompt<PromptSkill>()
         return injectPluginVersion(content)
     }
 

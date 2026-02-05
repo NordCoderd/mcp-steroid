@@ -33,8 +33,13 @@ class PromptGenerationContext(
     val serviceMember = MemberName("com.intellij.openapi.components", "service")
 }
 
-fun String.toPromptClassName() = split("-", "_")
-    .joinToString("") { it.titleCase() }
+fun String.toPromptClassName(): String {
+    return split("-", "_")
+        .map { if (it.all { it.isUpperCase() }) it.lowercase() else it }
+        .map { it.titleCase() }
+        .map { if (it.equals("intellij", ignoreCase = true)) "IntelliJ" else it }
+        .joinToString("")
+}
 
 fun String.titleCase() = replaceFirstChar { it.titlecase() }
 

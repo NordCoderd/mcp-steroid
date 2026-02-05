@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
-import com.jonnyzzz.mcpSteroid.prompts.PromptTESTSKILL
+import com.jonnyzzz.mcpSteroid.prompts.PromptTestSkill
 import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**
@@ -28,5 +28,5 @@ class TestSkillResourceHandler : McpRegistrar {
         )
     }
 
-    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptTESTSKILL>()
+    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptTestSkill>()
 }

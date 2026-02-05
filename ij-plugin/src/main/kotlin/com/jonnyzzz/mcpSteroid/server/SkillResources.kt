@@ -32,21 +32,21 @@ class SkillResources {
         id = "debugger-guide",
         resourceUri = "mcp-steroid://skill/debugger-guide",
         resourceName = "IntelliJ Debugger Skill Guide",
-        contentProvider = { promptFactory.renderPrompt<PromptDEBUGGERSKILL>() },
+        contentProvider = { promptFactory.renderPrompt<PromptDebuggerSkill>() },
     )
 
     val test = SkillDescriptor(
         id = "test-runner-guide",
         resourceUri = "mcp-steroid://skill/test-runner-guide",
         resourceName = "IntelliJ Test Runner Skill Guide",
-        contentProvider = { promptFactory.renderPrompt<PromptTESTSKILL>() },
+        contentProvider = { promptFactory.renderPrompt<PromptTestSkill>() },
     )
 
     val debugRemote = SkillDescriptor(
         id = "debug-remote-ide-guide",
         resourceUri = "mcp-steroid://skill/debug-remote-ide-guide",
         resourceName = "How to Debug Another IDE Instance",
-        contentProvider = { promptFactory.renderPrompt<PromptDEBUGREMOTEIDESKILL>() },
+        contentProvider = { promptFactory.renderPrompt<PromptDebugRemoteIdeSkill>() },
     )
 
     val all = listOf(main, debugger, test, debugRemote)
