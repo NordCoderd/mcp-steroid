@@ -36,7 +36,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
              WHAT: Finally SEE IntelliJ-based IDEs - not just read code. The only MCP server with visual understanding and full IDE control.
              HOW: Execute Kotlin code directly in IntelliJ's runtime with full API access. 
 
-             📖 **COMPLETE GUIDE**: [Coding with IntelliJ APIs](mcp-steroid://coding-with-intellij)
+             📖 **COMPLETE GUIDE**: [Coding with IntelliJ APIs](mcp-steroid://skill/coding-with-intellij)
 
              This is a **stateful** API - everything you do changes the IDE state. The IntelliJ IDE is running exclusively for you. Use it aggressively instead of manual file operations.
 
@@ -69,11 +69,10 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - Provide detailed 'reason' parameter
 
              **Resources:**
-             - 📖 [Complete Coding Guide](mcp-steroid://coding-with-intellij) - Patterns, examples, best practices
-             - 📊 [Resource Graph](mcp-steroid://docs/resource-graph) - All 58 resources organized
-             - 🚀 [API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Essential patterns
-             - 🐛 [Debugger Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
-             - 🧪 [Test Runner Guide](mcp-steroid://skill/test-runner-guide) - Test execution
+             - [Complete Coding Guide](mcp-steroid://skill/coding-with-intellij) - Patterns, examples, best practices
+             - [API Power User Guide](mcp-steroid://skill/skill) - Essential patterns
+             - [Debugger Guide](mcp-steroid://skill/debugger-skill) - Debug workflows
+             - [Test Runner Guide](mcp-steroid://skill/test-skill) - Test execution
 
              IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
 

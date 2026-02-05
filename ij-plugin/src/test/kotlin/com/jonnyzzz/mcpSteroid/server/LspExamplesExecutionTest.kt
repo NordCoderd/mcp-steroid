@@ -160,7 +160,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testGoToDefinitionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.goToDefinitionKts.kts.readPrompt()
+        val raw = index.goToDefinitionKts.payload.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -173,7 +173,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testFindReferencesExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.findReferencesKts.kts.readPrompt()
+        val raw = index.findReferencesKts.payload.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -186,7 +186,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testHoverExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.hoverKts.kts.readPrompt()
+        val raw = index.hoverKts.payload.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -199,7 +199,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testCompletionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.completionKts.kts.readPrompt()
+        val raw = index.completionKts.payload.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -212,7 +212,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testDocumentSymbolsExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.documentSymbolsKts.kts.readPrompt()
+        val raw = index.documentSymbolsKts.payload.readPrompt()
         val code = configureExample(raw, filePath = sampleFilePath)
 
         val result = executeExample("document-symbols", code)
@@ -220,7 +220,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testRenameExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.renameKts.kts.readPrompt()
+        val raw = index.renameKts.payload.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -241,7 +241,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testFormattingExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.formattingKts.kts.readPrompt()
+        val raw = index.formattingKts.payload.readPrompt()
         val code = configureExample(raw, filePath = sampleFilePath)
 
         val result = executeExample("formatting", code)
@@ -249,7 +249,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testCodeActionExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.codeActionKts.kts.readPrompt()
+        val raw = index.codeActionKts.payload.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -262,7 +262,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testSignatureHelpExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.signatureHelpKts.kts.readPrompt()
+        val raw = index.signatureHelpKts.payload.readPrompt()
         val code = configureExample(
             raw,
             filePath = sampleFilePath,
@@ -275,7 +275,7 @@ class LspExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testWorkspaceSymbolExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.workspaceSymbolKts.kts.readPrompt()
+        val raw = index.workspaceSymbolKts.payload.readPrompt()
         val code = configureExample(raw, query = "Greeter")
 
         val result = executeExample("workspace-symbol", code)

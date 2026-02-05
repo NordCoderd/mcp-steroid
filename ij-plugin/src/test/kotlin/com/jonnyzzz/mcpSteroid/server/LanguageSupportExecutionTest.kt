@@ -21,7 +21,6 @@ import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
 
 class LanguageSupportExecutionTest : BasePlatformTestCase() {
-    private val handler = LspExamplesResourceHandler()
     val index = LspExamplesIndex()
     private lateinit var samples: List<LanguageSample>
 
@@ -47,7 +46,7 @@ class LanguageSupportExecutionTest : BasePlatformTestCase() {
     fun testLanguageSupportViaGoToDefinition(): Unit = timeoutRunBlocking(120.seconds) {
         val available = resolveAvailableSpecs()
 
-        val raw = index.goToDefinitionKts.kts.readPrompt()
+        val raw = index.goToDefinitionKts.payload.readPrompt()
         for (sample in samples.filter { it.spec in available }) {
             val code = configureExample(
                 raw,

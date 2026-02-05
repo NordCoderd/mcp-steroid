@@ -1,48 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.server
 
-import com.intellij.openapi.components.Service
-import com.intellij.openapi.components.service
-
 data class SkillFrontmatter(
     val name: String?,
     val description: String?,
 )
-
-data class SkillDocument(
-    val descriptor: SkillDescriptor,
-    val promptName: String,
-    val description: String?,
-    val content: String,
-    val contentWithoutFrontmatter: String,
-)
-
-@Service(Service.Level.APP)
-class SkillCatalog {
-    private val skills: List<SkillDocument> by lazy {
-        skillResources.all.map { descriptor -> loadSkill(descriptor) }
-    }
-
-    fun listSkills(): List<SkillDocument> = skills
-
-    fun findByPromptName(name: String): SkillDocument? {
-        return skills.firstOrNull { it.promptName == name || it.descriptor.id == name }
-    }
-
-    private fun loadSkill(descriptor: SkillDescriptor): SkillDocument {
-        val content = descriptor.contentProvider()
-        val parsed = parseSkillFrontmatter(content)
-        val promptName = parsed.frontmatter?.name?.takeIf { it.isNotBlank() } ?: descriptor.id
-        val description = parsed.frontmatter?.description
-        return SkillDocument(
-            descriptor = descriptor,
-            promptName = promptName,
-            description = description,
-            content = content,
-            contentWithoutFrontmatter = parsed.body,
-        )
-    }
-}
 
 internal data class FrontmatterParseResult(
     val frontmatter: SkillFrontmatter?,
