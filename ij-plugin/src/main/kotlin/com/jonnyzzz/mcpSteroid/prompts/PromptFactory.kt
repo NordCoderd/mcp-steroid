@@ -16,5 +16,9 @@ class PromptFactory {
 inline val promptFactory get() = service<PromptFactory>()
 
 sealed class PromptBase {
-    abstract fun readPrompt(): String
+    fun readPrompt(): String {
+        return readPromptInternal()
+    }
+
+    protected abstract fun readPromptInternal(): String
 }
