@@ -66,12 +66,10 @@ fun PromptGenerationContext.geratePromptClazz(
         .addModifiers(KModifier.OVERRIDE)
         .returns(String::class)
         .addCode(buildCodeBlock {
-            beginControlFlow("return sequence{")
+            beginControlFlow("return sequence")
             readFn.forEach { fn -> addStatement("yield(%L())", fn.name) }
-            endControlFlow()
-            add(".flatten()")
-            add(".map { it / %L }\n", factor)
-            add(".joinToString(%S) { it.toChar().toString() }\n", "")
+            unindent()
+            add("}.flatten().map { it / %L }.joinToString(%S) { it.toChar().toString() }\n", factor, "")
         })
         .build()
 
