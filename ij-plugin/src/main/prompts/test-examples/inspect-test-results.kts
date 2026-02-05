@@ -1,18 +1,3 @@
-/**
- * Test: Inspect Test Results
- *
- * This example accesses test results from the most recent test execution
- * and displays a summary of passed/failed/ignored tests.
- *
- * IntelliJ API used:
- * - RunContentManager - Access run content descriptors
- * - SMTRunnerConsoleView - Test console view
- * - SMTestRunnerResultsForm - Test results form
- * - SMTestProxy / SMRootTestProxy - Test tree nodes
- *
- * Output: Test results summary with failure details
- */
-
 import com.intellij.execution.ui.RunContentManager
 import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
@@ -117,22 +102,3 @@ if (failed == 0) {
 } else {
     println("✗ $failed test(s) failed")
 }
-
-/**
- * ## See Also
- *
- * Related test examples:
- * - [Run Tests](mcp-steroid://test/run-tests) - Execute test configuration
- * - [List Run Configurations](mcp-steroid://test/list-run-configurations) - Discover available tests
- * - [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll test status
- * - [Test Tree Navigation](mcp-steroid://test/test-tree-navigation) - Navigate test hierarchy
- * - [Test Failure Details](mcp-steroid://test/test-failure-details) - Access failure messages
- * - [Test Statistics](mcp-steroid://test/test-statistics) - Get test counts
- *
- * Related IDE operations:
- * - [Run Configuration](mcp-steroid://ide/run-configuration) - List and execute run configs
- *
- * Overview resources:
- * - [Test Examples Overview](mcp-steroid://test/overview) - Complete test execution guide
- * - [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Essential test knowledge
- */
