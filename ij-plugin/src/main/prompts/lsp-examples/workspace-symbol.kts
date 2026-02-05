@@ -1,23 +1,23 @@
-/**
- * LSP: workspace/symbol - Workspace Symbol Search
- *
- * This example demonstrates how to search for symbols across the entire
- * workspace/project, similar to Ctrl+N (Go to Class) or Ctrl+Shift+N
- * (Go to File) in IDEs.
- *
- * IntelliJ API used:
- * - GotoClassModel2 - Search for classes
- * - GotoSymbolModel2 - Search for all symbols
- * - PsiShortNamesCache - Fast lookup by short name
- * - AllClassesSearch - Search all classes
- *
- * Parameters to customize:
- * - query: Search pattern (supports camelCase matching)
- * - searchType: "class", "symbol", or "file"
- * - maxResults: Maximum number of results
- *
- * Output: List of matching symbols with their locations
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.ide.util.gotoByName.*
 import com.intellij.navigation.NavigationItem
@@ -204,21 +204,3 @@ val result = readAction {
 }
 
 println(result)
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
- * - [Hover](mcp-steroid://lsp/hover) - Get documentation/type info
- *
- * IDE power operations:
- * - [Project Search](mcp-steroid://ide/project-search) - Search files by name or type
- * - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find class inheritors
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
