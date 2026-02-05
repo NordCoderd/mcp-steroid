@@ -1,22 +1,22 @@
-/**
- * IDE: Inline Method
- *
- * This example inlines a method body at call sites,
- * similar to "Refactor | Inline".
- *
- * IntelliJ API used:
- * - InlineMethodProcessor
- * - EditorFactory for a temporary editor
- *
- * Parameters to customize:
- * - filePath: Absolute path to the file
- * - line/column: Position inside method call or declaration
- * - inlineThisOnly: Inline only the selected call site
- * - deleteDeclaration: Remove the original method after inlining
- * - dryRun: Preview only (no changes)
- *
- * Output: Summary of inline operation or error message
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.openapi.editor.EditorFactory
@@ -101,21 +101,3 @@ try {
         EditorFactory.getInstance().releaseEditor(editor)
     }
 }
-
-/**
- * ## See Also
- *
- * Related IDE refactorings:
- * - [Extract Method](mcp-steroid://ide/extract-method) - Extract statements into new method
- * - [Introduce Variable](mcp-steroid://ide/introduce-variable) - Extract expression into variable
- * - [Change Signature](mcp-steroid://ide/change-signature) - Add/reorder parameters
- * - [Safe Delete](mcp-steroid://ide/safe-delete) - Safely remove elements
- *
- * Related LSP operations:
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- * - [Rename](mcp-steroid://lsp/rename) - Rename symbol across project
- *
- * Overview resources:
- * - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE power operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
