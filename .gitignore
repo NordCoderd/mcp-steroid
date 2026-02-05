@@ -4,13 +4,9 @@
 .gradle/
 .gradle*/
 build/
-!gradle/wrapper/gradle-wrapper.jar
 
 # IntelliJ IDEA
 .idea/
-*.iml
-*.iws
-*.ipr
 out/
 .intellijPlatform/
 
@@ -33,9 +29,6 @@ docs/runs/
 
 .gradle-local
 .kotlin
-
-#Ignore vscode AI rules
-.github/instructions/codacy.instructions.md
 
 # Website public repository checkout
 website/mcp-steroid-public/
