@@ -1,12 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
-
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.annotate.AnnotationProvider
