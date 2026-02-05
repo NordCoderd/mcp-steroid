@@ -1,23 +1,23 @@
-/**
- * IDE: Push Down Members
- *
- * This example pushes a member from a base class into its subclasses,
- * similar to "Refactor | Push Members Down".
- *
- * IntelliJ API used:
- * - PushDownProcessor
- * - MemberInfo
- * - DocCommentPolicy
- *
- * Parameters to customize:
- * - sourceClassFqn: Fully-qualified name of the base class
- * - memberName: Member (method/field) to push down
- * - dryRun: Preview only (no changes)
- *
- * Output: Summary of push down operation
- *
- * WARNING: This modifies code. Use dryRun=true to preview changes first.
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.application.writeIntentReadAction
 import com.intellij.psi.JavaPsiFacade
@@ -92,21 +92,3 @@ writeIntentReadAction {
 }
 
 println("Pushed down member '${plan.member.name}' from ${plan.sourceFqn}")
-
-/**
- * ## See Also
- *
- * Related IDE refactorings:
- * - [Pull Up Members](mcp-steroid://ide/pull-up-members) - Move members to base class
- * - [Extract Interface](mcp-steroid://ide/extract-interface) - Create interface from class
- * - [Move Class](mcp-steroid://ide/move-class) - Move classes between packages
- * - [Safe Delete](mcp-steroid://ide/safe-delete) - Safely remove elements
- *
- * Related LSP operations:
- * - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find class inheritors
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- *
- * Overview resources:
- * - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE power operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
