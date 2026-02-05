@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
+import com.jonnyzzz.mcpSteroid.prompts.PromptDEBUGREMOTEIDESKILL
+import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**
  * Handler for the Remote IDE Debugging skill guide resource.
@@ -11,7 +13,6 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
  */
 class DebugRemoteIdeSkillResourceHandler : McpRegistrar {
     private val descriptor = skillResources.debugRemote
-    private val skillResourcePath = descriptor.resourcePath
     private val resourceName = descriptor.resourceName
     private val resourceDescription = """
         Guide for AI agents on debugging IntelliJ-based IDEs (CLion, Rider, etc.)
@@ -23,20 +24,7 @@ class DebugRemoteIdeSkillResourceHandler : McpRegistrar {
         Written entirely by AI agents using MCP Steroid.
     """.trimIndent()
 
-    /** Cached skill content - validated at load time */
-    private val skillContent: String by lazy {
-        javaClass.getResourceAsStream(skillResourcePath)
-            ?.bufferedReader()
-            ?.readText()
-            ?: error("Debug Remote IDE skill resource not found: $skillResourcePath")
-    }
-
     override fun register(server: McpServerCore) {
-        // Validate resource exists during registration (fail-fast)
-        require(javaClass.getResource(skillResourcePath) != null) {
-            "Debug Remote IDE skill resource missing from JAR: $skillResourcePath"
-        }
-
         registerSkillResource(
             server = server,
             descriptor = descriptor,
@@ -46,5 +34,5 @@ class DebugRemoteIdeSkillResourceHandler : McpRegistrar {
         )
     }
 
-    fun loadSkillMd(): String = skillContent
+    fun loadSkillMd(): String = promptFactory.renderPrompt<PromptDEBUGREMOTEIDESKILL>()
 }
