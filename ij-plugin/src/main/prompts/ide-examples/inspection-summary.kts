@@ -1,19 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
 import com.intellij.profile.codeInspection.InspectionProjectProfileManager
 
 // Configuration - modify these for your use case
