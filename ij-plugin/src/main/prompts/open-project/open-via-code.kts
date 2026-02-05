@@ -1,14 +1,3 @@
-//
-//
-//
-//
-//
-//
-//
-//
-//
-//
-
 import com.intellij.ide.impl.OpenProjectTask
 import com.intellij.ide.trustedProjects.TrustedProjects
 import com.intellij.openapi.project.ex.ProjectManagerEx
