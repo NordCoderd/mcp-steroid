@@ -14,4 +14,4 @@ Related test operations:
 
 Overview resources:
 - [Debugger Examples Overview](mcp-steroid://debugger/overview) - All debugger operations
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Essential debugger knowledge
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge

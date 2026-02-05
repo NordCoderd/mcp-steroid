@@ -63,9 +63,9 @@ that go beyond LSP capabilities. Each example is a complete script for `steroid_
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API reference and patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
-- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Debug workflows
+- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Test execution
 
 ### IDE Power Operations
 - Refactorings: `extract-method`, `introduce-variable`, `inline-method`, `change-signature`, `move-file`, `safe-delete`, `pull-up-members`, `push-down-members`, `extract-interface`, `move-class`

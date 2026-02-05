@@ -30,9 +30,9 @@ long script with waits.
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API reference and patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Essential debugger knowledge and workflows
-- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge and workflows
+- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Test execution
 
 ### Debugger Examples
 - [Debugger Overview](mcp-steroid://debugger/overview) - This document

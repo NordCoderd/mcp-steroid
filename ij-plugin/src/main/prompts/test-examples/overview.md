@@ -197,16 +197,16 @@ This pattern avoids timeout issues and provides better feedback to the agent.
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API reference and patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug workflows and session management
-- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Essential test execution knowledge
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Debug workflows and session management
+- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Essential test execution knowledge
 
 ### Test Execution Examples
 - [Test Overview](mcp-steroid://test/overview) - This document
 - [List Run Configurations](mcp-steroid://test/list-run-configurations) - Discover available tests
 - [Run Tests](mcp-steroid://test/run-tests) - Execute test configurations
 - [Inspect Test Results](mcp-steroid://test/inspect-test-results) - Access results
-- [Test Tree Navigation](mcp-steroid://test/test-tree-navigation) - Navigate test hierarchy
+- [Test Tree Navigation](mcp-steroid://test/tree-navigation) - Navigate test hierarchy
 - [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll test status
 - [Demo Debug Test](mcp-steroid://test/demo-debug-test) - End-to-end debug flow for demo test
 

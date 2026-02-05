@@ -121,9 +121,9 @@ graph TD
 ### Skill Guides
 | Resource | URI |
 |----------|-----|
-| IntelliJ API Power User Guide | `mcp-steroid://skill/intellij-api-poweruser-guide` |
-| Debugger Skill Guide | `mcp-steroid://skill/debugger-guide` |
-| Test Runner Skill Guide | `mcp-steroid://skill/test-runner-guide` |
+| IntelliJ API Power User Guide | `mcp-steroid://skill/skill` |
+| Debugger Skill Guide | `mcp-steroid://skill/debugger-skill` |
+| Test Runner Skill Guide | `mcp-steroid://skill/test-skill` |
 
 ### LSP Examples
 | Resource | URI |
@@ -185,9 +185,9 @@ graph TD
 | Run Tests | `mcp-steroid://test/run-tests` |
 | Wait for Completion | `mcp-steroid://test/wait-for-completion` |
 | Inspect Test Results | `mcp-steroid://test/inspect-test-results` |
-| Test Tree Navigation | `mcp-steroid://test/test-tree-navigation` |
-| Test Statistics | `mcp-steroid://test/test-statistics` |
-| Test Failure Details | `mcp-steroid://test/test-failure-details` |
+| Test Tree Navigation | `mcp-steroid://test/tree-navigation` |
+| Test Statistics | `mcp-steroid://test/statistics` |
+| Test Failure Details | `mcp-steroid://test/failure-details` |
 | Find Recent Test Run | `mcp-steroid://test/find-recent-test-run` |
 | Demo Debug Test | `mcp-steroid://test/demo-debug-test` |
 
@@ -209,19 +209,19 @@ graph TD
 ## Common Navigation Paths
 
 ### For Beginners
-1. Start with `mcp-steroid://skill/intellij-api-poweruser-guide` - Learn the basics
+1. Start with `mcp-steroid://skill/skill` - Learn the basics
 2. Explore `mcp-steroid://lsp/overview` - Understand LSP-like operations
 3. Try `mcp-steroid://ide/overview` - See advanced IDE features
 
 ### For Code Analysis
-1. `mcp-steroid://skill/intellij-api-poweruser-guide` - PSI navigation patterns
+1. `mcp-steroid://skill/skill` - PSI navigation patterns
 2. `mcp-steroid://lsp/go-to-definition` - Navigate to symbol definitions
 3. `mcp-steroid://lsp/find-references` - Find all usages
 4. `mcp-steroid://lsp/hover` - Get documentation and type info
 5. `mcp-steroid://ide/hierarchy-search` - Find class hierarchies
 
 ### For Refactoring
-1. `mcp-steroid://skill/intellij-api-poweruser-guide` - Refactoring best practices
+1. `mcp-steroid://skill/skill` - Refactoring best practices
 2. `mcp-steroid://lsp/rename` - Rename symbols
 3. `mcp-steroid://ide/extract-method` - Extract methods
 4. `mcp-steroid://ide/inline-method` - Inline methods
@@ -229,7 +229,7 @@ graph TD
 6. `mcp-steroid://ide/move-class` - Move classes between packages
 
 ### For Debugging
-1. `mcp-steroid://skill/debugger-guide` - Debugger workflow overview
+1. `mcp-steroid://skill/debugger-skill` - Debugger workflow overview
 2. `mcp-steroid://debugger/overview` - Debugger examples overview
 3. `mcp-steroid://debugger/set-line-breakpoint` - Set breakpoints
 4. `mcp-steroid://debugger/debug-run-configuration` - Start debug session
@@ -237,21 +237,21 @@ graph TD
 6. `mcp-steroid://debugger/debug-thread-dump` - Build thread dump
 
 ### For Testing
-1. `mcp-steroid://skill/test-runner-guide` - Test execution patterns
+1. `mcp-steroid://skill/test-skill` - Test execution patterns
 2. `mcp-steroid://test/overview` - Test examples overview
 3. `mcp-steroid://test/list-run-configurations` - List test configs
 4. `mcp-steroid://test/run-tests` - Run tests
 5. `mcp-steroid://test/inspect-test-results` - Check results
-6. `mcp-steroid://test/test-failure-details` - Analyze failures
+6. `mcp-steroid://test/failure-details` - Analyze failures
 
 ### For Version Control
-1. `mcp-steroid://skill/intellij-api-poweruser-guide` - VCS API basics
+1. `mcp-steroid://skill/skill` - VCS API basics
 2. `mcp-steroid://vcs/overview` - VCS examples overview
 3. `mcp-steroid://vcs/git-annotations` - Get git blame
 4. `mcp-steroid://vcs/git-history` - View commit history
 
 ### For Project Management
-1. `mcp-steroid://skill/intellij-api-poweruser-guide` - Project model basics
+1. `mcp-steroid://skill/skill` - Project model basics
 2. `mcp-steroid://open-project/overview` - Project opening overview
 3. `mcp-steroid://open-project/open-trusted` - Quick project opening
 4. `mcp-steroid://ide/project-dependencies` - View dependencies
@@ -308,7 +308,7 @@ sequenceDiagram
     MCP->>Agent: Show skill guides
 
     Agent->>MCP: Read Power User Guide
-    MCP->>Server: resources/read(mcp-steroid://skill/intellij-api-poweruser-guide)
+    MCP->>Server: resources/read(mcp-steroid://skill/skill)
     Server->>MCP: [Guide content with cross-refs]
     MCP->>Agent: Here's the guide
 
@@ -355,7 +355,7 @@ resources.filter(r => r.uri.startsWith("mcp-steroid://open-project/")) // Open p
 const guide = await client.callTool({
   name: "resources/read",
   arguments: {
-    uri: "mcp-steroid://skill/intellij-api-poweruser-guide"
+    uri: "mcp-steroid://skill/skill"
   }
 });
 
@@ -401,7 +401,7 @@ const result = await client.callTool({
 ## Resource Metadata
 
 All resources include:
-- **uri**: Unique identifier (e.g., `mcp-steroid://skill/intellij-api-poweruser-guide`)
+- **uri**: Unique identifier (e.g., `mcp-steroid://skill/skill`)
 - **name**: Human-readable name
 - **description**: Brief description of the resource
 - **mimeType**: Content type (`text/markdown` or `text/x-kotlin`)
@@ -424,4 +424,4 @@ The MCP Steroid resource system provides:
 - **Runnable Examples** - All examples are ready to execute
 - **Progressive Learning** - Clear paths from beginner to advanced
 
-**Start exploring**: `mcp-steroid://skill/intellij-api-poweruser-guide`
+**Start exploring**: `mcp-steroid://skill/skill`

@@ -84,9 +84,9 @@ Structure View (`LanguageStructureViewBuilder`), or inspection output.
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API reference and patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Debug workflows
-- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Debug workflows
+- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Test execution
 
 ### LSP Examples
 - Navigation: `go-to-definition`, `find-references`, `workspace-symbol`

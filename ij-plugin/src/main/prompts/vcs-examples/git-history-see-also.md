@@ -13,4 +13,4 @@ Related LSP operations:
 
 Overview resources:
 - [VCS Examples Overview](mcp-steroid://vcs/overview) - All VCS operations
-- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

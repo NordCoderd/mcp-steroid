@@ -8,10 +8,9 @@ import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
-import com.squareup.kotlinpoet.WildcardTypeName
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.buildCodeBlock
-import kotlin.reflect.KClass
+
 
 data class GeneratedIndexClazz(
     val folder: String,
@@ -28,13 +27,9 @@ fun PromptGenerationContext.generateIndexClazz(
 
     val classType = run {
         val clazzName = if (folder.isEmpty()) "Root" else folder.toPromptClassName()
-        val packageName = (articles.flatMap { it.article } + prompts).map { it.clazzName.packageName }.distinct().single()
+        val packageName = (articles.flatMap { it.article.allClasses } + prompts).map { it.clazzName.packageName }.distinct().single()
         ClassName(packageName, clazzName + "Index")
     }
-
-    val kclassType = KClass::class.asClassName().parameterizedBy(
-        WildcardTypeName.producerOf(promptBaseClass)
-    )
 
     val sortedPrompts = prompts
         .sortedWith(compareBy<GeneratedPromptClazz>({ it.fileType }, { it.clazzName }))

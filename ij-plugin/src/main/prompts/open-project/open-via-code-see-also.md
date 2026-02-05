@@ -12,4 +12,4 @@ Related MCP tools:
 
 Overview resources:
 - [Open Project Examples Overview](mcp-steroid://open-project/overview) - All project opening workflows
-- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

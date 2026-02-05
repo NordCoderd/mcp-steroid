@@ -11,4 +11,4 @@ Related LSP operations:
 
 Overview resources:
 - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE power operations
-- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

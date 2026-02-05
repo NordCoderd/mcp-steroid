@@ -63,9 +63,9 @@ The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex cal
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Essential IntelliJ API patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - This guide
-- [Test Runner Skill Guide](mcp-steroid://skill/test-runner-guide) - Test execution workflows
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Essential IntelliJ API patterns
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - This guide
+- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Test execution workflows
 
 ### Debugger Resources
 - [Debugger Overview](mcp-steroid://debugger/overview) - Complete debugger examples overview
