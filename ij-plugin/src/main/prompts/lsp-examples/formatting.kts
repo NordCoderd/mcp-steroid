@@ -1,21 +1,21 @@
-/**
- * LSP: textDocument/formatting - Format Document
- *
- * This example demonstrates how to format an entire document
- * according to the project's code style settings.
- *
- * IntelliJ API used:
- * - CodeStyleManager.reformat() - Format PSI elements
- * - CodeStyleManager.reformatText() - Format text range
- *
- * Parameters to customize:
- * - filePath: Path to the file to format
- * - dryRun: Preview changes without modifying the file
- *
- * Output: Formatted code or diff showing changes
- *
- * WARNING: This modifies code. Use dryRun=true to preview changes first.
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
@@ -126,20 +126,3 @@ if (dryRun) {
         println("File has been formatted according to project code style.")
     }
 }
-
-/**
- * ## See Also
- *
- * Related LSP examples:
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
- * - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- *
- * IDE power operations:
- * - [Optimize Imports](mcp-steroid://ide/optimize-imports) - Remove unused imports
- * - [Code Hygiene](mcp-steroid://ide/inspection-summary) - Run inspections
- *
- * Overview resources:
- * - [LSP Examples Overview](mcp-steroid://lsp/overview) - All LSP operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
