@@ -7,6 +7,7 @@
 // - File must be in a Git repository
 // - Git4Idea plugin must be enabled
 
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
 import com.intellij.openapi.vcs.annotate.AnnotationProvider
 import com.intellij.openapi.vcs.annotate.FileAnnotation
@@ -42,7 +43,7 @@ if (annotationProvider == null) {
 
 // Get annotations - this may take time for large files
 println("Fetching annotations...")
-val annotation = annotationProvider.annotate(virtualFile)
+val annotation = annotationProvider?.annotate(virtualFile)
 
 if (annotation == null) {
     println("ERROR: Could not get annotations for file")
@@ -73,7 +74,7 @@ if (lineCount > 50) {
 }
 
 // Clean up
-annotation.dispose()
+Disposer.dispose(annotation)
 
 /**
  * ## See Also
