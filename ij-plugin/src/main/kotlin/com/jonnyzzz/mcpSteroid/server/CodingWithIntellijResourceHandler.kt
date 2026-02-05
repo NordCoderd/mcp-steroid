@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
+import com.jonnyzzz.mcpSteroid.prompts.PromptCODINGWITHINTELLIJ
+import com.jonnyzzz.mcpSteroid.prompts.promptFactory
 
 /**
  * Handler for the Coding with IntelliJ guide resource.
@@ -37,13 +39,9 @@ class CodingWithIntellijResourceHandler : McpRegistrar {
     }
 
     /**
-     * Load the CODING_WITH_INTELLIJ.md content from resources.
+     * Load the CODING_WITH_INTELLIJ.md content from generated prompt class.
      */
     fun loadCodingGuide(): String {
-        val content = javaClass.getResourceAsStream("/skill/CODING_WITH_INTELLIJ.md")
-            ?.bufferedReader()
-            ?.readText()
-            ?: error("CODING_WITH_INTELLIJ.md resource is not found")
-        return content
+        return promptFactory.renderPrompt<PromptCODINGWITHINTELLIJ>()
     }
 }
