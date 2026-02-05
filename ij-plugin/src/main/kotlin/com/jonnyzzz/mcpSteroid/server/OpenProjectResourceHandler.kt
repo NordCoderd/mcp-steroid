@@ -100,16 +100,12 @@ class OpenProjectResourceHandler : McpRegistrar {
     }
 
     fun loadOverview(): String {
-        return javaClass.getResourceAsStream("/open-project/OPEN_PROJECT_OVERVIEW.md")
-            ?.bufferedReader()
-            ?.readText()
+        return DynamicResourceScanner.loadResourceContent("/open-project/OPEN_PROJECT_OVERVIEW.md")
             ?: error("OPEN_PROJECT_OVERVIEW.md resource is not found")
     }
 
     fun loadExample(resourceFile: String): String {
-        return javaClass.getResourceAsStream(resourceFile)
-            ?.bufferedReader()
-            ?.readText()
+        return DynamicResourceScanner.loadResourceContent(resourceFile)
             ?: error("Open project example resource is not found: $resourceFile")
     }
 }
