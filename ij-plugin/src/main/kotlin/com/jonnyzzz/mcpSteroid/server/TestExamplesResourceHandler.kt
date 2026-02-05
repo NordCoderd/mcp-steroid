@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
+import com.jonnyzzz.mcpSteroid.prompts.DynamicResource
+import com.jonnyzzz.mcpSteroid.prompts.DynamicResourceScanner
 import com.jonnyzzz.mcpSteroid.prompts.PromptRegistry
 
 /**
