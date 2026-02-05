@@ -1,16 +1,16 @@
-/**
- * Set Line Breakpoint
- *
- * Create a line breakpoint for a file/line in the current project.
- * This shows how to choose a line breakpoint type, resolve a file,
- * and register the breakpoint with the XBreakpointManager.
- *
- * Parameters:
- * - filePath: project-relative path to a source file.
- * - lineNumber: 1-based line number (as seen in the editor gutter).
- *
- * IntelliJ APIs: XDebuggerManager, XBreakpointManager, XDebuggerUtil
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerUtil
@@ -39,24 +39,3 @@ if (breakpoint == null) {
 }
 
 println("Created breakpoint:", breakpoint)
-
-/**
- * ## See Also
- *
- * Related debugger operations:
- * - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging
- * - [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause/resume/stop
- * - [List Threads](mcp-steroid://debugger/debug-list-threads) - Inspect execution stacks
- * - [Thread Dump](mcp-steroid://debugger/debug-thread-dump) - Generate thread dumps
- *
- * Related IDE operations:
- * - [Run Configuration](mcp-steroid://ide/run-configuration) - List and execute run configs
- *
- * Related test operations:
- * - [Run Tests](mcp-steroid://test/run-tests) - Execute test configuration
- * - [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll test status
- *
- * Overview resources:
- * - [Debugger Examples Overview](mcp-steroid://debugger/overview) - All debugger operations
- * - [Debugger Skill Guide](mcp-steroid://skill/debugger-guide) - Essential debugger knowledge
- */
