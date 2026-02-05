@@ -80,16 +80,12 @@ class VcsExamplesResourceHandler : McpRegistrar {
     }
 
     fun loadOverview(): String {
-        return javaClass.getResourceAsStream("/vcs-examples/VCS_OVERVIEW.md")
-            ?.bufferedReader()
-            ?.readText()
+        return DynamicResourceScanner.loadResourceContent("/vcs-examples/VCS_OVERVIEW.md")
             ?: error("VCS_OVERVIEW.md resource is not found")
     }
 
     fun loadExample(resourceFile: String): String {
-        return javaClass.getResourceAsStream(resourceFile)
-            ?.bufferedReader()
-            ?.readText()
+        return DynamicResourceScanner.loadResourceContent(resourceFile)
             ?: error("VCS example resource is not found: $resourceFile")
     }
 }
