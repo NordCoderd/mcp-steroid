@@ -1,22 +1,22 @@
-/**
- * IDE: Generate Constructor
- *
- * This example generates a constructor for selected fields,
- * similar to "Generate | Constructor".
- *
- * IntelliJ API used:
- * - GenerateConstructorHandler
- * - GenerateMembersUtil
- *
- * Parameters to customize:
- * - classFqn: Fully-qualified name of the class
- * - fieldNames: Fields to include in the constructor
- * - dryRun: Preview only (no changes)
- *
- * Output: Summary of generated constructor
- *
- * WARNING: This modifies code. Use dryRun=true to preview changes first.
- */
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
 
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.JavaPsiFacade
@@ -90,21 +90,3 @@ WriteCommandAction.runWriteCommandAction(project) {
 }
 
 println("Generated constructor for ${plan.classFqn}")
-
-/**
- * ## See Also
- *
- * Related IDE operations:
- * - [Generate Overrides](mcp-steroid://ide/generate-override) - Implement interface methods
- * - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find class inheritors
- * - [Extract Interface](mcp-steroid://ide/extract-interface) - Create interface from class
- * - [Change Signature](mcp-steroid://ide/change-signature) - Add/reorder parameters
- *
- * Related LSP operations:
- * - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
- * - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
- *
- * Overview resources:
- * - [IDE Examples Overview](mcp-steroid://ide/overview) - All IDE power operations
- * - [IntelliJ API Power User Guide](mcp-steroid://skill/intellij-api-poweruser-guide) - Core API patterns
- */
