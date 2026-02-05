@@ -14,6 +14,7 @@ import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.TypeName
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
+import com.squareup.kotlinpoet.asTypeName
 import com.squareup.kotlinpoet.buildCodeBlock
 import java.io.File
 import kotlin.math.absoluteValue
@@ -43,20 +44,32 @@ fun PromptGenerationContext.geratePromptClazz(
     val content = src.readText()
     val factor = Random.nextInt(1000).absoluteValue + 11234
 
-    val packedContent = content.map { it.code * factor }
-
     val className = "Prompt" + src.nameWithoutExtension.toPromptClassName()
     val classType = ClassName(packageName, className)
+
+    val readFn = content.chunked(1024).mapIndexed { index, content ->
+        val packedContent = content.map { it.code * factor }
+        FunSpec.builder("readPrompt_" + index)
+            .addModifiers(KModifier.PRIVATE)
+            .returns(Sequence::class.asClassName().parameterizedBy(Int::class.asTypeName()))
+            .addCode(buildCodeBlock {
+                beginControlFlow("return sequence")
+                packedContent.forEach { code ->
+                    addStatement("yield(%L)", code)
+                }
+                endControlFlow()
+            })
+            .build()
+    }
 
     val readResourceFun = FunSpec.builder("readPrompt")
         .addModifiers(KModifier.OVERRIDE)
         .returns(String::class)
         .addCode(buildCodeBlock {
-            beginControlFlow("return sequence")
-            packedContent.forEach { code ->
-                addStatement("yield(%L)", code)
-            }
+            beginControlFlow("return sequence{")
+            readFn.forEach { fn -> addStatement("yield(%L())", fn.name) }
             endControlFlow()
+            add(".flatten()")
             add(".map { it / %L }\n", factor)
             add(".joinToString(%S) { it.toChar().toString() }\n", "")
         })
@@ -70,6 +83,7 @@ fun PromptGenerationContext.geratePromptClazz(
         )
         .superclass(ClassName.bestGuess("com.jonnyzzz.mcpSteroid.prompts.PromptBase"))
         .addFunction(readResourceFun)
+        .addFunctions(readFn)
         .build()
 
     val fileSpec = FileSpec.builder(packageName, className)
@@ -82,8 +96,8 @@ fun PromptGenerationContext.geratePromptClazz(
     val testFuncSpec = FunSpec.builder("test$className")
         .returns(Unit::class)
         .addCode(buildCodeBlock {
-            add("val content = %L(%S).readText()\n", File::class.asClassName(), src.absolutePath)
-            add("assertEquals(content, %L().%N())", classType, readResourceFun.name)
+            add("val content = %T(%S).readText()\n", File::class.asClassName(), src.absolutePath)
+            add("assertEquals(content, %T().%N())", classType, readResourceFun.name)
         })
         .build()
 

@@ -37,42 +37,9 @@ abstract class CompilePromptsTask : DefaultTask() {
         project.mkdir(testOutputRoot)
 
         val ctx = PromptGenerationContext(inputRoot, outputRoot, testOutputRoot)
-
-        val allPromptClasses = inputRoot
+        inputRoot
             .walkTopDown()
             .filter { it.isFile }
-            .map { src -> ctx.geratePromptClazz(src) }
-
-        ctx.run {
-            val allProperty = PropertySpec.builder("all", sequenceOfAny)
-                .getter(
-                    FunSpec.getterBuilder()
-                        .addCode(buildCodeBlock {
-                            beginControlFlow("return sequence")
-                            allPromptClasses.forEach { classType ->
-                                addStatement("yield(%M<%T>())", serviceMember, classType)
-                            }
-                            endControlFlow()
-                        })
-                        .build()
-                )
-                .build()
-
-            val allPromptsType = TypeSpec.classBuilder("AllPrompts")
-                .addAnnotation(
-                    AnnotationSpec.builder(serviceAnnotation)
-                        .addMember("%T.Level.APP", serviceAnnotation)
-                        .build()
-                )
-                .addProperty(allProperty)
-                .build()
-
-            val allPromptsFile = FileSpec.builder(packageName, "AllPrompts")
-                .addFileComment("GENERATED FILE - DO NOT EDIT")
-                .addType(allPromptsType)
-                .build()
-
-            outputRoot.resolve("AllPrompts.kt").writeText(allPromptsFile.toString())
-        }
+            .forEach { src -> ctx.geratePromptClazz(src) }
     }
 }
