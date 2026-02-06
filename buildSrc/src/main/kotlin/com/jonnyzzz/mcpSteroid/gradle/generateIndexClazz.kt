@@ -21,14 +21,13 @@ fun PromptGenerationContext.generateIndexClazz(
     folder: String,
     prompts: List<GeneratedPromptClazz>,
     articles: List<GeneratedArticleClazz>,
-    tocContent: String,
 ): GeneratedIndexClazz {
 
     println("generate prompt index $folder: ${prompts.joinToString { it.folder }}")
 
     val classType = run {
         val clazzName = if (folder.isEmpty()) "Root" else folder.toPromptClassName()
-        val packageName = (articles.flatMap { it.article.allClasses } + prompts).map { it.clazzName.packageName }.distinct().single()
+        val packageName = (articles.flatMap { it.article?.allClasses ?: emptyList() } + prompts).map { it.clazzName.packageName }.distinct().single()
         ClassName(packageName, clazzName + "Index")
     }
 
@@ -85,44 +84,10 @@ fun PromptGenerationContext.generateIndexClazz(
             .build()
     }
 
-    // TOC properties (all computed at build time)
-    val uriPrefix = folderToUriPrefix(folder)
-    val displayName = folderToDisplayName(folder)
-
-    val tocUriProperty = PropertySpec.builder("tocUri", String::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", if (uriPrefix.isEmpty()) "" else "mcp-steroid://$uriPrefix")
-        .build()
-
-    val tocNameProperty = PropertySpec.builder("tocName", String::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", if (displayName.isEmpty()) "" else "$displayName Resources")
-        .build()
-
-    // tocContent - PromptBase holder for non-empty content
-    val tocContentProperty = if (tocContent.isNotEmpty()) {
-        val tocHolderClass = ClassName(classType.packageName, classType.simpleName + "TocContent")
-        generateStringPromptClazz(tocContent, tocHolderClass)
-        PropertySpec.builder("tocContent", String::class)
-            .addModifiers(KModifier.OVERRIDE)
-            .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-                addStatement("return %T().readPrompt()", tocHolderClass)
-            }).build())
-            .build()
-    } else {
-        PropertySpec.builder("tocContent", String::class)
-            .addModifiers(KModifier.OVERRIDE)
-            .initializer("%S", "")
-            .build()
-    }
-
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptIndexBaseClass)
         .addProperty(registryProperty)
         .addProperty(articleProperty)
-        .addProperty(tocUriProperty)
-        .addProperty(tocNameProperty)
-        .addProperty(tocContentProperty)
         .addProperties(typedGetters)
         .build()
 

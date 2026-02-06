@@ -23,7 +23,6 @@ class ResourceRegistrar : McpRegistrar {
 
         for ((folder, index) in resourcesIndex.roots) {
             registerArticleResources(server, index)
-            registerFolderToc(server, index)
             if (folder == "skill") {
                 registerSkillPrompts(server, index)
             }
@@ -63,23 +62,6 @@ class ResourceRegistrar : McpRegistrar {
                 }
             )
         }
-    }
-
-    private fun registerFolderToc(
-        server: McpServerCore,
-        index: PromptIndexBase,
-    ) {
-        val tocUri = index.tocUri
-        if (tocUri.isEmpty()) return
-        if (index.articles.isEmpty()) return
-
-        server.resourceRegistry.registerResource(
-            uri = tocUri,
-            name = index.tocName,
-            description = "Table of contents for all ${index.tocName.lowercase()}",
-            mimeType = "text/markdown",
-            contentProvider = { index.tocContent }
-        )
     }
 
     private fun registerSkillPrompts(

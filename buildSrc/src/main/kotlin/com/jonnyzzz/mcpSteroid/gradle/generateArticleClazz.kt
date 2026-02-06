@@ -55,10 +55,12 @@ data class GeneratedArticleClazz(
     val folder: String,
     val path: String,
     override val clazzName: ClassName,
-    val article: PromptArticle,
+    val article: PromptArticle?,
     val uri: String,
 ) : Generated {
-    override val entryName: String get() = article.mainElement.entryName
+    override val entryName: String
+        get() = article?.mainElement?.entryName
+            ?: path.substringAfterLast("/").toPromptIdentifierName()
 }
 
 /**
@@ -257,4 +259,80 @@ fun PromptGenerationContext.generateArticleClazz(
 
     writeClazz(fileSpec, classType)
     return GeneratedArticleClazz(folder, article.mainElement.path, classType, article, uri)
+}
+
+/**
+ * Generate a TOC article for a folder. Returns null for empty folders.
+ */
+fun PromptGenerationContext.generateTocArticleClazz(
+    folder: String,
+    tocContent: String,
+    packageName: String,
+): GeneratedArticleClazz? {
+    if (folder.isEmpty() || tocContent.isEmpty()) return null
+
+    val uriPrefix = folderToUriPrefix(folder)
+    val displayName = folderToDisplayName(folder)
+    val uri = "mcp-steroid://$uriPrefix"
+    val tocName = "$displayName Resources"
+    val tocDescription = "Table of contents for all $displayName resources"
+    val tocEntryName = "toc"
+
+    val classType = ClassName(packageName, displayName.replace(" ", "") + "TocArticle")
+
+    // Generate payload holder with TOC content
+    val payloadHolderClass = ClassName(packageName, classType.simpleName + "Payload")
+    generateStringPromptClazz(tocContent, payloadHolderClass)
+
+    val props = mutableListOf<PropertySpec>()
+
+    props += PropertySpec.builder("payload", promptBaseClass)
+        .addModifiers(KModifier.OVERRIDE)
+        .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
+            addStatement("return %T()", payloadHolderClass)
+        }).build())
+        .build()
+
+    props += PropertySpec.builder("uri", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", uri)
+        .build()
+
+    props += PropertySpec.builder("name", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", tocName)
+        .build()
+
+    props += PropertySpec.builder("path", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", "$folder/$tocEntryName")
+        .build()
+
+    props += PropertySpec.builder("mimeType", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", "text/markdown")
+        .build()
+
+    props += PropertySpec.builder("description", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", tocDescription)
+        .build()
+
+    props += PropertySpec.builder("seeAlsoContent", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", "")
+        .build()
+
+    val typeSpec = TypeSpec.classBuilder(classType)
+        .superclass(promptArticleClass)
+        .addProperties(props)
+        .build()
+
+    val fileSpec = FileSpec.builder(classType)
+        .addFileComment("GENERATED FILE - DO NOT EDIT")
+        .addType(typeSpec)
+        .build()
+
+    writeClazz(fileSpec, classType)
+    return GeneratedArticleClazz(folder, "$folder/$tocEntryName", classType, null, uri)
 }

@@ -52,11 +52,15 @@ abstract class CompilePromptsTask : DefaultTask() {
                 }
 
                 val tocContent = buildTocContent(folder, articles)
+                val pkg = articleClasses.firstOrNull()?.clazzName?.packageName
+                    ?: (ctx.packageName + "." + folder.toPromptIdentifierName())
+                val tocArticle = ctx.generateTocArticleClazz(folder, tocContent, pkg)
+                val allArticleClasses = articleClasses + listOfNotNull(tocArticle)
 
-                val usedPromptNames = articleClasses.flatMap { it.article.allClasses }.map { it.path }.toSortedSet()
+                val usedPromptNames = allArticleClasses.flatMap { it.article?.allClasses ?: emptyList() }.map { it.path }.toSortedSet()
                 val standaloneFiles = clazzes.filter { it.path !in usedPromptNames }
 
-                ctx.generateIndexClazz(folder, standaloneFiles, articleClasses, tocContent)
+                ctx.generateIndexClazz(folder, standaloneFiles, allArticleClasses)
             }
 
         ctx.generateIndexClazz(indexes)
