@@ -10,7 +10,6 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallParams
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
 import com.jonnyzzz.mcpSteroid.storage.ExecutionStorage
-import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import kotlinx.serialization.json.*
 
 /**
@@ -94,8 +93,6 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(params: ToolCallParams): ToolCallResult {
-        validateTimeBomb()
-
         val args = params.arguments ?: return errorResult("Missing arguments")
 
         val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull

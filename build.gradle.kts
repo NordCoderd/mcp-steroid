@@ -90,13 +90,12 @@ val compilePrompts by tasks.registering(CompilePromptsTask::class) {
     testOutputDir.set(generatedTestSourcesPath.map { it.dir("prompts") })
 }
 
-// Generate metadata with encoded version and time bomb
+// Generate metadata with encoded version
 val generateMetadata by tasks.registering(GenerateMetadataTask::class) {
     group = "build"
-    description = "Generate plugin metadata with version and time bomb"
+    description = "Generate plugin metadata with encoded version"
 
     versionString.set(version.toString())
-    timeBombDays.set(10)
     outputFile.set(generatedSourcesPath.map { it.file("PluginMetadata.kt") })
 
     outputs.upToDateWhen { false }

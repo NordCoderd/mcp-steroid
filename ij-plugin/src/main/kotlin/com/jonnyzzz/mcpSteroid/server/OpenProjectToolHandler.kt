@@ -13,7 +13,6 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallContext
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
 import com.jonnyzzz.mcpSteroid.mcp.builder
-import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.add
@@ -99,8 +98,6 @@ class OpenProjectToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(context: ToolCallContext): ToolCallResult {
-        validateTimeBomb()
-
         val args = context.params.arguments ?: return errorResult("Missing arguments")
         val projectPathStr = args["project_path"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: project_path")

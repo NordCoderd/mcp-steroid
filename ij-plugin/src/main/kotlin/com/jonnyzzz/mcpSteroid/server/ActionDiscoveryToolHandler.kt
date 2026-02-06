@@ -27,7 +27,6 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
 import com.jonnyzzz.mcpSteroid.mcp.*
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
-import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import kotlinx.coroutines.*
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
@@ -144,8 +143,6 @@ class ActionDiscoveryToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(context: ToolCallContext): ToolCallResult {
-        validateTimeBomb()
-
         val args = context.params.arguments ?: return errorResult("Missing arguments")
         val projectName = args["project_name"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: project_name")

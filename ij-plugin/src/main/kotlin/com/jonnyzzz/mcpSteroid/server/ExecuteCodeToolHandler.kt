@@ -21,7 +21,6 @@ import com.jonnyzzz.mcpSteroid.prompts.generated.skill.CodingWithIntelliJPromptA
 import com.jonnyzzz.mcpSteroid.prompts.generated.skill.DebuggerSkillPromptArticle
 import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPromptArticle
 import com.jonnyzzz.mcpSteroid.prompts.generated.skill.TestSkillPromptArticle
-import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import kotlinx.serialization.json.*
 
 data class ExecCodeParams(
@@ -144,8 +143,6 @@ class ExecuteCodeToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(context: ToolCallContext): ToolCallResult {
-        validateTimeBomb()
-
         val params = context.params
         val args = params.arguments ?: return errorResult("Missing arguments")
 

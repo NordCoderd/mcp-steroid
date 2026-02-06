@@ -4,7 +4,6 @@ package com.jonnyzzz.mcpSteroid.server
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.ProjectManager
 import com.jonnyzzz.mcpSteroid.mcp.*
-import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -31,8 +30,6 @@ class ListProjectsToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(): ToolCallResult {
-        validateTimeBomb()
-
         val openProjects = readAction {
             ProjectManager.getInstance().openProjects.toList()
         }

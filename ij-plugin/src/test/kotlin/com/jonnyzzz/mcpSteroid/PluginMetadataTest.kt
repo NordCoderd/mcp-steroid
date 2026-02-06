@@ -8,14 +8,4 @@ class PluginMetadataTest : BasePlatformTestCase() {
         val version = getPluginVersion()
         println("Version: $version")
     }
-
-    fun testExpirationDate() {
-        val exp = getTimeBombExpiration()
-
-        println("Expiration Date: $exp")
-    }
-
-    fun testNotExpired() {
-        validateTimeBomb()
-    }
 }
