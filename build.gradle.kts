@@ -58,6 +58,9 @@ dependencies {
     implementation("io.ktor:ktor-server-cio:$ktorVersion")
     implementation("io.ktor:ktor-server-sse:$ktorVersion")
 
+    // PostHog analytics
+    implementation("com.posthog:posthog-server:2.3.0")
+
     // Testing
     testImplementation("junit:junit:4.13.2")
     testImplementation(project(":test-helper"))
@@ -265,6 +268,7 @@ val verifyBundledLibraries by tasks.registering {
 
             //libraries
             "lib/config-1.4.3.jar",
+            "lib/gson-2.10.1.jar",
             "lib/jansi-2.4.1.jar",
 
             "lib/ktor-events-jvm-3.1.0.jar",
@@ -279,6 +283,11 @@ val verifyBundledLibraries by tasks.registering {
             "lib/ktor-sse-jvm-3.1.0.jar",
             "lib/ktor-utils-jvm-3.1.0.jar",
             "lib/ktor-websockets-jvm-3.1.0.jar",
+
+            "lib/okhttp-4.11.0.jar",
+            "lib/okio-jvm-3.2.0.jar",
+            "lib/posthog-6.4.0.jar",
+            "lib/posthog-server-2.3.0.jar",
 
             "ocr-tesseract/bin/ocr-tesseract",
             "ocr-tesseract/bin/ocr-tesseract.bat",

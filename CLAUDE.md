@@ -23,6 +23,8 @@ better than a test that does not check the problems. Make sure you fix tests.
 
 Check your changes to see if there are no new warnings added to the code.
 
+Do not use `@Suppress("DEPRECATION")` — find the proper non-deprecated replacement instead.
+
 You should log new ideas and tasks in TODO* files in the repository (for example TODO.md), focus on the main goal. Iterate over tasks later.
 
 ## Workflow Best Practices
