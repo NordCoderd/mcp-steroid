@@ -34,27 +34,28 @@ class ResourceRegistrar : McpRegistrar {
         index: PromptIndexBase,
     ) {
         for ((_, article) in index.articles) {
+            val payload = article.payload
             server.resourceRegistry.registerResourceMultiContent(
                 uri = article.uri,
                 name = article.name,
-                description = article.description,
-                mimeType = article.mimeType,
+                description = article.description?.readPrompt(),
+                mimeType = payload.mimeType,
                 contentsProvider = {
                     buildList {
                         add(
                             ResourceContent(
                                 uri = article.uri,
-                                mimeType = article.mimeType,
-                                text = article.payload.readPrompt()
+                                mimeType = payload.mimeType,
+                                text = payload.readPrompt()
                             )
                         )
-                        val seeAlso = article.seeAlsoContent
-                        if (seeAlso.isNotBlank()) {
+                        val seeAlso = article.seeAlso
+                        if (seeAlso != null) {
                             add(
                                 ResourceContent(
                                     uri = article.uri,
-                                    mimeType = "text/markdown",
-                                    text = seeAlso
+                                    mimeType = seeAlso.mimeType,
+                                    text = seeAlso.readPrompt()
                                 )
                             )
                         }
@@ -69,7 +70,7 @@ class ResourceRegistrar : McpRegistrar {
         index: PromptIndexBase,
     ) {
         for ((_, article) in index.articles) {
-            if (article.mimeType != "text/markdown") continue
+            if (article.payload.mimeType != "text/markdown") continue
 
             val content = article.payload.readPrompt()
             val parsed = parseSkillFrontmatter(content)

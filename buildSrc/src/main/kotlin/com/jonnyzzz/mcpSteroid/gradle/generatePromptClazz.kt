@@ -6,6 +6,7 @@ import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
+import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.asTypeName
@@ -99,8 +100,19 @@ fun PromptGenerationContext.generatePromptClazz(
 
     val (readFn, readResourceFun) = buildEncodedReadFunctions(src.readText())
 
+    val mimeType = when (filePropValue) {
+        "kts" -> "text/x-kotlin"
+        "md" -> "text/markdown"
+        else -> "text/plain"
+    }
+    val mimeTypeProp = PropertySpec.builder("mimeType", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", mimeType)
+        .build()
+
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptBaseClass)
+        .addProperty(mimeTypeProp)
         .addFunction(readResourceFun)
         .addFunctions(readFn)
         .build()
@@ -121,11 +133,18 @@ fun PromptGenerationContext.generatePromptClazz(
 fun PromptGenerationContext.generateStringPromptClazz(
     content: String,
     classType: ClassName,
+    mimeType: String = "text/markdown",
 ) {
     val (readFn, readResourceFun) = buildEncodedReadFunctions(content)
 
+    val mimeTypeProp = PropertySpec.builder("mimeType", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", mimeType)
+        .build()
+
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptBaseClass)
+        .addProperty(mimeTypeProp)
         .addFunction(readResourceFun)
         .addFunctions(readFn)
         .build()

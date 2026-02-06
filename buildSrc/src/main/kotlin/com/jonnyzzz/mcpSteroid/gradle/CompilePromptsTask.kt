@@ -69,23 +69,13 @@ abstract class CompilePromptsTask : DefaultTask() {
 
 /**
  * Build the see-also content for an article.
- * If the article has a manual -see-also.md file, use its content as-is.
- * Otherwise, auto-generate same-folder sibling links.
+ * Always auto-generates links to all other articles in the same folder.
  */
 private fun buildSeeAlsoContent(
     folder: String,
     article: PromptArticle,
     folderArticles: Map<String, List<PromptArticle>>,
 ): String {
-    // Prefer original see-also content if provided
-    if (article.seeAlso != null) {
-        val manualContent = article.seeAlso.content.trim()
-        if (manualContent.isNotEmpty()) {
-            return manualContent
-        }
-    }
-
-    // Fall back to auto-generated same-folder sibling links
     val siblings = folderArticles[folder]?.filter { it !== article } ?: emptyList()
     if (siblings.isEmpty()) return ""
 

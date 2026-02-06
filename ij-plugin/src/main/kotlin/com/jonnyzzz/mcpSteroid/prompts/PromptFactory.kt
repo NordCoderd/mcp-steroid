@@ -6,10 +6,8 @@ abstract class ArticleBase {
 
     abstract val uri: String
     abstract val name: String
-    abstract val description: String
-    abstract val path: String
-    abstract val mimeType: String
-    abstract val seeAlsoContent: String
+    abstract val description: PromptBase?
+    abstract val seeAlso: PromptBase?
 }
 
 abstract class PromptRootBase {
@@ -22,6 +20,8 @@ abstract class PromptBase {
     }
 
     protected abstract fun readPromptInternal(): String
+
+    open val mimeType: String = "text/plain"
 }
 
 abstract class PromptIndexBase {

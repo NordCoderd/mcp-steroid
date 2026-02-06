@@ -176,6 +176,8 @@ fun PromptGenerationContext.generateArticleClazz(
 
     val props = mutableListOf<PropertySpec>()
 
+    val nullablePromptBase = promptBaseClass.copy(nullable = true)
+
     // payload property
     props += PropertySpec.builder("payload", promptBaseClass)
         .addModifiers(KModifier.OVERRIDE)
@@ -196,54 +198,37 @@ fun PromptGenerationContext.generateArticleClazz(
         .initializer("%S", name)
         .build()
 
-    // path property (payload file path)
-    props += PropertySpec.builder("path", String::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", article.payload.path)
-        .build()
-
-    // mimeType property (derived from payload file extension)
-    val mimeType = when (article.payload.fileType) {
-        "kts" -> "text/x-kotlin"
-        "md" -> "text/markdown"
-        else -> "text/plain"
-    }
-    props += PropertySpec.builder("mimeType", String::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", mimeType)
-        .build()
-
-    // description property - PromptBase holder for non-empty content
+    // description property - PromptBase? holder for non-empty content
     if (description.isNotEmpty()) {
         val descHolderClass = ClassName(pkg, classType.simpleName + "Description")
         generateStringPromptClazz(description, descHolderClass)
-        props += PropertySpec.builder("description", String::class)
+        props += PropertySpec.builder("description", nullablePromptBase)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-                addStatement("return %T().readPrompt()", descHolderClass)
+                addStatement("return %T()", descHolderClass)
             }).build())
             .build()
     } else {
-        props += PropertySpec.builder("description", String::class)
+        props += PropertySpec.builder("description", nullablePromptBase)
             .addModifiers(KModifier.OVERRIDE)
-            .initializer("%S", "")
+            .initializer("null")
             .build()
     }
 
-    // seeAlsoContent property - PromptBase holder for non-empty content
+    // seeAlso property - PromptBase? holder for non-empty content
     if (seeAlsoContent.isNotEmpty()) {
         val seeAlsoHolderClass = ClassName(pkg, classType.simpleName + "SeeAlso")
         generateStringPromptClazz(seeAlsoContent, seeAlsoHolderClass)
-        props += PropertySpec.builder("seeAlsoContent", String::class)
+        props += PropertySpec.builder("seeAlso", nullablePromptBase)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-                addStatement("return %T().readPrompt()", seeAlsoHolderClass)
+                addStatement("return %T()", seeAlsoHolderClass)
             }).build())
             .build()
     } else {
-        props += PropertySpec.builder("seeAlsoContent", String::class)
+        props += PropertySpec.builder("seeAlso", nullablePromptBase)
             .addModifiers(KModifier.OVERRIDE)
-            .initializer("%S", "")
+            .initializer("null")
             .build()
     }
 
@@ -284,6 +269,8 @@ fun PromptGenerationContext.generateTocArticleClazz(
     val payloadHolderClass = ClassName(packageName, classType.simpleName + "Payload")
     generateStringPromptClazz(tocContent, payloadHolderClass)
 
+    val nullablePromptBase = promptBaseClass.copy(nullable = true)
+
     val props = mutableListOf<PropertySpec>()
 
     props += PropertySpec.builder("payload", promptBaseClass)
@@ -303,24 +290,19 @@ fun PromptGenerationContext.generateTocArticleClazz(
         .initializer("%S", tocName)
         .build()
 
-    props += PropertySpec.builder("path", String::class)
+    // description - PromptBase holder for TOC description
+    val descHolderClass = ClassName(packageName, classType.simpleName + "Description")
+    generateStringPromptClazz(tocDescription, descHolderClass)
+    props += PropertySpec.builder("description", nullablePromptBase)
         .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", "$folder/$tocEntryName")
+        .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
+            addStatement("return %T()", descHolderClass)
+        }).build())
         .build()
 
-    props += PropertySpec.builder("mimeType", String::class)
+    props += PropertySpec.builder("seeAlso", nullablePromptBase)
         .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", "text/markdown")
-        .build()
-
-    props += PropertySpec.builder("description", String::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", tocDescription)
-        .build()
-
-    props += PropertySpec.builder("seeAlsoContent", String::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", "")
+        .initializer("null")
         .build()
 
     val typeSpec = TypeSpec.classBuilder(classType)
