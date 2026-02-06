@@ -19,9 +19,11 @@
     <p>Learn how to install, configure, and use MCP Steroid with your AI agents.</p>
 </div>
 
+{{ $docs := site.GetPage "section" "docs" }}
+{{ $all := $docs.Pages.ByWeight }}
+
 <div class="docs-grid">
-    {{ $docs := site.GetPage "section" "docs" }}
-    {{ range $docs.RegularPagesRecursive.ByWeight }}
+    {{ range $all }}
     <a href="{{ .RelPermalink }}" class="doc-card">
         <h2>{{ .Title }}</h2>
         {{ $desc := .Description | plainify }}
