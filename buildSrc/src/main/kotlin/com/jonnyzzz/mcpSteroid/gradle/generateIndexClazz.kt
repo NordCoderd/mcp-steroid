@@ -21,6 +21,7 @@ fun PromptGenerationContext.generateIndexClazz(
     folder: String,
     prompts: List<GeneratedPromptClazz>,
     articles: List<GeneratedArticleClazz>,
+    tocContent: String,
 ): GeneratedIndexClazz {
 
     println("generate prompt index $folder: ${prompts.joinToString { it.folder }}")
@@ -84,10 +85,32 @@ fun PromptGenerationContext.generateIndexClazz(
             .build()
     }
 
+    // TOC properties (all computed at build time)
+    val uriPrefix = folderToUriPrefix(folder)
+    val displayName = folderToDisplayName(folder)
+
+    val tocUriProperty = PropertySpec.builder("tocUri", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", if (uriPrefix.isEmpty()) "" else "mcp-steroid://$uriPrefix")
+        .build()
+
+    val tocNameProperty = PropertySpec.builder("tocName", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", if (displayName.isEmpty()) "" else "$displayName Resources")
+        .build()
+
+    val tocContentProperty = PropertySpec.builder("tocContent", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", tocContent)
+        .build()
+
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptIndexBaseClass)
         .addProperty(registryProperty)
         .addProperty(articleProperty)
+        .addProperty(tocUriProperty)
+        .addProperty(tocNameProperty)
+        .addProperty(tocContentProperty)
         .addProperties(typedGetters)
         .build()
 

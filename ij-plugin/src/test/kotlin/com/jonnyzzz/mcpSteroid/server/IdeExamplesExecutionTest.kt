@@ -15,7 +15,7 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.execution.ExecutionManager
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
-import com.jonnyzzz.mcpSteroid.prompts.generated.ideExamples.IdeExamplesIndex
+import com.jonnyzzz.mcpSteroid.prompts.generated.ide.IdeIndex
 import com.jonnyzzz.mcpSteroid.setSystemPropertyForTest
 import com.jonnyzzz.mcpSteroid.testExecParams
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +24,7 @@ import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
 
 class IdeExamplesExecutionTest : BasePlatformTestCase() {
-    private val index = IdeExamplesIndex()
+    private val index = IdeIndex()
 
     private lateinit var refactorSamplePath: String
     private lateinit var importsSamplePath: String

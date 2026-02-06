@@ -57,35 +57,32 @@ data class GeneratedArticleClazz(
     override val clazzName: ClassName,
     val article: PromptArticle,
     val uri: String,
-    val seeAlsoContent: String,
 ) : Generated {
     override val entryName: String get() = article.mainElement.entryName
 }
 
 /**
- * Derive the URI prefix from a folder name: strip `-examples` suffix.
+ * Derive the URI prefix from a folder name.
+ * After the folder rename (removing `-examples` suffix), this is now just the folder name.
  */
 fun folderToUriPrefix(folder: String): String {
-    if (folder.isEmpty()) return ""
-    return folder.removeSuffix("-examples")
+    return folder
 }
 
 /**
- * Derive the name prefix from a folder for resource naming.
+ * Derive the display name for a folder (used for TOC headers and resource naming).
  */
-fun folderToNamePrefix(folder: String): String {
-    val prefix = folderToUriPrefix(folder)
-    return when (prefix) {
-        "lsp" -> "LSP: "
-        "ide" -> "IDE: "
-        "debugger" -> "Debugger: "
-        "test" -> "Test: "
-        "vcs" -> "VCS: "
-        "open-project" -> "Open Project: "
-        "skill" -> ""
-        "docs" -> ""
+fun folderToDisplayName(folder: String): String {
+    return when (folder) {
+        "lsp" -> "LSP"
+        "ide" -> "IDE"
+        "debugger" -> "Debugger"
+        "test" -> "Test"
+        "vcs" -> "VCS"
+        "open-project" -> "Open Project"
+        "skill" -> "Skill"
         "" -> ""
-        else -> "${prefix.titleCase()}: "
+        else -> folder.titleCase()
     }
 }
 
@@ -111,6 +108,41 @@ fun buildArticleUri(folder: String, payloadPath: String): String {
     } else {
         "mcp-steroid://$prefix/$stem"
     }
+}
+
+/**
+ * Compute the generated article class name for a [PromptArticle].
+ * This is deterministic and matches the class name that [generateArticleClazz] will create.
+ */
+fun articleClassName(article: PromptArticle): ClassName {
+    val packageName = article.allClasses.map { it.clazzName.packageName }.distinct().single()
+    val className = article.mainElement.clazzName.simpleName + "Article"
+    return ClassName(packageName, className)
+}
+
+/**
+ * Extract the article name from a header file's content (first line).
+ */
+fun articleName(article: PromptArticle): String {
+    return article.header.content.trim().lineSequence().first().trim()
+}
+
+/**
+ * Extract the first line of description from a header file's content (second line onward).
+ */
+fun articleDescriptionFirstLine(article: PromptArticle): String {
+    return article.header.content.trim().lineSequence().drop(1).firstOrNull()?.trim() ?: ""
+}
+
+/**
+ * Build a see-also markdown entry for an article.
+ */
+fun buildSeeAlsoLine(folder: String, article: PromptArticle): String {
+    val uri = buildArticleUri(folder, article.mainElement.path)
+    val name = articleName(article)
+    val desc = articleDescriptionFirstLine(article)
+    val suffix = if (desc.isNotEmpty()) " - $desc" else ""
+    return "- [$name]($uri)$suffix"
 }
 
 fun PromptGenerationContext.generateArticleClazz(
@@ -144,30 +176,13 @@ fun PromptGenerationContext.generateArticleClazz(
         }).build())
         .build()
 
-    // seeAlso property (nullable)
-    if (article.seeAlso != null) {
-        props += PropertySpec.builder("seeAlsoFile", promptBaseClass.copy(nullable = true))
-            .addModifiers(KModifier.OVERRIDE)
-            .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-                addStatement("return %T()", article.seeAlso.clazzName)
-            }).build())
-            .build()
-    } else {
-        props += PropertySpec.builder("seeAlsoFile", promptBaseClass.copy(nullable = true))
-            .addModifiers(KModifier.OVERRIDE)
-            .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-                addStatement("return null")
-            }).build())
-            .build()
-    }
-
     // uri property
     props += PropertySpec.builder("uri", String::class)
         .addModifiers(KModifier.OVERRIDE)
         .initializer("%S", uri)
         .build()
 
-    // seeAlsoContent property (auto-generated + manual merged)
+    // seeAlsoContent property (built at codegen time)
     props += PropertySpec.builder("seeAlsoContent", String::class)
         .addModifiers(KModifier.OVERRIDE)
         .initializer("%S", seeAlsoContent)
@@ -184,5 +199,5 @@ fun PromptGenerationContext.generateArticleClazz(
         .build()
 
     writeClazz(fileSpec, classType)
-    return GeneratedArticleClazz(folder, article.mainElement.path, classType, article, uri, seeAlsoContent)
+    return GeneratedArticleClazz(folder, article.mainElement.path, classType, article, uri)
 }

@@ -22,22 +22,22 @@ class ResourceRegistrar : McpRegistrar {
         val resourcesIndex = ResourcesIndex()
 
         for ((folder, index) in resourcesIndex.roots) {
-            registerArticleResources(server, folder, index)
-            registerFolderToc(server, folder, index)
-            registerSkillPrompts(server, folder, index)
+            registerArticleResources(server, index)
+            registerFolderToc(server, index)
+            if (folder == "skill") {
+                registerSkillPrompts(server, index)
+            }
         }
     }
 
     private fun registerArticleResources(
         server: McpServerCore,
-        folder: String,
         index: PromptIndexBase,
     ) {
-        val namePrefix = folderToNamePrefix(folder)
         for ((_, article) in index.articles) {
             server.resourceRegistry.registerResourceMultiContent(
                 uri = article.uri,
-                name = namePrefix + article.name,
+                name = article.name,
                 description = article.description,
                 mimeType = article.mimeType,
                 contentsProvider = {
@@ -67,36 +67,25 @@ class ResourceRegistrar : McpRegistrar {
 
     private fun registerFolderToc(
         server: McpServerCore,
-        folder: String,
         index: PromptIndexBase,
     ) {
-        if (folder.isEmpty()) return
-        val uriPrefix = folderToUriPrefix(folder)
-        if (uriPrefix.isEmpty()) return
+        val tocUri = index.tocUri
+        if (tocUri.isEmpty()) return
         if (index.articles.isEmpty()) return
-
-        val tocUri = "mcp-steroid://$uriPrefix"
-        val label = folderToNamePrefix(folder).trimEnd(' ', ':')
-        val tocName = if (label.isNotEmpty()) "$label Resources" else "$uriPrefix Resources"
 
         server.resourceRegistry.registerResource(
             uri = tocUri,
-            name = tocName,
-            description = "Table of contents for all $uriPrefix resources",
+            name = index.tocName,
+            description = "Table of contents for all ${index.tocName.lowercase()}",
             mimeType = "text/markdown",
-            contentProvider = {
-                buildTocContent(tocName, index)
-            }
+            contentProvider = { index.tocContent }
         )
     }
 
     private fun registerSkillPrompts(
         server: McpServerCore,
-        folder: String,
         index: PromptIndexBase,
     ) {
-        if (folder != "skill") return
-
         for ((_, article) in index.articles) {
             if (article.mimeType != "text/markdown") continue
 
@@ -123,36 +112,5 @@ class ResourceRegistrar : McpRegistrar {
                 )
             }
         }
-    }
-}
-
-private fun buildTocContent(tocName: String, index: PromptIndexBase): String = buildString {
-    appendLine("# $tocName")
-    appendLine()
-    for ((_, article) in index.articles) {
-        val desc = article.description.lineSequence().firstOrNull()?.take(120) ?: ""
-        val suffix = if (desc.isNotEmpty()) " - $desc" else ""
-        appendLine("- [${article.name}](${article.uri})$suffix")
-    }
-}
-
-private fun folderToUriPrefix(folder: String): String {
-    if (folder.isEmpty()) return ""
-    return folder.removeSuffix("-examples")
-}
-
-private fun folderToNamePrefix(folder: String): String {
-    val prefix = folderToUriPrefix(folder)
-    return when (prefix) {
-        "lsp" -> "LSP: "
-        "ide" -> "IDE: "
-        "debugger" -> "Debugger: "
-        "test" -> "Test: "
-        "vcs" -> "VCS: "
-        "open-project" -> "Open Project: "
-        "skill" -> ""
-        "docs" -> ""
-        "" -> ""
-        else -> "${prefix.replaceFirstChar { it.titlecase() }}: "
     }
 }

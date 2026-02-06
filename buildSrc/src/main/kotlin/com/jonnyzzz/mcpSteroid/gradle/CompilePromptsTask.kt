@@ -37,11 +37,11 @@ abstract class CompilePromptsTask : DefaultTask() {
             ctx.generatePromptClazzTest(clazz)
         }
 
-        // First pass: group articles per folder and compute URIs
+        // First pass: group articles per folder
         val folderArticles = promptClasses.groupBy { it.folder }
             .mapValues { (_, clazzes) -> groupByArticle(clazzes) }
 
-        // Second pass: generate article classes with see-also content
+        // Second pass: generate article classes with see-also content, then index classes
         val indexes = promptClasses.groupBy { it.folder }
             .map { (folder, clazzes) ->
                 val articles = folderArticles[folder] ?: emptyList()
@@ -51,10 +51,12 @@ abstract class CompilePromptsTask : DefaultTask() {
                     ctx.generateArticleClazz(folder, article, seeAlsoContent)
                 }
 
+                val tocContent = buildTocContent(folder, articles)
+
                 val usedPromptNames = articleClasses.flatMap { it.article.allClasses }.map { it.path }.toSortedSet()
                 val standaloneFiles = clazzes.filter { it.path !in usedPromptNames }
 
-                ctx.generateIndexClazz(folder, standaloneFiles, articleClasses)
+                ctx.generateIndexClazz(folder, standaloneFiles, articleClasses, tocContent)
             }
 
         ctx.generateIndexClazz(indexes)
@@ -76,20 +78,13 @@ private fun buildSeeAlsoContent(
     // Auto-generate same-folder sibling links
     val siblings = folderArticles[folder]?.filter { it !== article } ?: emptyList()
     if (siblings.isNotEmpty()) {
-        val namePrefix = folderToNamePrefix(folder)
-        val folderLabel = when {
-            namePrefix.isNotEmpty() -> namePrefix.trimEnd(' ', ':')
-            else -> "related"
-        }
+        val displayName = folderToDisplayName(folder)
+        val folderLabel = displayName.ifEmpty { "related" }
         sb.appendLine("## See Also")
         sb.appendLine()
         sb.appendLine("Related $folderLabel resources:")
         for (sibling in siblings) {
-            val siblingUri = buildArticleUri(folder, sibling.mainElement.path)
-            val siblingTitle = sibling.header.content.trim().lineSequence().first().trim()
-            val siblingDesc = sibling.header.content.trim().lineSequence().drop(1).firstOrNull()?.trim() ?: ""
-            val descSuffix = if (siblingDesc.isNotEmpty()) " - $siblingDesc" else ""
-            sb.appendLine("- [$siblingTitle]($siblingUri)$descSuffix")
+            sb.appendLine(buildSeeAlsoLine(folder, sibling))
         }
     }
 
@@ -105,4 +100,24 @@ private fun buildSeeAlsoContent(
     }
 
     return sb.toString().trim()
+}
+
+/**
+ * Build the table-of-contents content for a folder, generated at build time.
+ */
+private fun buildTocContent(
+    folder: String,
+    articles: List<PromptArticle>,
+): String {
+    if (articles.isEmpty()) return ""
+    val displayName = folderToDisplayName(folder)
+    val tocName = if (displayName.isNotEmpty()) "$displayName Resources" else "Resources"
+
+    return buildString {
+        appendLine("# $tocName")
+        appendLine()
+        for (article in articles) {
+            appendLine(buildSeeAlsoLine(folder, article))
+        }
+    }.trim()
 }
