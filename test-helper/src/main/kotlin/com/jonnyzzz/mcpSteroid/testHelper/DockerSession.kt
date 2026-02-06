@@ -1,8 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid
+package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.intellij.openapi.Disposable
-import com.intellij.openapi.util.Disposer
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -144,12 +142,33 @@ class DockerSessionScope(
     }
 }
 
+/**
+ * A DockerSession that implements AutoCloseable for cleanup.
+ */
+class CloseableDockerSession(
+    private val scope: DockerSessionScope,
+    private val containerId: String,
+    private val cleanupActions: List<() -> Unit>,
+) : DockerSession, AutoCloseable {
+
+    override fun runInContainer(
+        vararg args: String,
+        timeoutSeconds: Long,
+        extraEnvVars: Map<String, String>
+    ): ProcessResult {
+        return scope.runInContainer(containerId, args.toList(), timeoutSeconds, extraEnvVars)
+    }
+
+    override fun close() {
+        cleanupActions.forEach { it() }
+    }
+}
+
 fun DockerSession.Companion.startDockerSession(
-    parentDisposable: Disposable,
     dockerFileBase: String, //aka codex-cli
     secretPatterns: List<String> = listOf(),
-): DockerSession {
-    val dockerDisposable = Disposer.newDisposable(parentDisposable)
+): CloseableDockerSession {
+    val cleanupActions = mutableListOf<() -> Unit>()
 
     val dockerfilePath = File("src/test/docker/$dockerFileBase/Dockerfile")
     require(dockerfilePath.isFile) { "Docker file $dockerfilePath must exist" }
@@ -157,10 +176,10 @@ fun DockerSession.Companion.startDockerSession(
     val logPrefix = dockerFileBase.uppercase().replace("/", "-")
     val workDir = createTempDirectory(logPrefix.lowercase())
     println("[$logPrefix] Creating new session in temp dir: $workDir")
-    Disposer.register(dockerDisposable, Disposable {
+    cleanupActions += {
         workDir.deleteRecursively()
         println("[$logPrefix] Temp directory cleaned up: $workDir")
-    })
+    }
 
     val scope = DockerSessionScope(workDir, logPrefix, secretPatterns)
     val imageName = "$dockerFileBase-test"
@@ -174,20 +193,12 @@ fun DockerSession.Companion.startDockerSession(
 
     //we are not disposing the image
     val containerId = scope.startContainer(imageName)
-    Disposer.register(parentDisposable, Disposable {
+    cleanupActions += {
         println("[$logPrefix] Stopping and removing container: $containerId")
         scope.killContainer(containerId)
-    })
-
-    return object : DockerSession {
-        override fun runInContainer(
-            vararg args: String,
-            timeoutSeconds: Long,
-            extraEnvVars: Map<String, String>
-        ): ProcessResult {
-            return scope.runInContainer(containerId, args.toList(), timeoutSeconds, extraEnvVars)
-        }
     }
+
+    return CloseableDockerSession(scope, containerId, cleanupActions)
 }
 
 private fun createTempDirectory(prefix: String): File {

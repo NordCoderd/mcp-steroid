@@ -7,6 +7,11 @@ import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.testFramework.replaceService
 import com.jonnyzzz.mcpSteroid.mcp.McpJson
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
+import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
+import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.assertNoErrorsInOutput
+import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject

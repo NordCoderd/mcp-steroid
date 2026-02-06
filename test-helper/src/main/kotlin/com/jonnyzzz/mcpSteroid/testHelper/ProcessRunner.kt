@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid
+package com.jonnyzzz.mcpSteroid.testHelper
 
 import junit.framework.TestCase.assertEquals
 import junit.framework.TestCase.assertFalse
@@ -79,7 +79,6 @@ class ProcessRunner(
      * @param description A short description of what this command does (for logging)
      * @param workingDir Working directory for the process
      * @param timeoutSeconds Maximum time to wait for the process to complete
-     * @param logPrefix Prefix for log messages (default: "PROCESS")
      */
     fun run(
         command: List<String>,

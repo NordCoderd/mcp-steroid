@@ -60,6 +60,7 @@ dependencies {
 
     // Testing
     testImplementation("junit:junit:4.13.2")
+    testImplementation(project(":test-helper"))
 
     // https://mvnrepository.com/artifact/org.testcontainers/testcontainers-bom
     testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.2"))

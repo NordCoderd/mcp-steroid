@@ -1,9 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid
+package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.intellij.openapi.Disposable
-import com.jetbrains.rd.util.assert
-import com.jonnyzzz.mcpSteroid.server.IdeaDescriptionWriter
 import java.io.File
 
 /**
@@ -14,17 +11,17 @@ import java.io.File
  * The API key is read from ~/.openai mounted into the container.
  */
 class DockerCodexSession(
-    private val session: DockerSession,
+    private val session: CloseableDockerSession,
     private val apiKey: String,
     private val debug: Boolean = false,
-) : AiAgentSession {
+) : AiAgentSession, AutoCloseable {
     fun toAiSession(): AiAgentSession = this
 
     fun registerMcp(mcpUrl: String, mcpName: String) = apply {
-        var command = IdeaDescriptionWriter.getInstance().codexMcpAddCommand(mcpUrl, mcpName)
+        var command = "codex mcp add $mcpName --url $mcpUrl"
             .split(" ")
 
-        assert(command[0] == "codex")
+        require(command[0] == "codex")
         command = command.drop(1)
         runInContainer(args = command.toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
@@ -75,6 +72,10 @@ class DockerCodexSession(
         )
     }
 
+    override fun close() {
+        session.close()
+    }
+
     companion object {
         private fun readOpenAiApiKey(): String {
             System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
@@ -86,10 +87,10 @@ class DockerCodexSession(
             error("OPENAI_API_KEY is required for Codex CLI tests (set env or ~/.openai)")
         }
 
-        fun create(parentDisposable: Disposable): DockerCodexSession {
+        fun create(secretPatterns: List<String> = listOf()): DockerCodexSession {
             println("[DOCKER-CODEX] Session created in container")
             val apiKey = readOpenAiApiKey()
-            val session = DockerSession.startDockerSession(parentDisposable, "codex-cli", listOf(apiKey))
+            val session = DockerSession.startDockerSession("codex-cli", listOf(apiKey) + secretPatterns)
             return DockerCodexSession(session, apiKey)
         }
     }

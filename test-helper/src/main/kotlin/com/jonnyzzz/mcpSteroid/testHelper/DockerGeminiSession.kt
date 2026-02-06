@@ -1,25 +1,22 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid
+package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.intellij.openapi.Disposable
-import com.jetbrains.rd.util.assert
-import com.jonnyzzz.mcpSteroid.server.IdeaDescriptionWriter
 import java.io.File
 
 /**
  * Manages a Gemini CLI session running inside a Docker container.
  */
 class DockerGeminiSession(
-    val session: DockerSession,
+    val session: CloseableDockerSession,
     private val apiKey: String,
     private val debug: Boolean = false,
-) : AiAgentSession {
+) : AiAgentSession, AutoCloseable {
 
     fun registerMcp(mcpUrl: String, mcpName: String) = apply {
-        var command = IdeaDescriptionWriter.getInstance().geminiMcpAddCommand(mcpUrl, mcpName)
+        var command = "gemini mcp add $mcpName --type http $mcpUrl"
             .split(" ")
 
-        assert(command[0] == "gemini")
+        require(command[0] == "gemini")
         command = command.drop(1)
         command += "--trust"
 
@@ -60,6 +57,10 @@ class DockerGeminiSession(
         )
     }
 
+    override fun close() {
+        session.close()
+    }
+
     companion object {
         private fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
@@ -71,9 +72,9 @@ class DockerGeminiSession(
             error("GEMINI_API_KEY required (set env or ~/.vertex)")
         }
 
-        fun create(parentDisposable: Disposable): DockerGeminiSession {
+        fun create(secretPatterns: List<String> = listOf()): DockerGeminiSession {
             val apiKey = readApiKey()
-            val session = DockerSession.startDockerSession(parentDisposable, "gemini-cli", listOf(apiKey))
+            val session = DockerSession.startDockerSession("gemini-cli", listOf(apiKey) + secretPatterns)
             return DockerGeminiSession(session, apiKey)
         }
     }

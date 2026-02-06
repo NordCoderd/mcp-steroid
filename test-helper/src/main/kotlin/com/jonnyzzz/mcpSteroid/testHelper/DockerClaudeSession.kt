@@ -1,9 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid
+package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.intellij.openapi.Disposable
-import com.jetbrains.rd.util.assert
-import com.jonnyzzz.mcpSteroid.server.IdeaDescriptionWriter
 import java.io.File
 
 /**
@@ -12,18 +9,18 @@ import java.io.File
  * MCP server registrations from affecting the local Claude config.
  */
 class DockerClaudeSession(
-    private val session: DockerSession,
+    private val session: CloseableDockerSession,
     private val apiKey: String,
     private val debug: Boolean = false,
-) : AiAgentSession {
+) : AiAgentSession, AutoCloseable {
 
     fun toAiSession() : AiAgentSession = this
 
     fun registerMcp(mcpUrl: String, mcpName : String) = apply {
-        var command = IdeaDescriptionWriter.getInstance().claudeMcpAddCommand(mcpUrl, mcpName)
+        var command = "claude mcp add --transport http $mcpName $mcpUrl"
             .split(" ")
 
-        assert(command[0] == "claude")
+        require(command[0] == "claude")
         command = command.drop(1)
         runInContainer(args = command.toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
@@ -84,6 +81,10 @@ class DockerClaudeSession(
         )
     }
 
+    override fun close() {
+        session.close()
+    }
+
     companion object {
         private fun readAnthropicApiKey(): String {
             System.getenv("ANTHROPIC_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
@@ -96,11 +97,11 @@ class DockerClaudeSession(
         }
 
         fun create(
-            parentDisposable: Disposable,
+            secretPatterns: List<String> = listOf(),
         ): DockerClaudeSession {
             println("[DOCKER-CLAUDE] Creating new session")
             val apiKey = readAnthropicApiKey()
-            val session = DockerSession.startDockerSession(parentDisposable, "claude-cli", listOf(apiKey))
+            val session = DockerSession.startDockerSession("claude-cli", listOf(apiKey) + secretPatterns)
             return DockerClaudeSession(session, apiKey)
         }
     }

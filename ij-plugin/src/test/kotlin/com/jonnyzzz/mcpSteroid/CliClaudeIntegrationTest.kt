@@ -1,7 +1,14 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid
 
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
+import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
+import com.jonnyzzz.mcpSteroid.testHelper.DockerClaudeSession
+import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.assertNoErrorsInOutput
+import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import java.util.UUID
 import kotlin.time.Duration.Companion.seconds
 
@@ -42,7 +49,11 @@ import kotlin.time.Duration.Companion.seconds
  * ============================================================================
  */
 class CliClaudeIntegrationTest : CliIntegrationTestBase() {
-    private fun claudeSession() = DockerClaudeSession.create(testRootDisposable)
+    private fun claudeSession(): DockerClaudeSession {
+        val session = DockerClaudeSession.create()
+        Disposer.register(testRootDisposable, Disposable { session.close() })
+        return session
+    }
 
     override fun newAiSession(): AiAgentSession = claudeSession().registerMcp(resolveDockerUrl(), "intellij")
 
