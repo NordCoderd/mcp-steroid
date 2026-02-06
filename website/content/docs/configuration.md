@@ -1,7 +1,7 @@
 ---
 title: "Configuration"
 description: "Registry keys and settings for MCP Steroid"
-weight: 3
+weight: 2
 ---
 
 MCP Steroid can be configured via IntelliJ's Registry (`Help > Find Action > Registry`) or via JVM system properties (`-D` flags). All settings use the `mcp.steroid.*` prefix.
@@ -17,7 +17,7 @@ MCP Steroid can be configured via IntelliJ's Registry (`Help > Find Action > Reg
 
 | Registry Key | Default | Description |
 |-------------|---------|-------------|
-| `mcp.steroid.review.mode` | `ALWAYS` | Code review mode: `ALWAYS` (default), or `NEVER`. |
+| `mcp.steroid.review.mode` | `ALWAYS` | Code review mode: `ALWAYS` (default), `TRUSTED`, or `NEVER`. |
 | `mcp.steroid.review.timeout` | `600` | Review timeout in seconds. |
 | `mcp.steroid.execution.timeout` | `600` | Script execution timeout in seconds. |
 
@@ -44,7 +44,7 @@ MCP Steroid can be configured via IntelliJ's Registry (`Help > Find Action > Reg
 |-------------|---------|-------------|
 | `mcp.steroid.updates.enabled` | `true` | Enable automatic update checks. |
 
-
+---
 
 > **Note:** When the plugin starts, it writes the server URL to `.idea/mcp-steroid.md` in each open project. The first line contains the URL (for example, `http://127.0.0.1:6315/mcp`). This file is your MCP client's connection target.
 
