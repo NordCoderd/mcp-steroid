@@ -64,42 +64,37 @@ abstract class CompilePromptsTask : DefaultTask() {
 }
 
 /**
- * Build the see-also content for an article by merging:
- * 1. Auto-generated same-folder sibling links
- * 2. Manual cross-folder links from the -see-also.md file (if present)
+ * Build the see-also content for an article.
+ * If the article has a manual -see-also.md file, use its content as-is.
+ * Otherwise, auto-generate same-folder sibling links.
  */
 private fun buildSeeAlsoContent(
     folder: String,
     article: PromptArticle,
     folderArticles: Map<String, List<PromptArticle>>,
 ): String {
-    val sb = StringBuilder()
-
-    // Auto-generate same-folder sibling links
-    val siblings = folderArticles[folder]?.filter { it !== article } ?: emptyList()
-    if (siblings.isNotEmpty()) {
-        val displayName = folderToDisplayName(folder)
-        val folderLabel = displayName.ifEmpty { "related" }
-        sb.appendLine("## See Also")
-        sb.appendLine()
-        sb.appendLine("Related $folderLabel resources:")
-        for (sibling in siblings) {
-            sb.appendLine(buildSeeAlsoLine(folder, sibling))
-        }
-    }
-
-    // Append manual cross-folder references from -see-also.md file if present
+    // Prefer original see-also content if provided
     if (article.seeAlso != null) {
         val manualContent = article.seeAlso.content.trim()
         if (manualContent.isNotEmpty()) {
-            if (sb.isNotEmpty()) {
-                sb.appendLine()
-            }
-            sb.appendLine(manualContent)
+            return manualContent
         }
     }
 
-    return sb.toString().trim()
+    // Fall back to auto-generated same-folder sibling links
+    val siblings = folderArticles[folder]?.filter { it !== article } ?: emptyList()
+    if (siblings.isEmpty()) return ""
+
+    val displayName = folderToDisplayName(folder)
+    val folderLabel = displayName.ifEmpty { "related" }
+    return buildString {
+        appendLine("## See Also")
+        appendLine()
+        appendLine("Related $folderLabel resources:")
+        for (sibling in siblings) {
+            appendLine(buildSeeAlsoLine(folder, sibling))
+        }
+    }.trim()
 }
 
 /**
