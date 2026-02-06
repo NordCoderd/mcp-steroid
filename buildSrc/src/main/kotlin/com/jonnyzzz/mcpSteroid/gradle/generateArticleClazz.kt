@@ -194,10 +194,27 @@ fun PromptGenerationContext.generateArticleClazz(
         .initializer("%S", name)
         .build()
 
+    // path property (payload file path)
+    props += PropertySpec.builder("path", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", article.payload.path)
+        .build()
+
+    // mimeType property (derived from payload file extension)
+    val mimeType = when (article.payload.fileType) {
+        "kts" -> "text/x-kotlin"
+        "md" -> "text/markdown"
+        else -> "text/plain"
+    }
+    props += PropertySpec.builder("mimeType", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", mimeType)
+        .build()
+
     // description property - PromptBase holder for non-empty content
     if (description.isNotEmpty()) {
         val descHolderClass = ClassName(pkg, classType.simpleName + "Description")
-        generateStringPromptClazz(description, descHolderClass, folder, "(generated)")
+        generateStringPromptClazz(description, descHolderClass)
         props += PropertySpec.builder("description", String::class)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
@@ -214,7 +231,7 @@ fun PromptGenerationContext.generateArticleClazz(
     // seeAlsoContent property - PromptBase holder for non-empty content
     if (seeAlsoContent.isNotEmpty()) {
         val seeAlsoHolderClass = ClassName(pkg, classType.simpleName + "SeeAlso")
-        generateStringPromptClazz(seeAlsoContent, seeAlsoHolderClass, folder, "(generated)")
+        generateStringPromptClazz(seeAlsoContent, seeAlsoHolderClass)
         props += PropertySpec.builder("seeAlsoContent", String::class)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {

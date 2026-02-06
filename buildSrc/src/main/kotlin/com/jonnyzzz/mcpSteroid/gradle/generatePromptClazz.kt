@@ -1,13 +1,11 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.gradle
 
-import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
-import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.asTypeName
@@ -101,29 +99,8 @@ fun PromptGenerationContext.generatePromptClazz(
 
     val (readFn, readResourceFun) = buildEncodedReadFunctions(src.readText())
 
-    val fileTypeProp = PropertySpec
-        .builder("fileType", String::class.asClassName())
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", filePropValue)
-        .build()
-
-    val pathProp = PropertySpec
-        .builder("path", String::class.asClassName())
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", pathValue)
-        .build()
-
-    val folderProp = PropertySpec
-        .builder("folder", String::class.asClassName())
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", folderValue)
-        .build()
-
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptBaseClass)
-        .addProperty(pathProp)
-        .addProperty(folderProp)
-        .addProperty(fileTypeProp)
         .addFunction(readResourceFun)
         .addFunctions(readFn)
         .build()
@@ -144,34 +121,11 @@ fun PromptGenerationContext.generatePromptClazz(
 fun PromptGenerationContext.generateStringPromptClazz(
     content: String,
     classType: ClassName,
-    folder: String,
-    path: String,
 ) {
     val (readFn, readResourceFun) = buildEncodedReadFunctions(content)
 
-    val fileTypeProp = PropertySpec
-        .builder("fileType", String::class.asClassName())
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", "md")
-        .build()
-
-    val pathProp = PropertySpec
-        .builder("path", String::class.asClassName())
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", path)
-        .build()
-
-    val folderProp = PropertySpec
-        .builder("folder", String::class.asClassName())
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", folder)
-        .build()
-
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptBaseClass)
-        .addProperty(pathProp)
-        .addProperty(folderProp)
-        .addProperty(fileTypeProp)
         .addFunction(readResourceFun)
         .addFunctions(readFn)
         .build()

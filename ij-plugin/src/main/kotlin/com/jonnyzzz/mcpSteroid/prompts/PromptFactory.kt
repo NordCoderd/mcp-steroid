@@ -7,16 +7,9 @@ abstract class ArticleBase {
     abstract val uri: String
     abstract val name: String
     abstract val description: String
+    abstract val path: String
+    abstract val mimeType: String
     abstract val seeAlsoContent: String
-
-    val path get() = payload.path
-
-    val mimeType: String
-        get() = when (payload.fileType) {
-            "kts" -> "text/x-kotlin"
-            "md" -> "text/markdown"
-            else -> "text/plain"
-        }
 }
 
 abstract class PromptRootBase {
@@ -27,10 +20,6 @@ abstract class PromptBase {
     fun readPrompt(): String {
         return readPromptInternal()
     }
-
-    abstract val fileType: String
-    abstract val folder: String
-    abstract val path: String
 
     protected abstract fun readPromptInternal(): String
 }

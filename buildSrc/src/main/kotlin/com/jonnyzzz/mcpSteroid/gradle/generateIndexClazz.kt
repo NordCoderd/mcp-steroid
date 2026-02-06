@@ -102,7 +102,7 @@ fun PromptGenerationContext.generateIndexClazz(
     // tocContent - PromptBase holder for non-empty content
     val tocContentProperty = if (tocContent.isNotEmpty()) {
         val tocHolderClass = ClassName(classType.packageName, classType.simpleName + "TocContent")
-        generateStringPromptClazz(tocContent, tocHolderClass, folder, "(generated)")
+        generateStringPromptClazz(tocContent, tocHolderClass)
         PropertySpec.builder("tocContent", String::class)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
