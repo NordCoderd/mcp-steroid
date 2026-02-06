@@ -1,7 +1,7 @@
 ---
 title: "Learning Methodology"
 description: "How MCP Steroid improves agent reliability with reproducible experiments"
-weight: 3
+weight: 4
 aliases:
   - /learning-methodology/
 ---

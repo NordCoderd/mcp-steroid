@@ -20,14 +20,10 @@
 </div>
 
 {{ $docs := site.GetPage "section" "docs" }}
-{{ $all := $docs.RegularPagesRecursive.ByWeight }}
-{{ $featured := slice "learning-methodology" "need-your-experiments-and-support" "how-to-debug-ide" }}
-{{ $core := where $all "File.BaseFileName" "not in" $featured }}
-{{ $research := where $all "File.BaseFileName" "in" (slice "learning-methodology" "need-your-experiments-and-support") }}
-{{ $debug := where $all "File.BaseFileName" "eq" "how-to-debug-ide" }}
+{{ $all := $docs.Pages.ByWeight }}
 
-<div class="docs-grid docs-grid-main">
-    {{ range $core }}
+<div class="docs-grid">
+    {{ range $all }}
     <a href="{{ .RelPermalink }}" class="doc-card">
         <h2>{{ .Title }}</h2>
         {{ $desc := .Description | plainify }}
@@ -38,34 +34,4 @@
     </a>
     {{ end }}
 </div>
-
-{{ if gt (len $research) 0 }}
-<div class="docs-grid docs-grid-research">
-    {{ range $research }}
-    <a href="{{ .RelPermalink }}" class="doc-card">
-        <h2>{{ .Title }}</h2>
-        {{ $desc := .Description | plainify }}
-        {{ if not $desc }}{{ $desc = .Summary | plainify }}{{ end }}
-        {{ if not $desc }}{{ $desc = .Plain | truncate 160 }}{{ end }}
-        <p>{{ $desc }}</p>
-        <span class="arrow">Read more &rarr;</span>
-    </a>
-    {{ end }}
-</div>
-{{ end }}
-
-{{ if gt (len $debug) 0 }}
-<div class="docs-grid docs-grid-debug">
-    {{ range $debug }}
-    <a href="{{ .RelPermalink }}" class="doc-card">
-        <h2>{{ .Title }}</h2>
-        {{ $desc := .Description | plainify }}
-        {{ if not $desc }}{{ $desc = .Summary | plainify }}{{ end }}
-        {{ if not $desc }}{{ $desc = .Plain | truncate 160 }}{{ end }}
-        <p>{{ $desc }}</p>
-        <span class="arrow">Read more &rarr;</span>
-    </a>
-    {{ end }}
-</div>
-{{ end }}
 {{ end }}
