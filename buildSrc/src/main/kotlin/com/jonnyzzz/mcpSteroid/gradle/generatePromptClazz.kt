@@ -28,29 +28,17 @@ data class GeneratedPromptClazz(
     override val entryName: String get() = path.substringAfterLast("/").toPromptIdentifierName()
 }
 
-fun PromptGenerationContext.generatePromptClazz(
-    src: File,
-): GeneratedPromptClazz {
-    val filePropValue = src.extension
-    val pathValue = src.toRelativeString(inputRoot)
-    val folderValue = src.parentFile.toRelativeString(inputRoot)
-
-    val classType = run {
-        val packageInfix = folderValue.trim('/')
-            .split("/")
-            .map { it.toPromptIdentifierName() }
-            .joinToString("") { ".$it" }
-
-        val className = src.nameWithoutExtension.toPromptClassName() + "Prompt"
-        ClassName(packageName + packageInfix, className)
-    }
-
-    val readFn = src.readText().chunked(1024).mapIndexed { index, content ->
+/**
+ * Build the encoded readPromptN() helper functions and readPromptInternal() override
+ * for a given text content. The content is chunked and obfuscated using a random factor.
+ */
+fun buildEncodedReadFunctions(content: String): Pair<List<FunSpec>, FunSpec> {
+    val readFn = content.chunked(1024).mapIndexed { index, chunk ->
         val factor = Random.nextInt(1000).absoluteValue + 11234
 
-        val packedContent = content
+        val packedContent = chunk
             .map { it.code * factor }
-            .chunked(80/7)
+            .chunked(80 / 7)
             .map { it.joinToString("|") }
 
         FunSpec.builder("readPrompt" + index)
@@ -66,7 +54,6 @@ fun PromptGenerationContext.generatePromptClazz(
             })
             .build()
     }
-
 
     val readResourceFun = FunSpec.builder("readPromptInternal")
         .addModifiers(KModifier.OVERRIDE)
@@ -91,6 +78,28 @@ fun PromptGenerationContext.generatePromptClazz(
             }
         })
         .build()
+
+    return readFn to readResourceFun
+}
+
+fun PromptGenerationContext.generatePromptClazz(
+    src: File,
+): GeneratedPromptClazz {
+    val filePropValue = src.extension
+    val pathValue = src.toRelativeString(inputRoot)
+    val folderValue = src.parentFile.toRelativeString(inputRoot)
+
+    val classType = run {
+        val packageInfix = folderValue.trim('/')
+            .split("/")
+            .map { it.toPromptIdentifierName() }
+            .joinToString("") { ".$it" }
+
+        val className = src.nameWithoutExtension.toPromptClassName() + "Prompt"
+        ClassName(packageName + packageInfix, className)
+    }
+
+    val (readFn, readResourceFun) = buildEncodedReadFunctions(src.readText())
 
     val fileTypeProp = PropertySpec
         .builder("fileType", String::class.asClassName())
@@ -126,5 +135,52 @@ fun PromptGenerationContext.generatePromptClazz(
 
     writeClazz(fileSpec, classType)
     return GeneratedPromptClazz(filePropValue, folderValue, pathValue, classType, src)
+}
+
+/**
+ * Generate a PromptBase subclass that holds an inline string content.
+ * Used for generated content like descriptions, see-also, and TOC.
+ */
+fun PromptGenerationContext.generateStringPromptClazz(
+    content: String,
+    classType: ClassName,
+    folder: String,
+    path: String,
+) {
+    val (readFn, readResourceFun) = buildEncodedReadFunctions(content)
+
+    val fileTypeProp = PropertySpec
+        .builder("fileType", String::class.asClassName())
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", "md")
+        .build()
+
+    val pathProp = PropertySpec
+        .builder("path", String::class.asClassName())
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", path)
+        .build()
+
+    val folderProp = PropertySpec
+        .builder("folder", String::class.asClassName())
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", folder)
+        .build()
+
+    val typeSpec = TypeSpec.classBuilder(classType)
+        .superclass(promptBaseClass)
+        .addProperty(pathProp)
+        .addProperty(folderProp)
+        .addProperty(fileTypeProp)
+        .addFunction(readResourceFun)
+        .addFunctions(readFn)
+        .build()
+
+    val fileSpec = FileSpec.builder(classType)
+        .addFileComment("GENERATED FILE - DO NOT EDIT")
+        .addType(typeSpec)
+        .build()
+
+    writeClazz(fileSpec, classType)
 }
 

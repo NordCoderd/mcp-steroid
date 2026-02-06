@@ -99,10 +99,22 @@ fun PromptGenerationContext.generateIndexClazz(
         .initializer("%S", if (displayName.isEmpty()) "" else "$displayName Resources")
         .build()
 
-    val tocContentProperty = PropertySpec.builder("tocContent", String::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", tocContent)
-        .build()
+    // tocContent - PromptBase holder for non-empty content
+    val tocContentProperty = if (tocContent.isNotEmpty()) {
+        val tocHolderClass = ClassName(classType.packageName, classType.simpleName + "TocContent")
+        generateStringPromptClazz(tocContent, tocHolderClass, folder, "(generated)")
+        PropertySpec.builder("tocContent", String::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
+                addStatement("return %T().readPrompt()", tocHolderClass)
+            }).build())
+            .build()
+    } else {
+        PropertySpec.builder("tocContent", String::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%S", "")
+            .build()
+    }
 
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptIndexBaseClass)
