@@ -189,7 +189,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
         session.runPrompt(
             """
             You are testing MCP integration. You MUST call steroid_execute_code exactly three times, in order.
-            Use only the MCP server named "mcp-steroid" in the project "${project.name}".
+            Use only the MCP server named "intellij" for tool calls. Do not call list_mcp_resources.
             Reason: cli session reset test, and distinct task_id values.
 
             Call #1 code:
