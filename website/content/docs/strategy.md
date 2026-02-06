@@ -1,7 +1,7 @@
 ---
 title: "Strategy"
 description: "How MCP Steroid is building IDE-native infrastructure for AI coding agents"
-weight: 2
+weight: 5
 aliases:
   - /strategy/
 ---

@@ -20,7 +20,7 @@
     <ul>
         {{ $currentPage := . }}
         {{ $docs := site.GetPage "section" "docs" }}
-        {{ range $docs.Pages.ByWeight }}
+        {{ range $docs.RegularPagesRecursive.ByWeight }}
         <li>
             <a href="{{ .RelPermalink }}"{{ if eq .RelPermalink $currentPage.RelPermalink }} class="active"{{ end }}>
                 {{ .Title }}
