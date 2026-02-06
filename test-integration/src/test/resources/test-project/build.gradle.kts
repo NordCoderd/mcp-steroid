@@ -1,15 +1,14 @@
 plugins {
     kotlin("jvm") version "2.2.21"
+    application
 }
-
-group = "com.jonnyzzz.intellij"
-version = rootProject.version
 
 repositories {
     mavenCentral()
 }
 
-dependencies {
+application {
+    mainClass.set("com.jonnyzzz.mcpSteroid.demo.DemoByJonnyzzz" + "Kt")
 }
 
 kotlin {

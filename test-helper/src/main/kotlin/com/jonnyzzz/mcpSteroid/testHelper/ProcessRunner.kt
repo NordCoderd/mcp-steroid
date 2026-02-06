@@ -1,9 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
-import junit.framework.TestCase.assertEquals
-import junit.framework.TestCase.assertFalse
-import org.junit.Assert
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
@@ -19,12 +16,16 @@ data class ProcessResult(
 
 fun ProcessResult.assertOutputContains(vararg expectedOutput: String, message: String = "") = apply {
     for (s in expectedOutput) {
-        Assert.assertTrue("Process $message output must container $s\n$this", output.contains(s) || stderr.contains(s))
+        check(output.contains(s) || stderr.contains(s)) {
+            "Process $message output must contain $s\n$this"
+        }
     }
 }
 
 fun ProcessResult.assertExitCode(expectedExitCode: Int, message: String = "") = apply {
-    assertEquals("Process $message exist code is $exitCode != $expectedExitCode", expectedExitCode, exitCode)
+    check(exitCode == expectedExitCode) {
+        "Process $message exit code is $exitCode != $expectedExitCode\n$this"
+    }
 }
 
 fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
@@ -41,11 +42,10 @@ fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
 
     for (pattern in errorPatterns) {
         val match = pattern.find(combined)
-        assertFalse(
+        check(match == null) {
             "$message: Found error pattern '${pattern.pattern}' in output. " +
-                    "Match: '${match?.value}'. Full output:\n$combined",
-            match != null
-        )
+                    "Match: '${match?.value}'. Full output:\n$combined"
+        }
     }
 }
 

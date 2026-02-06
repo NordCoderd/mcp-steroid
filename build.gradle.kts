@@ -223,6 +223,21 @@ tasks.buildPlugin {
     }
 }
 
+// Expose plugin .zip for consumption by test-integration module
+val pluginZipElements by configurations.creating {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "plugin-zip"))
+    }
+}
+
+artifacts {
+    add(pluginZipElements.name, tasks.buildPlugin.map { it.archiveFile }) {
+        builtBy(tasks.buildPlugin)
+    }
+}
+
 // Verify bundled libraries in plugin/lib folder
 val verifyBundledLibraries by tasks.registering {
     group = "verification"
