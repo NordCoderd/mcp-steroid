@@ -128,10 +128,25 @@ fun articleName(article: PromptArticle): String {
 }
 
 /**
+ * Extract the full description from a header file's content (all lines after title, trimmed).
+ * Skips blank separator lines between title and description.
+ */
+fun articleDescription(article: PromptArticle): String {
+    return article.header.content.trim().lineSequence()
+        .drop(1)
+        .dropWhile { it.isBlank() }
+        .joinToString("\n")
+        .trim()
+}
+
+/**
  * Extract the first line of description from a header file's content (second line onward).
  */
 fun articleDescriptionFirstLine(article: PromptArticle): String {
-    return article.header.content.trim().lineSequence().drop(1).firstOrNull()?.trim() ?: ""
+    return article.header.content.trim().lineSequence()
+        .drop(1)
+        .dropWhile { it.isBlank() }
+        .firstOrNull()?.trim() ?: ""
 }
 
 /**
@@ -151,22 +166,13 @@ fun PromptGenerationContext.generateArticleClazz(
     seeAlsoContent: String,
 ): GeneratedArticleClazz {
     val uri = buildArticleUri(folder, article.mainElement.path)
+    val name = articleName(article)
+    val description = articleDescription(article)
 
-    val classType = run {
-        val packageName = article.allClasses.map { it.clazzName.packageName }.distinct().single()
-        val className = article.mainElement.clazzName.simpleName + "Article"
-        ClassName(packageName, className)
-    }
+    val classType = articleClassName(article)
+    val pkg = classType.packageName
 
     val props = mutableListOf<PropertySpec>()
-
-    // header property
-    props += PropertySpec.builder("header", promptBaseClass)
-        .addModifiers(KModifier.OVERRIDE)
-        .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-            addStatement("return %T()", article.header.clazzName)
-        }).build())
-        .build()
 
     // payload property
     props += PropertySpec.builder("payload", promptBaseClass)
@@ -182,11 +188,45 @@ fun PromptGenerationContext.generateArticleClazz(
         .initializer("%S", uri)
         .build()
 
-    // seeAlsoContent property (built at codegen time)
-    props += PropertySpec.builder("seeAlsoContent", String::class)
+    // name property (short, pre-defined string constant)
+    props += PropertySpec.builder("name", String::class)
         .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", seeAlsoContent)
+        .initializer("%S", name)
         .build()
+
+    // description property - PromptBase holder for non-empty content
+    if (description.isNotEmpty()) {
+        val descHolderClass = ClassName(pkg, classType.simpleName + "Description")
+        generateStringPromptClazz(description, descHolderClass, folder, "(generated)")
+        props += PropertySpec.builder("description", String::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
+                addStatement("return %T().readPrompt()", descHolderClass)
+            }).build())
+            .build()
+    } else {
+        props += PropertySpec.builder("description", String::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%S", "")
+            .build()
+    }
+
+    // seeAlsoContent property - PromptBase holder for non-empty content
+    if (seeAlsoContent.isNotEmpty()) {
+        val seeAlsoHolderClass = ClassName(pkg, classType.simpleName + "SeeAlso")
+        generateStringPromptClazz(seeAlsoContent, seeAlsoHolderClass, folder, "(generated)")
+        props += PropertySpec.builder("seeAlsoContent", String::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
+                addStatement("return %T().readPrompt()", seeAlsoHolderClass)
+            }).build())
+            .build()
+    } else {
+        props += PropertySpec.builder("seeAlsoContent", String::class)
+            .addModifiers(KModifier.OVERRIDE)
+            .initializer("%S", "")
+            .build()
+    }
 
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptArticleClass)

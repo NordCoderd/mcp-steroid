@@ -2,10 +2,11 @@
 package com.jonnyzzz.mcpSteroid.prompts
 
 abstract class ArticleBase {
-    abstract val header: PromptBase
     abstract val payload: PromptBase
 
     abstract val uri: String
+    abstract val name: String
+    abstract val description: String
     abstract val seeAlsoContent: String
 
     val path get() = payload.path
@@ -16,9 +17,6 @@ abstract class ArticleBase {
             "md" -> "text/markdown"
             else -> "text/plain"
         }
-
-    val name get() = header.readPrompt().trim().lineSequence().first().trim()
-    val description get() = header.readPrompt().trim().lineSequence().drop(1).joinToString("\n").trim()
 }
 
 abstract class PromptRootBase {
