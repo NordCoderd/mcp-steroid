@@ -3,13 +3,10 @@ package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.readAction
 import com.intellij.openapi.project.DumbService
-import com.intellij.openapi.project.ProjectManager
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.ex.StatusBarEx
 import com.jonnyzzz.mcpSteroid.mcp.*
-import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import com.jonnyzzz.mcpSteroid.vision.WindowIdUtil
 import kotlinx.coroutines.Dispatchers
@@ -34,12 +31,12 @@ class ListWindowsToolHandler : McpRegistrar {
                 putJsonObject("properties") { }
                 putJsonArray("required") { }
             }
-        ) { context ->
-            handle(context.params)
+        ) {
+            handle()
         }
     }
 
-    private suspend fun handle(params: ToolCallParams): ToolCallResult {
+    private suspend fun handle(): ToolCallResult {
         validateTimeBomb()
 
         val (windowInfos, progressTasks) = withContext(Dispatchers.EDT) {
@@ -113,16 +110,6 @@ class ListWindowsToolHandler : McpRegistrar {
                 }
 
             (frameInfos + extraInfos) to allProgressTasks.toList()
-        }
-
-        val openProjects = readAction {
-            ProjectManager.getInstance().openProjects.toList()
-        }
-        openProjects.forEach { project ->
-            project.executionStorage.writeToolCall(
-                toolName = "steroid_list_windows",
-                arguments = params.arguments
-            )
         }
 
         val response = ListWindowsResponse(
