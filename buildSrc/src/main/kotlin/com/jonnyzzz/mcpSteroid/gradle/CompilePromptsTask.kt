@@ -69,7 +69,8 @@ abstract class CompilePromptsTask : DefaultTask() {
 
 /**
  * Build the see-also content for an article.
- * Always auto-generates links to all other articles in the same folder.
+ * Prepends manual cross-folder content from the see-also file, then auto-generates
+ * links to all other articles in the same folder.
  */
 private fun buildSeeAlsoContent(
     folder: String,
@@ -77,16 +78,30 @@ private fun buildSeeAlsoContent(
     folderArticles: Map<String, List<PromptArticle>>,
 ): String {
     val siblings = folderArticles[folder]?.filter { it !== article } ?: emptyList()
-    if (siblings.isEmpty()) return ""
 
-    val displayName = folderToDisplayName(folder)
-    val folderLabel = displayName.ifEmpty { "related" }
+    // Read manual cross-folder content from the see-also file
+    val manualContent = article.seeAlso?.content?.trim() ?: ""
+
+    if (siblings.isEmpty() && manualContent.isEmpty()) return ""
+
     return buildString {
         appendLine("## See Also")
         appendLine()
-        appendLine("Related $folderLabel resources:")
-        for (sibling in siblings) {
-            appendLine(buildSeeAlsoLine(folder, sibling))
+
+        // Prepend manual cross-folder references
+        if (manualContent.isNotEmpty()) {
+            appendLine(manualContent)
+            appendLine()
+        }
+
+        // Auto-generated same-folder sibling links
+        if (siblings.isNotEmpty()) {
+            val displayName = folderToDisplayName(folder)
+            val folderLabel = displayName.ifEmpty { "related" }
+            appendLine("Related $folderLabel resources:")
+            for (sibling in siblings) {
+                appendLine(buildSeeAlsoLine(folder, sibling))
+            }
         }
     }.trim()
 }

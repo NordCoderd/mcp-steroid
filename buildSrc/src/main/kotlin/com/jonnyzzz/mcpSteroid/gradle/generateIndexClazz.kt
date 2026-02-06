@@ -37,23 +37,6 @@ fun PromptGenerationContext.generateIndexClazz(
     val sortedArticles = articles
         .sortedWith(compareBy<GeneratedArticleClazz>({ it.path }))
 
-    val registryType = Map::class.asClassName().parameterizedBy(String::class.asClassName(), promptBaseClass)
-    val registryProperty = PropertySpec.builder("files", registryType)
-        .addModifiers(KModifier.OVERRIDE)
-        .getter(
-            FunSpec.getterBuilder()
-                .addCode(
-                    buildCodeBlock {
-                        controlFlow("return buildMap") {
-                            sortedPrompts
-                                .forEach { r ->
-                                    addStatement("put(%S, %T())", r.path.removePrefix(r.folder).trim('/'), r.clazzName)
-                                }
-                        }
-                    }).build()
-        )
-        .build()
-
     val articleType = Map::class.asClassName().parameterizedBy(String::class.asClassName(), promptArticleClass)
     val articleProperty = PropertySpec.builder("articles", articleType)
         .addModifiers(KModifier.OVERRIDE)
@@ -86,7 +69,6 @@ fun PromptGenerationContext.generateIndexClazz(
 
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptIndexBaseClass)
-        .addProperty(registryProperty)
         .addProperty(articleProperty)
         .addProperties(typedGetters)
         .build()

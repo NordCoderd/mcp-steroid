@@ -25,6 +25,5 @@ abstract class PromptBase {
 }
 
 abstract class PromptIndexBase {
-    abstract val files: Map<String, PromptBase>
     abstract val articles: Map<String, ArticleBase>
 }

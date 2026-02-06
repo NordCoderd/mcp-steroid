@@ -1,0 +1,3 @@
+- [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
+- [Rename](mcp-steroid://lsp/rename) - Rename symbol across project
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
