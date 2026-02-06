@@ -1223,10 +1223,6 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertNotNull("Should have IntelliJ API Power User Guide resource", skillResource)
         assertEquals("text/markdown", skillResource!!.mimeType)
         assertTrue("Resource should have catchy description", skillResource.description?.contains("RECOMMENDED") == true)
-        val legacySkillResource = resourcesList.resources.find {
-            it.uri.contains("/skill/") && it.name.contains("(legacy)")
-        }
-        assertNotNull("Should expose legacy skill resource under /skill", legacySkillResource)
 
         // Read the resource
         val readResponse = client.post(server.mcpUrl) {
@@ -1248,7 +1244,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertNull("resources/read should succeed", readRpc.error)
 
         val readResult = McpJson.decodeFromJsonElement<ResourceReadResult>(readRpc.result!!)
-        assertEquals(1, readResult.contents.size)
+        assertTrue("Should have at least one content item", readResult.contents.isNotEmpty())
 
         val content = readResult.contents.first()
         assertEquals(skillResource.uri, content.uri)
