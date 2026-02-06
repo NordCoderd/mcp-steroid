@@ -1,114 +1,64 @@
 ---
 title: "Strategy"
-description: "Strategic direction, validation model, and funding path for MCP Steroid"
+description: "How MCP Steroid is building IDE-native infrastructure for AI coding agents"
 ---
 
-## Strategy in one sentence
+## Give AI the whole IDE, not just the files
 
-MCP Steroid is building the IDE-native reliability layer for AI coding agents, so they can execute real engineering workflows in JetBrains IDEs instead of file-only approximations.
+MCP Steroid makes AI agents code with the IDE, not just with files. File-only workflows break on many real tasks because agents cannot run inspections, execute refactorings, launch debugger flows, or use live IDE context.
 
-Scope focus: IntelliJ-native workflows where outcomes depend on IDE state (inspections, run configurations, debugger, and UI context).
+MCP Steroid closes that gap by exposing IDE APIs, visual state, and runtime environment from JetBrains IDEs over MCP.
 
-## Creator and leadership
+## Three-phase product arc
 
-MCP Steroid is created and strategically led by Eugene Petrenko (jonnyzzz).
+1. Phase 1: IntelliJ plugin (current)
+2. Phase 2: benchmark, learn, and iterate
+3. Phase 3: headless background runtime
 
-This is intentionally founder-led:
+### Phase 1: IntelliJ plugin (current)
 
-- direct product accountability
-- fast iteration cycles
-- roadmap decisions based on reproducible technical evidence
+Today MCP Steroid runs as a plugin in IntelliJ-based IDEs. A developer connects their agent (Claude Code, Codex, Gemini, and others), and the agent gets controlled access to IDE-aware workflows.
 
-## Why this exists
+### Phase 2: benchmark, learn, and iterate
 
-Agents are improving quickly, but many workflows still break on non-trivial repositories because they cannot reliably use:
+Every major claim is validated with baseline/treatment runs:
 
-- inspections and refactorings
-- run configurations and test flows
-- debugger/runtime state
-- live IDE/UI context
-
-MCP Steroid addresses this gap by exposing IntelliJ capabilities through MCP in a traceable, automation-friendly way.
-
-## Efficiency thesis
-
-We expect higher efficiency than file-only workflows when tasks require IDE state. We validate this by comparing scenario outcomes against file-only baselines.
+- Baseline: same task without MCP Steroid
+- Treatment: same task with MCP Steroid
+- Controlled variables: same repository SHA, model/version, prompt, and time budget
 
 Core metrics:
 
-- completion rate against explicit acceptance criteria
-- manual interventions per run
-- post-run defects/regressions
+- task completion rate
+- manual interventions
+- token cost
+- time to first accepted result
+- regressions or new defects
 
-## Product strategy and sequencing
+This validation loop is described in [Learning Methodology](/learning-methodology/).
 
-Today MCP Steroid runs as an IntelliJ plugin. This is a deliberate validation wedge, not the final architecture.
+### Phase 3: headless background runtime
 
-Phase goals:
+The long-term target is a self-contained runtime that can run locally or in hosted environments, managed by the AI agent, without requiring an open IDE window.
 
-1. Reliability in high-frequency engineering tasks
-2. Auditability: traceable runs, explicit pass/fail criteria, reproducible artifacts
-3. Continuous adaptation to model and agent drift through external experiments
-4. Productization path toward a self-contained background runtime for team-scale usage
+## Strategic thesis
 
-## How we validate claims
+MCP Steroid is an agent-first product. Near-term distribution is through IntelliJ users, while the long-term product direction is infrastructure that lets agents execute reliable engineering workflows with IDE-native context.
 
-Each major claim is tested using a scenario package:
+On tasks that depend on IDE state, agents with MCP Steroid should complete more tasks with fewer interventions, lower token usage, and faster delivery than the same agent without MCP Steroid.
 
-- repository pointer + commit SHA
-- task prompt
-- review prompt
-- acceptance criteria
-- run artifacts from `runs/run_*/`
+## How you can help
 
-A scenario passes only when criteria are met and a separate validation pass confirms the result.
+- Developers: submit reproducible scenarios in [Need Your Experiments and Support](/need-your-experiments-and-support/)
+- Engineering leaders: request pilot evaluations on your repositories
+- Sponsors and investors: support benchmark expansion and productization
 
-## What success looks like
+## Creator
 
-- reproducible scenario playbooks that hold across multiple repositories
-- fewer manual recoveries during agent execution
-- improved execution quality through IDE inspections, refactorings, and test workflows
-- external scenario intake that continuously improves the roadmap
+MCP Steroid is created by [Eugene Petrenko](https://linkedin.com/in/jonnyzzz), with 21 years of JetBrains ecosystem experience.
 
-## Why community participation matters
+## Contact
 
-This strategy depends on external scenario diversity. Internal demos are not enough.
-
-Please contribute a reproducible package:
-
-- Repository pointer (public repo, temporary private access, or archive)
-- Commit SHA and environment constraints
-- Task prompt (what you want the agent to do)
-- Review prompt (how success should be judged)
-- Acceptance criteria
-
-Details are documented in:
-
-- [Learning Methodology](https://github.com/jonnyzzz/mcp-steroid/blob/main/docs/LEARNING-METHODOLOGY.md)
-- [Need Your Experiments and Support](https://github.com/jonnyzzz/mcp-steroid/blob/main/docs/NEED-YOUR-EXPERIMENTS-AND-SUPPORT.md)
-
-## Investor framing
-
-- Problem: file-level agent workflows fail on many real engineering tasks.
-- Solution: IDE-native execution via MCP for reliable agent behavior.
-- Wedge: IntelliJ-first teams already using frontier agents.
-- Moat: deep IDE integration plus a reproducible scenario corpus that compounds over time.
-
-## Funding and investment
-
-MCP Steroid is seeking funding to accelerate:
-
-- core reliability engineering
-- broader scenario coverage across repositories and team contexts
-- faster conversion of findings into docs, prompts, and regression checks
-
-## Call to action
-
-- Developers: submit one reproducible scenario package (repository pointer + task prompt + review prompt).
-- Engineering leaders: request a pilot on your repository workflow.
-- Angels and VCs: contact Eugene for roadmap and funding discussion.
-
-Contact:
-
-- LinkedIn: [linkedin.com/in/jonnyzzz](https://linkedin.com/in/jonnyzzz)
-- GitHub Sponsors: [github.com/sponsors/jonnyzzz](https://github.com/sponsors/jonnyzzz)
+- [LinkedIn](https://linkedin.com/in/jonnyzzz)
+- [GitHub](https://github.com/jonnyzzz/mcp-steroid)
+- [GitHub Sponsors](https://github.com/sponsors/jonnyzzz)
