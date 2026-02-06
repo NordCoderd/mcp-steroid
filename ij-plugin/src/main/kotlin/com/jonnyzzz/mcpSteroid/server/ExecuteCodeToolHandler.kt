@@ -13,6 +13,10 @@ import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallContext
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.CodingWithIntelliJPromptArticle
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.DebuggerSkillPromptArticle
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPromptArticle
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.TestSkillPromptArticle
 import com.jonnyzzz.mcpSteroid.validateTimeBomb
 import kotlinx.serialization.json.*
 
@@ -32,11 +36,16 @@ data class ExecCodeParams(
  * Handler for the steroid_execute_code MCP tool.
  */
 class ExecuteCodeToolHandler : McpRegistrar {
-    private val toolDescription get() = """
+    private val toolDescription get() = run {
+        val codingGuideUri = CodingWithIntelliJPromptArticle().uri
+        val skillUri = SkillPromptArticle().uri
+        val debuggerUri = DebuggerSkillPromptArticle().uri
+        val testUri = TestSkillPromptArticle().uri
+        """
              WHAT: Finally SEE IntelliJ-based IDEs - not just read code. The only MCP server with visual understanding and full IDE control.
-             HOW: Execute Kotlin code directly in IntelliJ's runtime with full API access. 
+             HOW: Execute Kotlin code directly in IntelliJ's runtime with full API access.
 
-             📖 **COMPLETE GUIDE**: [Coding with IntelliJ APIs](mcp-steroid://skill/coding-with-intellij)
+             📖 **COMPLETE GUIDE**: [Coding with IntelliJ APIs]($codingGuideUri)
 
              This is a **stateful** API - everything you do changes the IDE state. The IntelliJ IDE is running exclusively for you. Use it aggressively instead of manual file operations.
 
@@ -69,15 +78,16 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - Provide detailed 'reason' parameter
 
              **Resources:**
-             - [Complete Coding Guide](mcp-steroid://skill/coding-with-intellij) - Patterns, examples, best practices
-             - [API Power User Guide](mcp-steroid://skill/skill) - Essential patterns
-             - [Debugger Guide](mcp-steroid://skill/debugger-skill) - Debug workflows
-             - [Test Runner Guide](mcp-steroid://skill/test-skill) - Test execution
+             - [Complete Coding Guide]($codingGuideUri) - Patterns, examples, best practices
+             - [API Power User Guide]($skillUri) - Essential patterns
+             - [Debugger Guide]($debuggerUri) - Debug workflows
+             - [Test Runner Guide]($testUri) - Test execution
 
              IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
 
              💡 Call steroid_execute_feedback after execution to rate success
          """.trim().lines().joinToString("\n") { it.trim() }
+    }
 
     override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(

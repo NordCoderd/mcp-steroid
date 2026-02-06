@@ -3,6 +3,10 @@ package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.jonnyzzz.mcpSteroid.prompts.generated.debugger.OverviewPromptArticle as DebuggerOverview
+import com.jonnyzzz.mcpSteroid.prompts.generated.ide.OverviewPromptArticle as IdeOverview
+import com.jonnyzzz.mcpSteroid.prompts.generated.lsp.OverviewPromptArticle as LspOverview
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPromptArticle
 
 /**
  * Application service providing MCP resource references and brief tips for LLM agents.
@@ -39,14 +43,12 @@ class SkillReference {
         append("4. Never use runBlocking - you're already in a coroutine context")
     }
 
-    // Resource hints are static since SkillReference is accessed early in startup
-    // before McpServerCore is fully initialized. These URIs are stable entrypoints.
     private val resourceHint: String = buildString {
         appendLine("TIP: Browse MCP resources for examples and patterns:")
-        appendLine("   mcp-steroid://skill/skill - API patterns")
-        appendLine("   mcp-steroid://debugger/overview - Debugger workflows")
-        appendLine("   mcp-steroid://ide/overview - Refactorings & inspections")
-        append("   mcp-steroid://lsp/overview - Code navigation & completion")
+        appendLine("   ${SkillPromptArticle().uri} - API patterns")
+        appendLine("   ${DebuggerOverview().uri} - Debugger workflows")
+        appendLine("   ${IdeOverview().uri} - Refactorings & inspections")
+        append("   ${LspOverview().uri} - Code navigation & completion")
     }
 
     /**
@@ -67,10 +69,10 @@ class SkillReference {
                 "TIP: This operation requires EDT. Use: withContext(Dispatchers.EDT) { }"
 
             errorMessage.contains("JavaLineBreakpointProperties", ignoreCase = true) || errorMessage.contains("\"props\" is null") ->
-                "TIP: Use XDebuggerUtil.toggleLineBreakpoint() instead of breakpointManager.addLineBreakpoint() with null properties. See mcp-steroid://debugger/overview"
+                "TIP: Use XDebuggerUtil.toggleLineBreakpoint() instead of breakpointManager.addLineBreakpoint() with null properties. See ${DebuggerOverview().uri}"
 
             errorMessage.contains("breakpoint", ignoreCase = true) || errorMessage.contains("debug", ignoreCase = true) ->
-                "TIP: For debugger help, see mcp-steroid://debugger/overview resource (run resources/list)"
+                "TIP: For debugger help, see ${DebuggerOverview().uri} resource (run resources/list)"
 
             errorMessage.contains("runBlocking") ->
                 "TIP: Never use runBlocking - the script body already runs in a coroutine context."
