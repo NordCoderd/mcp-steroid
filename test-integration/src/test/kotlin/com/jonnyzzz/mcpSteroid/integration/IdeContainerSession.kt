@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import java.io.File
 import java.nio.file.Files
@@ -24,6 +25,12 @@ class IdeContainerSession(
     val containerName: String,
     /** Host directory for this test run (timestamped) */
     val runDir: File,
+    /** Background processes running inside the container */
+    val xvfbProcess: RunningContainerProcess,
+    val videoProcess: RunningContainerProcess,
+    val screenshotProcess: RunningContainerProcess,
+    val windowManagerProcess: RunningContainerProcess,
+    val ideProcess: RunningContainerProcess,
 ) {
     val videoDir: File get() = File(runDir, "video")
     val videoFile: File get() = File(videoDir, "recording.mp4")
@@ -77,9 +84,17 @@ class IdeContainerSession(
      * The video file is already on the host via the mounted volume.
      */
     fun stopVideoRecording() {
-        scope.runInContainer(containerId, listOf("pkill", "-SIGINT", "ffmpeg"), timeoutSeconds = 5)
+        videoProcess.kill(signal = "INT")
         Thread.sleep(3000)
-        println("[IDE-AGENT] Video recording stopped. File: $videoFile")
+        println("[$LOG_PREFIX] Video recording stopped. File: $videoFile")
+    }
+
+    /**
+     * Stop the periodic screenshot capture.
+     */
+    fun stopScreenshotCapture() {
+        screenshotProcess.kill()
+        println("[$LOG_PREFIX] Screenshot capture stopped.")
     }
 
     /**
@@ -168,22 +183,33 @@ class IdeContainerSession(
             File(runDir, "containerId").writeText(containerId)
 
             // Write generated vmoptions into the container
-            writeVmOptionsToContainer(driver, containerId, contextDir)
+            writeVmOptionsToContainer(driver, containerId)
 
             // Deploy plugin into the container's plugins directory
             deployPluginToContainer(driver, containerId, pluginZipPath)
 
-            // Start the display server, video recording, window manager, and IDE
-            // Video recording starts first (after Xvfb) to capture the full IDE startup
-            startDisplayServer(driver, containerId)
-            startVideoRecording(driver, containerId)
-            startWindowManager(driver, containerId)
-            startIde(driver, containerId)
+            // Start the display server, video recording, screenshot capture, window manager, and IDE.
+            // Video recording starts first (after Xvfb) to capture the full IDE startup.
+            val xvfbProc = startDisplayServer(driver, containerId)
+            val videoProc = startVideoRecording(driver, containerId)
+            val screenshotProc = startScreenshotCapture(driver, containerId)
+            val wmProc = startWindowManager(driver, containerId)
+            val ideProc = startIde(driver, containerId)
 
             println("[$LOG_PREFIX] Container started: name=$containerName id=$containerId")
             println("[$LOG_PREFIX] Run directory: $runDir")
 
-            return IdeContainerSession(driver, containerId, containerName, runDir)
+            return IdeContainerSession(
+                scope = driver,
+                containerId = containerId,
+                containerName = containerName,
+                runDir = runDir,
+                xvfbProcess = xvfbProc,
+                videoProcess = videoProc,
+                screenshotProcess = screenshotProc,
+                windowManagerProcess = wmProc,
+                ideProcess = ideProc,
+            )
         }
 
         /**
@@ -228,14 +254,9 @@ class IdeContainerSession(
         /**
          * Write the generated vmoptions file into the container at the IDEA install location.
          */
-        private fun writeVmOptionsToContainer(driver: DockerDriver, containerId: String, workDir: File) {
-            val vmoptionsContent = generateVmOptions()
-            val tempFile = File(workDir, "idea64.vmoptions")
-            tempFile.writeText(vmoptionsContent)
-
+        private fun writeVmOptionsToContainer(driver: DockerDriver, containerId: String) {
             println("[$LOG_PREFIX] Writing vmoptions to container: $IDEA_VMOPTIONS_PATH")
-            driver.copyToContainer(containerId, tempFile, IDEA_VMOPTIONS_PATH)
-            tempFile.delete()
+            driver.writeFileInContainer(containerId, IDEA_VMOPTIONS_PATH, generateVmOptions())
         }
 
         /**
@@ -267,67 +288,89 @@ class IdeContainerSession(
         /**
          * Start Xvfb virtual display server (4K resolution).
          */
-        private fun startDisplayServer(driver: DockerDriver, containerId: String) {
+        private fun startDisplayServer(driver: DockerDriver, containerId: String): RunningContainerProcess {
             println("[$LOG_PREFIX] Starting Xvfb...")
-            driver.runInContainer(
+            val proc = driver.runInContainerDetached(
                 containerId,
-                listOf("bash", "-c", "Xvfb :99 -screen 0 3840x2160x24 -ac &"),
-                timeoutSeconds = 10,
+                listOf("Xvfb", ":99", "-screen", "0", "3840x2160x24", "-ac"),
+                name = "xvfb",
             )
             Thread.sleep(1000)
+            return proc
         }
 
         /**
          * Start ffmpeg video recording.
          * Writes to the mounted video directory so the recording is available on the host in real-time.
          */
-        private fun startVideoRecording(driver: DockerDriver, containerId: String) {
+        private fun startVideoRecording(driver: DockerDriver, containerId: String): RunningContainerProcess {
             val videoPath = "$CONTAINER_VIDEO_DIR/recording.mp4"
             println("[$LOG_PREFIX] Starting video recording to $videoPath...")
-            val ffmpegCmd = buildString {
-                append("ffmpeg -f x11grab -video_size 3840x2160 -framerate 10 -i :99 ")
-                append("-c:v libx264 -preset ultrafast -crf 28 ")
-                append("$videoPath </dev/null >/dev/null 2>&1 &")
-            }
-            driver.runInContainer(
+            val proc = driver.runInContainerDetached(
                 containerId,
-                listOf("bash", "-c", ffmpegCmd),
-                timeoutSeconds = 10,
+                listOf(
+                    "ffmpeg", "-f", "x11grab", "-video_size", "3840x2160",
+                    "-framerate", "10", "-i", ":99",
+                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+                    videoPath,
+                ),
+                name = "ffmpeg",
                 extraEnvVars = mapOf("DISPLAY" to ":99"),
             )
             Thread.sleep(500)
+            return proc
+        }
+
+        /**
+         * Start periodic screenshot capture (one PNG per second).
+         * Screenshots are saved to the mounted screenshots directory for live inspection.
+         */
+        private fun startScreenshotCapture(driver: DockerDriver, containerId: String): RunningContainerProcess {
+            println("[$LOG_PREFIX] Starting periodic screenshot capture...")
+            val captureScript = buildString {
+                append("while true; do ")
+                append("scrot $CONTAINER_SCREENSHOTS_DIR/screen-\$(date +%Y%m%d-%H%M%S).png; ")
+                append("sleep 1; ")
+                append("done")
+            }
+            return driver.runInContainerDetached(
+                containerId,
+                listOf("bash", "-c", captureScript),
+                name = "screenshots",
+                extraEnvVars = mapOf("DISPLAY" to ":99"),
+            )
         }
 
         /**
          * Start fluxbox window manager.
          */
-        private fun startWindowManager(driver: DockerDriver, containerId: String) {
+        private fun startWindowManager(driver: DockerDriver, containerId: String): RunningContainerProcess {
             println("[$LOG_PREFIX] Starting fluxbox...")
-            driver.runInContainer(
+            val proc = driver.runInContainerDetached(
                 containerId,
-                listOf("bash", "-c", "fluxbox &"),
-                timeoutSeconds = 10,
+                listOf("fluxbox"),
+                name = "fluxbox",
                 extraEnvVars = mapOf("DISPLAY" to ":99"),
             )
             Thread.sleep(1000)
+            return proc
         }
 
         /**
          * Start IntelliJ IDEA in the background.
          * Detects JAVA_HOME dynamically based on the installed JDK.
          */
-        private fun startIde(driver: DockerDriver, containerId: String) {
+        private fun startIde(driver: DockerDriver, containerId: String): RunningContainerProcess {
             println("[$LOG_PREFIX] Starting IntelliJ IDEA...")
-            // Detect JAVA_HOME and launch IDEA in background
             val launchScript = buildString {
                 append("export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java)))) && ")
                 append("export DISPLAY=:99 && ")
-                append("/opt/idea/bin/idea nosplash /home/agent/project &")
+                append("exec /opt/idea/bin/idea nosplash /home/agent/project")
             }
-            driver.runInContainer(
+            return driver.runInContainerDetached(
                 containerId,
                 listOf("bash", "-c", launchScript),
-                timeoutSeconds = 30,
+                name = "idea",
                 extraEnvVars = mapOf("DISPLAY" to ":99"),
             )
         }
@@ -335,7 +378,7 @@ class IdeContainerSession(
         /**
          * Assemble the Docker build context directory.
          * Copies docker resources (Dockerfile, entrypoint.sh) as files,
-         * symlinks large artifacts (IDEA archive) to avoid redundant copies.
+         * hard-links large artifacts (IDEA archive) to avoid redundant copies.
          * Plugin is deployed separately during container run.
          */
         private fun assembleDockerContext(
@@ -351,11 +394,15 @@ class IdeContainerSession(
                 file.copyTo(File(contextDir, file.name), overwrite = true)
             }
 
-            // Symlink large IDEA archive to avoid copying ~1GB file
-            Files.createSymbolicLink(
-                File(contextDir, "idea.tar.gz").toPath(),
-                ideaArchivePath.toPath(),
-            )
+            // Hard-link large IDEA archive to avoid copying ~1GB file.
+            // Falls back to copy if hard link fails (e.g. cross-filesystem).
+            val ideaDest = File(contextDir, "idea.tar.gz").toPath()
+            try {
+                Files.createLink(ideaDest, ideaArchivePath.toPath())
+            } catch (_: Exception) {
+                println("[$LOG_PREFIX] Hard link failed, copying IDEA archive...")
+                ideaArchivePath.copyTo(File(contextDir, "idea.tar.gz"), overwrite = true)
+            }
 
             testProjectDir.copyRecursively(File(contextDir, "test-project"), overwrite = true)
 
