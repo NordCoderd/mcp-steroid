@@ -4,7 +4,6 @@ package com.jonnyzzz.mcpSteroid.integration
 import org.junit.jupiter.api.Test
 
 class InfrastructureTest {
-
     @Test
     fun test() {
         IdeTestFolders.toString()
