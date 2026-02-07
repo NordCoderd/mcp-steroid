@@ -16,12 +16,25 @@ class XcvbDriver(
     private val DISPLAY = ":99"
     private val driver = driver.withEnv("DISPLAY", DISPLAY)
 
+    /**
+     * Container-local path for the video recording, NOT on the mounted volume.
+     *
+     * Docker Desktop virtiofs does not flush file data to the host while
+     * the writing process (ffmpeg) keeps the file open. Screenshots work
+     * because scrot opens-writes-closes each file, but ffmpeg writes
+     * continuously. Writing to a non-mounted path avoids the issue;
+     * we copy the file out during cleanup after ffmpeg exits.
+     */
+    private val videoInternalDir = "/tmp/xcvb-video"
+    private val videoInternalPath = "$videoInternalDir/recording.mp4"
+
     fun withDisplay(container: ContainerDriver): ContainerDriver {
         return container.withEnv("DISPLAY", DISPLAY)
     }
 
     fun startAllServices() {
         driver.mkdirs(videoDirInContainer)
+        driver.mkdirs(videoInternalDir)
         startDisplayServer()
 
         startWindowManager()
@@ -56,41 +69,84 @@ class XcvbDriver(
     val videoFile get() = driver.mapGuestPathToHostPath(videoGuestPath)
 
     fun startVideoRecording(): RunningContainerProcess {
-        println("[xcvb] Starting video recording to ${driver.mapGuestPathToHostPath(videoGuestPath)}...")
+        val hostVideoFile = driver.mapGuestPathToHostPath(videoGuestPath)
+        println("[xcvb] Starting video recording (container-local: $videoInternalPath, host: $hostVideoFile)...")
         val proc = driver.runInContainerDetached(
             listOf(
                 "ffmpeg", "-nostdin", "-y",
                 "-f", "x11grab", "-video_size", "3840x2160",
                 "-framerate", "10", "-i", DISPLAY,
                 "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+                "-pix_fmt", "yuv420p",
                 "-movflags", "frag_keyframe+empty_moov",
                 "-flush_packets", "1",
-                videoGuestPath,
+                videoInternalPath,
             ),
         )
         lifetime.registerCleanupAction {
-            println("Check out screen recording at ${driver.mapGuestPathToHostPath(videoGuestPath)}")
-            proc.kill("INT")
+            stopVideoRecordingAndCopyOut(proc)
         }
 
         return proc
     }
 
     /**
+     * Gracefully stop ffmpeg, wait for it to finalize the MP4, then copy
+     * the recording from the container-local path to the mounted volume
+     * so it is available on the host.
+     */
+    private fun stopVideoRecordingAndCopyOut(proc: RunningContainerProcess) {
+        val hostVideoFile = driver.mapGuestPathToHostPath(videoGuestPath)
+
+        // Send SIGINT so ffmpeg writes the final trailer
+        proc.kill("INT")
+
+        // Wait for ffmpeg to exit (up to 10 seconds)
+        val deadline = System.currentTimeMillis() + 10_000
+        while (proc.isRunning() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(200)
+        }
+        if (proc.isRunning()) {
+            println("[xcvb] ffmpeg did not exit after SIGINT, sending SIGKILL")
+            proc.kill("KILL")
+            Thread.sleep(500)
+        }
+
+        // Copy the finalized video from the container-local path to the mounted volume.
+        // Using cp (open-write-close) instead of letting ffmpeg write directly to the
+        // mount avoids the virtiofs stale-data issue.
+        val copyResult = driver.runInContainer(
+            listOf("bash", "-c", "cp $videoInternalPath $videoGuestPath && sync"),
+            timeoutSeconds = 30,
+        )
+        if (copyResult.exitCode == 0) {
+            println("[xcvb] Video recording copied to $hostVideoFile")
+        } else {
+            println("[xcvb] WARNING: failed to copy video recording: ${copyResult.output}")
+        }
+
+        println("Check out screen recording at $hostVideoFile")
+    }
+
+    /**
      * Start the Node.js HTTP server that streams the growing MP4 file.
      * The server is baked into the Docker image at /usr/local/bin/video-server.js.
+     *
+     * The server reads from the container-local video path (not the mounted
+     * volume) so it sees ffmpeg's writes in real-time.
      */
     fun startVideoStreamingServer(): RunningContainerProcess {
         val hostPort = driver.mapContainerPortToHostPort(VIDEO_STREAMING_PORT)
         println("[xcvb] Starting video streaming server at http://localhost:$hostPort/")
         return driver.runInContainerDetached(
-            listOf("node", "/usr/local/bin/video-server.js", videoGuestPath, VIDEO_STREAMING_PORT.containerPort.toString(), runId),
+            listOf("node", "/usr/local/bin/video-server.js", videoInternalPath, VIDEO_STREAMING_PORT.containerPort.toString(), runId),
         )
     }
 
     /**
      * Start periodic screenshot capture (one PNG per second).
-     * Screenshots are saved to the mounted screenshots directory for live inspection.
+     * Screenshots are saved to the mounted volume directory for live inspection.
+     * (scrot opens-writes-closes each file, so virtiofs flushes correctly.)
      */
     private fun startScreenshotCapture(): RunningContainerProcess {
         println("[xcvb] Starting periodic screenshot capture to ${driver.mapGuestPathToHostPath(videoDirInContainer)}/...")
