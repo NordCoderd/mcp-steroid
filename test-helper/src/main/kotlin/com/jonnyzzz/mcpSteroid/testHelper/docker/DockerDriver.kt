@@ -85,6 +85,36 @@ class DockerDriver(
         println("[$logPrefix] Container removed successfully")
     }
 
+    fun copyToContainer(
+        containerId: String,
+        localPath: File,
+        containerPath: String,
+        timeoutSeconds: Long = 30,
+    ): ProcessResult {
+        require(localPath.exists()) { "Local path does not exist: $localPath" }
+        return processRunner.run(
+            listOf("docker", "cp", localPath.absolutePath, "$containerId:$containerPath"),
+            description = "Copy ${localPath.name} to container:$containerPath",
+            workingDir = workDir,
+            timeoutSeconds = timeoutSeconds,
+        )
+    }
+
+    fun copyFromContainer(
+        containerId: String,
+        containerPath: String,
+        localPath: File,
+        timeoutSeconds: Long = 30,
+    ): ProcessResult {
+        localPath.parentFile?.mkdirs()
+        return processRunner.run(
+            listOf("docker", "cp", "$containerId:$containerPath", localPath.absolutePath),
+            description = "Copy container:$containerPath to ${localPath.name}",
+            workingDir = workDir,
+            timeoutSeconds = timeoutSeconds,
+        )
+    }
+
     fun runInContainer(
         containerId: String,
         args: List<String>,

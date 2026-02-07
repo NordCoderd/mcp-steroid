@@ -55,12 +55,7 @@ class IdeContainerSession(
     fun takeScreenshot(localPath: File) {
         val remotePath = "/tmp/screenshot.png"
         scope.runInContainer(containerId, listOf("scrot", remotePath), timeoutSeconds = 10)
-        scope.processRunner.run(
-            listOf("docker", "cp", "$containerId:$remotePath", localPath.absolutePath),
-            description = "Copy screenshot to host",
-            workingDir = scope.workDir,
-            timeoutSeconds = 10,
-        )
+        scope.copyFromContainer(containerId, remotePath, localPath)
     }
 
     /**
@@ -87,6 +82,12 @@ class IdeContainerSession(
         private const val IMAGE_NAME = "mcp-steroid-ide-test"
         private const val IDEA_BIN_DIR = "/opt/idea/bin"
         private const val IDEA_VMOPTIONS_PATH = "$IDEA_BIN_DIR/idea64.vmoptions"
+
+        // Explicit IDE directory paths inside the container
+        const val IDE_CONFIG_DIR = "/home/agent/ide-config"
+        const val IDE_SYSTEM_DIR = "/home/agent/ide-system"
+        const val IDE_LOG_DIR = "/home/agent/ide-log"
+        const val IDE_PLUGINS_DIR = "/home/agent/ide-plugins"
 
         /**
          * Build and start an IDE Docker container.
@@ -136,6 +137,12 @@ class IdeContainerSession(
             appendLine("-Xmx2g")
             appendLine("-Xms512m")
 
+            appendLine("# Redirect IDE directories to explicit paths")
+            appendLine("-Didea.config.path=$IDE_CONFIG_DIR")
+            appendLine("-Didea.system.path=$IDE_SYSTEM_DIR")
+            appendLine("-Didea.log.path=$IDE_LOG_DIR")
+            appendLine("-Didea.plugins.path=$IDE_PLUGINS_DIR")
+
             appendLine("# MCP Steroid plugin configuration")
             appendLine("-Dmcp.steroid.server.host=0.0.0.0")
             appendLine("-Dmcp.steroid.server.port=6315")
@@ -172,12 +179,7 @@ class IdeContainerSession(
             tempFile.writeText(vmoptionsContent)
 
             println("[$LOG_PREFIX] Writing vmoptions to container: $IDEA_VMOPTIONS_PATH")
-            driver.processRunner.run(
-                listOf("docker", "cp", tempFile.absolutePath, "$containerId:$IDEA_VMOPTIONS_PATH"),
-                description = "Copy vmoptions to container",
-                workingDir = workDir,
-                timeoutSeconds = 10,
-            )
+            driver.copyToContainer(containerId, tempFile, IDEA_VMOPTIONS_PATH)
             tempFile.delete()
         }
 
