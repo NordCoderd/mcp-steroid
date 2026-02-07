@@ -12,6 +12,7 @@ RUN apt-get update && \
         curl \
         git \
         jq \
+        ripgrep \
         unzip \
         procps \
         ca-certificates \
@@ -47,9 +48,17 @@ ARG CACHE_BUST=1
 # Install Claude Code CLI
 RUN npm install -g @anthropic-ai/claude-code
 
+# Install Codex CLI
+RUN npm install -g @openai/codex
+
+# Install Gemini CLI
+RUN npm install -g @google/gemini-cli
+
 # Create non-root user
 RUN useradd -m -s /bin/bash agent && \
     mkdir -p /home/agent/.local/bin && \
+    mkdir -p /home/agent/.codex && \
+    mkdir -p /home/agent/.gemini && \
     chown -R agent:agent /home/agent
 
 # Copy and extract IntelliJ IDEA Community Edition (pre-downloaded by Gradle)
