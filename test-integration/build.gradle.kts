@@ -1,4 +1,7 @@
+@file:Suppress("HasPlatformType")
+
 import de.undercouch.gradle.tasks.download.Download
+import org.gradle.kotlin.dsl.provideDelegate
 
 plugins {
     kotlin("jvm") version "2.2.21"
@@ -28,22 +31,28 @@ dependencies {
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 kotlin {
     jvmToolchain(21)
 }
 
-// IntelliJ IDEA Ultimate download (always x86_64 for Docker container)
-// CE 2025.3 is not released; plugin requires sinceBuild=253, so we use Ultimate
-val ideVersion = "2025.3.2"
-val ideFileName = "ideaIU-${ideVersion}.tar.gz"
-val ideUrl = "https://download.jetbrains.com/idea/$ideFileName"
-val ideDownloadDir = layout.buildDirectory.dir("idea-download")
+val ideDownloadDir = layout.buildDirectory.dir("ide-download")
+val (ideUrl, ideFileName) = run {
+    val ideVersion = "2025.3.2"
+    val ideUrlARM = "https://download.jetbrains.com/idea/idea-${ideVersion}-aarch64.tar.gz"
+    val ideUrlX86 = "https://download.jetbrains.com/idea/idea-${ideVersion}.tar.gz"
+    if (System.getProperty("os.arch").let { it == "aarch64" || it == "arm64" }) {
+        ideUrlARM to "ideaIC-arm.tar.gz"
+    } else {
+        ideUrlX86 to "ideaIC-arm.tar.gz"
+    }
+}
 
 val downloadIdea by tasks.registering(Download::class) {
     group = "ide"
-    description = "Download IntelliJ IDEA Community Edition"
+    description = "Download IntelliJ IDEA"
     src(ideUrl)
     dest(ideDownloadDir.map { it.file(ideFileName) })
     onlyIfModified(true)
@@ -53,19 +62,15 @@ tasks.test {
     useJUnitPlatform()
     systemProperty("junit.jupiter.execution.timeout.default", "15m")
 
-    // Plugin zip path resolved via Gradle configuration
     dependsOn(pluginZip)
     dependsOn(downloadIdea)
     doFirst {
+        val testOut = layout.buildDirectory.dir("test-logs").get().asFile.absolutePath
+        mkdir(testOut)
+
         systemProperty("test.integration.plugin.zip", pluginZip.singleFile.absolutePath)
         systemProperty("test.integration.idea.archive", downloadIdea.get().dest.absolutePath)
-    }
-
-    // Pass through optional properties
-    listOf(
-        "test.integration.video.output",
-        "test.integration.docker.keep",
-    ).forEach { prop ->
-        System.getProperty(prop)?.let { systemProperty(prop, it) }
+        systemProperty("test.integration.docker", layout.projectDirectory.dir("src/test/docker").asFile.absolutePath)
+        systemProperty("test.integration.testOutput", testOut)
     }
 }

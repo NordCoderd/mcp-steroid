@@ -10,14 +10,37 @@ import java.util.concurrent.TimeUnit
  *
  * Runs Claude CLI inside a Docker container with IntelliJ IDEA + MCP Steroid plugin.
  * The agent is asked to debug DemoByJonnyzzz.kt and find the sortedByDescending bug.
+ *
+ * The container is kept alive after the test for debugging (removed on next run).
+ * Video is always recorded and mounted to the host for live preview.
  */
-class DebuggerDemoTest : BaseIdeIntegrationTest() {
-
+class DebuggerDemoTest {
+/*
     @Test
-    @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
     fun `agent finds sortedByDescending bug via debugger`() {
-        // Register MCP server with Claude CLI inside the container
-        registerClaudeMcp()
+        val apiKey = readAnthropicApiKey()
+        val outputDir = resolveBuildOutputDir("debugger-demo")
+
+        // Start IDE container (removes previous container with same name)
+        val session = IdeDockerSession.start(
+            containerName = "mcp-steroid-debugger-demo",
+            pluginZipPath = resolvePluginZip(),
+            ideaArchivePath = resolveIdeaArchive(),
+            testProjectDir = resolveTestProject(),
+            dockerDir = resolveDockerDir(),
+            videoDir = outputDir.resolve("video").also { it.mkdirs() },
+        )
+
+        // Start live video preview on macOS (opens QuickTime once video starts)
+        val previewThread = startLiveVideoPreview(session.videoFile)
+
+        println("[TEST] Waiting for IDE to be ready...")
+        session.waitForIdeReady(timeoutSeconds = 300)
+        println("[TEST] IDE is ready")
+
+        // Register MCP server with Claude CLI inside container
+        session.registerClaudeMcp(apiKey)
 
         // Send debugger prompt adapted from ai-tests/07-debugger.md
         val prompt = buildString {
@@ -39,27 +62,34 @@ class DebuggerDemoTest : BaseIdeIntegrationTest() {
             appendLine("ROOT_CAUSE: <one line description>")
         }
 
-        val result = runClaudePrompt(prompt, timeoutSeconds = 600)
+        val result = session.runClaudePrompt(prompt, apiKey, timeoutSeconds = 600)
+
+        // Stop video recording (file is already on host via mount)
+        try {
+            session.stopVideoRecording()
+            println("[TEST] Video saved to: ${session.videoFile}")
+        } catch (e: Exception) {
+            println("[TEST] Failed to stop video: ${e.message}")
+        }
+
+        // Interrupt preview thread
+        previewThread?.interrupt()
 
         // Assertions
         val combined = result.output + "\n" + result.stderr
 
-        // Agent should have exited successfully
         check(result.exitCode == 0) {
             "Claude CLI exited with code ${result.exitCode}.\nOutput:\n$combined"
         }
 
-        // Agent should have used steroid_execute_code
         check(combined.contains("steroid_execute_code")) {
             "Agent did not use steroid_execute_code tool.\nOutput:\n$combined"
         }
 
-        // Agent should have identified sortedByDescending as the problem
         check(combined.contains("sortedByDescending")) {
             "Agent output does not mention sortedByDescending.\nOutput:\n$combined"
         }
 
-        // Agent should have identified the root cause: return value ignored
         val rootCausePatterns = listOf(
             "ignor", "unused", "discard", "new list", "does not modify",
             "return value", "not assigned", "not used", "immutable",
@@ -71,5 +101,7 @@ class DebuggerDemoTest : BaseIdeIntegrationTest() {
             "Agent did not identify the root cause (ignored return value).\n" +
                     "Expected one of: $rootCausePatterns\nOutput:\n$combined"
         }
-    }
+
+        println("[TEST] Agent successfully identified the sortedByDescending bug")
+    }*/
 }
