@@ -69,15 +69,8 @@ RUN mkdir -p /opt/idea && \
 
 # IDE directories — redirected via vmoptions to explicit paths
 ENV IDE_CONFIG_DIR=/home/agent/ide-config
-ENV IDE_PLUGINS_DIR=/home/agent/ide-plugins
 
-# Copy plugin zip and install it
-COPY plugin.zip /tmp/plugin.zip
-RUN mkdir -p ${IDE_PLUGINS_DIR} && \
-    cd ${IDE_PLUGINS_DIR} && \
-    unzip /tmp/plugin.zip && \
-    rm /tmp/plugin.zip && \
-    chown -R agent:agent ${IDE_PLUGINS_DIR}
+# Plugin is copied and extracted by IdeContainerSession during container run
 
 # Copy test project
 COPY test-project/ /home/agent/project/

@@ -115,7 +115,7 @@ class IdeContainerSession(
             require(dockerDir.isDirectory) { "Docker dir not found: $dockerDir" }
             videoDir.mkdirs()
 
-            val contextDir = assembleDockerContext(dockerDir, ideaArchivePath, pluginZipPath, testProjectDir)
+            val contextDir = assembleDockerContext(dockerDir, ideaArchivePath, testProjectDir)
             val driver = DockerDriver(contextDir, LOG_PREFIX, emptyList())
 
             buildImage(driver, contextDir)
@@ -123,6 +123,9 @@ class IdeContainerSession(
 
             // Write generated vmoptions into the container
             writeVmOptionsToContainer(driver, containerId, contextDir)
+
+            // Deploy plugin into the container's plugins directory
+            deployPluginToContainer(driver, containerId, pluginZipPath)
 
             println("[$LOG_PREFIX] Container started: name=$containerName id=$containerId")
             println("[$LOG_PREFIX] Video output: ${videoDir.absolutePath}/recording.mp4")
@@ -184,14 +187,40 @@ class IdeContainerSession(
         }
 
         /**
+         * Deploy the MCP Steroid plugin into the running container.
+         * Copies the plugin zip and extracts it into the plugins directory.
+         */
+        private fun deployPluginToContainer(driver: DockerDriver, containerId: String, pluginZipPath: File) {
+            val containerTempPath = "/tmp/plugin.zip"
+            println("[$LOG_PREFIX] Deploying plugin to container: $IDE_PLUGINS_DIR")
+
+            driver.copyToContainer(containerId, pluginZipPath, containerTempPath)
+            driver.runInContainer(
+                containerId,
+                listOf("mkdir", "-p", IDE_PLUGINS_DIR),
+                timeoutSeconds = 10,
+            )
+            driver.runInContainer(
+                containerId,
+                listOf("unzip", "-o", containerTempPath, "-d", IDE_PLUGINS_DIR),
+                timeoutSeconds = 30,
+            )
+            driver.runInContainer(
+                containerId,
+                listOf("rm", containerTempPath),
+                timeoutSeconds = 10,
+            )
+        }
+
+        /**
          * Assemble the Docker build context directory.
-         * Copies docker resources (Dockerfile, entrypoint, vmoptions) as files,
+         * Copies docker resources (Dockerfile, entrypoint.sh) as files,
          * symlinks large artifacts (IDEA archive) to avoid redundant copies.
+         * Plugin is deployed separately during container run.
          */
         private fun assembleDockerContext(
             dockerDir: File,
             ideaArchivePath: File,
-            pluginZipPath: File,
             testProjectDir: File,
         ): File {
             val contextDir = createTempDir(LOG_PREFIX.lowercase())
@@ -208,7 +237,6 @@ class IdeContainerSession(
                 ideaArchivePath.toPath(),
             )
 
-            pluginZipPath.copyTo(File(contextDir, "plugin.zip"), overwrite = true)
             testProjectDir.copyRecursively(File(contextDir, "test-project"), overwrite = true)
 
             return contextDir
