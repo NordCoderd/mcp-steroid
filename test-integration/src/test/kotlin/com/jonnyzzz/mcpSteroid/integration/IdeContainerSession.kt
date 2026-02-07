@@ -5,6 +5,8 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import java.io.File
 import java.nio.file.Files
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * Manages a Docker container running IntelliJ IDEA with MCP Steroid plugin.
@@ -13,18 +15,23 @@ import java.nio.file.Files
  * The container is NOT removed after the test — it stays around for debugging.
  * It IS removed before the next test run (by name).
  *
- * Video is always recorded. The video directory is mounted from the host
- * so that the recording is accessible in real-time (for live preview on macOS).
+ * All IDE directories, video, and screenshots are mounted to a timestamped
+ * run directory under testOutputDir for easy inspection and debugging.
  */
 class IdeContainerSession(
     private val scope: DockerDriver,
     private val containerId: String,
     val containerName: String,
-    /** Host directory where the video recording is written */
-    val videoDir: File,
+    /** Host directory for this test run (timestamped) */
+    val runDir: File,
 ) {
-    /** Path to the video file on the host (available after container starts) */
+    val videoDir: File get() = File(runDir, "video")
     val videoFile: File get() = File(videoDir, "recording.mp4")
+    val screenshotDir: File get() = File(runDir, "screenshots")
+    val configDir: File get() = File(runDir, "ide-config")
+    val systemDir: File get() = File(runDir, "ide-system")
+    val logDir: File get() = File(runDir, "ide-log")
+    val pluginsDir: File get() = File(runDir, "ide-plugins")
 
     /**
      * Wait for the IDE to be ready (MCP server responding).
@@ -89,17 +96,24 @@ class IdeContainerSession(
         const val IDE_LOG_DIR = "/home/agent/ide-log"
         const val IDE_PLUGINS_DIR = "/home/agent/ide-plugins"
 
+        private const val CONTAINER_VIDEO_DIR = "/home/agent/video"
+        private const val CONTAINER_SCREENSHOTS_DIR = "/home/agent/screenshots"
+
+        private val RUN_DIR_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'Z'HH-mm-ss-SSS")
+
         /**
          * Build and start an IDE Docker container.
          * Removes any existing container with the same name before starting.
-         * Video is always recorded to a host-mounted directory for live access.
+         *
+         * All IDE directories, video, and screenshots are mounted to a timestamped
+         * run directory under testOutputDir.
          *
          * @param containerName Stable name for the container (survives test runs for debugging)
          * @param pluginZipPath Path to the built plugin .zip
          * @param ideaArchivePath Path to the downloaded IntelliJ IDEA .tar.gz
          * @param testProjectDir Path to the test project directory
          * @param dockerDir Path to the docker directory containing Dockerfile and entrypoint.sh
-         * @param videoDir Host directory to mount for video output
+         * @param testOutputDir Root output directory; a timestamped run subfolder is created
          */
         fun start(
             containerName: String,
@@ -107,19 +121,44 @@ class IdeContainerSession(
             ideaArchivePath: File,
             testProjectDir: File,
             dockerDir: File,
-            videoDir: File,
+            testOutputDir: File,
         ): IdeContainerSession {
             require(pluginZipPath.isFile) { "Plugin zip not found: $pluginZipPath" }
             require(ideaArchivePath.isFile) { "IDEA archive not found: $ideaArchivePath" }
             require(testProjectDir.isDirectory) { "Test project not found: $testProjectDir" }
             require(dockerDir.isDirectory) { "Docker dir not found: $dockerDir" }
-            videoDir.mkdirs()
+
+            // Create timestamped run directory
+            val timestamp = RUN_DIR_FORMATTER.format(LocalDateTime.now())
+            val runDir = File(testOutputDir, "run-$timestamp")
+            runDir.mkdirs()
+
+            // Create all mount-point subdirectories
+            val videoDir = File(runDir, "video").apply { mkdirs() }
+            val screenshotDir = File(runDir, "screenshots").apply { mkdirs() }
+            val configDir = File(runDir, "ide-config").apply { mkdirs() }
+            val systemDir = File(runDir, "ide-system").apply { mkdirs() }
+            val logDir = File(runDir, "ide-log").apply { mkdirs() }
+            val pluginsDir = File(runDir, "ide-plugins").apply { mkdirs() }
+
+            println("[$LOG_PREFIX] Run directory: $runDir")
 
             val contextDir = assembleDockerContext(dockerDir, ideaArchivePath, testProjectDir)
             val driver = DockerDriver(contextDir, LOG_PREFIX, emptyList())
 
             buildImage(driver, contextDir)
-            val containerId = startContainer(driver, containerName, videoDir, contextDir)
+            val containerId = startContainer(
+                driver, containerName, contextDir,
+                videoDir = videoDir,
+                screenshotDir = screenshotDir,
+                configDir = configDir,
+                systemDir = systemDir,
+                logDir = logDir,
+                pluginsDir = pluginsDir,
+            )
+
+            // Write containerId file
+            File(runDir, "containerId").writeText(containerId)
 
             // Write generated vmoptions into the container
             writeVmOptionsToContainer(driver, containerId, contextDir)
@@ -128,9 +167,9 @@ class IdeContainerSession(
             deployPluginToContainer(driver, containerId, pluginZipPath)
 
             println("[$LOG_PREFIX] Container started: name=$containerName id=$containerId")
-            println("[$LOG_PREFIX] Video output: ${videoDir.absolutePath}/recording.mp4")
+            println("[$LOG_PREFIX] Run directory: $runDir")
 
-            return IdeContainerSession(driver, containerId, containerName, videoDir)
+            return IdeContainerSession(driver, containerId, containerName, runDir)
         }
 
         /**
@@ -174,7 +213,6 @@ class IdeContainerSession(
 
         /**
          * Write the generated vmoptions file into the container at the IDEA install location.
-         * Uses docker cp to copy a temp file into the running container.
          */
         private fun writeVmOptionsToContainer(driver: DockerDriver, containerId: String, workDir: File) {
             val vmoptionsContent = generateVmOptions()
@@ -253,8 +291,13 @@ class IdeContainerSession(
         private fun startContainer(
             driver: DockerDriver,
             containerName: String,
-            videoDir: File,
             workDir: File,
+            videoDir: File,
+            screenshotDir: File,
+            configDir: File,
+            systemDir: File,
+            logDir: File,
+            pluginsDir: File,
         ): String {
             // Remove existing container with the same name (from previous run)
             println("[$LOG_PREFIX] Removing previous container '$containerName' if exists...")
@@ -273,12 +316,22 @@ class IdeContainerSession(
                 add(containerName)
                 add("--shm-size=2g")
                 add("--memory=4g")
-                // Mount host video dir so recording is accessible in real-time
-                add("-v")
-                add("${videoDir.absolutePath}:/tmp/video")
+
+                // Mount all IDE directories to host for inspection
+                fun mount(hostDir: File, containerDir: String) {
+                    add("-v")
+                    add("${hostDir.absolutePath}:$containerDir")
+                }
+                mount(videoDir, CONTAINER_VIDEO_DIR)
+                mount(screenshotDir, CONTAINER_SCREENSHOTS_DIR)
+                mount(configDir, IDE_CONFIG_DIR)
+                mount(systemDir, IDE_SYSTEM_DIR)
+                mount(logDir, IDE_LOG_DIR)
+                mount(pluginsDir, IDE_PLUGINS_DIR)
+
                 // Tell entrypoint to write video to the mounted path
                 add("-e")
-                add("VIDEO_OUTPUT=/tmp/video/recording.mp4")
+                add("VIDEO_OUTPUT=$CONTAINER_VIDEO_DIR/recording.mp4")
                 add(IMAGE_NAME)
             }
 
