@@ -1,54 +1,41 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration
 
-import org.junit.jupiter.api.Test
+import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
+import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
+import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
+import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Timeout
-import java.io.File
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import java.util.concurrent.TimeUnit
+import java.util.stream.Stream
 
 /**
  * Integration test: debugger demo from ai-tests/07-debugger.md.
  *
- * Runs Claude CLI inside a Docker container with IntelliJ IDEA + MCP Steroid plugin.
+ * Runs AI agents inside a Docker container with IntelliJ IDEA + MCP Steroid plugin.
  * The agent is asked to debug DemoByJonnyzzz.kt and find the sortedByDescending bug.
  *
  * The container is kept alive after the test for debugging (removed on next run).
  * Video is always recorded and mounted to the host for live preview.
  */
 class DebuggerDemoTest {
-/*
-    @Test
+
+    @MethodSource("agents")
+    @ParameterizedTest(name = "{0}")
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
-    fun `agent finds sortedByDescending bug via debugger`() {
-        val apiKey = readAnthropicApiKey()
-
-        val session = IdeContainerSession.start(
-            containerName = "mcp-steroid-debugger-demo",
-            pluginZipPath = IdeTestFolders.pluginZip,
-            ideaArchivePath = IdeTestFolders.downloadedIdea,
-            testProjectDir = File(IdeTestFolders.dockerDir, "test-project"),
-            dockerDir = File(IdeTestFolders.dockerDir, "ide-agent"),
-            testOutputDir = IdeTestFolders.testOutputDir,
-        )
-
-        // Start live video preview on macOS (opens QuickTime once video starts)
-        val previewThread = startLiveVideoPreview(session.videoFile)
-
-        println("[TEST] Waiting for IDE to be ready...")
-        session.waitForIdeReady(timeoutSeconds = 300)
-        println("[TEST] IDE is ready")
-
-        // Register MCP server with Claude CLI inside container
-        session.registerClaudeMcp(apiKey)
-
-        // Send debugger prompt adapted from ai-tests/07-debugger.md
+    fun `agent finds sortedByDescending bug via debugger`(agentName: String, agent: AiAgentSession) {
         val prompt = buildString {
             appendLine("Debug the file DemoByJonnyzzz.kt in this project to find the bug in the leaderboard function.")
             appendLine()
             appendLine("Requirements:")
             appendLine("1. Find and open DemoByJonnyzzz.kt in the project")
             appendLine("2. Set a breakpoint at the sortedByDescending line (line 7)")
-            appendLine("3. Create a run configuration for DemoByJonnyzzz" + "Kt and start the debugger")
+            appendLine("3. Create a run configuration for DemoByJonnyzzzKt and start the debugger")
             appendLine("4. Wait for the debugger to suspend at the breakpoint")
             appendLine("5. Evaluate variables and expressions to understand the bug")
             appendLine("6. Step over the line and observe what happens")
@@ -61,34 +48,21 @@ class DebuggerDemoTest {
             appendLine("ROOT_CAUSE: <one line description>")
         }
 
-        val result = session.runClaudePrompt(prompt, apiKey, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
 
-        // Stop video recording (file is already on host via mount)
-        try {
-            session.stopVideoRecording()
-            println("[TEST] Video saved to: ${session.videoFile}")
-        } catch (e: Exception) {
-            println("[TEST] Failed to stop video: ${e.message}")
-        }
+        // Agent must exit successfully
+        result.assertExitCode(0, message = "debugger demo")
 
-        // Interrupt preview thread
-        previewThread?.interrupt()
-
-        // Assertions
         val combined = result.output + "\n" + result.stderr
 
-        check(result.exitCode == 0) {
-            "Claude CLI exited with code ${result.exitCode}.\nOutput:\n$combined"
-        }
+        // Agent must have used MCP Steroid execute_code tool
+        result.assertOutputContains("steroid_execute_code", message = "agent must use steroid_execute_code")
 
-        check(combined.contains("steroid_execute_code")) {
-            "Agent did not use steroid_execute_code tool.\nOutput:\n$combined"
-        }
+        // Agent must mention sortedByDescending in its analysis
+        result.assertOutputContains("sortedByDescending", message = "agent must mention sortedByDescending")
 
-        check(combined.contains("sortedByDescending")) {
-            "Agent output does not mention sortedByDescending.\nOutput:\n$combined"
-        }
-
+        // Agent must identify the root cause: sortedByDescending returns a new list
+        // but the return value is ignored
         val rootCausePatterns = listOf(
             "ignor", "unused", "discard", "new list", "does not modify",
             "return value", "not assigned", "not used", "immutable",
@@ -101,6 +75,43 @@ class DebuggerDemoTest {
                     "Expected one of: $rootCausePatterns\nOutput:\n$combined"
         }
 
-        println("[TEST] Agent successfully identified the sortedByDescending bug")
-    }*/
+        println("[TEST] Agent '$agentName' successfully identified the sortedByDescending bug")
+    }
+
+    companion object {
+        @JvmStatic
+        val lifetime by lazy {
+            CloseableStackHost()
+        }
+
+        val session by lazy {
+            IdeContainer.create(
+                lifetime,
+                "ide-agent",
+            )
+        }
+
+        @JvmStatic
+        fun agents(): Stream<Arguments> = session
+            .aiAgentDriver
+            .aiAgents
+            .entries.stream()
+            .map { (name, driver) ->
+                Arguments.of(name, driver)
+            }
+
+        @JvmStatic
+        @BeforeAll
+        fun beforeAll() {
+            // Trigger session creation (IDE start, MCP readiness)
+            // The aiAgents lazy property will also call waitForMcpReady()
+            session.toString()
+        }
+
+        @JvmStatic
+        @AfterAll
+        fun tearDown() {
+            lifetime.closeAllStacks()
+        }
+    }
 }
