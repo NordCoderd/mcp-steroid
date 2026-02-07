@@ -128,6 +128,12 @@ class XcvbContainer(
             return
         }
 
-        ProcessBuilder("open", videoFile.absolutePath).start()
+        val path = videoFile.absolutePath
+        println("[VIDEO] Opening live preview: $path")
+        ProcessBuilder(
+            "osascript",
+            "-e", """tell application "QuickTime Player" to open POSIX file "$path"""",
+            "-e", """tell application "QuickTime Player" to play document 1""",
+        ).start()
     }
 }
