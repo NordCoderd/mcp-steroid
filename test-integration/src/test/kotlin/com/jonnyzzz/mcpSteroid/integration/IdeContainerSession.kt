@@ -34,21 +34,28 @@ class IdeContainerSession(
     val pluginsDir: File get() = File(runDir, "ide-plugins")
 
     /**
-     * Wait for the IDE to be ready (MCP server responding).
-     * Polls /tmp/ide-ready marker inside the container.
+     * Wait for the IDE to be ready (MCP server responding to initialize request).
+     * Polls the MCP HTTP endpoint inside the container.
      */
     fun waitForIdeReady(timeoutSeconds: Long = 300) {
         val startTime = System.currentTimeMillis()
         val deadline = startTime + timeoutSeconds * 1000
 
+        val mcpInit = """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"""
+
         while (System.currentTimeMillis() < deadline) {
             val result = scope.runInContainer(
                 containerId,
-                listOf("test", "-f", "/tmp/ide-ready"),
+                listOf(
+                    "curl", "-s", "-f", "-X", "POST",
+                    "http://localhost:6315/mcp",
+                    "-H", "Content-Type: application/json",
+                    "-d", mcpInit,
+                ),
                 timeoutSeconds = 5,
             )
             if (result.exitCode == 0) {
-                println("[IDE-AGENT] IDE is ready (took ${(System.currentTimeMillis() - startTime) / 1000}s)")
+                println("[$LOG_PREFIX] IDE is ready (took ${(System.currentTimeMillis() - startTime) / 1000}s)")
                 return
             }
             Thread.sleep(3000)
@@ -166,6 +173,11 @@ class IdeContainerSession(
             // Deploy plugin into the container's plugins directory
             deployPluginToContainer(driver, containerId, pluginZipPath)
 
+            // Start the display server, window manager, and IDE
+            startDisplayServer(driver, containerId)
+            startWindowManager(driver, containerId)
+            startIde(driver, containerId)
+
             println("[$LOG_PREFIX] Container started: name=$containerName id=$containerId")
             println("[$LOG_PREFIX] Run directory: $runDir")
 
@@ -251,6 +263,53 @@ class IdeContainerSession(
         }
 
         /**
+         * Start Xvfb virtual display server (4K resolution).
+         */
+        private fun startDisplayServer(driver: DockerDriver, containerId: String) {
+            println("[$LOG_PREFIX] Starting Xvfb...")
+            driver.runInContainer(
+                containerId,
+                listOf("bash", "-c", "Xvfb :99 -screen 0 3840x2160x24 -ac &"),
+                timeoutSeconds = 10,
+            )
+            Thread.sleep(1000)
+        }
+
+        /**
+         * Start fluxbox window manager.
+         */
+        private fun startWindowManager(driver: DockerDriver, containerId: String) {
+            println("[$LOG_PREFIX] Starting fluxbox...")
+            driver.runInContainer(
+                containerId,
+                listOf("bash", "-c", "fluxbox &"),
+                timeoutSeconds = 10,
+                extraEnvVars = mapOf("DISPLAY" to ":99"),
+            )
+            Thread.sleep(1000)
+        }
+
+        /**
+         * Start IntelliJ IDEA in the background.
+         * Detects JAVA_HOME dynamically based on the installed JDK.
+         */
+        private fun startIde(driver: DockerDriver, containerId: String) {
+            println("[$LOG_PREFIX] Starting IntelliJ IDEA...")
+            // Detect JAVA_HOME and launch IDEA in background
+            val launchScript = buildString {
+                append("export JAVA_HOME=\$(dirname \$(dirname \$(readlink -f \$(which java)))) && ")
+                append("export DISPLAY=:99 && ")
+                append("/opt/idea/bin/idea nosplash /home/agent/project &")
+            }
+            driver.runInContainer(
+                containerId,
+                listOf("bash", "-c", launchScript),
+                timeoutSeconds = 30,
+                extraEnvVars = mapOf("DISPLAY" to ":99"),
+            )
+        }
+
+        /**
          * Assemble the Docker build context directory.
          * Copies docker resources (Dockerfile, entrypoint.sh) as files,
          * symlinks large artifacts (IDEA archive) to avoid redundant copies.
@@ -329,9 +388,6 @@ class IdeContainerSession(
                 mount(logDir, IDE_LOG_DIR)
                 mount(pluginsDir, IDE_PLUGINS_DIR)
 
-                // Tell entrypoint to write video to the mounted path
-                add("-e")
-                add("VIDEO_OUTPUT=$CONTAINER_VIDEO_DIR/recording.mp4")
                 add(IMAGE_NAME)
             }
 
