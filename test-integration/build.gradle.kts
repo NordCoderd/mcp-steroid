@@ -42,12 +42,12 @@ kotlin {
 val ideDownloadDir = layout.buildDirectory.dir("ide-download")
 val (ideUrl, ideFileName) = run {
     val ideVersion = "2025.3.2"
-    val ideUrlARM = "https://download.jetbrains.com/idea/idea-${ideVersion}-aarch64.tar.gz"
-    val ideUrlX86 = "https://download.jetbrains.com/idea/idea-${ideVersion}.tar.gz"
+    val ideUrlARM = "https://download.jetbrains.com/idea/ideaIC-${ideVersion}-aarch64.tar.gz"
+    val ideUrlX86 = "https://download.jetbrains.com/idea/ideaIC-${ideVersion}.tar.gz"
     if (System.getProperty("os.arch").let { it == "aarch64" || it == "arm64" }) {
         ideUrlARM to "ideaIC-arm.tar.gz"
     } else {
-        ideUrlX86 to "ideaIC-arm.tar.gz"
+        ideUrlX86 to "ideaIC-x86.tar.gz"
     }
 }
 
