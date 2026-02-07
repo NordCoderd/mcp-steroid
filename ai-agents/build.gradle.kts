@@ -10,7 +10,6 @@ repositories {
 }
 
 dependencies {
-    implementation(project(":ai-agents"))
 }
 
 kotlin {

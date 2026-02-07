@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddCommand
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import java.io.File
 
@@ -16,7 +17,7 @@ class DockerClaudeSession(
 ) : AiAgentSession {
 
     override fun registerMcp(mcpUrl: String, mcpName : String) : AiAgentSession {
-        var command = "claude mcp add --transport http $mcpName $mcpUrl"
+        var command = claudeMcpAddCommand(mcpUrl, mcpName)
             .split(" ")
 
         require(command[0] == "claude")
