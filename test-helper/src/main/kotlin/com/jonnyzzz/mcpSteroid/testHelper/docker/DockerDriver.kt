@@ -53,7 +53,7 @@ class DockerDriver(
         lifetime: CloseableStack,
         imageName: String,
         extraEnvVars: Map<String, String> = emptyMap(),
-        volumes: Map<File, String> = emptyMap(),
+        volumes: List<ContainerVolume> = emptyList(),
     ): String {
         val command = buildList {
             add("docker")
@@ -65,9 +65,9 @@ class DockerDriver(
                 add("$key=$value")
             }
 
-            volumes.forEach { (file, volume) ->
+            volumes.forEach { v ->
                 add("-v")
-                add("$file:$volume")
+                add("${v.host.absolutePath}:${v.guest}:${v.mode}")
             }
 
             add(imageName)
@@ -209,7 +209,7 @@ class DockerDriver(
         val wrapperScript = buildString {
             appendLine("#!/bin/bash")
             appendLine("$innerCommand >$logDir/stdout.log 2>$logDir/stderr.log &")
-            appendLine("echo \\$! > $logDir/pid")
+            appendLine("echo $! > $logDir/pid")
             appendLine("wait")
         }
 

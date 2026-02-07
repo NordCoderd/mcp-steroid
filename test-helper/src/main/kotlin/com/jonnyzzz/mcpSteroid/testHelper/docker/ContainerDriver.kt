@@ -43,6 +43,8 @@ interface ContainerDriver {
         containerPath: String,
     )
 
+    fun mapGuestPathToHostPath(path: String) : File
+
     companion object
 }
 
@@ -79,23 +81,30 @@ fun startContainerDriver(
     scope: DockerDriver,
     imageName: String,
     extraEnvVars: Map<String, String> = emptyMap(),
-    volumes: Map<File, String> = emptyMap(),
+    volumes: List<ContainerVolume> = listOf(),
 ): ContainerDriver {
     val containerId = scope.startContainer(lifetime, imageName, extraEnvVars, volumes)
-    return ContainerDriverImpl(scope, containerId, imageName)
+    return ContainerDriverImpl(scope, containerId, imageName, volumes)
 }
+
+data class ContainerVolume(
+    val host: File,
+    val guest: String,
+    val mode: String = "rw",
+)
 
 private class ContainerDriverImpl(
     private val scope: DockerDriver,
     private val containerId: String,
-    private val imageName: String
+    private val imageName: String,
+    private val volumes: List<ContainerVolume> = emptyList(),
 ) : ContainerDriver {
     override fun withSecretPattern(secretPattern: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName)
+        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes.toList())
     }
 
     override fun withEnv(key: String, value: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName)
+        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName, volumes.toList())
     }
 
     override fun runInContainer(
@@ -128,6 +137,20 @@ private class ContainerDriverImpl(
 
     override fun copyToContainer(localPath: File, containerPath: String) {
         scope.copyToContainer(containerId, localPath, containerPath)
+    }
+
+    override fun mapGuestPathToHostPath(path: String): File {
+        for (v in volumes) {
+            if (v.guest == path) {
+                return v.host
+            }
+
+            if (path.startsWith(v.guest + "/")) {
+                val prefix = path.removePrefix(v.guest + "/").trim('/')
+                return v.host.resolve(prefix)
+            }
+        }
+        error("Not found volume for guest path $path")
     }
 
     override fun toString(): String {

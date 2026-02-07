@@ -40,11 +40,11 @@ class RunningContainerProcess(
     }
 
     /** Read the PID of the background process. Returns null if not available. */
-    fun readPid(timeoutSeconds: Long = 5): String? {
+    fun readPid(): String? {
         val result = driver.runInContainer(
             containerId,
             listOf("cat", pidPath),
-            timeoutSeconds = timeoutSeconds,
+            timeoutSeconds = 5L,
         )
         return result.output.trim().takeIf { it.isNotEmpty() && result.exitCode == 0 }
     }

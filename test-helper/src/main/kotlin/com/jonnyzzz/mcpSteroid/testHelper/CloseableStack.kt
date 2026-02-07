@@ -14,15 +14,20 @@ class CloseableStackHost : CloseableStack {
 
     fun closeAllStacks() {
         val errors = mutableListOf<Throwable>()
-        cleanupActions.reversed().forEach {
-            try {
-                it()
-            } catch (t: Throwable) {
-                println("Error during cleanup: ${t.message}")
-                println(t.stackTraceToString())
-                errors.add(t)
+        while (cleanupActions.isNotEmpty()) {
+            val copy = cleanupActions.toMutableList().reversed()
+            cleanupActions.clear()
+            for (it in copy) {
+                try {
+                    it()
+                } catch (t: Throwable) {
+                    println("Error during cleanup: ${t.message}")
+                    println(t.stackTraceToString())
+                    errors.add(t)
+                }
             }
         }
+
         if (errors.isNotEmpty()) {
             throw Error("Error during cleanup").apply {
                 errors.forEach {

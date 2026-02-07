@@ -33,7 +33,7 @@ class XcvbContainer(
 
     fun startVideoRecording(): RunningContainerProcess {
         val videoPath = "$videoDirInContainer/recording.mp4"
-        println("[xcvb] Starting video recording to $videoPath...")
+        println("[xcvb] Starting video recording to ${driver.mapGuestPathToHostPath(videoPath)}...")
         val proc = driver.runInContainerDetached(
             listOf(
                 "ffmpeg", "-f", "x11grab", "-video_size", "3840x2160",
@@ -43,6 +43,11 @@ class XcvbContainer(
             ),
             name = "ffmpeg",
         )
+        lifetime.registerCleanupAction {
+            //TODO: map the path back to the host!
+            println("Check out screen recording at ${driver.mapGuestPathToHostPath(videoPath)}")
+            proc.kill("TERM")
+        }
         return proc
     }
 

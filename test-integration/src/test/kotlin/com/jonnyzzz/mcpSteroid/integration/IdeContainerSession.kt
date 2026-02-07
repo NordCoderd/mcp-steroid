@@ -6,6 +6,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
 import java.lang.Thread.sleep
@@ -146,8 +147,8 @@ class IdeContainerSession(
             val container = startContainerDriver(
                 lifetime, scope, imageName,
                 extraEnvVars = emptyMap(),
-                volumes = mapOf(
-                    hostPaths.runDir to containerMountedPath,
+                volumes = listOf(
+                    ContainerVolume(hostPaths.runDir, containerMountedPath, "rw")
                 )
             )
 
