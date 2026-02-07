@@ -9,4 +9,7 @@ interface AiAgentSession {
         prompt: String,
         timeoutSeconds: Long = 120
     ): ProcessResult
+
+
+    fun registerMcp(mcpUrl: String, mcpName : String) : AiAgentSession
 }

@@ -93,20 +93,18 @@ fun IdeContainer.Companion.create(
 
     // Write info file with all ports and URLs for external tools
     val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
-    val mcpPort = session.aiAgentDriver.mcpSteroidHostPort
+    val mcpUrl = session.aiAgentDriver.mcpSteroidHostUrl
     val infoFile = File(runDir, "session-info.txt")
     infoFile.writeText(buildString {
         appendLine("RUN_DIR=$runDir")
         appendLine("VIDEO_DASHBOARD=http://localhost:$videoPort/")
         appendLine("VIDEO_STREAM=http://localhost:$videoPort/video.mp4")
-        appendLine("MCP_STEROID=http://localhost:$mcpPort/")
-        appendLine("VIDEO_PORT=$videoPort")
-        appendLine("MCP_PORT=$mcpPort")
+        appendLine("MCP_STEROID=$mcpUrl")
     })
     println()
     println("=".repeat(60))
     println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
-    println("  MCP STEROID:     http://localhost:$mcpPort/")
+    println("  MCP STEROID:     http://localhost:$mcpUrl/")
     println("  SESSION INFO:    $infoFile")
     println("=".repeat(60))
     println()

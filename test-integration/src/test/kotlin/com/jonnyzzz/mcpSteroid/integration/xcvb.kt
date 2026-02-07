@@ -149,7 +149,7 @@ class XcvbDriver(
                     process.inputStream.bufferedReader().readText().trim() == "200"
                 }
 
-                println("[VIDEO] Opening dashboard: $dashboardUrl")
+                println("[TEST VIDEO] Opening dashboard: $dashboardUrl")
                 ProcessBuilder("open", dashboardUrl).start()
             }
         }

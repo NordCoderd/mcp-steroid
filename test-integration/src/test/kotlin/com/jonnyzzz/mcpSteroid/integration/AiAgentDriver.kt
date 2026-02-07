@@ -6,18 +6,32 @@ import com.jonnyzzz.mcpSteroid.testHelper.DockerClaudeSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerCodexSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 
-class McpSteroidDriver(
+class AiAgentDriver(
     val scope: ContainerDriver,
-
+    val connectMcpSteroid: Boolean = true
 ) {
     /** Host port mapped to the MCP Steroid server inside the container. */
     val mcpSteroidHostPort: Int
         get() = scope.mapContainerPortToHostPort(IntelliJDriver.MCP_STEROID_PORT)
 
-    val mcpSteroidUrl get() = "http://127.0.0.1:$mcpSteroidHostPort"
+    val mcpSteroidHostUrl get() = "http://localhost:$mcpSteroidHostPort"
+    val mcpSteroidGuestUrl get() = "http://localhost:${IntelliJDriver.MCP_STEROID_PORT.containerPort}"
+
     val mcpSteroidName: String = "mcp-steroid"
 
-    private fun prepareAIAgent(agent: AiAgentSession): AiAgentSession = agent.registerMcp(mcpSteroidName, mcpSteroidUrl)
+    private fun prepareAIAgent(agent: AiAgentSession): AiAgentSession {
+        return if (connectMcpSteroid) {
+            agent.registerMcp(mcpSteroidName, mcpSteroidGuestUrl)
+        } else {
+            agent
+        }
+    }
+
+    val aiAgents get() = mapOf(
+        "claude" to claudeCode,
+        "codex" to codex,
+        "gemini" to gemini,
+    )
 
     val claudeCode by lazy {
         prepareAIAgent(

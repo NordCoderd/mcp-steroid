@@ -17,9 +17,7 @@ class DockerCodexSession(
     private val debug: Boolean = false,
 ) : AiAgentSession {
 
-    fun toAiSession(): AiAgentSession = this
-
-    fun registerMcp(mcpUrl: String, mcpName: String) = apply {
+    override fun registerMcp(mcpUrl: String, mcpName: String) : AiAgentSession{
         var command = "codex mcp add $mcpName --url $mcpUrl"
             .split(" ")
 
@@ -28,6 +26,8 @@ class DockerCodexSession(
         runInContainer(args = command.toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput("MCP server registration")
+
+        return this
     }
 
     /**

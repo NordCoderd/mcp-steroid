@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerSession
 import java.io.File
 
 /**
@@ -14,9 +13,7 @@ class DockerGeminiSession(
     private val debug: Boolean = false,
 ) : AiAgentSession {
 
-    fun toAiSession(): AiAgentSession = this
-
-    fun registerMcp(mcpUrl: String, mcpName: String) = apply {
+    override fun registerMcp(mcpUrl: String, mcpName: String) : AiAgentSession {
         var command = "gemini mcp add $mcpName --type http $mcpUrl"
             .split(" ")
 
@@ -27,6 +24,8 @@ class DockerGeminiSession(
         runInContainer(args = command.toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput(message = "MCP server registration")
+
+        return this
     }
 
     fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {

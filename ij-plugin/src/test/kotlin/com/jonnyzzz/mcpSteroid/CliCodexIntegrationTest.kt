@@ -45,7 +45,7 @@ import kotlin.time.Duration.Companion.seconds
 class CliCodexIntegrationTest : CliIntegrationTestBase() {
     private fun codexSession() = DockerCodexSession.create(lifetime)
 
-    override fun newAiSession(): AiAgentSession = codexSession().registerMcp(resolveDockerUrl(), "intellij").toAiSession()
+    override fun newAiSession(): AiAgentSession = codexSession().registerMcp(resolveDockerUrl(), "intellij")
 
     /**
      * Tests that Codex CLI is properly installed in the Docker container.
