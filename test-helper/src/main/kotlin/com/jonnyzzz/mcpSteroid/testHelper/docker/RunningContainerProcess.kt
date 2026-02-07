@@ -20,9 +20,10 @@ class RunningContainerProcess(
     val stdoutPath: String get() = "$logDir/stdout.log"
     val stderrPath: String get() = "$logDir/stderr.log"
     val pidPath: String get() = "$logDir/pid"
+    val exitcodePath: String get() = "$logDir/exitcode"
 
     override val exitCode: Int
-        get() = -1
+        get() = readExitCode() ?: -1
 
     override val output: String
         get() = readOutput()
@@ -58,6 +59,20 @@ class RunningContainerProcess(
             timeoutSeconds = 5L,
         )
         return result.output.trim().takeIf { it.isNotEmpty() && result.exitCode == 0 }
+    }
+
+    /**
+     * Read the exit code of the process. Returns null if the process
+     * is still running (exitcode file not yet written).
+     */
+    fun readExitCode(timeoutSeconds: Long = 5): Int? {
+        val result = driver.runInContainer(
+            containerId,
+            listOf("cat", exitcodePath),
+            timeoutSeconds = timeoutSeconds,
+        )
+        if (result.exitCode != 0) return null
+        return result.output.trim().toIntOrNull()
     }
 
     /** Kill the background process if it is still running. */

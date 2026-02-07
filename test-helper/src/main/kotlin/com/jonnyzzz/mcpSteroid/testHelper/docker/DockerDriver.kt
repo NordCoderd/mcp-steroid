@@ -215,8 +215,10 @@ class DockerDriver(
         val wrapperScript = buildString {
             appendLine("#!/bin/bash")
             appendLine("$innerCommand >$logDir/stdout.log 2>$logDir/stderr.log &")
-            appendLine("echo $! > $logDir/pid")
-            appendLine("wait")
+            appendLine("_PID=\$!")
+            appendLine("echo \$_PID > $logDir/pid")
+            appendLine("wait \$_PID")
+            appendLine("echo \$? > $logDir/exitcode")
         }
 
         // Write the wrapper script into the container
