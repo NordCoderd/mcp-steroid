@@ -8,7 +8,7 @@ repositories {
 }
 
 application {
-    mainClass.set("com.jonnyzzz.mcpSteroid.demo.DemoByJonnyzzz" + "Kt")
+    mainClass.set("com.jonnyzzz.mcpSteroid.demo.DemoByJonnyzzzKt")
 }
 
 kotlin {
