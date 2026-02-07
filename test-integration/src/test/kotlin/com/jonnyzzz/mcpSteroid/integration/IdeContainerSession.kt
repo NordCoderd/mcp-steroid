@@ -85,6 +85,8 @@ class IdeContainerSession(
     companion object {
         private const val LOG_PREFIX = "IDE-AGENT"
         private const val IMAGE_NAME = "mcp-steroid-ide-test"
+        private const val IDEA_BIN_DIR = "/opt/idea/bin"
+        private const val IDEA_VMOPTIONS_PATH = "$IDEA_BIN_DIR/idea64.vmoptions"
 
         /**
          * Build and start an IDE Docker container.
@@ -118,10 +120,65 @@ class IdeContainerSession(
             buildImage(driver, contextDir)
             val containerId = startContainer(driver, containerName, videoDir, contextDir)
 
+            // Write generated vmoptions into the container
+            writeVmOptionsToContainer(driver, containerId, contextDir)
+
             println("[$LOG_PREFIX] Container started: name=$containerName id=$containerId")
             println("[$LOG_PREFIX] Video output: ${videoDir.absolutePath}/recording.mp4")
 
             return IdeContainerSession(driver, containerId, containerName, videoDir)
+        }
+
+        /**
+         * Generate IDEA VM options content for running inside the Docker container.
+         */
+        private fun generateVmOptions(): String = buildString {
+            appendLine("-Xmx2g")
+            appendLine("-Xms512m")
+
+            appendLine("# MCP Steroid plugin configuration")
+            appendLine("-Dmcp.steroid.server.host=0.0.0.0")
+            appendLine("-Dmcp.steroid.server.port=6315")
+            appendLine("-Dmcp.steroid.review.mode=NEVER")
+            appendLine("-Dmcp.steroid.updates.enabled=false")
+            appendLine("-Dmcp.steroid.analytics.enabled=false")
+            appendLine("-Dmcp.steroid.idea.description.enabled=false")
+
+            appendLine("# Skip EULA, consent dialogs, and onboarding")
+            appendLine("-Djb.consents.confirmation.enabled=false")
+            appendLine("-Djb.privacy.policy.text=<!--999.999-->")
+            appendLine("-Djb.privacy.policy.ai.assistant.text=<!--999.999-->")
+            appendLine("-Dmarketplace.eula.reviewed.and.accepted=true")
+            appendLine("-Dwriterside.eula.reviewed.and.accepted=true")
+            appendLine("-Didea.initially.ask.config=never")
+            appendLine("-Dide.newUsersOnboarding=false")
+
+            appendLine("# Suppress telemetry and update checks")
+            appendLine("-Didea.suppress.statistics.report=true")
+            appendLine("-Didea.local.statistics.without.report=true")
+            appendLine("-Dfeature.usage.event.log.send.on.ide.close=false")
+            appendLine("-Dide.enable.notification.trace.data.sharing=false")
+            appendLine("-Didea.updates.url=http://127.0.0.1")
+            appendLine("-Dide.do.not.disable.paid.plugins.on.startup=true")
+        }
+
+        /**
+         * Write the generated vmoptions file into the container at the IDEA install location.
+         * Uses docker cp to copy a temp file into the running container.
+         */
+        private fun writeVmOptionsToContainer(driver: DockerDriver, containerId: String, workDir: File) {
+            val vmoptionsContent = generateVmOptions()
+            val tempFile = File(workDir, "idea64.vmoptions")
+            tempFile.writeText(vmoptionsContent)
+
+            println("[$LOG_PREFIX] Writing vmoptions to container: $IDEA_VMOPTIONS_PATH")
+            driver.processRunner.run(
+                listOf("docker", "cp", tempFile.absolutePath, "$containerId:$IDEA_VMOPTIONS_PATH"),
+                description = "Copy vmoptions to container",
+                workingDir = workDir,
+                timeoutSeconds = 10,
+            )
+            tempFile.delete()
         }
 
         /**
@@ -138,7 +195,7 @@ class IdeContainerSession(
             val contextDir = createTempDir(LOG_PREFIX.lowercase())
             println("[$LOG_PREFIX] Build context: $contextDir")
 
-            // Copy docker resource files (Dockerfile, entrypoint.sh, idea.vmoptions)
+            // Copy docker resource files (Dockerfile, entrypoint.sh)
             dockerDir.listFiles()?.filter { it.isFile }?.forEach { file ->
                 file.copyTo(File(contextDir, file.name), overwrite = true)
             }

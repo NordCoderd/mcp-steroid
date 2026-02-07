@@ -82,9 +82,7 @@ RUN mkdir -p ${IDE_CONFIG_DIR}/plugins && \
 COPY test-project/ /home/agent/project/
 RUN chown -R agent:agent /home/agent/project
 
-# Copy IDE VM options
-COPY idea.vmoptions ${IDE_CONFIG_DIR}/idea64.vmoptions
-RUN chown agent:agent ${IDE_CONFIG_DIR}/idea64.vmoptions
+# VM options are generated and written by IdeContainerSession during container run
 
 # Copy entrypoint
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
