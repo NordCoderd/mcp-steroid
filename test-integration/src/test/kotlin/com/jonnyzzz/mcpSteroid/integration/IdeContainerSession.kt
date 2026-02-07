@@ -173,8 +173,10 @@ class IdeContainerSession(
             // Deploy plugin into the container's plugins directory
             deployPluginToContainer(driver, containerId, pluginZipPath)
 
-            // Start the display server, window manager, and IDE
+            // Start the display server, video recording, window manager, and IDE
+            // Video recording starts first (after Xvfb) to capture the full IDE startup
             startDisplayServer(driver, containerId)
+            startVideoRecording(driver, containerId)
             startWindowManager(driver, containerId)
             startIde(driver, containerId)
 
@@ -273,6 +275,27 @@ class IdeContainerSession(
                 timeoutSeconds = 10,
             )
             Thread.sleep(1000)
+        }
+
+        /**
+         * Start ffmpeg video recording.
+         * Writes to the mounted video directory so the recording is available on the host in real-time.
+         */
+        private fun startVideoRecording(driver: DockerDriver, containerId: String) {
+            val videoPath = "$CONTAINER_VIDEO_DIR/recording.mp4"
+            println("[$LOG_PREFIX] Starting video recording to $videoPath...")
+            val ffmpegCmd = buildString {
+                append("ffmpeg -f x11grab -video_size 3840x2160 -framerate 10 -i :99 ")
+                append("-c:v libx264 -preset ultrafast -crf 28 ")
+                append("$videoPath </dev/null >/dev/null 2>&1 &")
+            }
+            driver.runInContainer(
+                containerId,
+                listOf("bash", "-c", ffmpegCmd),
+                timeoutSeconds = 10,
+                extraEnvVars = mapOf("DISPLAY" to ":99"),
+            )
+            Thread.sleep(500)
         }
 
         /**
