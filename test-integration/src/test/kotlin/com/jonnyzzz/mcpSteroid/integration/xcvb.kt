@@ -6,7 +6,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import kotlin.concurrent.thread
 
-class XcvbContainer(
+class XcvbDriver(
     private val lifetime: CloseableStack,
     driver: ContainerDriver,
     private val videoDirInContainer: String,
@@ -23,6 +23,7 @@ class XcvbContainer(
 
         startWindowManager()
         startVideoRecording()
+        startVideoStreamingServer()
         startScreenshotCapture()
     }
 
@@ -73,6 +74,17 @@ class XcvbContainer(
     }
 
     /**
+     * Start the Node.js HTTP server that streams the growing MP4 file.
+     * The server is baked into the Docker image at /usr/local/bin/video-server.js.
+     */
+    fun startVideoStreamingServer(): RunningContainerProcess {
+        println("[xcvb] Starting video streaming server on container port $VIDEO_STREAMING_PORT...")
+        return driver.runInContainerDetached(
+            listOf("node", "/usr/local/bin/video-server.js", videoGuestPath, VIDEO_STREAMING_PORT.toString()),
+        )
+    }
+
+    /**
      * Start periodic screenshot capture (one PNG per second).
      * Screenshots are saved to the mounted screenshots directory for live inspection.
      */
@@ -105,11 +117,15 @@ class XcvbContainer(
     }
 
     /**
-     * Start a background thread that watches the video file and opens it with QuickTime
-     * once it reaches a minimum size (ffmpeg has started writing). This provides
-     * live screen output during the test on macOS.
+     * Start a background thread that opens the live video stream in the default browser
+     * once the streaming server is ready. This provides live screen output during the test
+     * on macOS.
      *
-     * No-op on non-macOS platforms or if video file does not appear within timeout.
+     * The video is served by the Node.js streaming server inside the container,
+     * exposed to the host via Docker port mapping. This avoids the Docker Desktop
+     * virtiofs flush issue where mounted volume files are not readable until closed.
+     *
+     * No-op on non-macOS platforms or if the streaming port is not mapped.
      */
     fun startLiveVideoPreview() {
         if (System.getProperty("os.name")?.contains("Mac", ignoreCase = true) != true) {
@@ -117,24 +133,34 @@ class XcvbContainer(
             return
         }
 
+        val hostPort = driver.hostPorts[VIDEO_STREAMING_PORT]
+        if (hostPort == null) {
+            println("[VIDEO] Streaming port $VIDEO_STREAMING_PORT not mapped, skipping live preview")
+            return
+        }
+
+        val streamUrl = "http://localhost:$hostPort/video.mp4"
+
         val thread = thread(start = true) {
             runCatching {
-                waitFor(35_000L, "Video File is created and not empty") {
-                    videoFile.isFile() && videoFile.length() > 1110
+                waitFor(35_000L, "Video streaming server ready") {
+                    val process = ProcessBuilder("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", streamUrl)
+                        .start()
+                    process.waitFor()
+                    process.inputStream.bufferedReader().readText().trim() == "200"
                 }
 
-                val path = videoFile.absolutePath
-                println("[VIDEO] Opening live preview: $path")
-                ProcessBuilder(
-                    "osascript",
-                    "-e", """tell application "QuickTime Player" to open POSIX file "$path"""",
-                    "-e", """tell application "QuickTime Player" to play document 1""",
-                ).start()
+                println("[VIDEO] Opening live stream: $streamUrl")
+                ProcessBuilder("open", streamUrl).start()
             }
         }
 
         lifetime.registerCleanupAction {
             thread.interrupt()
         }
+    }
+
+    companion object {
+        const val VIDEO_STREAMING_PORT = 8765
     }
 }

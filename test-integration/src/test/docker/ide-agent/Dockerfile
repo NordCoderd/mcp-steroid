@@ -69,6 +69,9 @@ RUN mkdir -p /opt/idea && chmod a+rwx /opt && \
     tar -xzf /tmp/idea.tar.gz -C /opt/idea --strip-components=1 && \
     rm /tmp/idea.tar.gz
 
+# Video streaming server (serves growing MP4 over HTTP for live preview)
+COPY video-server.js /usr/local/bin/video-server.js
+
 # Desktop wallpaper
 COPY wallpaper.jpg /usr/share/images/mcp-steroid-wallpaper.jpg
 
