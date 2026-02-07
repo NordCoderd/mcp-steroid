@@ -41,34 +41,37 @@ function serveHtml(req, res) {
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
+  html, body {
     font-family: 'JetBrains Mono', monospace;
     background: #1e1e2e;
     color: #cdd6f4;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 24px;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
   }
   .header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
     display: flex;
     align-items: center;
     gap: 16px;
-    margin-bottom: 16px;
-    width: 100%;
-    max-width: 1920px;
+    padding: 8px 16px;
+    background: rgba(30, 30, 46, 0.85);
+    backdrop-filter: blur(8px);
   }
   .title {
-    font-size: 20px;
+    font-size: 16px;
     font-weight: 700;
     color: #cba6f7;
   }
   .run-id {
-    font-size: 13px;
+    font-size: 12px;
     color: #6c7086;
     background: #313244;
-    padding: 4px 10px;
+    padding: 3px 8px;
     border-radius: 6px;
   }
   .status {
@@ -76,7 +79,7 @@ function serveHtml(req, res) {
     align-items: center;
     gap: 8px;
     margin-left: auto;
-    font-size: 13px;
+    font-size: 12px;
   }
   .dot {
     width: 10px;
@@ -98,25 +101,27 @@ function serveHtml(req, res) {
     50% { opacity: 0.5; }
   }
   .status-text { color: #a6adc8; }
-  .video-container {
-    width: 100%;
-    max-width: 1920px;
-    background: #181825;
-    border-radius: 12px;
-    overflow: hidden;
-    border: 1px solid #313244;
-  }
   video {
-    width: 100%;
-    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+    background: #000;
   }
   .waiting {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    height: 400px;
     color: #6c7086;
     font-size: 14px;
+    background: #1e1e2e;
   }
 </style>
 </head>
@@ -129,17 +134,57 @@ function serveHtml(req, res) {
       <span class="status-text" id="statusText">checking...</span>
     </div>
   </div>
-  <div class="video-container">
-    <div class="waiting" id="waiting">Waiting for video stream...</div>
-    <video id="video" controls autoplay muted style="display:none">
-      <source src="/video.mp4" type="video/mp4">
-    </video>
-  </div>
+  <div class="waiting" id="waiting">Waiting for video stream...</div>
+  <video id="video" autoplay muted style="display:none"></video>
 <script>
   const dot = document.getElementById('statusDot');
   const statusText = document.getElementById('statusText');
   const video = document.getElementById('video');
   const waiting = document.getElementById('waiting');
+
+  let videoStarted = false;
+
+  async function startVideoStream() {
+    if (videoStarted) return;
+    videoStarted = true;
+
+    video.style.display = 'block';
+    waiting.style.display = 'none';
+
+    // Use fetch + ReadableStream to pipe growing MP4 into MediaSource
+    if (window.MediaSource && MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
+      const ms = new MediaSource();
+      video.src = URL.createObjectURL(ms);
+
+      ms.addEventListener('sourceopen', async () => {
+        const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E"');
+        const response = await fetch('/video.mp4');
+        const reader = response.body.getReader();
+
+        async function pump() {
+          const { done, value } = await reader.read();
+          if (done) {
+            if (ms.readyState === 'open') ms.endOfStream();
+            return;
+          }
+          // Wait for the buffer to finish updating before appending more
+          if (sb.updating) {
+            await new Promise(r => sb.addEventListener('updateend', r, { once: true }));
+          }
+          sb.appendBuffer(value);
+          await new Promise(r => sb.addEventListener('updateend', r, { once: true }));
+          pump();
+        }
+        pump();
+      });
+    } else {
+      // Fallback: direct src (won't stream progressively but may work for completed files)
+      video.src = '/video.mp4';
+      video.load();
+    }
+
+    video.play().catch(() => {});
+  }
 
   async function checkStatus() {
     try {
@@ -152,10 +197,8 @@ function serveHtml(req, res) {
         dot.className = 'dot stopped';
         statusText.textContent = 'test stopped';
       }
-      if (data.videoReady && video.style.display === 'none') {
-        video.style.display = 'block';
-        waiting.style.display = 'none';
-        video.load();
+      if (data.videoReady && !videoStarted) {
+        startVideoStream();
       }
     } catch (_) {
       dot.className = 'dot stopped';
