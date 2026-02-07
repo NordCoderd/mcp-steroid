@@ -3,10 +3,8 @@ package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
-import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -33,5 +31,13 @@ class IdeContainerSessionTest {
             "ide-agent",
         )
 
+        val videoPort = session.scope.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
+        val mcpPort = session.mcpSteroidHostPort
+        println()
+        println("=".repeat(60))
+        println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
+        println("  MCP STEROID:     http://localhost:$mcpPort/")
+        println("=".repeat(60))
+        println()
     }
 }

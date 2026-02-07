@@ -21,6 +21,7 @@ class XcvbDriver(
     }
 
     fun startAllServices() {
+        driver.mkdirs(videoDirInContainer)
         startDisplayServer()
 
         startWindowManager()

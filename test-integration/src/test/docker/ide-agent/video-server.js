@@ -144,45 +144,13 @@ function serveHtml(req, res) {
 
   let videoStarted = false;
 
-  async function startVideoStream() {
+  function startVideoStream() {
     if (videoStarted) return;
     videoStarted = true;
 
     video.style.display = 'block';
     waiting.style.display = 'none';
-
-    // Use fetch + ReadableStream to pipe growing MP4 into MediaSource
-    if (window.MediaSource && MediaSource.isTypeSupported('video/mp4; codecs="avc1.42E01E"')) {
-      const ms = new MediaSource();
-      video.src = URL.createObjectURL(ms);
-
-      ms.addEventListener('sourceopen', async () => {
-        const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.42E01E"');
-        const response = await fetch('/video.mp4');
-        const reader = response.body.getReader();
-
-        async function pump() {
-          const { done, value } = await reader.read();
-          if (done) {
-            if (ms.readyState === 'open') ms.endOfStream();
-            return;
-          }
-          // Wait for the buffer to finish updating before appending more
-          if (sb.updating) {
-            await new Promise(r => sb.addEventListener('updateend', r, { once: true }));
-          }
-          sb.appendBuffer(value);
-          await new Promise(r => sb.addEventListener('updateend', r, { once: true }));
-          pump();
-        }
-        pump();
-      });
-    } else {
-      // Fallback: direct src (won't stream progressively but may work for completed files)
-      video.src = '/video.mp4';
-      video.load();
-    }
-
+    video.src = '/video.mp4';
     video.play().catch(() => {});
   }
 

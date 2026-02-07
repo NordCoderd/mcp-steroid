@@ -60,6 +60,9 @@ val downloadIdea by tasks.registering(Download::class) {
 
 tasks.test {
     useJUnitPlatform()
+    testLogging {
+        showStandardStreams = true
+    }
     systemProperty("junit.jupiter.execution.timeout.default", "15m")
 
     dependsOn(pluginZip)
