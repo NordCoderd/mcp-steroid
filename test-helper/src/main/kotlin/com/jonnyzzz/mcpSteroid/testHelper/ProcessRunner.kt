@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit
  * Result from running a process.
  */
 interface ProcessResult {
-    val exitCode: Int
+    val exitCode: Int?
     val output: String
     val stderr: String
 }

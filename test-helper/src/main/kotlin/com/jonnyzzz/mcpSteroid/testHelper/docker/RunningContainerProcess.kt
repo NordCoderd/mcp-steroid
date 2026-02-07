@@ -2,11 +2,12 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
+import kotlin.sequences.forEach
 
 /**
  * Represents a process running inside a Docker container with output redirected to files.
  * Stdout, stderr, and PID are stored in [logDir] inside the container.
- * Use [readOutput], [readStderr] to fetch content via `docker exec`.
+ * Use [readStdOut], [readStderr] to fetch content via `docker exec`.
  * Use [kill] to terminate the process if it is still running.
  */
 class RunningContainerProcess(
@@ -22,17 +23,35 @@ class RunningContainerProcess(
     val pidPath: String get() = "$logDir/pid"
     val exitcodePath: String get() = "$logDir/exitcode"
 
-    override val exitCode: Int
-        get() = readExitCode() ?: -1
+    override val exitCode: Int?
+        get() = readExitCode()
 
     override val output: String
-        get() = readOutput()
+        get() = readStdOut()
 
     override val stderr: String
         get() = readStderr()
 
+    fun printProcessInfo() {
+        val exitCode = readExitCode()
+        val isRunning = isRunning()
+        val output = buildString {
+            appendLine()
+            if (isRunning) {
+                appendLine("[$name] Process is till running...")
+            } else {
+                appendLine("[$name] Process is exited with code $exitCode!")
+            }
+            readStdOut().lineSequence().forEach { line -> appendLine("[$name OUT] $line") }
+            appendLine()
+            readStderr().lineSequence().forEach { line -> appendLine("[$name ERR] $line") }
+            appendLine()
+        }
+        println(output)
+    }
+
     /** Read current stdout content from the container. */
-    fun readOutput(timeoutSeconds: Long = 10): String {
+    fun readStdOut(timeoutSeconds: Long = 10): String {
         val result = driver.runInContainer(
             containerId,
             listOf("cat", stdoutPath),

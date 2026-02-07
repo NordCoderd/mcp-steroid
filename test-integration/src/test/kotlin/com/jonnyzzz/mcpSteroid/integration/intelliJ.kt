@@ -16,7 +16,7 @@ class IntelliJDriver(
     private val intelliJGuestHomeDir = "/opt/idea"
     private val projectDir = "$guestDir/project-home"
     private val configGuestDir = "$guestDir/ide-config"
-    private val systemGuestDir = "/internal/ide-system"
+    private val systemGuestDir = "/home/agent/ide-system"
     private val logsGuestDir = "$guestDir/ide-log"
     private val pluginsGuestDir = "$guestDir/ide-plugins"
 
@@ -48,33 +48,42 @@ class IntelliJDriver(
         println("[IDE-AGENT] Starting IntelliJ IDEA...")
         val idea = driver.runInContainerDetached(
             listOf("/opt/idea/bin/idea.sh", projectDir),
-            extraEnvVars = mapOf(),
         )
 
         try {
-            waitFor(60_000L) {
+            waitFor(10_000L) {
                 readLogs().size > 20
             }
         } catch (t: Throwable) {
-            idea.stderrPath
-            throw RuntimeException("Problem reading IntelliJ IDEA", t)
+            idea.printProcessInfo()
 
+            if (!idea.isRunning()) {
+                throw RuntimeException("IntelliJ IDEA Exited Unexpectedly with code ${idea.exitCode}. See logs above for details.")
+            } else {
+                throw RuntimeException("Problem reading IntelliJ IDEA", t)
+            }
         }
 
-//
-//        val ijLogsStream = thread(isDaemon = true, name = "ijLogsStream") {
-//            waitFor(20_000L) {
-//
-//            }
-//            val logsFile =
-//            while (true) {
-//                Thread.sleep(100)
-//            }
-//        }
+        val ijLogsStream = thread(isDaemon = true, name = "ijLogsStream") {
+            runCatching {
+                ideaLogsFile().bufferedReader().use { reader ->
+                    while (true) {
+                        val line = reader.readLine()
+                        if (line == null) {
+                            Thread.sleep(100)
+                            continue
+                        }
+                        println("[IntelliJ LOG] $line")
+                    }
+                }
+            }
+        }
 
-        TODO()
-        //wait for IDEA is ready somehow
-//        return idea
+        lifetime.registerCleanupAction {
+            ijLogsStream.interrupt()
+        }
+
+        return idea
     }
 
     fun mountProjectFiles(projectName: String) {

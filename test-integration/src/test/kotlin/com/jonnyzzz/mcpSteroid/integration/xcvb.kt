@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
+import kotlin.concurrent.thread
 
 class XcvbContainer(
     private val lifetime: CloseableStack,
@@ -68,10 +69,6 @@ class XcvbContainer(
             proc.kill("INT")
         }
 
-        waitFor(15_000L) {
-            videoFile.exists() && videoFile.length() > 1110
-        }
-
         return proc
     }
 
@@ -120,12 +117,24 @@ class XcvbContainer(
             return
         }
 
-        val path = videoFile.absolutePath
-        println("[VIDEO] Opening live preview: $path")
-        ProcessBuilder(
-            "osascript",
-            "-e", """tell application "QuickTime Player" to open POSIX file "$path"""",
-            "-e", """tell application "QuickTime Player" to play document 1""",
-        ).start()
+        val thread = thread(start = true) {
+            runCatching {
+                waitFor(35_000L, "Video File is created and not empty") {
+                    videoFile.isFile() && videoFile.length() > 1110
+                }
+
+                val path = videoFile.absolutePath
+                println("[VIDEO] Opening live preview: $path")
+                ProcessBuilder(
+                    "osascript",
+                    "-e", """tell application "QuickTime Player" to open POSIX file "$path"""",
+                    "-e", """tell application "QuickTime Player" to play document 1""",
+                ).start()
+            }
+        }
+
+        lifetime.registerCleanupAction {
+            thread.interrupt()
+        }
     }
 }

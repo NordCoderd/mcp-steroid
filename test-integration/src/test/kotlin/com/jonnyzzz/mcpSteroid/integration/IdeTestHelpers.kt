@@ -50,10 +50,15 @@ fun copyRecursively(source: File, destination: File) {
     }
 }
 
-fun waitFor(timeoutMillie: Long, action: () -> Boolean) {
+fun waitFor(timeoutMillie: Long, condition: String = "condition", action: () -> Boolean) {
+    println("Waiting $condition for $timeoutMillie ms...")
     val now = System.currentTimeMillis()
     Thread.sleep(50)
-    while (System.currentTimeMillis() - now < timeoutMillie && action()) {
+    while (System.currentTimeMillis() - now < timeoutMillie) {
+        if (runCatching { action() }.getOrNull() == true) {
+            return
+        }
         Thread.sleep(50)
     }
+    throw RuntimeException("Failed waiting for $condition!")
 }
