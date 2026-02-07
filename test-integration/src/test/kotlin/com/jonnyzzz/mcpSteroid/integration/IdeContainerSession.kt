@@ -5,7 +5,10 @@ import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
+import java.lang.Thread.sleep
 import java.nio.file.Files
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -109,7 +112,6 @@ class IdeContainerSession(
 
     companion object {
         private const val LOG_PREFIX = "IDE-AGENT"
-        private const val IMAGE_NAME = "mcp-steroid-ide-test"
         private const val IDEA_BIN_DIR = "/opt/idea/bin"
         private const val IDEA_VMOPTIONS_PATH = "$IDEA_BIN_DIR/idea64.vmoptions"
 
@@ -119,27 +121,50 @@ class IdeContainerSession(
         const val IDE_LOG_DIR = "/home/agent/ide-log"
         const val IDE_PLUGINS_DIR = "/home/agent/ide-plugins"
 
-        private const val CONTAINER_VIDEO_DIR = "/home/agent/video"
-        private const val CONTAINER_SCREENSHOTS_DIR = "/home/agent/screenshots"
-
         fun create(
             lifetime: CloseableStack,
-            containerName: String,
+            dockerFileBase: String,
         ): IdeContainerSession {
-            val hostPaths = HostPaths(containerName)
+            val hostPaths = HostPaths(dockerFileBase)
 
             // Create all mount-point subdirectories
             println("[$LOG_PREFIX] Run directory: ${hostPaths.runDir}")
 
             val contextDir = hostPaths.createTempDir("container-sources")
-            prepareDockerDir(containerName, contextDir = contextDir)
-            val driver = DockerDriver(contextDir, LOG_PREFIX)
+            prepareDockerDir(dockerFileBase, contextDir)
+            val scope = DockerDriver(contextDir, LOG_PREFIX)
 
-            driver.buildDockerImage(
-                imageName = IMAGE_NAME,
+            val imageName = "$dockerFileBase-test"
+            scope.buildDockerImage(
+                imageName = imageName,
                 dockerfilePath = File(contextDir, "Dockerfile"),
                 timeoutSeconds = 900,
             )
+
+            val containerMountedPath = "/mcp-run-dir"
+
+            val container = startContainerDriver(
+                lifetime, scope, imageName,
+                extraEnvVars = emptyMap(),
+                volumes = mapOf(
+                    hostPaths.runDir to containerMountedPath,
+                )
+            )
+
+            val xcvb = XcvbContainer(
+                lifetime,
+                container,
+                "$containerMountedPath/video"
+            )
+
+            xcvb.startAllServices()
+
+            sleep(3000)
+
+
+
+
+
 
             TODO()
 
@@ -261,77 +286,6 @@ class IdeContainerSession(
         }
 
         /**
-         * Start Xvfb virtual display server (4K resolution).
-         */
-        private fun startDisplayServer(driver: DockerDriver, containerId: String): RunningContainerProcess {
-            println("[$LOG_PREFIX] Starting Xvfb...")
-            val proc = driver.runInContainerDetached(
-                containerId,
-                listOf("Xvfb", ":99", "-screen", "0", "3840x2160x24", "-ac"),
-                name = "xvfb",
-            )
-            Thread.sleep(1000)
-            return proc
-        }
-
-        /**
-         * Start ffmpeg video recording.
-         * Writes to the mounted video directory so the recording is available on the host in real-time.
-         */
-        private fun startVideoRecording(driver: DockerDriver, containerId: String): RunningContainerProcess {
-            val videoPath = "$CONTAINER_VIDEO_DIR/recording.mp4"
-            println("[$LOG_PREFIX] Starting video recording to $videoPath...")
-            val proc = driver.runInContainerDetached(
-                containerId,
-                listOf(
-                    "ffmpeg", "-f", "x11grab", "-video_size", "3840x2160",
-                    "-framerate", "10", "-i", ":99",
-                    "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                    videoPath,
-                ),
-                name = "ffmpeg",
-                extraEnvVars = mapOf("DISPLAY" to ":99"),
-            )
-            Thread.sleep(500)
-            return proc
-        }
-
-        /**
-         * Start periodic screenshot capture (one PNG per second).
-         * Screenshots are saved to the mounted screenshots directory for live inspection.
-         */
-        private fun startScreenshotCapture(driver: DockerDriver, containerId: String): RunningContainerProcess {
-            println("[$LOG_PREFIX] Starting periodic screenshot capture...")
-            val captureScript = buildString {
-                append("while true; do ")
-                append("scrot $CONTAINER_SCREENSHOTS_DIR/screen-\$(date +%Y%m%d-%H%M%S).png; ")
-                append("sleep 1; ")
-                append("done")
-            }
-            return driver.runInContainerDetached(
-                containerId,
-                listOf("bash", "-c", captureScript),
-                name = "screenshots",
-                extraEnvVars = mapOf("DISPLAY" to ":99"),
-            )
-        }
-
-        /**
-         * Start fluxbox window manager.
-         */
-        private fun startWindowManager(driver: DockerDriver, containerId: String): RunningContainerProcess {
-            println("[$LOG_PREFIX] Starting fluxbox...")
-            val proc = driver.runInContainerDetached(
-                containerId,
-                listOf("fluxbox"),
-                name = "fluxbox",
-                extraEnvVars = mapOf("DISPLAY" to ":99"),
-            )
-            Thread.sleep(1000)
-            return proc
-        }
-
-        /**
          * Start IntelliJ IDEA in the background.
          * Detects JAVA_HOME dynamically based on the installed JDK.
          */
@@ -358,13 +312,11 @@ class IdeContainerSession(
          */
         private fun prepareDockerDir(
             containerName: String,
-            testProjectName: String = "test-project",
             contextDir: File,
         ) {
             println("[$LOG_PREFIX] Build context: $contextDir")
 
             IdeTestFolders.copyDockerFiles(containerName, contextDir)
-            IdeTestFolders.copyProjectFiles(testProjectName, contextDir.resolve("test-project"))
 
             // Hard-link large IDEA archive to avoid copying ~1GB file.
             // Falls back to copy if hard link fails (e.g. cross-filesystem).
@@ -414,14 +366,14 @@ class IdeContainerSession(
                     add("-v")
                     add("${hostDir.absolutePath}:$containerDir")
                 }
-                mount(videoDir, CONTAINER_VIDEO_DIR)
-                mount(screenshotDir, CONTAINER_SCREENSHOTS_DIR)
+//                mount(videoDir, CONTAINER_VIDEO_DIR)
+//                mount(screenshotDir, CONTAINER_SCREENSHOTS_DIR)
                 mount(configDir, IDE_CONFIG_DIR)
                 mount(systemDir, IDE_SYSTEM_DIR)
                 mount(logDir, IDE_LOG_DIR)
                 mount(pluginsDir, IDE_PLUGINS_DIR)
 
-                add(IMAGE_NAME)
+                add("mcp-steroid-ide-test")
             }
 
             val result = driver.processRunner.run(

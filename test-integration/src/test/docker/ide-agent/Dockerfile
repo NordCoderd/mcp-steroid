@@ -61,42 +61,11 @@ RUN useradd -m -s /bin/bash agent && \
     mkdir -p /home/agent/.gemini && \
     chown -R agent:agent /home/agent
 
-# Copy and extract IntelliJ IDEA Community Edition (pre-downloaded by Gradle)
+# Copy and extract IntelliJ IDEA (pre-downloaded by Gradle)
 COPY idea.tar.gz /tmp/idea.tar.gz
 RUN mkdir -p /opt/idea && \
     tar -xzf /tmp/idea.tar.gz -C /opt/idea --strip-components=1 && \
     rm /tmp/idea.tar.gz
-
-# IDE directories — redirected via vmoptions to explicit paths
-ENV IDE_CONFIG_DIR=/home/agent/ide-config
-
-# Plugin is copied and extracted by IdeContainerSession during container run
-
-# Copy test project
-COPY test-project/ /home/agent/project/
-RUN chown -R agent:agent /home/agent/project
-
-# VM options are generated and written by IdeContainerSession during container run
-
-# Copy entrypoint
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
-
-# Accept ALL IntelliJ EULA variants and data sharing consent via Java Preferences
-# Keys from JetBrains test infrastructure (IDERunContext.kt): JetBrains.privacy_policy.*_accepted_version
-RUN mkdir -p /home/agent/.java/.userPrefs/jetbrains/privacy_policy && \
-    printf '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n<!DOCTYPE map SYSTEM "http://java.sun.com/dtd/preferences.dtd">\n<map MAP_XML_VERSION="1.0">\n  <entry key="accepted_version" value="999.999"/>\n  <entry key="privacy_policy_accepted_version" value="999.999"/>\n  <entry key="eua_accepted_version" value="999.999"/>\n  <entry key="euaCommunity_accepted_version" value="999.999"/>\n  <entry key="ij_euaEap_accepted_version" value="999.999"/>\n</map>\n' \
-        > /home/agent/.java/.userPrefs/jetbrains/privacy_policy/prefs.xml && \
-    mkdir -p /home/agent/.config/JetBrains/consentOptions && \
-    echo -n "rsch.send.usage.stat:1.1:0:$(date +%s)000" > /home/agent/.config/JetBrains/consentOptions/accepted && \
-    chown -R agent:agent /home/agent/.config /home/agent/.java
-
-# Pre-trust the project directory (skip "Trust and Open Project?" dialog)
-# From JetBrains test infrastructure (IDETestContext.addProjectToTrustedLocations)
-RUN mkdir -p ${IDE_CONFIG_DIR}/options && \
-    printf '<application>\n  <component name="Trusted.Paths">\n    <option name="TRUSTED_PROJECT_PATHS">\n      <map>\n        <entry key="/home/agent/project" value="true" />\n      </map>\n    </option>\n  </component>\n  <component name="Trusted.Paths.Settings">\n    <option name="TRUSTED_PATHS">\n      <list>\n        <option value="/home/agent" />\n      </list>\n    </option>\n  </component>\n</application>\n' \
-        > ${IDE_CONFIG_DIR}/options/trusted-paths.xml && \
-    chown -R agent:agent ${IDE_CONFIG_DIR}/options
 
 # Switch to agent user
 USER agent
@@ -106,8 +75,10 @@ ENV DISPLAY=:99
 ENV PATH="/home/agent/.local/bin:/opt/idea/bin:/usr/bin:$PATH"
 ENV SHELL=/bin/bash
 ENV HOME=/home/agent
-# JAVA_HOME is set dynamically in entrypoint since path varies by arch
 
 EXPOSE 6315
 
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+# All configuration (vmoptions, EULA, trusted paths, plugin, project)
+# is written by IdeContainerSession at runtime via docker exec.
+# All processes (Xvfb, fluxbox, ffmpeg, IDEA) are started via docker exec --detach.
+CMD ["sleep", "infinity"]

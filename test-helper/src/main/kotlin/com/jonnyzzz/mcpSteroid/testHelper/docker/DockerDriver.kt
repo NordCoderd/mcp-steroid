@@ -1,20 +1,29 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
+import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ofPattern
+import kotlin.collections.component1
+import kotlin.collections.component2
 
 class DockerDriver(
     val workDir: File,
     val logPrefix: String,
     val secretPatterns: List<String> = emptyList(),
+    val environmentVariables: Map<String, String> = emptyMap(),
 ) {
     fun withSecretPattern(secretPattern: String): DockerDriver {
-        return DockerDriver(workDir, logPrefix, (secretPatterns + secretPattern).distinct())
+        return DockerDriver(workDir, logPrefix, (secretPatterns + secretPattern).distinct(), environmentVariables)
+    }
+
+    fun withEnv(key: String, value: String): DockerDriver {
+        return DockerDriver(workDir, logPrefix, secretPatterns, (environmentVariables + (key to value)).toSortedMap())
     }
 
     val processRunner get() = ProcessRunner(logPrefix, secretPatterns.toList())
@@ -25,7 +34,6 @@ class DockerDriver(
         timeoutSeconds: Long
     ) {
         require(dockerfilePath.exists() && dockerfilePath.isFile) { "File does not exist: $dockerfilePath" }
-
 
         val nowDate = DateTimeFormatter.ISO_DATE.format(LocalDateTime.now())
         val result = processRunner.run(
@@ -42,13 +50,26 @@ class DockerDriver(
     }
 
     fun startContainer(
+        lifetime: CloseableStack,
         imageName: String,
+        extraEnvVars: Map<String, String> = emptyMap(),
+        volumes: Map<File, String> = emptyMap(),
     ): String {
         val command = buildList {
             add("docker")
             add("run")
             add("-d")
             add("--add-host=host.docker.internal:host-gateway")
+            (environmentVariables + extraEnvVars).forEach { (key, value) ->
+                add("-e")
+                add("$key=$value")
+            }
+
+            volumes.forEach { (file, volume) ->
+                add("-v")
+                add("$file:$volume")
+            }
+
             add(imageName)
         }
 
@@ -65,6 +86,11 @@ class DockerDriver(
         }
 
         println("[$logPrefix] Container started: $containerId")
+        lifetime.registerCleanupAction {
+            println("[$logPrefix] Stopping and removing container: $containerId")
+            killContainer(containerId)
+        }
+
         return containerId
     }
 
@@ -90,38 +116,30 @@ class DockerDriver(
         containerId: String,
         localPath: File,
         containerPath: String,
-        timeoutSeconds: Long = 30,
-    ): ProcessResult {
+    ) {
         require(localPath.exists()) { "Local path does not exist: $localPath" }
-        return processRunner.run(
+        processRunner.run(
             listOf("docker", "cp", localPath.absolutePath, "$containerId:$containerPath"),
             description = "Copy ${localPath.name} to container:$containerPath",
             workingDir = workDir,
-            timeoutSeconds = timeoutSeconds,
-        )
+            timeoutSeconds = 30L,
+        ).assertExitCode(0)
     }
 
     fun copyFromContainer(
         containerId: String,
         containerPath: String,
         localPath: File,
-        timeoutSeconds: Long = 30,
-    ): ProcessResult {
+    ) {
         localPath.parentFile?.mkdirs()
-        return processRunner.run(
+        processRunner.run(
             listOf("docker", "cp", "$containerId:$containerPath", localPath.absolutePath),
             description = "Copy container:$containerPath to ${localPath.name}",
             workingDir = workDir,
-            timeoutSeconds = timeoutSeconds,
-        )
+            timeoutSeconds = 30L,
+        ).assertExitCode(0)
     }
 
-    /**
-     * Write a text file inside the container at [containerPath].
-     * Creates parent directories if needed.
-     *
-     * @param executable When true, marks the file as executable after writing.
-     */
     fun writeFileInContainer(
         containerId: String,
         containerPath: String,
@@ -145,12 +163,6 @@ class DockerDriver(
         }
     }
 
-    /**
-     * Run a command inside the container.
-     *
-     * @param detach When true, passes `--detach` to `docker exec` so the command
-     *               runs in the background and this call returns immediately.
-     */
     fun runInContainer(
         containerId: String,
         args: List<String>,
@@ -164,7 +176,7 @@ class DockerDriver(
             add("docker")
             add("exec")
             if (detach) add("--detach")
-            extraEnvVars.forEach { (key, value) ->
+            (environmentVariables + extraEnvVars).forEach { (key, value) ->
                 add("-e")
                 add("$key=$value")
             }
@@ -182,18 +194,6 @@ class DockerDriver(
         )
     }
 
-    /**
-     * Run a command inside the container in detached mode with output capture.
-     *
-     * Creates a wrapper bash script inside the container that:
-     * - Redirects stdout/stderr to log files under `/tmp/run-<datetime>-<name>/`
-     * - Records the PID of the actual process
-     * - Runs via `docker exec --detach`
-     *
-     * Returns a [RunningContainerProcess] handle to read output, check status, or kill.
-     *
-     * @param name Label for this background process (used in log dir name and logging)
-     */
     fun runInContainerDetached(
         containerId: String,
         args: List<String>,

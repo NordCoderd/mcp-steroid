@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
 import java.io.File
@@ -14,12 +13,35 @@ import java.io.File
  */
 interface ContainerDriver {
     fun withSecretPattern(secretPattern: String): ContainerDriver
+    fun withEnv(key: String, value: String): ContainerDriver
 
     fun runInContainer(
         vararg args: String,
         timeoutSeconds: Long = 30,
         extraEnvVars: Map<String, String> = emptyMap()
     ): ProcessResult
+
+    fun runInContainerDetached(
+        args: List<String>,
+        name: String,
+        extraEnvVars: Map<String, String> = emptyMap(),
+    ) : RunningContainerProcess
+
+    fun writeFileInContainer(
+        containerPath: String,
+        content: String,
+        executable: Boolean = false,
+    )
+
+    fun copyFromContainer(
+        containerPath: String,
+        localPath: File,
+    )
+
+    fun copyToContainer(
+        localPath: File,
+        containerPath: String,
+    )
 
     companion object
 }
@@ -43,30 +65,37 @@ fun ContainerDriver.Companion.startDockerSession(
     val scope = DockerDriver(workDir, logPrefix, secretPatterns)
     val imageName = "$dockerFileBase-test"
 
-    //TODO: drop image it it's older than one day
     scope.buildDockerImage(
         imageName = imageName,
         dockerfilePath,
         timeoutSeconds = 600
     )
 
-    //we are not disposing the image
-    val containerId = scope.startContainer(imageName)
-    lifetime.registerCleanupAction {
-        println("[$logPrefix] Stopping and removing container: $containerId")
-        scope.killContainer(containerId)
-    }
+    return startContainerDriver(lifetime, scope, imageName)
+}
 
-    return ContainerDriverImpl(scope, containerId, dockerFileBase)
+fun startContainerDriver(
+    lifetime: CloseableStack,
+    scope: DockerDriver,
+    imageName: String,
+    extraEnvVars: Map<String, String> = emptyMap(),
+    volumes: Map<File, String> = emptyMap(),
+): ContainerDriver {
+    val containerId = scope.startContainer(lifetime, imageName, extraEnvVars, volumes)
+    return ContainerDriverImpl(scope, containerId, imageName)
 }
 
 private class ContainerDriverImpl(
     private val scope: DockerDriver,
     private val containerId: String,
-    private val dockerFileBase: String
+    private val imageName: String
 ) : ContainerDriver {
     override fun withSecretPattern(secretPattern: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, dockerFileBase)
+        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName)
+    }
+
+    override fun withEnv(key: String, value: String): ContainerDriver {
+        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName)
     }
 
     override fun runInContainer(
@@ -77,7 +106,31 @@ private class ContainerDriverImpl(
         return scope.runInContainer(containerId, args.toList(), timeoutSeconds, extraEnvVars)
     }
 
+    override fun runInContainerDetached(
+        args: List<String>,
+        name: String,
+        extraEnvVars: Map<String, String>
+    ): RunningContainerProcess {
+        return scope.runInContainerDetached(containerId, args, name, extraEnvVars)
+    }
+
+    override fun writeFileInContainer(
+        containerPath: String,
+        content: String,
+        executable: Boolean
+    ) {
+        scope.writeFileInContainer(containerId, containerPath, content, executable)
+    }
+
+    override fun copyFromContainer(containerPath: String, localPath: File) {
+        scope.copyFromContainer(containerId, containerPath, localPath)
+    }
+
+    override fun copyToContainer(localPath: File, containerPath: String) {
+        scope.copyToContainer(containerId, localPath, containerPath)
+    }
+
     override fun toString(): String {
-        return "DockerContained(id=$containerId, image=$dockerFileBase)"
+        return "DockerContained(id=$containerId, image=$imageName)"
     }
 }
