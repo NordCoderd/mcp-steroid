@@ -4,12 +4,10 @@ package com.jonnyzzz.mcpSteroid.integration
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
-import java.lang.Thread.sleep
 import java.nio.file.Files.createLink
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -25,7 +23,7 @@ import kotlin.io.path.exists
  * All IDE directories, video, and screenshots are mounted to a timestamped
  * run directory under testOutputDir for easy inspection and debugging.
  */
-class IdeContainerSession(
+class IdeContainer(
     val lifetime: CloseableStack,
     val scope: ContainerDriver,
     val intellijDriver: IntelliJDriver,
@@ -39,11 +37,11 @@ class IdeContainerSession(
     companion object
 }
 
-fun IdeContainerSession.Companion.create(
+fun IdeContainer.Companion.create(
     lifetime: CloseableStack,
     dockerFileBase: String,
     projectName: String = "test-project",
-): IdeContainerSession {
+): IdeContainer {
     val runDir = run {
         val timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'Z'HH-mm-ss-SSS").format(LocalDateTime.now())
         val file = File(IdeTestFolders.testOutputDir, "run-$timestamp-$dockerFileBase")
@@ -93,7 +91,7 @@ fun IdeContainerSession.Companion.create(
     val ijContainer = ijDriver.startIde()
 
 
-    return IdeContainerSession(lifetime, container, ijDriver, xcvb, ijContainer)
+    return IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
 }
 
 private fun buildIdeImage(dockerFileBase: String, imageName: String): DockerDriver {

@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit
  * Verifies that the Docker container can be built and started,
  * all directories are properly mounted, and the IDE starts successfully.
  */
-class IdeContainerSessionTest {
+class IdeContainerTest {
     val lifetime by lazy {
         CloseableStackHost()
     }
@@ -26,7 +26,7 @@ class IdeContainerSessionTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
     fun `container starts and IDE becomes ready`() {
-        val session = IdeContainerSession.create(
+        val session = IdeContainer.create(
             lifetime,
             "ide-agent",
         )
