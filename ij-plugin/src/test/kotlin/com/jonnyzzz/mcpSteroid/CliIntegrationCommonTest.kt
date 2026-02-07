@@ -30,14 +30,15 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
         val session = llmSession()
 
         session.runInContainer(
+            listOf(
             "curl",
             "-v", "-X", "POST",
             "-H", "Content-Type: application/json",
             "-H", "Accept: application/json",
             "-d",
             """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
-
             resolveDockerUrl()
+            )
         )
             .assertExitCode(0, "curl to MCP")
             .assertNoErrorsInOutput("curl to MCP")

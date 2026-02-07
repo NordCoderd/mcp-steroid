@@ -37,6 +37,7 @@ fun copyRecursively(source: File, destination: File) {
     if (source.isFile) {
         destination.parentFile.mkdirs()
         Files.copy(source.toPath(), destination.toPath())
+        destination.setLastModified(source.lastModified())
         return
     }
 
@@ -46,5 +47,13 @@ fun copyRecursively(source: File, destination: File) {
 
     sourceFiles.forEach { sourceFile ->
         copyRecursively(sourceFile, destination.resolve(sourceFile.name))
+    }
+}
+
+fun waitFor(timeoutMillie: Long, action: () -> Boolean) {
+    val now = System.currentTimeMillis()
+    Thread.sleep(50)
+    while (System.currentTimeMillis() - now < timeoutMillie && action()) {
+        Thread.sleep(50)
     }
 }

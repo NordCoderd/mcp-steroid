@@ -8,11 +8,17 @@ import java.util.concurrent.TimeUnit
 /**
  * Result from running a process.
  */
-data class ProcessResult(
-    val exitCode: Int,
-    val output: String,
+interface ProcessResult {
+    val exitCode: Int
+    val output: String
     val stderr: String
-)
+}
+
+data class ProcessResultValue(
+    override val exitCode: Int,
+    override val output: String,
+    override val stderr: String,
+) : ProcessResult
 
 fun ProcessResult.assertOutputContains(vararg expectedOutput: String, message: String = "") = apply {
     for (s in expectedOutput) {
@@ -135,7 +141,7 @@ class ProcessRunner(
         if (!completed) {
             process.destroyForcibly()
             println("[$logPrefix] Timed out after ${timeoutSeconds}s")
-            return ProcessResult(-1, outputBuilder.toString(), "Timeout\n$errorBuilder")
+            return ProcessResultValue(-1, outputBuilder.toString(), "Timeout\n$errorBuilder")
         }
 
         outputThread.join(1000)
@@ -143,6 +149,6 @@ class ProcessRunner(
 
         val exitCode = process.exitValue()
         println("[$logPrefix] Exit code: $exitCode")
-        return ProcessResult(exitCode, outputBuilder.toString(), errorBuilder.toString())
+        return ProcessResultValue(exitCode, outputBuilder.toString(), errorBuilder.toString())
     }
 }

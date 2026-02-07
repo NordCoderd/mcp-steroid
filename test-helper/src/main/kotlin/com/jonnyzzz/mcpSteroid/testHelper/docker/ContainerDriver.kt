@@ -16,14 +16,17 @@ interface ContainerDriver {
     fun withEnv(key: String, value: String): ContainerDriver
 
     fun runInContainer(
-        vararg args: String,
+        args: List<String>,
+        workingDir: String? = null,
         timeoutSeconds: Long = 30,
         extraEnvVars: Map<String, String> = emptyMap()
     ): ProcessResult
 
+    fun mkdirs(guestPath: String) = runInContainer(listOf("mkdir", "-p", guestPath))
+
     fun runInContainerDetached(
         args: List<String>,
-        name: String,
+        workingDir: String? = null,
         extraEnvVars: Map<String, String> = emptyMap(),
     ) : RunningContainerProcess
 
@@ -108,19 +111,20 @@ private class ContainerDriverImpl(
     }
 
     override fun runInContainer(
-        vararg args: String,
+        args: List<String>,
+        workingDir: String?,
         timeoutSeconds: Long,
         extraEnvVars: Map<String, String>
     ): ProcessResult {
-        return scope.runInContainer(containerId, args.toList(), timeoutSeconds, extraEnvVars)
+        return scope.runInContainer(containerId, args.toList(), workingDir, timeoutSeconds, extraEnvVars)
     }
 
     override fun runInContainerDetached(
         args: List<String>,
-        name: String,
+        workingDir: String?,
         extraEnvVars: Map<String, String>
     ): RunningContainerProcess {
-        return scope.runInContainerDetached(containerId, args, name, extraEnvVars)
+        return scope.runInContainerDetached(containerId, args, workingDir, extraEnvVars)
     }
 
     override fun writeFileInContainer(

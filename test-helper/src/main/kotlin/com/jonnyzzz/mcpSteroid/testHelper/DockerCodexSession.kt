@@ -50,7 +50,7 @@ class DockerCodexSession(
             }
         }
         return session.runInContainer(
-            *codexArgs.toTypedArray(),
+            codexArgs,
             timeoutSeconds = timeoutSeconds, extraEnvVars = extraEnvVars
         )
     }

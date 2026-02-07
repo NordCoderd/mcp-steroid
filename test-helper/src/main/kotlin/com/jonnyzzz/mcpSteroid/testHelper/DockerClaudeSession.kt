@@ -44,7 +44,7 @@ class DockerClaudeSession(
             addAll(args.toList())
         }
         return session.runInContainer(
-            args = claudeArgs.toTypedArray(),
+            args = claudeArgs,
             timeoutSeconds = timeoutSeconds,
             extraEnvVars = buildMap {
                 put("ANTHROPIC_API_KEY", apiKey)

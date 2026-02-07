@@ -29,7 +29,6 @@ class XcvbContainer(
         println("[xcvb] Starting Xvfb...")
         val proc = driver.runInContainerDetached(
             listOf("Xvfb", DISPLAY, "-screen", "0", "3840x2160x24", "-ac"),
-            name = "xvfb-server",
         )
 
         println("[xcvb] Waiting for display $DISPLAY to be ready...")
@@ -63,19 +62,14 @@ class XcvbContainer(
                 "-flush_packets", "1",
                 videoGuestPath,
             ),
-            name = "ffmpeg",
         )
         lifetime.registerCleanupAction {
             println("Check out screen recording at ${driver.mapGuestPathToHostPath(videoGuestPath)}")
             proc.kill("INT")
         }
 
-        while (true) {
-            if (videoFile.exists() && videoFile.length() > 1110) {
-                println("[VIDEO] Opening live preview: $videoFile")
-                break
-            }
-            Thread.sleep(100)
+        waitFor(15_000L) {
+            videoFile.exists() && videoFile.length() > 1110
         }
 
         return proc
@@ -95,7 +89,6 @@ class XcvbContainer(
         }
         return driver.runInContainerDetached(
             listOf("bash", "-c", captureScript),
-            name = "screenshots",
         )
     }
 
@@ -110,7 +103,6 @@ class XcvbContainer(
         println("[xcvb] Starting fluxbox...")
         val proc = driver.runInContainerDetached(
             listOf("fluxbox"),
-            name = "fluxbox",
         )
         return proc
     }

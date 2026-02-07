@@ -149,23 +149,24 @@ class DockerDriver(
         // Ensure parent directory exists
         val parentDir = containerPath.substringBeforeLast('/')
         if (parentDir.isNotEmpty()) {
-            runInContainer(containerId, listOf("mkdir", "-p", parentDir), timeoutSeconds = 5)
+            runInContainer(containerId, listOf("mkdir", "-p", parentDir), timeoutSeconds = 5).assertExitCode(0)
         }
 
         runInContainer(
             containerId,
             listOf("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF"),
             timeoutSeconds = 5,
-        )
+        ).assertExitCode(0)
 
         if (executable) {
-            runInContainer(containerId, listOf("chmod", "+x", containerPath), timeoutSeconds = 5)
+            runInContainer(containerId, listOf("chmod", "+x", containerPath), timeoutSeconds = 5).assertExitCode(0)
         }
     }
 
     fun runInContainer(
         containerId: String,
         args: List<String>,
+        workingDir: String? = null,
         timeoutSeconds: Long,
         extraEnvVars: Map<String, String> = emptyMap(),
         detach: Boolean = false,
@@ -179,6 +180,10 @@ class DockerDriver(
             (environmentVariables + extraEnvVars).forEach { (key, value) ->
                 add("-e")
                 add("$key=$value")
+            }
+            if (workingDir != null) {
+                add("-w")
+                add(workingDir)
             }
             add(containerId)
             add("bash")
@@ -197,10 +202,11 @@ class DockerDriver(
     fun runInContainerDetached(
         containerId: String,
         args: List<String>,
-        name: String,
+        workingDir: String? = null,
         extraEnvVars: Map<String, String> = emptyMap(),
     ): RunningContainerProcess {
         val timestamp = ofPattern("yyyyMMdd-HHmmss-SSS").format(LocalDateTime.now())
+        val name = args.first().substringAfterLast("/")
         val logDir = "/tmp/run-$timestamp-$name"
 
         // Build the wrapper script that runs the real command,
@@ -221,6 +227,7 @@ class DockerDriver(
         val result = runInContainer(
             containerId,
             listOf("bash", scriptPath),
+            workingDir = workingDir,
             timeoutSeconds = 10,
             extraEnvVars = extraEnvVars,
             detach = true,
@@ -230,7 +237,7 @@ class DockerDriver(
             error("Failed to start detached process '$name': ${result.stderr}")
         }
 
-        println("[$logPrefix] Detached process '$name' started, logs at $logDir")
+        println("[$logPrefix] Detached process '$name' started, stdout/stderr at $logDir")
         return RunningContainerProcess(this, containerId, name, logDir)
     }
 

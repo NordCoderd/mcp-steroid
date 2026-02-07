@@ -47,7 +47,7 @@ class DockerGeminiSession(
         }
 
         return session.runInContainer(
-            args = geminiArgs.toTypedArray(),
+            args = geminiArgs,
             timeoutSeconds = timeoutSeconds,
             extraEnvVars = env
         )

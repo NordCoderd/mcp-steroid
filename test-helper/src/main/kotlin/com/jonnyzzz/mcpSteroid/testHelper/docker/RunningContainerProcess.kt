@@ -1,6 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
+import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
+
 /**
  * Represents a process running inside a Docker container with output redirected to files.
  * Stdout, stderr, and PID are stored in [logDir] inside the container.
@@ -14,10 +16,19 @@ class RunningContainerProcess(
     val name: String,
     /** Container-side directory holding stdout.log, stderr.log, and pid */
     val logDir: String,
-) {
+) : ProcessResult {
     val stdoutPath: String get() = "$logDir/stdout.log"
     val stderrPath: String get() = "$logDir/stderr.log"
     val pidPath: String get() = "$logDir/pid"
+
+    override val exitCode: Int
+        get() = -1
+
+    override val output: String
+        get() = readOutput()
+
+    override val stderr: String
+        get() = readStderr()
 
     /** Read current stdout content from the container. */
     fun readOutput(timeoutSeconds: Long = 10): String {
