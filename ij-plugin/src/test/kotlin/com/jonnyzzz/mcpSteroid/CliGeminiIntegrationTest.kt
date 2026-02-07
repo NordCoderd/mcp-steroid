@@ -1,13 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid
 
-import com.intellij.openapi.Disposable
-import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.assertNoErrorsInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,11 +23,7 @@ import kotlin.time.Duration.Companion.seconds
  * See: https://github.com/google-gemini/gemini-cli/issues/15449
  */
 class CliGeminiIntegrationTest : CliIntegrationTestBase() {
-    private fun geminiSession(): DockerGeminiSession {
-        val session = DockerGeminiSession.create()
-        Disposer.register(testRootDisposable, Disposable { session.close() })
-        return session
-    }
+    private fun geminiSession() = DockerGeminiSession.create(lifetime)
 
     override fun newAiSession(): AiAgentSession = geminiSession().registerMcp(resolveDockerUrl(), "intellij")
 

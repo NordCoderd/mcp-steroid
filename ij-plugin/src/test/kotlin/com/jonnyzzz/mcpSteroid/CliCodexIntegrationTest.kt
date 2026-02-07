@@ -1,15 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid
 
-import com.intellij.openapi.Disposable
-import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
-import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
-import com.jonnyzzz.mcpSteroid.testHelper.DockerCodexSession
-import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.assertNoErrorsInOutput
-import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
-import java.util.UUID
+import com.jonnyzzz.mcpSteroid.testHelper.*
+import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -49,11 +43,7 @@ import kotlin.time.Duration.Companion.seconds
  * ============================================================================
  */
 class CliCodexIntegrationTest : CliIntegrationTestBase() {
-    private fun codexSession(): DockerCodexSession {
-        val session = DockerCodexSession.create()
-        Disposer.register(testRootDisposable, Disposable { session.close() })
-        return session
-    }
+    private fun codexSession() = DockerCodexSession.create(lifetime)
 
     override fun newAiSession(): AiAgentSession = codexSession().registerMcp(resolveDockerUrl(), "intellij").toAiSession()
 

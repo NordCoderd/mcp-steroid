@@ -7,10 +7,10 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerSession
 abstract class AIAgentCompanion<T : Any>(val dockerFileBase: String) {
     protected abstract fun readApiKey(): String
 
-    fun create(lifetime: CloseableStack): DockerCodexSession {
+    fun create(lifetime: CloseableStack): T {
         println("[DOCKER-${dockerFileBase.uppercase()}] Session created in container")
         val session = ContainerDriver.startDockerSession(lifetime, dockerFileBase)
-        return DockerCodexSession.Companion.create(session)
+        return create(session)
     }
 
     fun create(session: ContainerDriver): T {

@@ -1,28 +1,30 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid
 
-import com.intellij.openapi.Disposable
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.jonnyzzz.mcpSteroid.testHelper.DockerSession
+import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertNoErrorsInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
-import com.jonnyzzz.mcpSteroid.testHelper.startDockerSession
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerSession
 import kotlin.time.Duration.Companion.seconds
 
 class CliIntegrationCommonTest : BasePlatformTestCase() {
+    val lifetime by lazy {
+        CloseableStackHost().apply {
+            Disposer.register(testRootDisposable, this::closeAllStacks)
+        }
+    }
+
     override fun setUp() {
         setServerPortProperties()
         return super.setUp()
     }
 
-    private fun llmSession(): DockerSession {
-        val session = DockerSession.startDockerSession("ubuntu-cli")
-        Disposer.register(testRootDisposable, Disposable { session.close() })
-        return session
-    }
+    private fun llmSession(): ContainerDriver = ContainerDriver.startDockerSession(lifetime, "ubuntu-cli")
 
     fun testHostAvailability(): Unit = timeoutRunBlocking(180.seconds) {
         val session = llmSession()

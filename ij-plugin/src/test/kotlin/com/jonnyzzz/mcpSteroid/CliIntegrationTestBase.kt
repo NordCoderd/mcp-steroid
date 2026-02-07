@@ -1,27 +1,23 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid
 
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import com.intellij.testFramework.replaceService
 import com.jonnyzzz.mcpSteroid.mcp.McpJson
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
-import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
-import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.assertNoErrorsInOutput
-import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
-import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import java.util.UUID
+import com.jonnyzzz.mcpSteroid.testHelper.*
+import kotlinx.serialization.json.*
+import java.util.*
 import kotlin.time.Duration.Companion.seconds
 
 abstract class CliIntegrationTestBase : BasePlatformTestCase() {
+    val lifetime by lazy {
+        CloseableStackHost().apply {
+            Disposer.register(testRootDisposable, this::closeAllStacks)
+        }
+    }
+
     override fun setUp() {
         setServerPortProperties()
         return super.setUp()
