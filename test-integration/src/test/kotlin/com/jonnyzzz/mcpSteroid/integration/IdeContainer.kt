@@ -33,6 +33,9 @@ class IdeContainer(
     //TODO: we need an option to start MCP Steroid connection to agents or not
     val aiAgentDriver = AiAgentDriver(scope, intellijDriver)
 
+    /** Convenience accessor for mouse/keyboard control inside the Xvfb session. */
+    val input: XcvbDriver get() = xcvbContainer
+
     companion object
 }
 
@@ -104,7 +107,7 @@ fun IdeContainer.Companion.create(
     println()
     println("=".repeat(60))
     println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
-    println("  MCP STEROID:     http://localhost:$mcpUrl/")
+    println("  MCP STEROID:     $mcpUrl")
     println("  SESSION INFO:    $infoFile")
     println("=".repeat(60))
     println()

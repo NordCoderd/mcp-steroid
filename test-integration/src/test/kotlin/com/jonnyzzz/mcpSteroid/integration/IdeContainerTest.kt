@@ -31,4 +31,37 @@ class IdeContainerTest {
             "ide-agent",
         )
     }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `xdotool input control works`() {
+        val session = IdeContainer.create(lifetime, "ide-agent")
+
+        // Move the mouse to the center of the screen
+        session.input.mouseMove(1920, 1080)
+
+        // Click at the center
+        session.input.mouseClick(1920, 1080)
+
+        // Type some text (will go to whatever is focused)
+        session.input.typeText("hello from xdotool")
+
+        // Press Escape to dismiss any popup
+        session.input.keyPress("Escape")
+
+        // Verify we can query window info without crashing
+        val activeWindow = session.input.getActiveWindowId()
+        println("[test] Active window ID: $activeWindow")
+
+        // Verify clipboard round-trip
+        session.input.clipboardCopy("mcp-steroid-test")
+        val pasted = session.input.clipboardPaste()
+        assert(pasted.contains("mcp-steroid-test")) {
+            "Clipboard round-trip failed: expected 'mcp-steroid-test', got '$pasted'"
+        }
+
+        // Capture a region screenshot
+        session.input.screenshotRegion(0, 0, 800, 600, "input-test-region.png")
+        println("[test] Input control test passed")
+    }
 }

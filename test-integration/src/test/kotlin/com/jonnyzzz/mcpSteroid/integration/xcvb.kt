@@ -198,6 +198,98 @@ class XcvbDriver(
         return proc
     }
 
+    // ── Input control via xdotool ──────────────────────────────────────
+
+    /** Move the mouse cursor to the given display coordinates. */
+    fun mouseMove(x: Int, y: Int) {
+        xdotool("mousemove", "--sync", x.toString(), y.toString())
+    }
+
+    /** Move the mouse to (x, y) and click the given button (1=left, 2=middle, 3=right). */
+    fun mouseClick(x: Int, y: Int, button: Int = 1) {
+        xdotool("mousemove", "--sync", x.toString(), y.toString())
+        xdotool("click", button.toString())
+    }
+
+    /** Move the mouse to (x, y) and double-click. */
+    fun mouseDoubleClick(x: Int, y: Int) {
+        xdotool("mousemove", "--sync", x.toString(), y.toString())
+        xdotool("click", "--repeat", "2", "1")
+    }
+
+    /**
+     * Press a key or key combination.
+     * Examples: `"Return"`, `"Tab"`, `"ctrl+s"`, `"alt+F4"`, `"shift+ctrl+p"`.
+     */
+    fun keyPress(key: String) {
+        xdotool("key", key)
+    }
+
+    /** Type a text string character by character with a small inter-key delay. */
+    fun typeText(text: String) {
+        xdotool("type", "--delay", "50", "--", text)
+    }
+
+    /** Return the window ID of the currently active (focused) window. */
+    fun getActiveWindowId(): String {
+        return xdotool("getactivewindow").trim()
+    }
+
+    /** Activate (focus + raise) a window found by name pattern. */
+    fun activateWindow(namePattern: String) {
+        xdotool("search", "--name", namePattern, "windowactivate")
+    }
+
+    /** List all window IDs visible on the display. */
+    fun listWindowIds(): List<String> {
+        val output = xdotool("search", "--name", "")
+        return output.lines().filter { it.isNotBlank() }
+    }
+
+    /** Capture a rectangular region of the screen to a file inside the container. */
+    fun screenshotRegion(x: Int, y: Int, width: Int, height: Int, filename: String) {
+        val destPath = "$videoDirInContainer/$filename"
+        driver.runInContainer(
+            listOf(
+                "bash", "-c",
+                "import -window root -crop ${width}x${height}+${x}+${y} $destPath",
+            ),
+            timeoutSeconds = 10,
+        )
+    }
+
+    /** Copy text to the X11 clipboard. */
+    fun clipboardCopy(text: String) {
+        driver.runInContainer(
+            listOf("bash", "-c", "echo -n ${shellEscape(text)} | xclip -selection clipboard"),
+            timeoutSeconds = 5,
+        )
+    }
+
+    /** Read text from the X11 clipboard. */
+    fun clipboardPaste(): String {
+        val result = driver.runInContainer(
+            listOf("xclip", "-selection", "clipboard", "-o"),
+            timeoutSeconds = 5,
+        )
+        return result.output
+    }
+
+    private fun xdotool(vararg args: String): String {
+        val result = driver.runInContainer(
+            listOf("xdotool") + args.toList(),
+            timeoutSeconds = 10,
+        )
+        if (result.exitCode != 0) {
+            error("[xcvb] xdotool ${args.joinToString(" ")} failed (exit ${result.exitCode}): ${result.output}${result.stderr}")
+        }
+        return result.output
+    }
+
+    private fun shellEscape(s: String): String {
+        return "'" + s.replace("'", "'\\''") + "'"
+    }
+
     /**
      * Start a background thread that opens the live video stream in the default browser
      * once the streaming server is ready. This provides live screen output during the test
