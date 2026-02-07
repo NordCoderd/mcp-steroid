@@ -31,7 +31,7 @@ class IdeContainer(
     val intellij: RunningContainerProcess,
 ) {
     //TODO: we need an option to start MCP Steroid connection to agents or not
-    val aiAgentDriver = AiAgentDriver(scope)
+    val aiAgentDriver = AiAgentDriver(scope, intellijDriver)
 
     companion object
 }

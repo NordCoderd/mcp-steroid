@@ -15,13 +15,13 @@ class IntelliJDriver(
     private val guestDir: String,
 ) {
     private val intelliJGuestHomeDir = "/opt/idea"
-    private val projectDir = "$guestDir/project-home"
+    private val projectGuestDir = "$guestDir/project-home"
     private val configGuestDir = "$guestDir/ide-config"
     private val systemGuestDir = "/home/agent/ide-system"
     private val logsGuestDir = "$guestDir/ide-log"
     private val pluginsGuestDir = "$guestDir/ide-plugins"
 
-    val steroidPort get() = MCP_STEROID_PORT.containerPort
+    fun getGuestProjectDir() = projectGuestDir
 
     fun readLogs(): List<String> {
         val file = ideaLogsFile()
@@ -33,7 +33,7 @@ class IntelliJDriver(
 
     fun startIde(): RunningContainerProcess {
         driver.mkdirs(intelliJGuestHomeDir)
-        driver.mkdirs(projectDir)
+        driver.mkdirs(projectGuestDir)
         driver.mkdirs(configGuestDir)
         driver.mkdirs(systemGuestDir)
         driver.mkdirs(logsGuestDir)
@@ -48,7 +48,7 @@ class IntelliJDriver(
 
         println("[IDE-AGENT] Starting IntelliJ IDEA...")
         val idea = driver.runInContainerDetached(
-            listOf("/opt/idea/bin/idea.sh", projectDir),
+            listOf("/opt/idea/bin/idea.sh", projectGuestDir),
         )
 
         try {
@@ -88,7 +88,7 @@ class IntelliJDriver(
     }
 
     fun mountProjectFiles(projectName: String) {
-        IdeTestFolders.copyProjectFiles(projectName, driver.mapGuestPathToHostPath(projectDir))
+        IdeTestFolders.copyProjectFiles(projectName, driver.mapGuestPathToHostPath(projectGuestDir))
     }
 
     private fun generateVmOptions() {
@@ -104,7 +104,7 @@ class IntelliJDriver(
 
             appendLine("# MCP Steroid plugin configuration")
             appendLine("-Dmcp.steroid.server.host=0.0.0.0")
-            appendLine("-Dmcp.steroid.server.port=$steroidPort")
+            appendLine("-Dmcp.steroid.server.port=${MCP_STEROID_PORT.containerPort}")
             appendLine("-Dmcp.steroid.review.mode=NEVER")
             appendLine("-Dmcp.steroid.updates.enabled=false")
             appendLine("-Dmcp.steroid.analytics.enabled=false")
@@ -168,7 +168,7 @@ class IntelliJDriver(
             appendLine("""  <component name="Trusted.Paths">""")
             appendLine("""    <option name="TRUSTED_PROJECT_PATHS">""")
             appendLine("""      <map>""")
-            appendLine("""        <entry key="$projectDir" value="true" />""")
+            appendLine("""        <entry key="$projectGuestDir" value="true" />""")
             appendLine("""      </map>""")
             appendLine("""    </option>""")
             appendLine("""  </component>""")

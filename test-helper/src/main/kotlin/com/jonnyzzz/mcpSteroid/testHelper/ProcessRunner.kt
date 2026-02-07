@@ -55,6 +55,23 @@ fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
     }
 }
 
+fun ProcessResult.assertNoMessageInOutput(messageRegex: String) = apply {
+    val combined = output + "\n" + stderr
+
+    // Check for explicit ERROR patterns (case-insensitive)
+    val errorPatterns = listOf(
+        Regex(messageRegex, RegexOption.IGNORE_CASE),
+    )
+
+    for (pattern in errorPatterns) {
+        val match = pattern.find(combined)
+        check(match == null) {
+            "$messageRegex: Found error pattern '${pattern.pattern}' in output. " +
+                    "Match: '${match?.value}'. Full output:\n$combined"
+        }
+    }
+}
+
 /**
  * Utility for running processes with consistent logging.
  * All output is logged to stdout with prefixes for easy debugging.

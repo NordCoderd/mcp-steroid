@@ -4,12 +4,18 @@ package com.jonnyzzz.mcpSteroid.integration
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerClaudeSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerCodexSession
+import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 
 class AiAgentDriver(
-    val scope: ContainerDriver,
+    scope: ContainerDriver,
+    val intellijDriver: IntelliJDriver,
     val connectMcpSteroid: Boolean = true
 ) {
+    private val scope by lazy {
+        scope.withGuestWorkDir(intellijDriver.getGuestProjectDir())
+    }
+
     /** Host port mapped to the MCP Steroid server inside the container. */
     val mcpSteroidHostPort: Int
         get() = scope.mapContainerPortToHostPort(IntelliJDriver.MCP_STEROID_PORT)
@@ -21,7 +27,7 @@ class AiAgentDriver(
 
     private fun prepareAIAgent(agent: AiAgentSession): AiAgentSession {
         return if (connectMcpSteroid) {
-            agent.registerMcp(mcpSteroidName, mcpSteroidGuestUrl)
+            agent.registerMcp(mcpSteroidGuestUrl, mcpSteroidName)
         } else {
             agent
         }
@@ -47,7 +53,7 @@ class AiAgentDriver(
 
     val gemini by lazy {
         prepareAIAgent(
-            DockerCodexSession.create(scope)
+            DockerGeminiSession.create(scope)
         )
     }
 

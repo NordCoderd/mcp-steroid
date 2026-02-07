@@ -12,9 +12,9 @@ import java.io.File
  * and running commands.
  */
 interface ContainerDriver {
-    /** Maps a [ContainerPort] to the host port it was mapped to. Throws if not mapped. */
     fun mapContainerPortToHostPort(port: ContainerPort): Int
 
+    fun withGuestWorkDir(guestWorkDir: String): ContainerDriver
     fun withSecretPattern(secretPattern: String): ContainerDriver
     fun withEnv(key: String, value: String): ContainerDriver
 
@@ -123,12 +123,16 @@ private class ContainerDriverImpl(
         hostPorts[port.containerPort]
             ?: error("Port ${port.containerPort} is not mapped. Available: ${hostPorts.keys}")
 
+    override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver {
+        return ContainerDriverImpl(scope.withGuestWorkDir(guestWorkDir), containerId, imageName, volumes, hostPorts)
+    }
+
     override fun withSecretPattern(secretPattern: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes.toList(), hostPorts)
+        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes, hostPorts)
     }
 
     override fun withEnv(key: String, value: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName, volumes.toList(), hostPorts)
+        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName, volumes, hostPorts)
     }
 
     override fun runInContainer(

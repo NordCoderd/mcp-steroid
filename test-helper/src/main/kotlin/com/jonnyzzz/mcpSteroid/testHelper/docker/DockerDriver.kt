@@ -17,13 +17,18 @@ class DockerDriver(
     val logPrefix: String,
     val secretPatterns: List<String> = emptyList(),
     val environmentVariables: Map<String, String> = emptyMap(),
+    val guestWorkDir: String? = null,
 ) {
+    fun withGuestWorkDir(guestWorkDir: String): DockerDriver {
+        return DockerDriver(workDir, logPrefix, secretPatterns, environmentVariables, guestWorkDir)
+    }
+
     fun withSecretPattern(secretPattern: String): DockerDriver {
-        return DockerDriver(workDir, logPrefix, (secretPatterns + secretPattern).distinct(), environmentVariables)
+        return DockerDriver(workDir, logPrefix, (secretPatterns + secretPattern).distinct(), environmentVariables, guestWorkDir)
     }
 
     fun withEnv(key: String, value: String): DockerDriver {
-        return DockerDriver(workDir, logPrefix, secretPatterns, (environmentVariables + (key to value)).toSortedMap())
+        return DockerDriver(workDir, logPrefix, secretPatterns, (environmentVariables + (key to value)).toSortedMap(), guestWorkDir)
     }
 
     val processRunner get() = ProcessRunner(logPrefix, secretPatterns.toList())
