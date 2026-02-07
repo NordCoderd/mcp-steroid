@@ -20,8 +20,8 @@ class AiAgentDriver(
     val mcpSteroidHostPort: Int
         get() = scope.mapContainerPortToHostPort(IntelliJDriver.MCP_STEROID_PORT)
 
-    val mcpSteroidHostUrl get() = "http://localhost:$mcpSteroidHostPort"
-    val mcpSteroidGuestUrl get() = "http://localhost:${IntelliJDriver.MCP_STEROID_PORT.containerPort}"
+    val mcpSteroidHostUrl get() = "http://localhost:$mcpSteroidHostPort/mcp"
+    val mcpSteroidGuestUrl get() = "http://localhost:${IntelliJDriver.MCP_STEROID_PORT.containerPort}/mcp"
 
     val mcpSteroidName: String = "mcp-steroid"
 
@@ -33,29 +33,29 @@ class AiAgentDriver(
         }
     }
 
-    val aiAgents get() = mapOf(
-        "claude" to claudeCode,
-        "codex" to codex,
-        "gemini" to gemini,
+    val aiAgents: Map<String, AiAgentSession> by lazy {
+        if (connectMcpSteroid) {
+            waitForMcpReady()
+        }
+
+        val agents = mutableMapOf<String, AiAgentSession>()
+        for ((name, factory) in agentFactories) {
+            try {
+                agents[name] = factory()
+            } catch (e: Exception) {
+                println("[IDE-AGENT] Failed to initialize agent '$name': ${e.message}")
+                e.printStackTrace()
+            }
+        }
+        require(agents.isNotEmpty()) { "At least one AI agent must initialize successfully" }
+        agents
+    }
+
+    private val agentFactories: Map<String, () -> AiAgentSession> = mapOf(
+        "claude" to { prepareAIAgent(DockerClaudeSession.create(scope)) },
+        "codex" to { prepareAIAgent(DockerCodexSession.create(scope)) },
+        "gemini" to { prepareAIAgent(DockerGeminiSession.create(scope)) },
     )
-
-    val claudeCode by lazy {
-        prepareAIAgent(
-            DockerClaudeSession.create(scope)
-        )
-    }
-
-    val codex by lazy {
-        prepareAIAgent(
-            DockerCodexSession.create(scope)
-        )
-    }
-
-    val gemini by lazy {
-        prepareAIAgent(
-            DockerGeminiSession.create(scope)
-        )
-    }
 
     fun waitForMcpReady() {
         val mcpInit = """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"""

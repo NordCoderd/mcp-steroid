@@ -20,6 +20,8 @@ class DockerGeminiSession(
 
         require(command[0] == "gemini")
         command = command.drop(1)
+        command += "--scope"
+        command += "user"
         command += "--trust"
 
         runInContainer(args = command.toTypedArray())

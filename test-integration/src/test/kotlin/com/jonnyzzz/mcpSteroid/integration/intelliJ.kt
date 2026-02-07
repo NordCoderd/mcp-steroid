@@ -39,7 +39,7 @@ class IntelliJDriver(
         driver.mkdirs(logsGuestDir)
         driver.mkdirs(pluginsGuestDir)
 
-        driver.runInContainer(listOf("find", "-r", intelliJGuestHomeDir))
+        driver.runInContainer(listOf("ls", "-la", intelliJGuestHomeDir))
 
         writeEulaAcceptance()
         writeConsentOptions()
@@ -203,6 +203,12 @@ class IntelliJDriver(
             workingDir = pluginsGuestDir,
             timeoutSeconds = 30,
         ).assertExitCode(0)
+
+        // Ensure kotlinc and other bundled binaries are executable
+        driver.runInContainer(
+            listOf("bash", "-c", "find $pluginsGuestDir -name 'kotlinc' -type f -exec chmod +x {} +"),
+            timeoutSeconds = 10,
+        )
     }
 
     companion object {
