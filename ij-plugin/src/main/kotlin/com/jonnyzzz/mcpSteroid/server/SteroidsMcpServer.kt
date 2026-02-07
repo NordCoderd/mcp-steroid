@@ -7,6 +7,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.registry.Registry
+import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddCommand
 import com.jonnyzzz.mcpSteroid.mcp.*
 import com.jonnyzzz.mcpSteroid.prompts.generated.McpSteroidInfoPrompt
 import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPrompt
@@ -90,7 +91,7 @@ class SteroidsMcpServer(
             if (actualPort > 0) {
                 log.info("MCP Steroid server started on $mcpUrl")
                 log.info("Note: If you restart IntelliJ, connected MCP clients (Claude CLI, etc.) will need to reconnect.")
-                log.info("      Client should re-run: claude mcp add --transport http intellij-steroid $mcpUrl")
+                log.info("      Client should re-run: ${claudeMcpAddCommand(mcpUrl)}")
             }
         }
     }

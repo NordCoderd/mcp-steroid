@@ -52,6 +52,9 @@ dependencies {
     // OCR common models shared with ocr-tesseract CLI
     implementation(project(":ocr-common"))
 
+    // AI agent MCP server configuration helpers
+    implementation(project(":ai-agents"))
+
     // Ktor server for MCP HTTP transport
     val ktorVersion = "3.1.0"
     implementation("io.ktor:ktor-server-core:$ktorVersion")
@@ -269,6 +272,7 @@ val verifyBundledLibraries by tasks.registering {
             "LICENSE",
 
             //our binaires
+            "lib/ai-agents-${project.version}.jar",
             "lib/mcp-steroid-${project.version}.jar",
             "lib/ocr-common-${project.version}.jar",
             "ocr-tesseract/lib/ocr-common-${project.version}.jar",

@@ -1,16 +1,16 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.server
 
-import com.intellij.execution.configurations.GeneralCommandLine
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.registry.Registry
+import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddCommand
+import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddCommand
+import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddCommand
+import com.jonnyzzz.mcpSteroid.aiAgents.genericMcpServersJson
 import com.jonnyzzz.mcpSteroid.storage.storagePaths
-import org.jsoup.internal.StringUtil
 import java.nio.file.Files
-import java.nio.file.Path
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
@@ -62,31 +62,6 @@ class IdeaDescriptionWriter {
         appendLine()
         appendLine("Report issues, Join Slack & Community: https://mcp-steroid.jonnyzzz.com")
         appendLine()
-    }
-
-    private val defaultServerName = "mcp-steroid"
-
-    fun genericMcpServersJson(serverUrl: String, serverName: String = defaultServerName) = buildString {
-        appendLine("{")
-        appendLine("  \"mcpServers\": {")
-        appendLine("    \"$serverName\": {")
-        appendLine("      \"type\": \"http\",")
-        appendLine("      \"url\": \"$serverUrl\"")
-        appendLine("    }")
-        appendLine("  }")
-        appendLine("}")
-    }
-
-    fun geminiMcpAddCommand(serverUrl: String, serverName: String = defaultServerName): String {
-        return "gemini mcp add $serverName --type http $serverUrl"
-    }
-
-    fun codexMcpAddCommand(serverUrl: String, serverName: String = defaultServerName): String {
-        return "codex mcp add $serverName --url $serverUrl"
-    }
-
-    fun claudeMcpAddCommand(serverUrl: String, serverName: String = defaultServerName): String {
-        return "claude mcp add --transport http $serverName $serverUrl"
     }
 
     companion object {
