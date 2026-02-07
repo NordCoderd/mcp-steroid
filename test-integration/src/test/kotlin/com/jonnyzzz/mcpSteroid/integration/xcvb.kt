@@ -15,6 +15,7 @@ class XcvbContainer(
 
     fun startAllServices() {
         startDisplayServer()
+
         startWindowManager()
         startVideoRecording()
         startScreenshotCapture()
@@ -26,28 +27,51 @@ class XcvbContainer(
             listOf("Xvfb", DISPLAY, "-screen", "0", "3840x2160x24", "-ac"),
             name = "xvfb-server",
         )
-        //TODO: pump logs from container
-        //TODO: monitor host is started without timeout.
+
+        println("[xcvb] Waiting for display $DISPLAY to be ready...")
+        val result = driver.runInContainer(
+            "bash", "-c",
+            "for i in \$(seq 1 150); do xdpyinfo -display $DISPLAY >/dev/null 2>&1 && exit 0; sleep 0.1; done; exit 1",
+            timeoutSeconds = 20,
+        )
+        if (result.exitCode != 0) {
+            error("[xcvb] Display $DISPLAY did not become ready within 15s")
+        }
+        println("[xcvb] Display $DISPLAY is ready")
+
         return proc
     }
 
+    val videoGuestPath = "$videoDirInContainer/recording.mp4"
+    val videoFile get() = driver.mapGuestPathToHostPath(videoGuestPath)
+
     fun startVideoRecording(): RunningContainerProcess {
-        val videoPath = "$videoDirInContainer/recording.mp4"
-        println("[xcvb] Starting video recording to ${driver.mapGuestPathToHostPath(videoPath)}...")
+        println("[xcvb] Starting video recording to ${driver.mapGuestPathToHostPath(videoGuestPath)}...")
         val proc = driver.runInContainerDetached(
             listOf(
-                "ffmpeg", "-f", "x11grab", "-video_size", "3840x2160",
+                "ffmpeg", "-nostdin", "-y",
+                "-f", "x11grab", "-video_size", "3840x2160",
                 "-framerate", "10", "-i", DISPLAY,
                 "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                videoPath,
+                "-movflags", "frag_keyframe+empty_moov",
+                "-flush_packets", "1",
+                videoGuestPath,
             ),
             name = "ffmpeg",
         )
         lifetime.registerCleanupAction {
-            //TODO: map the path back to the host!
-            println("Check out screen recording at ${driver.mapGuestPathToHostPath(videoPath)}")
-            proc.kill("TERM")
+            println("Check out screen recording at ${driver.mapGuestPathToHostPath(videoGuestPath)}")
+            proc.kill("INT")
         }
+
+        while (true) {
+            if (videoFile.exists() && videoFile.length() > 1110) {
+                println("[VIDEO] Opening live preview: $videoFile")
+                break
+            }
+            Thread.sleep(100)
+        }
+
         return proc
     }
 
@@ -56,7 +80,7 @@ class XcvbContainer(
      * Screenshots are saved to the mounted screenshots directory for live inspection.
      */
     private fun startScreenshotCapture(): RunningContainerProcess {
-        println("[xcvb] Starting periodic screenshot capture...")
+        println("[xcvb] Starting periodic screenshot capture to ${driver.mapGuestPathToHostPath(videoGuestPath)}...")
         val captureScript = buildString {
             appendLine("while true; do ")
             appendLine($$"  scrot $$videoDirInContainer/screen-$(date +%Y%m%d-%H%M%S).png")
@@ -70,11 +94,36 @@ class XcvbContainer(
     }
 
     fun startWindowManager(): RunningContainerProcess {
+        // The Debian fluxbox style sets background.pixmap to a wallpaper image
+        // that doesn't exist in debian-slim. The default overlay has
+        // "background: none" commented out. Write it uncommented to suppress
+        // the fbsetbg error dialog.
+        driver.writeFileInContainer(
+            "/home/agent/.fluxbox/overlay",
+            "background: none\n",
+        )
+
         println("[xcvb] Starting fluxbox...")
         val proc = driver.runInContainerDetached(
             listOf("fluxbox"),
             name = "fluxbox",
         )
         return proc
+    }
+
+    /**
+     * Start a background thread that watches the video file and opens it with QuickTime
+     * once it reaches a minimum size (ffmpeg has started writing). This provides
+     * live screen output during the test on macOS.
+     *
+     * No-op on non-macOS platforms or if video file does not appear within timeout.
+     */
+    fun startLiveVideoPreview() {
+        if (System.getProperty("os.name")?.contains("Mac", ignoreCase = true) != true) {
+            println("[VIDEO] Not on macOS, skipping live preview")
+            return
+        }
+
+        ProcessBuilder("open", videoFile.absolutePath).start()
     }
 }
