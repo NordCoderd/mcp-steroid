@@ -83,11 +83,33 @@ class XcvbDriver(
                 videoInternalPath,
             ),
         )
+
+        startVideoRsync()
+
         lifetime.registerCleanupAction {
             stopVideoRecordingAndCopyOut(proc)
         }
 
         return proc
+    }
+
+    /**
+     * Periodically rsync the growing video file from the container-local path
+     * to the mounted volume so the host has a reasonably current copy at all
+     * times. Because the file uses fragmented MP4 (frag_keyframe+empty_moov),
+     * each synced copy is a valid (if truncated) MP4.
+     */
+    private fun startVideoRsync(): RunningContainerProcess {
+        println("[xcvb] Starting periodic video rsync to $videoGuestPath...")
+        val rsyncScript = buildString {
+            appendLine("while true; do")
+            appendLine("  rsync --inplace $videoInternalPath $videoGuestPath 2>/dev/null")
+            appendLine("  sleep 1")
+            appendLine("done")
+        }
+        return driver.runInContainerDetached(
+            listOf("bash", "-c", rsyncScript),
+        )
     }
 
     /**

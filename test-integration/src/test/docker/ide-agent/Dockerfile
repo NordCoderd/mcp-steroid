@@ -16,6 +16,7 @@ RUN apt-get update && \
         jq \
         ripgrep \
         unzip \
+        rsync \
         procps \
         ca-certificates \
         gnupg \
