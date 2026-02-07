@@ -160,6 +160,8 @@ class IdeContainerSession(
 
             xcvb.startAllServices()
 
+            xcvb.startLiveVideoPreview()
+
             sleep(3000)
 
 

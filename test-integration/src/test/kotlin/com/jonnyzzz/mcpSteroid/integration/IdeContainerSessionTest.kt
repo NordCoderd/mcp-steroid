@@ -57,7 +57,7 @@ class IdeContainerSessionTest {
         println("[TEST] Plugin files: ${pluginFiles!!.map { it.name }}")
 
         // Start live video preview on macOS
-        val previewThread = startLiveVideoPreview(session.videoFile)
+//        val previewThread = startLiveVideoPreview(session.videoFile)
 
         // Wait for IDE to be ready (MCP server responding)
         println("[TEST] Waiting for IDE to be ready...")
@@ -83,8 +83,6 @@ class IdeContainerSessionTest {
         } catch (e: Exception) {
             println("[TEST] Failed to stop video: ${e.message}")
         }
-
-        previewThread?.interrupt()
 
         println("[TEST] IdeContainerSession infrastructure test passed")
         println("[TEST] Run directory: ${session.runDir}")
