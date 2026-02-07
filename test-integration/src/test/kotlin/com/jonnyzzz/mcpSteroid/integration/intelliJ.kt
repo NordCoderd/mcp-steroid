@@ -110,6 +110,9 @@ class IntelliJDriver(
             appendLine("-Dmcp.steroid.analytics.enabled=false")
             appendLine("-Dmcp.steroid.idea.description.enabled=false")
 
+            appendLine("# Activate as Community Edition (no license dialog)")
+            appendLine("-Didea.platform.prefix=Idea")
+            appendLine()
             appendLine("# Skip EULA, consent dialogs, and onboarding")
             appendLine("-Djb.consents.confirmation.enabled=false")
             appendLine("-Djb.privacy.policy.text=<!--999.999-->")
