@@ -32,6 +32,10 @@ class IdeContainerSession(
     val xcvbContainer: XcvbDriver,
     val intellij: RunningContainerProcess,
 ) {
+    /** Host port mapped to the MCP Steroid server inside the container. */
+    val mcpSteroidHostPort: Int?
+        get() = scope.hostPorts[IntelliJDriver.MCP_STEROID_PORT]
+
     companion object
 }
 
@@ -62,13 +66,15 @@ fun IdeContainerSession.Companion.create(
         ),
         ports = listOf(
             ContainerPort(XcvbDriver.VIDEO_STREAMING_PORT),
+            ContainerPort(IntelliJDriver.MCP_STEROID_PORT),
         ),
     )
 
     val xcvb = XcvbDriver(
         lifetime,
         container,
-        "$containerMountedPath/video"
+        "$containerMountedPath/video",
+        runId = runDir.name,
     )
 
     xcvb.startAllServices()

@@ -20,7 +20,7 @@ class IntelliJDriver(
     private val logsGuestDir = "$guestDir/ide-log"
     private val pluginsGuestDir = "$guestDir/ide-plugins"
 
-    val steroidPort = 6754
+    val steroidPort get() = MCP_STEROID_PORT
 
     fun readLogs(): List<String> {
         val file = ideaLogsFile()
@@ -199,5 +199,9 @@ class IntelliJDriver(
             workingDir = pluginsGuestDir,
             timeoutSeconds = 30,
         ).assertExitCode(0)
+    }
+
+    companion object {
+        const val MCP_STEROID_PORT = 6754
     }
 }
