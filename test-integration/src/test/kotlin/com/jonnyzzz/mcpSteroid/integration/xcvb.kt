@@ -10,6 +10,7 @@ class XcvbDriver(
     private val lifetime: CloseableStack,
     driver: ContainerDriver,
     private val videoDirInContainer: String,
+    private val runId: String = "unknown",
 ) {
     private val DISPLAY = ":99"
     private val driver = driver.withEnv("DISPLAY", DISPLAY)
@@ -80,7 +81,7 @@ class XcvbDriver(
     fun startVideoStreamingServer(): RunningContainerProcess {
         println("[xcvb] Starting video streaming server on container port $VIDEO_STREAMING_PORT...")
         return driver.runInContainerDetached(
-            listOf("node", "/usr/local/bin/video-server.js", videoGuestPath, VIDEO_STREAMING_PORT.toString()),
+            listOf("node", "/usr/local/bin/video-server.js", videoGuestPath, VIDEO_STREAMING_PORT.toString(), runId),
         )
     }
 
@@ -139,19 +140,19 @@ class XcvbDriver(
             return
         }
 
-        val streamUrl = "http://localhost:$hostPort/video.mp4"
+        val dashboardUrl = "http://localhost:$hostPort/"
 
         val thread = thread(start = true) {
             runCatching {
                 waitFor(35_000L, "Video streaming server ready") {
-                    val process = ProcessBuilder("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", streamUrl)
+                    val process = ProcessBuilder("curl", "-s", "-o", "/dev/null", "-w", "%{http_code}", "${dashboardUrl}status")
                         .start()
                     process.waitFor()
                     process.inputStream.bufferedReader().readText().trim() == "200"
                 }
 
-                println("[VIDEO] Opening live stream: $streamUrl")
-                ProcessBuilder("open", streamUrl).start()
+                println("[VIDEO] Opening dashboard: $dashboardUrl")
+                ProcessBuilder("open", dashboardUrl).start()
             }
         }
 
