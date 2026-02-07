@@ -26,18 +26,9 @@ class IdeContainerTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
     fun `container starts and IDE becomes ready`() {
-        val session = IdeContainer.create(
+        IdeContainer.create(
             lifetime,
             "ide-agent",
         )
-
-        val videoPort = session.scope.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
-        val mcpPort = session.mcpSteroidHostPort
-        println()
-        println("=".repeat(60))
-        println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
-        println("  MCP STEROID:     http://localhost:$mcpPort/")
-        println("=".repeat(60))
-        println()
     }
 }

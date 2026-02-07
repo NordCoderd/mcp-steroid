@@ -30,9 +30,8 @@ class IdeContainer(
     val xcvbContainer: XcvbDriver,
     val intellij: RunningContainerProcess,
 ) {
-    /** Host port mapped to the MCP Steroid server inside the container. */
-    val mcpSteroidHostPort: Int
-        get() = scope.mapContainerPortToHostPort(IntelliJDriver.MCP_STEROID_PORT)
+    //TODO: we need an option to start MCP Steroid connection to agents or not
+    val aiAgentDriver = AiAgentDriver(scope)
 
     companion object
 }
@@ -90,8 +89,29 @@ fun IdeContainer.Companion.create(
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
     val ijContainer = ijDriver.startIde()
 
+    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
 
-    return IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
+    // Write info file with all ports and URLs for external tools
+    val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
+    val mcpPort = session.aiAgentDriver.mcpSteroidHostPort
+    val infoFile = File(runDir, "session-info.txt")
+    infoFile.writeText(buildString {
+        appendLine("RUN_DIR=$runDir")
+        appendLine("VIDEO_DASHBOARD=http://localhost:$videoPort/")
+        appendLine("VIDEO_STREAM=http://localhost:$videoPort/video.mp4")
+        appendLine("MCP_STEROID=http://localhost:$mcpPort/")
+        appendLine("VIDEO_PORT=$videoPort")
+        appendLine("MCP_PORT=$mcpPort")
+    })
+    println()
+    println("=".repeat(60))
+    println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
+    println("  MCP STEROID:     http://localhost:$mcpPort/")
+    println("  SESSION INFO:    $infoFile")
+    println("=".repeat(60))
+    println()
+
+    return session
 }
 
 private fun buildIdeImage(dockerFileBase: String, imageName: String): DockerDriver {
