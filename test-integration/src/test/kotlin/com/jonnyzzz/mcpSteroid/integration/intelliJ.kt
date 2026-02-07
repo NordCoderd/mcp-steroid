@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import java.io.File
 import kotlin.concurrent.thread
@@ -20,7 +21,7 @@ class IntelliJDriver(
     private val logsGuestDir = "$guestDir/ide-log"
     private val pluginsGuestDir = "$guestDir/ide-plugins"
 
-    val steroidPort get() = MCP_STEROID_PORT
+    val steroidPort get() = MCP_STEROID_PORT.containerPort
 
     fun readLogs(): List<String> {
         val file = ideaLogsFile()
@@ -202,6 +203,6 @@ class IntelliJDriver(
     }
 
     companion object {
-        const val MCP_STEROID_PORT = 6754
+        val MCP_STEROID_PORT = ContainerPort(6754)
     }
 }

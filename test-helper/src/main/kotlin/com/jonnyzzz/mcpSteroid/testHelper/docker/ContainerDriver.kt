@@ -12,8 +12,8 @@ import java.io.File
  * and running commands.
  */
 interface ContainerDriver {
-    /** Container port → host port mappings established at container start. */
-    val hostPorts: Map<Int, Int>
+    /** Maps a [ContainerPort] to the host port it was mapped to. Throws if not mapped. */
+    fun mapContainerPortToHostPort(port: ContainerPort): Int
 
     fun withSecretPattern(secretPattern: String): ContainerDriver
     fun withEnv(key: String, value: String): ContainerDriver
@@ -117,8 +117,12 @@ private class ContainerDriverImpl(
     private val containerId: String,
     private val imageName: String,
     private val volumes: List<ContainerVolume> = emptyList(),
-    override val hostPorts: Map<Int, Int> = emptyMap(),
+    private val hostPorts: Map<Int, Int> = emptyMap(),
 ) : ContainerDriver {
+    override fun mapContainerPortToHostPort(port: ContainerPort): Int =
+        hostPorts[port.containerPort]
+            ?: error("Port ${port.containerPort} is not mapped. Available: ${hostPorts.keys}")
+
     override fun withSecretPattern(secretPattern: String): ContainerDriver {
         return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes.toList(), hostPorts)
     }

@@ -33,8 +33,8 @@ class IdeContainerSession(
     val intellij: RunningContainerProcess,
 ) {
     /** Host port mapped to the MCP Steroid server inside the container. */
-    val mcpSteroidHostPort: Int?
-        get() = scope.hostPorts[IntelliJDriver.MCP_STEROID_PORT]
+    val mcpSteroidHostPort: Int
+        get() = scope.mapContainerPortToHostPort(IntelliJDriver.MCP_STEROID_PORT)
 
     companion object
 }
@@ -65,8 +65,8 @@ fun IdeContainerSession.Companion.create(
             ContainerVolume(runDir, containerMountedPath, "rw"),
         ),
         ports = listOf(
-            ContainerPort(XcvbDriver.VIDEO_STREAMING_PORT),
-            ContainerPort(IntelliJDriver.MCP_STEROID_PORT),
+            XcvbDriver.VIDEO_STREAMING_PORT,
+            IntelliJDriver.MCP_STEROID_PORT,
         ),
     )
 

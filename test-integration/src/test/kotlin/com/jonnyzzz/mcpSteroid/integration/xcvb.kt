@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import kotlin.concurrent.thread
 
@@ -79,9 +80,10 @@ class XcvbDriver(
      * The server is baked into the Docker image at /usr/local/bin/video-server.js.
      */
     fun startVideoStreamingServer(): RunningContainerProcess {
-        println("[xcvb] Starting video streaming server on container port $VIDEO_STREAMING_PORT...")
+        val hostPort = driver.mapContainerPortToHostPort(VIDEO_STREAMING_PORT)
+        println("[xcvb] Starting video streaming server at http://localhost:$hostPort/")
         return driver.runInContainerDetached(
-            listOf("node", "/usr/local/bin/video-server.js", videoGuestPath, VIDEO_STREAMING_PORT.toString(), runId),
+            listOf("node", "/usr/local/bin/video-server.js", videoGuestPath, VIDEO_STREAMING_PORT.containerPort.toString(), runId),
         )
     }
 
@@ -90,7 +92,7 @@ class XcvbDriver(
      * Screenshots are saved to the mounted screenshots directory for live inspection.
      */
     private fun startScreenshotCapture(): RunningContainerProcess {
-        println("[xcvb] Starting periodic screenshot capture to ${driver.mapGuestPathToHostPath(videoGuestPath)}...")
+        println("[xcvb] Starting periodic screenshot capture to ${driver.mapGuestPathToHostPath(videoDirInContainer)}/...")
         val captureScript = buildString {
             appendLine("while true; do ")
             appendLine($$"  scrot $$videoDirInContainer/screen-$(date +%Y%m%d-%H%M%S).png")
@@ -134,12 +136,7 @@ class XcvbDriver(
             return
         }
 
-        val hostPort = driver.hostPorts[VIDEO_STREAMING_PORT]
-        if (hostPort == null) {
-            println("[VIDEO] Streaming port $VIDEO_STREAMING_PORT not mapped, skipping live preview")
-            return
-        }
-
+        val hostPort = driver.mapContainerPortToHostPort(VIDEO_STREAMING_PORT)
         val dashboardUrl = "http://localhost:$hostPort/"
 
         val thread = thread(start = true) {
@@ -162,6 +159,6 @@ class XcvbDriver(
     }
 
     companion object {
-        const val VIDEO_STREAMING_PORT = 8765
+        val VIDEO_STREAMING_PORT = ContainerPort(8765)
     }
 }
