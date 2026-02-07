@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import java.io.File
+import java.nio.file.Files
 
 /**
  * Manages a Docker container running IntelliJ IDEA with MCP Steroid plugin.
@@ -94,7 +95,7 @@ class IdeContainerSession(
          * @param pluginZipPath Path to the built plugin .zip
          * @param ideaArchivePath Path to the downloaded IntelliJ IDEA .tar.gz
          * @param testProjectDir Path to the test project directory
-         * @param dockerDir Path to the docker directory containing Dockerfile
+         * @param dockerDir Path to the docker directory containing Dockerfile and entrypoint.sh
          * @param videoDir Host directory to mount for video output
          */
         fun start(
@@ -111,37 +112,72 @@ class IdeContainerSession(
             require(dockerDir.isDirectory) { "Docker dir not found: $dockerDir" }
             videoDir.mkdirs()
 
-            // Create temp build context
+            val contextDir = assembleDockerContext(dockerDir, ideaArchivePath, pluginZipPath, testProjectDir)
+            val driver = DockerDriver(contextDir, LOG_PREFIX, emptyList())
+
+            buildImage(driver, contextDir)
+            val containerId = startContainer(driver, containerName, videoDir, contextDir)
+
+            println("[$LOG_PREFIX] Container started: name=$containerName id=$containerId")
+            println("[$LOG_PREFIX] Video output: ${videoDir.absolutePath}/recording.mp4")
+
+            return IdeContainerSession(driver, containerId, containerName, videoDir)
+        }
+
+        /**
+         * Assemble the Docker build context directory.
+         * Copies docker resources (Dockerfile, entrypoint, vmoptions) as files,
+         * symlinks large artifacts (IDEA archive) to avoid redundant copies.
+         */
+        private fun assembleDockerContext(
+            dockerDir: File,
+            ideaArchivePath: File,
+            pluginZipPath: File,
+            testProjectDir: File,
+        ): File {
             val contextDir = createTempDir(LOG_PREFIX.lowercase())
             println("[$LOG_PREFIX] Build context: $contextDir")
 
-            // Assemble build context: copy Dockerfile + entrypoint + vmoptions + artifacts
-            dockerDir.listFiles()?.forEach { file ->
+            // Copy docker resource files (Dockerfile, entrypoint.sh, idea.vmoptions)
+            dockerDir.listFiles()?.filter { it.isFile }?.forEach { file ->
                 file.copyTo(File(contextDir, file.name), overwrite = true)
             }
-            ideaArchivePath.copyTo(File(contextDir, "idea.tar.gz"), overwrite = true)
+
+            // Symlink large IDEA archive to avoid copying ~1GB file
+            Files.createSymbolicLink(
+                File(contextDir, "idea.tar.gz").toPath(),
+                ideaArchivePath.toPath(),
+            )
+
             pluginZipPath.copyTo(File(contextDir, "plugin.zip"), overwrite = true)
             testProjectDir.copyRecursively(File(contextDir, "test-project"), overwrite = true)
 
-            val scope = DockerDriver(contextDir, LOG_PREFIX, emptyList())
+            return contextDir
+        }
 
-            // Build image
-            scope.buildDockerImage(
+        private fun buildImage(driver: DockerDriver, contextDir: File) {
+            driver.buildDockerImage(
                 imageName = IMAGE_NAME,
                 dockerfilePath = File(contextDir, "Dockerfile"),
                 timeoutSeconds = 900,
             )
+        }
 
+        private fun startContainer(
+            driver: DockerDriver,
+            containerName: String,
+            videoDir: File,
+            workDir: File,
+        ): String {
             // Remove existing container with the same name (from previous run)
             println("[$LOG_PREFIX] Removing previous container '$containerName' if exists...")
-            scope.processRunner.run(
+            driver.processRunner.run(
                 listOf("docker", "rm", "-f", containerName),
                 description = "Remove previous container $containerName",
-                workingDir = contextDir,
+                workingDir = workDir,
                 timeoutSeconds = 10,
             )
 
-            // Start container with a stable name; mount video directory
             val dockerRunCmd = buildList {
                 add("docker")
                 add("run")
@@ -159,10 +195,10 @@ class IdeContainerSession(
                 add(IMAGE_NAME)
             }
 
-            val result = scope.processRunner.run(
+            val result = driver.processRunner.run(
                 dockerRunCmd,
                 description = "Start IDE container '$containerName'",
-                workingDir = contextDir,
+                workingDir = workDir,
                 timeoutSeconds = 30,
             )
 
@@ -170,11 +206,7 @@ class IdeContainerSession(
             if (result.exitCode != 0 || containerId.isEmpty()) {
                 error("Failed to start IDE container: ${result.stderr}")
             }
-
-            println("[$LOG_PREFIX] Container started: name=$containerName id=$containerId")
-            println("[$LOG_PREFIX] Video output: ${videoDir.absolutePath}/recording.mp4")
-
-            return IdeContainerSession(scope, containerId, containerName, videoDir)
+            return containerId
         }
 
         private fun createTempDir(prefix: String): File {
