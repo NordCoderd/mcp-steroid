@@ -12,6 +12,9 @@ import java.io.File
  * and running commands.
  */
 interface ContainerDriver {
+    /** Container port → host port mappings established at container start. */
+    val hostPorts: Map<Int, Int>
+
     fun withSecretPattern(secretPattern: String): ContainerDriver
     fun withEnv(key: String, value: String): ContainerDriver
 
@@ -85,9 +88,18 @@ fun startContainerDriver(
     imageName: String,
     extraEnvVars: Map<String, String> = emptyMap(),
     volumes: List<ContainerVolume> = listOf(),
+    ports: List<ContainerPort> = listOf(),
 ): ContainerDriver {
-    val containerId = scope.startContainer(lifetime, imageName, extraEnvVars, volumes)
-    return ContainerDriverImpl(scope, containerId, imageName, volumes)
+    val containerId = scope.startContainer(lifetime, imageName, extraEnvVars, volumes, ports)
+
+    val hostPorts = ports.associate { p ->
+        p.containerPort to scope.queryMappedPort(containerId, p.containerPort)
+    }
+    if (hostPorts.isNotEmpty()) {
+        println("[${scope.logPrefix}] Port mappings: ${hostPorts.entries.joinToString { "${it.key} -> ${it.value}" }}")
+    }
+
+    return ContainerDriverImpl(scope, containerId, imageName, volumes, hostPorts)
 }
 
 data class ContainerVolume(
@@ -96,18 +108,23 @@ data class ContainerVolume(
     val mode: String = "rw",
 )
 
+data class ContainerPort(
+    val containerPort: Int,
+)
+
 private class ContainerDriverImpl(
     private val scope: DockerDriver,
     private val containerId: String,
     private val imageName: String,
     private val volumes: List<ContainerVolume> = emptyList(),
+    override val hostPorts: Map<Int, Int> = emptyMap(),
 ) : ContainerDriver {
     override fun withSecretPattern(secretPattern: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes.toList())
+        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes.toList(), hostPorts)
     }
 
     override fun withEnv(key: String, value: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName, volumes.toList())
+        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName, volumes.toList(), hostPorts)
     }
 
     override fun runInContainer(

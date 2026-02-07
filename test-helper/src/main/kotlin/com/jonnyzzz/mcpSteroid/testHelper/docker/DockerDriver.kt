@@ -54,6 +54,7 @@ class DockerDriver(
         imageName: String,
         extraEnvVars: Map<String, String> = emptyMap(),
         volumes: List<ContainerVolume> = emptyList(),
+        ports: List<ContainerPort> = emptyList(),
     ): String {
         val command = buildList {
             add("docker")
@@ -68,6 +69,11 @@ class DockerDriver(
             volumes.forEach { v ->
                 add("-v")
                 add("${v.host.absolutePath}:${v.guest}:${v.mode}")
+            }
+
+            ports.forEach { p ->
+                add("-p")
+                add("0:${p.containerPort}")
             }
 
             add(imageName)
@@ -92,6 +98,25 @@ class DockerDriver(
         }
 
         return containerId
+    }
+
+    /**
+     * Query the host port mapped to a container port.
+     * Docker output format: "0.0.0.0:52134" or "[::]:52134"
+     */
+    fun queryMappedPort(containerId: String, containerPort: Int): Int {
+        val result = processRunner.run(
+            listOf("docker", "port", containerId, "$containerPort/tcp"),
+            description = "Query host port for $containerPort",
+            workingDir = workDir,
+            timeoutSeconds = 5,
+        )
+        if (result.exitCode != 0) {
+            error("Failed to query mapped port for $containerPort: ${result.stderr}")
+        }
+        // Parse "0.0.0.0:52134" or "[::]:52134" — take the last colon-separated part
+        return result.output.trim().lines().first().substringAfterLast(':').toIntOrNull()
+            ?: error("Failed to parse host port from: ${result.output}")
     }
 
     fun killContainer(containerId: String) {
