@@ -1,8 +1,0 @@
--Xmx2g
--Xms512m
--Dmcp.steroid.server.host=0.0.0.0
--Dmcp.steroid.server.port=6315
--Dmcp.steroid.review.mode=NEVER
--Dmcp.steroid.updates.enabled=false
--Dmcp.steroid.analytics.enabled=false
--Dmcp.steroid.idea.description.enabled=false

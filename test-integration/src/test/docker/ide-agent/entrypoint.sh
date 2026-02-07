@@ -2,8 +2,14 @@
 # Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license.
 set -euo pipefail
 
-echo "[entrypoint] Starting Xvfb..."
-Xvfb :99 -screen 0 1920x1080x24 -ac &
+# Set JAVA_HOME dynamically (path varies by arch: amd64 vs aarch64)
+if [ -z "${JAVA_HOME:-}" ]; then
+    export JAVA_HOME=$(dirname $(dirname $(readlink -f $(which java))))
+    echo "[entrypoint] JAVA_HOME=$JAVA_HOME"
+fi
+
+echo "[entrypoint] Starting Xvfb (4K)..."
+Xvfb :99 -screen 0 3840x2160x24 -ac &
 XVFB_PID=$!
 sleep 1
 
@@ -11,14 +17,13 @@ echo "[entrypoint] Starting fluxbox..."
 fluxbox &
 sleep 1
 
-# Optional video recording
-if [ -n "${VIDEO_OUTPUT:-}" ]; then
-    echo "[entrypoint] Starting video recording to $VIDEO_OUTPUT..."
-    ffmpeg -f x11grab -video_size 1920x1080 -framerate 10 -i :99 \
-        -c:v libx264 -preset ultrafast -crf 28 \
-        "$VIDEO_OUTPUT" &
-    FFMPEG_PID=$!
-fi
+# Always record video
+VIDEO_OUTPUT="${VIDEO_OUTPUT:-/tmp/recording.mp4}"
+echo "[entrypoint] Starting video recording to $VIDEO_OUTPUT..."
+ffmpeg -f x11grab -video_size 3840x2160 -framerate 10 -i :99 \
+    -c:v libx264 -preset ultrafast -crf 28 \
+    "$VIDEO_OUTPUT" &
+FFMPEG_PID=$!
 
 echo "[entrypoint] Starting IntelliJ IDEA..."
 /opt/idea/bin/idea nosplash "$HOME/project" &
