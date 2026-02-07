@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration
 
+import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
@@ -121,54 +122,28 @@ class IdeContainerSession(
         private const val CONTAINER_VIDEO_DIR = "/home/agent/video"
         private const val CONTAINER_SCREENSHOTS_DIR = "/home/agent/screenshots"
 
-        private val RUN_DIR_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd'Z'HH-mm-ss-SSS")
-
-        /**
-         * Build and start an IDE Docker container.
-         * Removes any existing container with the same name before starting.
-         *
-         * All IDE directories, video, and screenshots are mounted to a timestamped
-         * run directory under testOutputDir.
-         *
-         * @param containerName Stable name for the container (survives test runs for debugging)
-         * @param pluginZipPath Path to the built plugin .zip
-         * @param ideaArchivePath Path to the downloaded IntelliJ IDEA .tar.gz
-         * @param testProjectDir Path to the test project directory
-         * @param dockerDir Path to the docker directory containing Dockerfile and entrypoint.sh
-         * @param testOutputDir Root output directory; a timestamped run subfolder is created
-         */
-        fun start(
+        fun create(
+            lifetime: CloseableStack,
             containerName: String,
-            pluginZipPath: File,
-            ideaArchivePath: File,
-            testProjectDir: File,
-            dockerDir: File,
-            testOutputDir: File,
         ): IdeContainerSession {
-            require(pluginZipPath.isFile) { "Plugin zip not found: $pluginZipPath" }
-            require(ideaArchivePath.isFile) { "IDEA archive not found: $ideaArchivePath" }
-            require(testProjectDir.isDirectory) { "Test project not found: $testProjectDir" }
-            require(dockerDir.isDirectory) { "Docker dir not found: $dockerDir" }
-
-            // Create timestamped run directory
-            val timestamp = RUN_DIR_FORMATTER.format(LocalDateTime.now())
-            val runDir = File(testOutputDir, "run-$timestamp-$containerName")
-            runDir.mkdirs()
+            val hostPaths = HostPaths(containerName)
 
             // Create all mount-point subdirectories
-            val videoDir = File(runDir, "video").apply { mkdirs() }
-            val screenshotDir = File(runDir, "screenshots").apply { mkdirs() }
-            val configDir = File(runDir, "ide-config").apply { mkdirs() }
-            val systemDir = File(runDir, "ide-system").apply { mkdirs() }
-            val logDir = File(runDir, "ide-log").apply { mkdirs() }
-            val pluginsDir = File(runDir, "ide-plugins").apply { mkdirs() }
+            println("[$LOG_PREFIX] Run directory: ${hostPaths.runDir}")
 
-            println("[$LOG_PREFIX] Run directory: $runDir")
+            val contextDir = hostPaths.createTempDir("container-sources")
+            prepareDockerDir(containerName, contextDir = contextDir)
+            val driver = DockerDriver(contextDir, LOG_PREFIX)
 
-            val contextDir = assembleDockerContext(dockerDir, ideaArchivePath, testProjectDir)
-            val driver = DockerDriver(contextDir, LOG_PREFIX, emptyList())
+            driver.buildDockerImage(
+                imageName = IMAGE_NAME,
+                dockerfilePath = File(contextDir, "Dockerfile"),
+                timeoutSeconds = 900,
+            )
 
-            buildImage(driver, contextDir)
+            TODO()
+
+/*
             val containerId = startContainer(
                 driver, containerName, contextDir,
                 videoDir = videoDir,
@@ -209,7 +184,7 @@ class IdeContainerSession(
                 screenshotProcess = screenshotProc,
                 windowManagerProcess = wmProc,
                 ideProcess = ideProc,
-            )
+            )*/
         }
 
         /**
@@ -381,21 +356,19 @@ class IdeContainerSession(
          * hard-links large artifacts (IDEA archive) to avoid redundant copies.
          * Plugin is deployed separately during container run.
          */
-        private fun assembleDockerContext(
-            dockerDir: File,
-            ideaArchivePath: File,
-            testProjectDir: File,
-        ): File {
-            val contextDir = createTempDir(LOG_PREFIX.lowercase())
+        private fun prepareDockerDir(
+            containerName: String,
+            testProjectName: String = "test-project",
+            contextDir: File,
+        ) {
             println("[$LOG_PREFIX] Build context: $contextDir")
 
-            // Copy docker resource files (Dockerfile, entrypoint.sh)
-            dockerDir.listFiles()?.filter { it.isFile }?.forEach { file ->
-                file.copyTo(File(contextDir, file.name), overwrite = true)
-            }
+            IdeTestFolders.copyDockerFiles(containerName, contextDir)
+            IdeTestFolders.copyProjectFiles(testProjectName, contextDir.resolve("test-project"))
 
             // Hard-link large IDEA archive to avoid copying ~1GB file.
             // Falls back to copy if hard link fails (e.g. cross-filesystem).
+            val ideaArchivePath = IdeTestFolders.intelliJTarGz
             val ideaDest = File(contextDir, "idea.tar.gz").toPath()
             try {
                 Files.createLink(ideaDest, ideaArchivePath.toPath())
@@ -404,17 +377,7 @@ class IdeContainerSession(
                 ideaArchivePath.copyTo(File(contextDir, "idea.tar.gz"), overwrite = true)
             }
 
-            testProjectDir.copyRecursively(File(contextDir, "test-project"), overwrite = true)
-
-            return contextDir
-        }
-
-        private fun buildImage(driver: DockerDriver, contextDir: File) {
-            driver.buildDockerImage(
-                imageName = IMAGE_NAME,
-                dockerfilePath = File(contextDir, "Dockerfile"),
-                timeoutSeconds = 900,
-            )
+            println("[$LOG_PREFIX] Prepared context: " + contextDir.walkTopDown().joinToString("") {"\n - ${it.relativeTo(contextDir)}"} )
         }
 
         private fun startContainer(
@@ -475,10 +438,29 @@ class IdeContainerSession(
             return containerId
         }
 
-        private fun createTempDir(prefix: String): File {
-            val tempDir = File(System.getProperty("java.io.tmpdir"), "docker-$prefix-${System.currentTimeMillis()}")
-            tempDir.mkdirs()
-            return tempDir
-        }
+    }
+}
+
+
+class HostPaths(containerName: String) {
+    // Create timestamped run directory
+    private val timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'Z'HH-mm-ss-SSS").format(LocalDateTime.now())
+    val runDir = File(IdeTestFolders.testOutputDir, "run-$timestamp-$containerName").apply {
+        mkdirs()
+    }
+
+    val videoDir = File(runDir, "video").apply { mkdirs() }
+    val screenshotDir = File(runDir, "screenshots").apply { mkdirs() }
+    val configDir = File(runDir, "ide-config").apply { mkdirs() }
+    val systemDir = File(runDir, "ide-system").apply { mkdirs() }
+    val logDir = File(runDir, "ide-log").apply { mkdirs() }
+    val pluginsDir = File(runDir, "ide-plugins").apply { mkdirs() }
+
+    private val tempDir = File(runDir, "temp").apply { mkdirs() }
+
+    fun createTempDir(prefix: String): File {
+        val tempDir = File(tempDir, "docker-$prefix-${System.currentTimeMillis()}")
+        tempDir.mkdirs()
+        return tempDir
     }
 }

@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration
 
 import java.io.File
+import java.nio.file.Files
 
 
 private fun readFilePathFromSystemProperties(key: String): File {
@@ -14,10 +15,40 @@ private fun readFilePathFromSystemProperties(key: String): File {
 
 object IdeTestFolders {
     val pluginZip = readFilePathFromSystemProperties("test.integration.plugin.zip")
-    val downloadedIdea = readFilePathFromSystemProperties("test.integration.idea.archive")
+    val intelliJTarGz = readFilePathFromSystemProperties("test.integration.idea.archive")
     val dockerDir = readFilePathFromSystemProperties("test.integration.docker")
+    val projectDir = dockerDir
     val testOutputDir = readFilePathFromSystemProperties("test.integration.testOutput")
+
+    fun copyDockerFiles(containerName: String, destinationDir: File) {
+        val sourcePath = dockerDir.resolve(containerName)
+        require(sourcePath.exists()) { "Directory $containerName already exists" }
+        copyRecursively(sourcePath, destinationDir)
+    }
+
+    fun copyProjectFiles(containerName: String, destinationDir: File) {
+        val sourcePath = dockerDir.resolve(containerName)
+        require(sourcePath.exists()) { "Directory $containerName already exists" }
+        copyRecursively(sourcePath, destinationDir)
+    }
 }
+
+fun copyRecursively(source: File, destination: File) {
+    if (source.isFile) {
+        destination.parentFile.mkdirs()
+        Files.copy(source.toPath(), destination.toPath())
+        return
+    }
+
+    destination.mkdirs()
+
+    val sourceFiles = source.listFiles() ?: error("Failed to list directory $source")
+
+    sourceFiles.forEach { sourceFile ->
+        copyRecursively(sourceFile, destination.resolve(sourceFile.name))
+    }
+}
+
 
 /**
  * Start a background thread that watches the video file and opens it with QuickTime

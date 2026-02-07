@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter.ofPattern
 class DockerDriver(
     val workDir: File,
     val logPrefix: String,
-    val secretPatterns: List<String>,
+    val secretPatterns: List<String> = emptyList(),
 ) {
     fun withSecretPattern(secretPattern: String): DockerDriver {
         return DockerDriver(workDir, logPrefix, (secretPatterns + secretPattern).distinct())
