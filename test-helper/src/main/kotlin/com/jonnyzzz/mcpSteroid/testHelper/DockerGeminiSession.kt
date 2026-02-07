@@ -77,5 +77,10 @@ class DockerGeminiSession(
             val session = DockerSession.startDockerSession("gemini-cli", listOf(apiKey) + secretPatterns)
             return DockerGeminiSession(session, apiKey)
         }
+
+        fun create(session: CloseableDockerSession): DockerGeminiSession {
+            val apiKey = readApiKey()
+            return DockerGeminiSession(session, apiKey)
+        }
     }
 }

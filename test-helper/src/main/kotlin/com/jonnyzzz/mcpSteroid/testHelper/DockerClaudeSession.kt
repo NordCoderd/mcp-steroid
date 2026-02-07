@@ -96,12 +96,15 @@ class DockerClaudeSession(
             error("ANTHROPIC_API_KEY is required for Claude CLI tests (set env or ~/.anthropic)")
         }
 
-        fun create(
-            secretPatterns: List<String> = listOf(),
-        ): DockerClaudeSession {
+        fun create(secretPatterns: List<String> = listOf()): DockerClaudeSession {
             println("[DOCKER-CLAUDE] Creating new session")
             val apiKey = readAnthropicApiKey()
             val session = DockerSession.startDockerSession("claude-cli", listOf(apiKey) + secretPatterns)
+            return DockerClaudeSession(session, apiKey)
+        }
+
+        fun create(session: CloseableDockerSession): DockerClaudeSession {
+            val apiKey = readAnthropicApiKey()
             return DockerClaudeSession(session, apiKey)
         }
     }

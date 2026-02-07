@@ -93,5 +93,10 @@ class DockerCodexSession(
             val session = DockerSession.startDockerSession("codex-cli", listOf(apiKey) + secretPatterns)
             return DockerCodexSession(session, apiKey)
         }
+
+        fun create(session: CloseableDockerSession): DockerCodexSession {
+            val apiKey = readOpenAiApiKey()
+            return DockerCodexSession(session, apiKey)
+        }
     }
 }
