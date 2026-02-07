@@ -15,7 +15,7 @@ import java.io.File
  * Video is always recorded. The video directory is mounted from the host
  * so that the recording is accessible in real-time (for live preview on macOS).
  */
-class IdeDockerSession(
+class IdeContainerSession(
     private val scope: DockerDriver,
     private val containerId: String,
     val containerName: String,
@@ -104,7 +104,7 @@ class IdeDockerSession(
             testProjectDir: File,
             dockerDir: File,
             videoDir: File,
-        ): IdeDockerSession {
+        ): IdeContainerSession {
             require(pluginZipPath.isFile) { "Plugin zip not found: $pluginZipPath" }
             require(ideaArchivePath.isFile) { "IDEA archive not found: $ideaArchivePath" }
             require(testProjectDir.isDirectory) { "Test project not found: $testProjectDir" }
@@ -174,7 +174,7 @@ class IdeDockerSession(
             println("[$LOG_PREFIX] Container started: name=$containerName id=$containerId")
             println("[$LOG_PREFIX] Video output: ${videoDir.absolutePath}/recording.mp4")
 
-            return IdeDockerSession(scope, containerId, containerName, videoDir)
+            return IdeContainerSession(scope, containerId, containerName, videoDir)
         }
 
         private fun createTempDir(prefix: String): File {

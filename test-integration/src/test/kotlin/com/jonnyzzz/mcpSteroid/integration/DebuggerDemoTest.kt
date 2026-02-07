@@ -23,7 +23,7 @@ class DebuggerDemoTest {
         val outputDir = resolveBuildOutputDir("debugger-demo")
 
         // Start IDE container (removes previous container with same name)
-        val session = IdeDockerSession.start(
+        val session = IdeContainerSession.start(
             containerName = "mcp-steroid-debugger-demo",
             pluginZipPath = resolvePluginZip(),
             ideaArchivePath = resolveIdeaArchive(),
