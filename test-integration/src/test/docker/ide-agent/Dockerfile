@@ -4,6 +4,7 @@ FROM debian:bookworm-slim
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         xvfb \
+        x11-utils \
         fluxbox \
         fonts-dejavu \
         ffmpeg \
