@@ -152,7 +152,7 @@ class IdeContainerSession(
 
             // Create timestamped run directory
             val timestamp = RUN_DIR_FORMATTER.format(LocalDateTime.now())
-            val runDir = File(testOutputDir, "run-$timestamp")
+            val runDir = File(testOutputDir, "run-$timestamp-$containerName")
             runDir.mkdirs()
 
             // Create all mount-point subdirectories

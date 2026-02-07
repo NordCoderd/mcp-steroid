@@ -197,8 +197,8 @@ class DockerDriver(
     fun writeFileInContainer(
         containerId: String,
         containerPath: String,
-        executable: Boolean = false,
         content: String,
+        executable: Boolean = false,
     ) {
         // Ensure parent directory exists
         val parentDir = containerPath.substringBeforeLast('/')
