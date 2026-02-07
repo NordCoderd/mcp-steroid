@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.integration
 
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
+import java.io.File
 import java.util.concurrent.TimeUnit
 
 /**
@@ -20,16 +21,14 @@ class DebuggerDemoTest {
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
     fun `agent finds sortedByDescending bug via debugger`() {
         val apiKey = readAnthropicApiKey()
-        val outputDir = resolveBuildOutputDir("debugger-demo")
 
-        // Start IDE container (removes previous container with same name)
         val session = IdeContainerSession.start(
             containerName = "mcp-steroid-debugger-demo",
-            pluginZipPath = resolvePluginZip(),
-            ideaArchivePath = resolveIdeaArchive(),
-            testProjectDir = resolveTestProject(),
-            dockerDir = resolveDockerDir(),
-            videoDir = outputDir.resolve("video").also { it.mkdirs() },
+            pluginZipPath = IdeTestFolders.pluginZip,
+            ideaArchivePath = IdeTestFolders.downloadedIdea,
+            testProjectDir = File(IdeTestFolders.dockerDir, "test-project"),
+            dockerDir = File(IdeTestFolders.dockerDir, "ide-agent"),
+            testOutputDir = IdeTestFolders.testOutputDir,
         )
 
         // Start live video preview on macOS (opens QuickTime once video starts)
