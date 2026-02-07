@@ -1,41 +1,22 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.testHelper
+package com.jonnyzzz.mcpSteroid.testHelper.docker
 
+import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.ProcessRunner
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-/**
- * Base class for managing CLI sessions running inside Docker containers.
- * Provides common functionality for building images, starting/stopping containers,
- * and running commands.
- */
-interface DockerSession {
-    fun runInContainer(
-        vararg args: String,
-        timeoutSeconds: Long = 30,
-        extraEnvVars: Map<String, String> = emptyMap()
-    ): ProcessResult
-
-    companion object
-}
-
-interface AiAgentSession {
-    /**
-     * Run codex exec for non-interactive mode.
-     */
-    fun runPrompt(
-        prompt: String,
-        timeoutSeconds: Long = 120
-    ): ProcessResult
-}
-
-class DockerSessionScope(
+class DockerDriver(
     val workDir: File,
     val logPrefix: String,
-    secretPatterns: List<String>,
+    val secretPatterns: List<String>,
 ) {
-    val processRunner = ProcessRunner(logPrefix, secretPatterns)
+    fun withSecretPattern(secretPattern: String): DockerDriver {
+        return DockerDriver(workDir, logPrefix, (secretPatterns + secretPattern).distinct())
+    }
+
+    val processRunner get() = ProcessRunner(logPrefix, secretPatterns.toList())
 
     fun buildDockerImage(
         imageName: String,
@@ -140,69 +121,4 @@ class DockerSessionScope(
             timeoutSeconds = timeoutSeconds,
         )
     }
-}
-
-/**
- * A DockerSession that implements AutoCloseable for cleanup.
- */
-class CloseableDockerSession(
-    private val scope: DockerSessionScope,
-    private val containerId: String,
-    private val cleanupActions: List<() -> Unit>,
-) : DockerSession, AutoCloseable {
-
-    override fun runInContainer(
-        vararg args: String,
-        timeoutSeconds: Long,
-        extraEnvVars: Map<String, String>
-    ): ProcessResult {
-        return scope.runInContainer(containerId, args.toList(), timeoutSeconds, extraEnvVars)
-    }
-
-    override fun close() {
-        cleanupActions.forEach { it() }
-    }
-}
-
-fun DockerSession.Companion.startDockerSession(
-    dockerFileBase: String, //aka codex-cli
-    secretPatterns: List<String> = listOf(),
-): CloseableDockerSession {
-    val cleanupActions = mutableListOf<() -> Unit>()
-
-    val dockerfilePath = File("src/test/docker/$dockerFileBase/Dockerfile")
-    require(dockerfilePath.isFile) { "Docker file $dockerfilePath must exist" }
-
-    val logPrefix = dockerFileBase.uppercase().replace("/", "-")
-    val workDir = createTempDirectory(logPrefix.lowercase())
-    println("[$logPrefix] Creating new session in temp dir: $workDir")
-    cleanupActions += {
-        workDir.deleteRecursively()
-        println("[$logPrefix] Temp directory cleaned up: $workDir")
-    }
-
-    val scope = DockerSessionScope(workDir, logPrefix, secretPatterns)
-    val imageName = "$dockerFileBase-test"
-
-    //TODO: drop image it it's older than one day
-    scope.buildDockerImage(
-        imageName = imageName,
-        dockerfilePath,
-        timeoutSeconds = 600
-    )
-
-    //we are not disposing the image
-    val containerId = scope.startContainer(imageName)
-    cleanupActions += {
-        println("[$logPrefix] Stopping and removing container: $containerId")
-        scope.killContainer(containerId)
-    }
-
-    return CloseableDockerSession(scope, containerId, cleanupActions)
-}
-
-private fun createTempDirectory(prefix: String): File {
-    val tempDir = File(System.getProperty("java.io.tmpdir"), "docker-$prefix-${System.currentTimeMillis()}")
-    tempDir.mkdirs()
-    return tempDir
 }

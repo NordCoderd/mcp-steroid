@@ -1,16 +1,20 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerSession
 import java.io.File
 
 /**
  * Manages a Gemini CLI session running inside a Docker container.
  */
 class DockerGeminiSession(
-    val session: CloseableDockerSession,
+    private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
-) : AiAgentSession, AutoCloseable {
+) : AiAgentSession {
+
+    fun toAiSession(): AiAgentSession = this
 
     fun registerMcp(mcpUrl: String, mcpName: String) = apply {
         var command = "gemini mcp add $mcpName --type http $mcpUrl"
@@ -57,12 +61,8 @@ class DockerGeminiSession(
         )
     }
 
-    override fun close() {
-        session.close()
-    }
-
-    companion object {
-        private fun readApiKey(): String {
+    companion object : AIAgentCompanion<DockerGeminiSession>("gemini-cli") {
+        override fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
             val keyFile = File(System.getProperty("user.home"), ".vertex")
             if (keyFile.exists()) {
@@ -72,14 +72,10 @@ class DockerGeminiSession(
             error("GEMINI_API_KEY required (set env or ~/.vertex)")
         }
 
-        fun create(secretPatterns: List<String> = listOf()): DockerGeminiSession {
-            val apiKey = readApiKey()
-            val session = DockerSession.startDockerSession("gemini-cli", listOf(apiKey) + secretPatterns)
-            return DockerGeminiSession(session, apiKey)
-        }
-
-        fun create(session: CloseableDockerSession): DockerGeminiSession {
-            val apiKey = readApiKey()
+        override fun createImpl(
+            session: ContainerDriver,
+            apiKey: String
+        ): DockerGeminiSession {
             return DockerGeminiSession(session, apiKey)
         }
     }

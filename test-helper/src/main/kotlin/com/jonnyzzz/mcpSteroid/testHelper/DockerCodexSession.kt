@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import java.io.File
 
 /**
@@ -11,10 +12,11 @@ import java.io.File
  * The API key is read from ~/.openai mounted into the container.
  */
 class DockerCodexSession(
-    private val session: CloseableDockerSession,
+    private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
-) : AiAgentSession, AutoCloseable {
+) : AiAgentSession {
+
     fun toAiSession(): AiAgentSession = this
 
     fun registerMcp(mcpUrl: String, mcpName: String) = apply {
@@ -72,12 +74,8 @@ class DockerCodexSession(
         )
     }
 
-    override fun close() {
-        session.close()
-    }
-
-    companion object {
-        private fun readOpenAiApiKey(): String {
+    companion object : AIAgentCompanion<DockerCodexSession>("codex-cli") {
+        override fun readApiKey(): String {
             System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
             val keyFile = File(System.getProperty("user.home"), ".openai")
             if (keyFile.exists()) {
@@ -87,15 +85,10 @@ class DockerCodexSession(
             error("OPENAI_API_KEY is required for Codex CLI tests (set env or ~/.openai)")
         }
 
-        fun create(secretPatterns: List<String> = listOf()): DockerCodexSession {
-            println("[DOCKER-CODEX] Session created in container")
-            val apiKey = readOpenAiApiKey()
-            val session = DockerSession.startDockerSession("codex-cli", listOf(apiKey) + secretPatterns)
-            return DockerCodexSession(session, apiKey)
-        }
-
-        fun create(session: CloseableDockerSession): DockerCodexSession {
-            val apiKey = readOpenAiApiKey()
+        override fun createImpl(
+            session: ContainerDriver,
+            apiKey: String
+        ): DockerCodexSession {
             return DockerCodexSession(session, apiKey)
         }
     }

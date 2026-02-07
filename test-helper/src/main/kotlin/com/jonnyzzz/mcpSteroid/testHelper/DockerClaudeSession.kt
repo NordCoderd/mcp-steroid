@@ -1,6 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerSession
 import java.io.File
 
 /**
@@ -9,10 +11,10 @@ import java.io.File
  * MCP server registrations from affecting the local Claude config.
  */
 class DockerClaudeSession(
-    private val session: CloseableDockerSession,
+    private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
-) : AiAgentSession, AutoCloseable {
+) : AiAgentSession {
 
     fun toAiSession() : AiAgentSession = this
 
@@ -81,12 +83,8 @@ class DockerClaudeSession(
         )
     }
 
-    override fun close() {
-        session.close()
-    }
-
-    companion object {
-        private fun readAnthropicApiKey(): String {
+    companion object : AIAgentCompanion<DockerClaudeSession>("claude-cli") {
+        override fun readApiKey(): String {
             System.getenv("ANTHROPIC_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
             val keyFile = File(System.getProperty("user.home"), ".anthropic")
             if (keyFile.exists()) {
@@ -96,16 +94,11 @@ class DockerClaudeSession(
             error("ANTHROPIC_API_KEY is required for Claude CLI tests (set env or ~/.anthropic)")
         }
 
-        fun create(secretPatterns: List<String> = listOf()): DockerClaudeSession {
-            println("[DOCKER-CLAUDE] Creating new session")
-            val apiKey = readAnthropicApiKey()
-            val session = DockerSession.startDockerSession("claude-cli", listOf(apiKey) + secretPatterns)
-            return DockerClaudeSession(session, apiKey)
-        }
-
-        fun create(session: CloseableDockerSession): DockerClaudeSession {
-            val apiKey = readAnthropicApiKey()
-            return DockerClaudeSession(session, apiKey)
+        override fun createImpl(
+            session: ContainerDriver,
+            apiKey: String
+        ): DockerClaudeSession {
+            return DockerClaudeSession(session.withSecretPattern(apiKey), apiKey)
         }
     }
 }
