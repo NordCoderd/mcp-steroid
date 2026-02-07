@@ -13,6 +13,10 @@ class XcvbContainer(
     private val DISPLAY = ":99"
     private val driver = driver.withEnv("DISPLAY", DISPLAY)
 
+    fun withDisplay(container: ContainerDriver): ContainerDriver {
+        return container.withEnv("DISPLAY", DISPLAY)
+    }
+
     fun startAllServices() {
         startDisplayServer()
 
@@ -30,8 +34,10 @@ class XcvbContainer(
 
         println("[xcvb] Waiting for display $DISPLAY to be ready...")
         val result = driver.runInContainer(
+            listOf(
             "bash", "-c",
             "for i in \$(seq 1 150); do xdpyinfo -display $DISPLAY >/dev/null 2>&1 && exit 0; sleep 0.1; done; exit 1",
+            ),
             timeoutSeconds = 20,
         )
         if (result.exitCode != 0) {
@@ -94,13 +100,11 @@ class XcvbContainer(
     }
 
     fun startWindowManager(): RunningContainerProcess {
-        // The Debian fluxbox style sets background.pixmap to a wallpaper image
-        // that doesn't exist in debian-slim. The default overlay has
-        // "background: none" commented out. Write it uncommented to suppress
-        // the fbsetbg error dialog.
+        // Override the Debian fluxbox style wallpaper (which references an
+        // image from desktop-base that isn't installed) with our own.
         driver.writeFileInContainer(
             "/home/agent/.fluxbox/overlay",
-            "background: none\n",
+            "background: fullscreen\nbackground.pixmap: /usr/share/images/mcp-steroid-wallpaper.jpg\n",
         )
 
         println("[xcvb] Starting fluxbox...")

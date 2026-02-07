@@ -9,6 +9,7 @@ RUN apt-get update && \
         fonts-dejavu \
         ffmpeg \
         scrot \
+        feh \
         imagemagick \
         curl \
         git \
@@ -64,22 +65,19 @@ RUN useradd -m -s /bin/bash agent && \
 
 # Copy and extract IntelliJ IDEA (pre-downloaded by Gradle)
 COPY idea.tar.gz /tmp/idea.tar.gz
-RUN mkdir -p /opt/idea && \
+RUN mkdir -p /opt/idea && chmod a+rwx /opt && \
     tar -xzf /tmp/idea.tar.gz -C /opt/idea --strip-components=1 && \
     rm /tmp/idea.tar.gz
+
+# Desktop wallpaper
+COPY wallpaper.jpg /usr/share/images/mcp-steroid-wallpaper.jpg
 
 # Switch to agent user
 USER agent
 WORKDIR /home/agent
 
-ENV DISPLAY=:99
 ENV PATH="/home/agent/.local/bin:/opt/idea/bin:/usr/bin:$PATH"
 ENV SHELL=/bin/bash
 ENV HOME=/home/agent
 
-EXPOSE 6315
-
-# All configuration (vmoptions, EULA, trusted paths, plugin, project)
-# is written by IdeContainerSession at runtime via docker exec.
-# All processes (Xvfb, fluxbox, ffmpeg, IDEA) are started via docker exec --detach.
 CMD ["sleep", "infinity"]
