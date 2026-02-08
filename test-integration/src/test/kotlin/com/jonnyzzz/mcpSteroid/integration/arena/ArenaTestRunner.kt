@@ -29,7 +29,15 @@ class ArenaTestRunner(
      * @return The guest directory path where the project was cloned
      */
     fun cloneAndCheckout(testCase: DpaiaTestCase): String {
-        val projectDir = "$projectGuestDir/${testCase.repoName}"
+        // Use a unique suffix so parallel runs for different agents don't collide
+        val suffix = System.nanoTime().toString(36)
+        val projectDir = "$projectGuestDir/${testCase.repoName}-$suffix"
+
+        // Ensure parent directory exists
+        container.runInContainer(
+            listOf("mkdir", "-p", projectGuestDir),
+            timeoutSeconds = 10,
+        )
 
         println("[ARENA] Cloning ${testCase.cloneUrl} into $projectDir ...")
         container.runInContainer(

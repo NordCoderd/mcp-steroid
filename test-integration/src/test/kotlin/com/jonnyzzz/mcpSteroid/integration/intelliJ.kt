@@ -96,6 +96,9 @@ class IntelliJDriver(
      * Use this instead of [mountProjectFiles] for external projects.
      */
     fun cloneGitRepo(repoUrl: String, shallow: Boolean = true, timeoutSeconds: Long = 300) {
+        // Ensure parent directory exists — cloneGitRepo may be called before startIde()
+        driver.mkdirs(guestDir)
+
         val args = mutableListOf("git", "clone")
         if (shallow) {
             args += listOf("--depth", "1")
