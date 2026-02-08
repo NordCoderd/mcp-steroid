@@ -6,13 +6,11 @@ import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.MethodSource
 import java.util.concurrent.TimeUnit
-import java.util.stream.Stream
 
 /**
  * Integration test: debugger demo from ai-tests/07-debugger.md.
@@ -25,10 +23,22 @@ import java.util.stream.Stream
  */
 class DebuggerDemoTest {
 
-    @MethodSource("agents")
-    @ParameterizedTest(name = "{0}")
+    @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
-    fun `agent finds sortedByDescending bug via debugger`(agentName: String, agent: AiAgentSession) {
+    fun `claude finds sortedByDescending bug via debugger`() = runDebuggerDemo("claude")
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    fun `codex finds sortedByDescending bug via debugger`() = runDebuggerDemo("codex")
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    fun `gemini finds sortedByDescending bug via debugger`() = runDebuggerDemo("gemini")
+
+    private fun runDebuggerDemo(agentName: String) {
+        val agent: AiAgentSession? = session.aiAgentDriver.aiAgents[agentName]
+        assumeTrue(agent != null, "Agent '$agentName' is not configured")
+
         val prompt = buildString {
             appendLine("Debug the file DemoByJonnyzzz.kt in this project to find the bug in the leaderboard function.")
             appendLine()
@@ -51,7 +61,7 @@ class DebuggerDemoTest {
             appendLine("ROOT_CAUSE: <one line description>")
         }
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
 
         // Agent must exit successfully
         result.assertExitCode(0, message = "debugger demo")
@@ -93,15 +103,6 @@ class DebuggerDemoTest {
                 "ide-agent",
             )
         }
-
-        @JvmStatic
-        fun agents(): Stream<Arguments> = session
-            .aiAgentDriver
-            .aiAgents
-            .entries.stream()
-            .map { (name, driver) ->
-                Arguments.of(name, driver)
-            }
 
         @JvmStatic
         @BeforeAll
