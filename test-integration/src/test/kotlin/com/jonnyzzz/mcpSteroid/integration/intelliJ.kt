@@ -21,6 +21,7 @@ class IntelliJDriver(
     private val systemGuestDir = "/home/agent/ide-system"
     private val logsGuestDir = "$guestDir/ide-log"
     private val pluginsGuestDir = "$guestDir/ide-plugins"
+    private val steroidGuestDir = "$guestDir/mcp-steroid"
 
     fun getGuestProjectDir() = projectGuestDir
 
@@ -118,6 +119,7 @@ class IntelliJDriver(
             appendLine("-Dmcp.steroid.updates.enabled=false")
             appendLine("-Dmcp.steroid.analytics.enabled=false")
             appendLine("-Dmcp.steroid.idea.description.enabled=false")
+            appendLine("-Dmcp.steroid.storage.path=$steroidGuestDir")
 
             appendLine("# Skip EULA, consent dialogs, and onboarding")
             appendLine("-Djb.consents.confirmation.enabled=false")
