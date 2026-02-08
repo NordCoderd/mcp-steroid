@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration.arena
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver
 
 /**
  * Manages the execution of a dpaia arena test case inside a Docker container
@@ -22,6 +23,8 @@ class ArenaTestRunner(
     private val projectGuestDir: String,
 ) {
 
+    private val git = GitDriver(container)
+
     /**
      * Clone a repository and check out a specific commit inside the container.
      *
@@ -33,32 +36,8 @@ class ArenaTestRunner(
         val suffix = System.nanoTime().toString(36)
         val projectDir = "$projectGuestDir/${testCase.repoName}-$suffix"
 
-        // Ensure parent directory exists
-        container.runInContainer(
-            listOf("mkdir", "-p", projectGuestDir),
-            timeoutSeconds = 10,
-        )
-
         println("[ARENA] Cloning ${testCase.cloneUrl} into $projectDir ...")
-        container.runInContainer(
-            listOf("git", "clone", testCase.cloneUrl, projectDir),
-            timeoutSeconds = 120,
-        ).also { result ->
-            check(result.exitCode == 0) {
-                "Failed to clone ${testCase.cloneUrl}: exit=${result.exitCode}\n${result.output}\n${result.stderr}"
-            }
-        }
-
-        println("[ARENA] Checking out base commit ${testCase.baseCommit} ...")
-        container.runInContainer(
-            listOf("git", "-C", projectDir, "checkout", testCase.baseCommit),
-            timeoutSeconds = 30,
-        ).also { result ->
-            check(result.exitCode == 0) {
-                "Failed to checkout ${testCase.baseCommit}: exit=${result.exitCode}\n${result.output}\n${result.stderr}"
-            }
-        }
-
+        git.cloneAndCheckout(testCase.cloneUrl, projectDir, testCase.baseCommit, timeoutSeconds = 120)
         return projectDir
     }
 
@@ -74,25 +53,8 @@ class ArenaTestRunner(
             println("[ARENA] No test patch to apply for ${testCase.instanceId}")
             return
         }
-
         println("[ARENA] Applying test patch for ${testCase.instanceId} ...")
-        val patchPath = "$projectDir/_arena_test.patch"
-        container.writeFileInContainer(patchPath, testCase.testPatch)
-
-        container.runInContainer(
-            listOf("git", "-C", projectDir, "apply", "--allow-empty", patchPath),
-            timeoutSeconds = 30,
-        ).also { result ->
-            check(result.exitCode == 0) {
-                "Failed to apply test patch: exit=${result.exitCode}\n${result.output}\n${result.stderr}"
-            }
-        }
-
-        // Clean up patch file
-        container.runInContainer(
-            listOf("rm", "-f", patchPath),
-            timeoutSeconds = 5,
-        )
+        git.applyPatch(projectDir, testCase.testPatch)
     }
 
     /**

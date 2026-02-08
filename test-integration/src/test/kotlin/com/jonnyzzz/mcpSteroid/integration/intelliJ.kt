@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import java.io.File
@@ -96,18 +97,7 @@ class IntelliJDriver(
      * Use this instead of [mountProjectFiles] for external projects.
      */
     fun cloneGitRepo(repoUrl: String, shallow: Boolean = true, timeoutSeconds: Long = 300) {
-        // Ensure parent directory exists — cloneGitRepo may be called before startIde()
-        driver.mkdirs(guestDir)
-
-        val args = mutableListOf("git", "clone")
-        if (shallow) {
-            args += listOf("--depth", "1")
-        }
-        args += listOf(repoUrl, projectGuestDir)
-
-        println("[IDE-AGENT] Cloning $repoUrl into $projectGuestDir (shallow=$shallow)...")
-        driver.runInContainer(args, timeoutSeconds = timeoutSeconds)
-            .assertExitCode(0, message = "git clone $repoUrl")
+        GitDriver(driver).clone(repoUrl, projectGuestDir, shallow, timeoutSeconds)
     }
 
     private fun generateVmOptions() {
