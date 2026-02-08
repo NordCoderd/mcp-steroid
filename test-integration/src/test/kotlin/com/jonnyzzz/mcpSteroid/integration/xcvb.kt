@@ -84,8 +84,11 @@ class XcvbDriver(
             ),
         )
 
-        startVideoRsync()
+        val rsyncProc = startVideoRsync()
 
+        lifetime.registerCleanupAction {
+            rsyncProc.kill("TERM")
+        }
         lifetime.registerCleanupAction {
             stopVideoRecordingAndCopyOut(proc)
         }
@@ -282,6 +285,9 @@ class XcvbDriver(
             listOf("xclip", "-selection", "clipboard", "-o"),
             timeoutSeconds = 5,
         )
+        if (result.exitCode != 0) {
+            error("[xcvb] clipboardPaste failed (exit ${result.exitCode}): ${result.output}${result.stderr}")
+        }
         return result.output
     }
 

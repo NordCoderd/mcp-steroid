@@ -116,9 +116,9 @@ class DpaiaArenaTest {
         }
 
         private fun selectTestCases(): List<DpaiaTestCase> {
-            // Option 1: Specific instance ID via system property
-            val specificId = System.getProperty("arena.test.instanceId")
-            if (specificId != null) {
+            // Option 1: Specific instance ID via system property (defaults to DEFAULT_INSTANCE_ID)
+            val specificId = System.getProperty("arena.test.instanceId") ?: DEFAULT_INSTANCE_ID
+            if (System.getProperty("arena.test.tag") == null && System.getProperty("arena.test.maxCases") == null) {
                 return listOf(DpaiaDatasetLoader.findById(dataset, specificId))
             }
 

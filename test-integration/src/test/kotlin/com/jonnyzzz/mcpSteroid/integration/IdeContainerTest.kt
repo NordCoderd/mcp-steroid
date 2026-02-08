@@ -56,14 +56,14 @@ class IdeContainerTest {
         // Verify clipboard round-trip
         session.input.clipboardCopy("mcp-steroid-test")
         val pasted = session.input.clipboardPaste()
-        assert(pasted.contains("mcp-steroid-test")) {
+        check(pasted.contains("mcp-steroid-test")) {
             "Clipboard round-trip failed: expected 'mcp-steroid-test', got '$pasted'"
         }
 
         // Capture a region screenshot and verify the file was created
         session.input.screenshotRegion(0, 0, 800, 600, "input-test-region.png")
         val screenshotFile = session.xcvbContainer.videoFile.parentFile.resolve("input-test-region.png")
-        assert(screenshotFile.exists() && screenshotFile.length() > 0) {
+        check(screenshotFile.exists() && screenshotFile.length() > 0) {
             "Screenshot file was not created or is empty: $screenshotFile"
         }
         println("[test] Input control test passed, screenshot: ${screenshotFile.length()} bytes")
