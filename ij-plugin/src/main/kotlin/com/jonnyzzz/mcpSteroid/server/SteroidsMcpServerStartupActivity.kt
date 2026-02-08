@@ -25,6 +25,7 @@ class SteroidsMcpServerStartupActivity : ProjectActivity {
 
         DemoModeService.getInstance(project).startDemoNotifications()
 
-        analyticsBeacon.capture("plugin_startup")
+        analyticsBeacon.runHeartbeat()
+        analyticsBeacon.capture("plugin_startup_per_project")
     }
 }

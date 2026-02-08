@@ -17,11 +17,15 @@ import com.posthog.server.PostHogConfig
 import com.posthog.server.PostHogInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import org.jetbrains.annotations.TestOnly
 import java.time.LocalDateTime
 import java.time.ZoneOffset
 import java.util.UUID
+import kotlin.time.Duration.Companion.minutes
 
 inline val analyticsBeacon: AnalyticsBeacon get() = service()
 
@@ -71,6 +75,16 @@ class AnalyticsBeacon(
     }
 
     override fun dispose() = Unit
+
+    fun runHeartbeat() {
+        coroutineScope.launch {
+            while (isActive) {
+                yield()
+                delay(30.minutes)
+                capture("heartbeat")
+            }
+        }
+    }
 
     fun flush() {
         posthog?.flush()
