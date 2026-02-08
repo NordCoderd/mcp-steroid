@@ -365,22 +365,13 @@ class XcvbDriver(
     }
 
     /**
-     * Start a background thread that opens the live video stream in the default browser
-     * once the streaming server is ready. This provides live screen output during the test
-     * on macOS.
+     * Wait for the video streaming server to become ready, log its URL,
+     * and open the dashboard in the default browser on macOS.
      *
-     * The video is served by the Node.js streaming server inside the container,
-     * exposed to the host via Docker port mapping. This avoids the Docker Desktop
-     * virtiofs flush issue where mounted volume files are not readable until closed.
-     *
-     * No-op on non-macOS platforms or if the streaming port is not mapped.
+     * The server always starts (inside Docker) and its address is always
+     * logged. Only the browser `open` command is macOS-specific.
      */
     fun startLiveVideoPreview() {
-        if (System.getProperty("os.name")?.contains("Mac", ignoreCase = true) != true) {
-            println("[VIDEO] Not on macOS, skipping live preview")
-            return
-        }
-
         val hostPort = driver.mapContainerPortToHostPort(VIDEO_STREAMING_PORT)
         val dashboardUrl = "http://localhost:$hostPort/"
 
@@ -393,8 +384,14 @@ class XcvbDriver(
                     process.inputStream.bufferedReader().readText().trim() == "200"
                 }
 
-                println("[TEST VIDEO] Opening dashboard: $dashboardUrl")
-                ProcessBuilder("open", dashboardUrl).start()
+                println("[VIDEO] Dashboard ready: $dashboardUrl")
+                println("[VIDEO] Stream URL:     ${dashboardUrl}video.mp4")
+
+                // Open browser on macOS only
+                if (System.getProperty("os.name")?.contains("Mac", ignoreCase = true) == true) {
+                    println("[VIDEO] Opening dashboard in browser...")
+                    ProcessBuilder("open", dashboardUrl).start()
+                }
             }
         }
 
