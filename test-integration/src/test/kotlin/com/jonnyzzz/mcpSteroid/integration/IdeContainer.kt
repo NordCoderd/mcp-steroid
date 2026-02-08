@@ -115,6 +115,90 @@ fun IdeContainer.Companion.create(
     return session
 }
 
+/**
+ * Creates an IdeContainer that clones an external git repository as the project.
+ * Useful for architecture investigation tests against real-world open source projects.
+ *
+ * @param gitRepoUrl URL of the git repository to clone
+ * @param cloneTimeoutSeconds timeout for `git clone` (large repos may need more time)
+ */
+fun IdeContainer.Companion.createWithGitRepo(
+    lifetime: CloseableStack,
+    dockerFileBase: String,
+    gitRepoUrl: String,
+    cloneTimeoutSeconds: Long = 300,
+): IdeContainer {
+    val runDir = run {
+        val timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'Z'HH-mm-ss-SSS").format(LocalDateTime.now())
+        val file = File(IdeTestFolders.testOutputDir, "run-$timestamp-$dockerFileBase")
+        file.mkdirs()
+        file
+    }
+
+    println("[IDE-AGENT] Run directory: $runDir")
+    val imageName = "$dockerFileBase-test"
+    val scope = buildIdeImage(dockerFileBase, imageName)
+
+    val containerMountedPath = "/mcp-run-dir"
+
+    var container = startContainerDriver(
+        lifetime, scope, imageName,
+        extraEnvVars = emptyMap(),
+        volumes = listOf(
+            ContainerVolume(runDir, containerMountedPath, "rw"),
+        ),
+        ports = listOf(
+            XcvbDriver.VIDEO_STREAMING_PORT,
+            IntelliJDriver.MCP_STEROID_PORT,
+        ),
+    )
+
+    val xcvb = XcvbDriver(
+        lifetime,
+        container,
+        "$containerMountedPath/video",
+        runId = runDir.name,
+    )
+
+    xcvb.startAllServices()
+    xcvb.startLiveVideoPreview()
+
+    container = xcvb.withDisplay(container)
+
+    val ijDriver = IntelliJDriver(
+        lifetime,
+        container,
+        "$containerMountedPath/intellij",
+    )
+
+    ijDriver.cloneGitRepo(gitRepoUrl, timeoutSeconds = cloneTimeoutSeconds)
+    ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
+    val ijContainer = ijDriver.startIde()
+
+    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
+
+    val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
+    val mcpUrl = session.aiAgentDriver.mcpSteroidHostUrl
+    val infoFile = File(runDir, "session-info.txt")
+    infoFile.writeText(buildString {
+        appendLine("RUN_DIR=$runDir")
+        appendLine("VIDEO_DASHBOARD=http://localhost:$videoPort/")
+        appendLine("VIDEO_STREAM=http://localhost:$videoPort/video.mp4")
+        appendLine("MCP_STEROID=$mcpUrl")
+        appendLine("GIT_REPO=$gitRepoUrl")
+    })
+    println()
+    println("=".repeat(60))
+    println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
+    println("  MCP STEROID:     $mcpUrl")
+    println("  GIT REPO:        $gitRepoUrl")
+    println("  SESSION INFO:    $infoFile")
+    println("=".repeat(60))
+    println()
+
+    return session
+}
+
 private fun buildIdeImage(dockerFileBase: String, imageName: String): DockerDriver {
     val contextDir = File(IdeTestFolders.testOutputDir, "docker-$dockerFileBase")
     contextDir.mkdirs()

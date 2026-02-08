@@ -91,6 +91,22 @@ class IntelliJDriver(
         IdeTestFolders.copyProjectFiles(projectName, driver.mapGuestPathToHostPath(projectGuestDir))
     }
 
+    /**
+     * Clone a git repository into the project directory inside the container.
+     * Use this instead of [mountProjectFiles] for external projects.
+     */
+    fun cloneGitRepo(repoUrl: String, shallow: Boolean = true, timeoutSeconds: Long = 300) {
+        val args = mutableListOf("git", "clone")
+        if (shallow) {
+            args += listOf("--depth", "1")
+        }
+        args += listOf(repoUrl, projectGuestDir)
+
+        println("[IDE-AGENT] Cloning $repoUrl into $projectGuestDir (shallow=$shallow)...")
+        driver.runInContainer(args, timeoutSeconds = timeoutSeconds)
+            .assertExitCode(0, message = "git clone $repoUrl")
+    }
+
     private fun generateVmOptions() {
         val opts = buildString {
             appendLine("-Xmx2g")
