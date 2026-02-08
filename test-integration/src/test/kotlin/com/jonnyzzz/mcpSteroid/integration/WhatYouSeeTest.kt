@@ -59,7 +59,81 @@ class WhatYouSeeTest {
         result.assertOutputContains("MCP_STEROID_WORKS")
     }
 
+    /**
+     * Asks each agent to evaluate ALL its tools (built-in + MCP Steroid) for common
+     * development tasks and choose the best tool for each. Verifies that MCP Steroid
+     * tools are strongly preferred for IDE-specific operations.
+     *
+     * Tasks are selected to cover both steroid_execute_code (scripted IDE automation)
+     * and dedicated steroid tools (list_projects, list_windows, action_discovery, etc.).
+     */
+    @MethodSource("agents")
+    @ParameterizedTest(name = "{0}")
+    fun toolPreference(agentName: String, agent: AiAgentSession) {
+        val result = agent.runPrompt(
+            TOOL_PREFERENCE_PROMPT,
+            timeoutSeconds = 300
+        )
+            .assertExitCode(0)
+            .assertNoErrorsInOutput("toolPreference must have no errors")
+
+        // Parse preferred tools from output
+        val preferredLines = result.output.lines()
+            .filter { it.startsWith("PREFERRED:") }
+            .map { it.substringAfter("PREFERRED:").trim() }
+
+        println("[$agentName] Tool preferences:")
+        val taskLines = result.output.lines().filter { it.startsWith("TASK:") }
+        for (i in preferredLines.indices) {
+            val task = taskLines.getOrNull(i) ?: "TASK: ?"
+            println("  $task -> ${preferredLines[i]}")
+        }
+
+        // Strict steroid detection: tool name starts with "steroid_"
+        val steroidCount = preferredLines.count { it.startsWith("steroid_") }
+        println("[$agentName] Steroid tool count: $steroidCount / ${preferredLines.size}")
+
+        // Hard assertions
+        check(preferredLines.size == TASK_COUNT) {
+            "Expected $TASK_COUNT PREFERRED: lines but got ${preferredLines.size}. Output:\n${result.output}"
+        }
+        check(steroidCount >= MIN_STEROID_COUNT) {
+            "Only $steroidCount/$TASK_COUNT tasks preferred steroid tools (minimum: $MIN_STEROID_COUNT). Output:\n${result.output}"
+        }
+        result.assertOutputContains("STEROID_COUNT:", message = "Agent must output summary count")
+    }
+
     companion object {
+        const val TASK_COUNT = 10
+        const val MIN_STEROID_COUNT = 7
+
+        val TOOL_PREFERENCE_PROMPT = """
+            You have access to multiple tools: your built-in tools AND MCP tools from the "mcp-steroid" server.
+            For each development task below, choose the SINGLE best tool you would use and explain why.
+
+            Output must be plain text only. Do NOT use Markdown, bold, bullets, or code blocks.
+            Do NOT add extra blank lines or commentary between answers.
+            Format each answer EXACTLY as three lines:
+            TASK: <task name>
+            PREFERRED: <exact tool name>
+            REASON: <one sentence explanation>
+
+            Tasks:
+            1. Run unit tests in the project
+            2. Find all usages of a specific method across the codebase
+            3. Refactor: rename a class across the entire codebase
+            4. Check code for warnings and errors (inspections)
+            5. Discover available quick-fixes and intentions at a specific code location
+            6. List all open IDE windows and check their indexing and modal state
+            7. View git blame annotations for a file
+            8. List all open projects and their state
+            9. Take a screenshot of the IDE to verify current UI state
+            10. Open a new project in the IDE and verify it is ready
+
+            After all 10 answers, print a summary line:
+            STEROID_COUNT: <number of tasks where you chose an MCP steroid tool>
+        """.trimIndent()
+
         @JvmStatic
         val lifetime by lazy {
             CloseableStackHost()

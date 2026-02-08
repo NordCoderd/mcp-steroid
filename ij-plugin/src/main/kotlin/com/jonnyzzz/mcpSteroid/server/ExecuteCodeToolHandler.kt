@@ -88,6 +88,13 @@ class ExecuteCodeToolHandler : McpRegistrar {
 
              IntelliJ API Version: ${ApplicationInfo.getInstance().apiVersion}
 
+             **When to use other steroid tools instead:**
+             - steroid_list_projects — list open projects and their paths
+             - steroid_list_windows — check window state, indexing progress, modal dialogs
+             - steroid_open_project — open a project directory in the IDE
+             - steroid_action_discovery — discover quick-fixes, intentions, and actions at a file location
+             - steroid_take_screenshot / steroid_input — visual UI inspection and interaction
+
              💡 Call steroid_execute_feedback after execution to rate success
          """.trim().lines().joinToString("\n") { it.trim() }
     }
