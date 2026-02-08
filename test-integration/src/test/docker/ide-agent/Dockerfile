@@ -29,6 +29,7 @@ RUN apt-get update && \
         libfontconfig1 \
         xdotool \
         xclip \
+        xterm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install JDK 21 (Eclipse Temurin via Adoptium APT)

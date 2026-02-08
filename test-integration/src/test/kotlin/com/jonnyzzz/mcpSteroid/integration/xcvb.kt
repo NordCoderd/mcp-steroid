@@ -201,6 +201,64 @@ class XcvbDriver(
         return proc
     }
 
+    // ── Visible console ────────────────────────────────────────────────
+
+    /**
+     * Run a command inside a visible xterm window on the X11 display.
+     * The terminal output appears in the video recording, making agent
+     * interactions observable during test playback.
+     *
+     * @param args command and arguments to run inside xterm
+     * @param title window title for the xterm window
+     * @param geometry xterm geometry string (columns x rows + position)
+     * @return a detached process handle for the xterm window
+     */
+    fun runInVisibleConsole(
+        args: List<String>,
+        title: String = "Agent Console",
+        geometry: String = "200x50+0+0",
+        workingDir: String? = null,
+        extraEnvVars: Map<String, String> = emptyMap(),
+    ): RunningContainerProcess {
+        val xtermArgs = mutableListOf(
+            "xterm",
+            "-title", title,
+            "-geometry", geometry,
+            "-fa", "DejaVu Sans Mono",
+            "-fs", "11",
+            "-bg", "black",
+            "-fg", "white",
+            "-e",
+        ) + args
+
+        println("[xcvb] Starting visible console '$title': ${args.joinToString(" ")}")
+        return driver.runInContainerDetached(
+            xtermArgs,
+            workingDir = workingDir,
+            extraEnvVars = extraEnvVars,
+        )
+    }
+
+    /**
+     * Create a [ContainerDriver] wrapper that runs commands in a visible
+     * xterm on the X11 display. Output appears in the video AND is captured
+     * for programmatic assertions.
+     *
+     * When the returned driver's [ContainerDriver.runInContainer] is called,
+     * the command runs inside an xterm window. A background `tail -f` of the
+     * detached log files mirrors output to the xterm display.
+     *
+     * Useful for wrapping agent sessions so their CLI interactions are visible
+     * in test recordings.
+     */
+    fun withVisibleConsole(
+        delegate: ContainerDriver,
+        title: String = "Agent",
+        geometry: String = "200x50+0+0",
+    ): ContainerDriver {
+        return VisibleConsoleContainerDriver(delegate, this, title, geometry)
+    }
+
     // ── Input control via xdotool ──────────────────────────────────────
 
     /** Move the mouse cursor to the given display coordinates. */
