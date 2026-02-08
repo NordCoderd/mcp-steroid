@@ -51,7 +51,6 @@ class AnalyticsBeacon(
             val config = PostHogConfig
                 .builder("phc_IPtbjwwy9YIGg0YNHNxYBePijvTvHEcKAjohah6obYW")
                 .host("https://us.i.posthog.com")
-                .debug(ApplicationManager.getApplication().isUnitTestMode)
                 .flushIntervalSeconds(15)
                 .flushAt(10)
                 .maxQueueSize(50)
