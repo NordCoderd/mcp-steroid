@@ -184,6 +184,17 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             .assertOutputContains(marker, message = "steroid_execute_code should output '$marker'")
     }
 
+    /**
+     * Tests that `forgetAllForTest()` truly restarts the MCP server, breaking the
+     * HTTP connection, and that the agent can recover and continue on the restarted server.
+     *
+     * Call #2 invokes `forgetAllForTest()` which stops the Ktor server mid-request.
+     * The HTTP connection carrying the response is broken, so the agent sees an error.
+     * This is expected and desired — it proves the server truly restarted.
+     *
+     * Call #3 runs on the restarted server with a fresh session. It verifies
+     * that session count is 1 (only the agent's new reconnected session).
+     */
     fun testExecSessionReset(): Unit = timeoutRunBlocking(360.seconds) {
         val session = newAiSession()
 
@@ -203,25 +214,27 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             ${SteroidsMcpServer::class.java.name}.getInstance().forgetAllForTest()
             println("SESSIONS_FORGOTTEN: OK")
             ```
+            IMPORTANT: Call #2 restarts the MCP server. The connection WILL break and the call WILL fail.
+            This is expected and correct. Do NOT retry call #2. Just note it failed and move on.
 
             Call #3 code:
             ```
-            println("EXEC2_OK")
+            val count = ${SteroidsMcpServer::class.java.name}.getInstance().getServer().sessionManager.getSessionCount()
+            println("EXEC2_OK: sessions=" + count)
             ```
 
-            After each call, extract the output line containing the marker and print:
-            RESULT1: <line with EXEC1_OK>
-            RESULT2: <line with SESSIONS_FORGOTTEN:>
-            RESULT3: <line with EXEC2_OK>
+            After each call, print a result line:
+            RESULT1: <line from call #1 output containing EXEC1_OK>
+            RESULT2: RESET_CONNECTION_BROKEN (if call #2 failed, which is expected) or RESET_OK (if it somehow succeeded)
+            RESULT3: <line from call #3 output containing EXEC2_OK>
 
             Output must be plain text only. Do NOT use Markdown, lists, or code blocks.
-            If any step fails, print ERROR: <reason>.
             """.trimIndent(),
         )
             .assertExitCode(0, "prompt")
-            .assertNoErrorsInOutput(message = "prompt")
-            .assertOutputContains("RESULT1:", "EXEC1_OK", message = "exec #1 should run")
-            .assertOutputContains("RESULT2:", "SESSIONS_FORGOTTEN:", message = "exec #2 should run")
-            .assertOutputContains("RESULT3:", "EXEC2_OK", message = "exec #3 should run")
+            .assertOutputContains("RESULT1:", "EXEC1_OK", message = "exec #1 should run before restart")
+            .assertOutputContains("RESULT2:", "RESET_CONNECTION_BROKEN", message = "exec #2 must report connection broken (server restart kills the HTTP connection)")
+            .assertOutputContains("RESULT3:", "EXEC2_OK", message = "exec #3 should run on the restarted server")
+            .assertOutputContains("sessions=1", message = "restarted server should have exactly 1 fresh session (old sessions were closed, this is a new one)")
     }
 }
