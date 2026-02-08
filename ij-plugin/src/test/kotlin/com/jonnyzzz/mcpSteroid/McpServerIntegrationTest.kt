@@ -1422,6 +1422,80 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
     }
 
     /**
+     * Tests that forgetAllForTest() truly restarts the Ktor server, breaking
+     * all existing HTTP connections and invalidating all sessions.
+     *
+     * After restart:
+     * - Old session IDs are unknown (server creates new sessions)
+     * - Server is reachable on the new port
+     * - New sessions can be established and used
+     */
+    fun testServerRestartBreaksConnections(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        val portBefore = server.port
+        assertTrue("Server should be running", portBefore > 0)
+
+        // Step 1: Establish a session and verify it works
+        val sessionId = startSession(server)
+
+        val toolsResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":"pre-restart","method":"tools/list"}""")
+        }
+        assertEquals(HttpStatusCode.OK, toolsResponse.status)
+        val toolsRpc = McpJson.decodeFromString<JsonRpcResponse>(toolsResponse.bodyAsText())
+        assertNull("tools/list should succeed before restart", toolsRpc.error)
+
+        // Step 2: Restart the server
+        server.forgetAllForTest()
+
+        val portAfter = server.port
+        assertTrue("Server should be running after restart", portAfter > 0)
+
+        // Step 3: Verify old session ID is no longer known
+        // The server creates a new session for unknown IDs (returns new Mcp-Session-Id)
+        val oldSessionResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":"post-restart","method":"tools/list"}""")
+        }
+        assertEquals(HttpStatusCode.OK, oldSessionResponse.status)
+        val newSessionId = oldSessionResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Server should assign a new session for the old (unknown) session ID", newSessionId)
+        assertFalse(
+            "New session ID should differ from the old one",
+            newSessionId == sessionId
+        )
+
+        // Step 4: Verify the restarted server responds to health checks
+        val healthResponse = client.get(server.mcpUrl) {
+            header("Accept", "application/json")
+        }
+        assertEquals(HttpStatusCode.OK, healthResponse.status)
+        assertTrue(
+            "Health check should return server info",
+            healthResponse.bodyAsText().contains("mcp-steroid")
+        )
+
+        // Step 5: Verify a brand-new session can be established and used
+        val freshSessionId = startSession(server)
+        val freshToolsResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, freshSessionId)
+            setBody("""{"jsonrpc":"2.0","id":"fresh","method":"tools/list"}""")
+        }
+        assertEquals(HttpStatusCode.OK, freshToolsResponse.status)
+        val freshToolsRpc = McpJson.decodeFromString<JsonRpcResponse>(freshToolsResponse.bodyAsText())
+        assertNull("tools/list should succeed with fresh session after restart", freshToolsRpc.error)
+    }
+
+    /**
      * Tests that the MCP-Protocol-Version header is included in responses.
      * Per MCP 2025-11-25 spec, the server should include this in all responses.
      */

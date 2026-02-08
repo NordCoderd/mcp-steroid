@@ -140,42 +140,7 @@ class SteroidsMcpServer(
         }
 
         try {
-            val server = scope.embeddedServer(CIO, host = bindHost, port = portToTry) {
-                install(requestLoggingPlugin)
-                install(SSE)
-                routing {
-                    with(McpHttpTransport) {
-                        installMcp("/mcp", mcpServer)
-                    }
-                    get("/.well-known/mcp.json") {
-                        // Use request local info to build correct URL for the client
-                        val local = call.request.local
-                        call.respondText(
-                            contentType = ContentType.Application.Json,
-                            text = buildWellKnownMcpJson(local.scheme, local.serverHost, local.serverPort)
-                        )
-                    }
-                    // Agent Skills endpoints - serve SKILL.md at root and /skill.md
-                    get("/") {
-                        call.respondText(
-                            contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = SkillPrompt().readPrompt()
-                        )
-                    }
-                    get("/skill.md") {
-                        call.respondText(
-                            contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = SkillPrompt().readPrompt()
-                        )
-                    }
-                    get("/SKILL.md") {
-                        call.respondText(
-                            contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                            text = SkillPrompt().readPrompt()
-                        )
-                    }
-                }
-            }
+            val server = createKtorServer(bindHost, portToTry)
 
             val startupMutex = ReentrantLock()
             startupMutex.lock()
@@ -205,6 +170,48 @@ class SteroidsMcpServer(
             // Other exception - log and rethrow
             log.error("Failed to start MCP server on port $portToTry: ${e.message}", e)
             throw e
+        }
+    }
+
+    /**
+     * Creates a Ktor embedded server with all MCP routes and plugins configured.
+     */
+    private fun createKtorServer(bindHost: String, port: Int): EmbeddedServer<*, *> {
+        return scope.embeddedServer(CIO, host = bindHost, port = port) {
+            install(requestLoggingPlugin)
+            install(SSE)
+            routing {
+                with(McpHttpTransport) {
+                    installMcp("/mcp", mcpServer)
+                }
+                get("/.well-known/mcp.json") {
+                    // Use request local info to build correct URL for the client
+                    val local = call.request.local
+                    call.respondText(
+                        contentType = ContentType.Application.Json,
+                        text = buildWellKnownMcpJson(local.scheme, local.serverHost, local.serverPort)
+                    )
+                }
+                // Agent Skills endpoints - serve SKILL.md at root and /skill.md
+                get("/") {
+                    call.respondText(
+                        contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
+                        text = SkillPrompt().readPrompt()
+                    )
+                }
+                get("/skill.md") {
+                    call.respondText(
+                        contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
+                        text = SkillPrompt().readPrompt()
+                    )
+                }
+                get("/SKILL.md") {
+                    call.respondText(
+                        contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
+                        text = SkillPrompt().readPrompt()
+                    )
+                }
+            }
         }
     }
 
@@ -262,13 +269,27 @@ class SteroidsMcpServer(
         log.info("MCP Steroid server stopped")
     }
 
+    /**
+     * Stops the current Ktor server, closes all MCP sessions, and starts a fresh server.
+     * This truly breaks all existing HTTP connections and invalidates all sessions.
+     */
     @TestOnly
-    @Suppress("unused")
     fun forgetAllForTest() {
-        //TODO: We need to make sure all connections are stopped.
-        val server = serverRef.get()?: return
-        server.reload()
-        getServer().sessionManager.forgetAllSessionsForTest()
+        startupLock.withLock {
+            // 1. Close all MCP sessions
+            mcpServer.sessionManager.forgetAllSessionsForTest()
+
+            // 2. Stop the current Ktor server (breaks all HTTP connections)
+            val server = serverRef.getAndSet(null) ?: return
+            val previousPort = portRef.getAndSet(0)
+            server.stop(1000, 2000)
+            log.info("Stopped MCP server on port $previousPort for test reset")
+
+            // 3. Restart on the same port
+            val bindHost = Registry.stringValue("mcp.steroid.server.host").takeIf { it.isNotBlank() } ?: "127.0.0.1"
+            val actualPort = startServerOnAvailablePort(bindHost, previousPort)
+            log.info("Restarted MCP server on port $actualPort for test reset")
+        }
     }
 
     private val requestLoggingPlugin get() = createApplicationPlugin("SteroidsMcpRequestLogger") {

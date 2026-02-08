@@ -244,8 +244,9 @@ class McpSessionManager {
     @TestOnly
     fun forgetAllSessionsForTest(): Int {
         val count = sessions.size
+        sessions.values.forEach { it.close() }
         sessions.clear()
-        log.info("[MCP SessionManager] Forgot all sessions without disposing (previous count: $count)")
+        log.info("[MCP SessionManager] Closed and forgot all sessions (previous count: $count)")
         return count
     }
 }

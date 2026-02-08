@@ -2,16 +2,15 @@
 package com.jonnyzzz.mcpSteroid.mcp
 
 import com.intellij.testFramework.common.timeoutRunBlocking
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.withTimeoutOrNull
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
+import org.junit.Assert.*
 import org.junit.Test
 import kotlin.time.Duration.Companion.seconds
 
 class McpSessionManagerTest {
     @Test
-    fun `test forgetAllSessionsForTest keeps sessions open`() = timeoutRunBlocking(10.seconds) {
+    fun `test forgetAllSessionsForTest closes and removes all sessions`() = timeoutRunBlocking(10.seconds) {
         val manager = McpSessionManager()
         val session = manager.createSession()
         manager.createSession()
@@ -21,10 +20,11 @@ class McpSessionManagerTest {
         assertEquals("Should forget all sessions", 2, forgotten)
         assertEquals("Manager should be empty after forget", 0, manager.getSessionCount())
 
-        val notification = JsonRpcNotification(method = "notifications/test")
-        session.sendNotification(notification)
-        val received = withTimeoutOrNull(2.seconds) { session.notifications().first() }
-
-        assertNotNull("Session should remain open after forgetAllSessionsForTest", received)
+        // Session notification channel should be closed after forgetAllSessionsForTest.
+        // Sending a notification to a closed session and trying to receive should
+        // yield null (flow completes immediately because the channel is closed).
+        session.sendNotification(JsonRpcNotification(method = "notifications/test"))
+        val received = withTimeoutOrNull(1.seconds) { session.notifications().firstOrNull() }
+        assertNull("Session should be closed after forgetAllSessionsForTest", received)
     }
 }
