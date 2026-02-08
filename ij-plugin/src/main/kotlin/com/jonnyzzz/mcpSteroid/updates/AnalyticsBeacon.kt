@@ -2,10 +2,13 @@
 package com.jonnyzzz.mcpSteroid.updates
 
 import com.intellij.ide.util.PropertiesComponent
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationInfo
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.mcpSteroid.PluginDescriptorProvider
 import com.posthog.server.PostHog
@@ -15,6 +18,9 @@ import com.posthog.server.PostHogInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.jetbrains.annotations.TestOnly
+import java.time.LocalDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 inline val analyticsBeacon: AnalyticsBeacon get() = service()
@@ -33,20 +39,41 @@ inline val analyticsBeacon: AnalyticsBeacon get() = service()
 @Service(Service.Level.APP)
 class AnalyticsBeacon(
     private val coroutineScope: CoroutineScope
-) {
+) : Disposable {
     private val log = thisLogger()
 
     private val posthog: PostHogInterface? by lazy {
         try {
             val config = PostHogConfig
-                .builder("phc_GpYAWraVQPRBHjn2NKCZ0PjE2TqGSHICaM6GfRFJm4K")
+                .builder("phc_IPtbjwwy9YIGg0YNHNxYBePijvTvHEcKAjohah6obYW")
                 .host("https://us.i.posthog.com")
+                .debug(ApplicationManager.getApplication().isUnitTestMode)
+                .flushIntervalSeconds(15)
+                .flushAt(10)
+                .maxQueueSize(50)
+                .maxBatchSize(5)
+                .preloadFeatureFlags(false)
+                .remoteConfig(false)
+                .sendFeatureFlagEvent(false)
                 .build()
-            PostHog.with(config)
+
+            val hog = PostHog.with(config)
+            Disposer.register(this) {
+                hog.flush()
+                hog.close()
+            }
+
+            hog
         } catch (e: Exception) {
             log.debug("PostHog init failed", e)
             null
         }
+    }
+
+    override fun dispose() = Unit
+
+    fun flush() {
+        posthog?.flush()
     }
 
     fun capture(event: String, properties: Map<String, Any> = emptyMap()) {
@@ -54,36 +81,33 @@ class AnalyticsBeacon(
 
         coroutineScope.launch(Dispatchers.IO) {
             try {
-                val ph = posthog ?: return@launch
-                val appInfo = ApplicationInfo.getInstance()
-                val pluginVersion = PluginDescriptorProvider.getInstance().version
-
-                val opts = PostHogCaptureOptions.builder()
-                properties.forEach { (k, v) ->
-                    when (v) {
-                        is String -> opts.property(k, v)
-                        is Number -> opts.property(k, v)
-                        is Boolean -> opts.property(k, v)
-                        else -> opts.property(k, v.toString())
-                    }
-                }
-                opts.property("ide_build", appInfo.build.asString())
-                opts.property("ide_version", appInfo.fullVersion)
-                opts.property("ide_product", appInfo.build.productCode)
-                opts.property("plugin_version", pluginVersion)
-
-                ph.capture(distinctId(), event, opts.build())
+                sendEventInternal(event, properties)
             } catch (e: Exception) {
                 log.debug("Analytics capture failed", e)
             }
         }
     }
 
-    fun shutdown() {
-        try {
-            posthog?.close()
-        } catch (_: Exception) {
+    @TestOnly
+    fun sendEventInternal(event: String, properties: Map<String, Any>) {
+        val ph = posthog ?: return
+        val appInfo = ApplicationInfo.getInstance()
+        val pluginVersion = PluginDescriptorProvider.getInstance().version
+
+        val opts = PostHogCaptureOptions.builder()
+        properties.forEach { (k, v) ->
+            opts.property(k, v)
         }
+
+        opts.property("ide_build", appInfo.build.asString())
+        opts.property("ide_version", appInfo.fullVersion)
+        opts.property("ide_product", appInfo.build.productCode)
+        opts.property("plugin_version", pluginVersion)
+
+        opts.appendFeatureFlags(false)
+        opts.timestamp(LocalDateTime.now().toInstant(ZoneOffset.UTC))
+
+        ph.capture(distinctId(), "ide_$event", opts.build())
     }
 
     private fun distinctId(): String {
