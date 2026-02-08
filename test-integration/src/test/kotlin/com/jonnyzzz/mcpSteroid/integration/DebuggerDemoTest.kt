@@ -32,6 +32,9 @@ class DebuggerDemoTest {
         val prompt = buildString {
             appendLine("Debug the file DemoByJonnyzzz.kt in this project to find the bug in the leaderboard function.")
             appendLine()
+            appendLine("Use MCP Steroid debugger resources for API details and examples.")
+            appendLine("Follow docs/DEBUG_SCRIPT.md for the full workflow.")
+            appendLine()
             appendLine("Requirements:")
             appendLine("1. Find and open DemoByJonnyzzz.kt in the project")
             appendLine("2. Set a breakpoint at the sortedByDescending line (line 7)")
