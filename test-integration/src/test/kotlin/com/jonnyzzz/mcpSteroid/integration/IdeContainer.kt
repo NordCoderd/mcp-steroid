@@ -79,6 +79,7 @@ fun IdeContainer.Companion.create(
 
     xcvb.startAllServices()
     xcvb.startLiveVideoPreview()
+    xcvb.deploySkill()
 
     container = xcvb.withDisplay(container)
 
@@ -162,6 +163,7 @@ fun IdeContainer.Companion.createWithGitRepo(
 
     xcvb.startAllServices()
     xcvb.startLiveVideoPreview()
+    xcvb.deploySkill()
 
     container = xcvb.withDisplay(container)
 

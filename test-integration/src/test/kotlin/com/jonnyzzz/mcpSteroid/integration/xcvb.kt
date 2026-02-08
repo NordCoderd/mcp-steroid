@@ -345,7 +345,26 @@ class XcvbDriver(
         }
     }
 
+    /**
+     * Deploy the xcvb display control skill file into the container.
+     * Agents can read this file to learn how to use xdotool, screenshots, etc.
+     *
+     * @return the guest path where the skill file was written
+     */
+    fun deploySkill(skillGuestPath: String = SKILL_GUEST_PATH): String {
+        val skillContent = XcvbDriver::class.java.getResource("/skills/xcvb-display-control.md")
+            ?.readText()
+            ?: error("xcvb-display-control.md skill resource not found on classpath")
+
+        driver.writeFileInContainer(skillGuestPath, skillContent)
+        println("[xcvb] Deployed display control skill to $skillGuestPath")
+        return skillGuestPath
+    }
+
     companion object {
         val VIDEO_STREAMING_PORT = ContainerPort(8765)
+
+        /** Default path where the xcvb skill file is deployed inside containers. */
+        const val SKILL_GUEST_PATH = "/home/agent/.skills/xcvb-display-control.md"
     }
 }
