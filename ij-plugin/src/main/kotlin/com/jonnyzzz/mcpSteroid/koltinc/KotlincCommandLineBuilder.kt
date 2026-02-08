@@ -1,9 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.koltinc
 
-import com.intellij.execution.CommandLineWrapperUtil
 import java.io.File
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -16,12 +14,24 @@ data class KotlincCommandLine(
 
 fun KotlincCommandLine.Companion.builder(outputJar: Path) = KotlincCommandLineBuilder(outputJar)
 
+/**
+ * Writes all args to a kotlinc @argfile and returns a new [KotlincCommandLine]
+ * whose args reference the argfile. Uses kotlinc-compatible quoting via [writeKotlincArgFile].
+ */
+fun KotlincCommandLine.toArgFile(argFile: Path): KotlincCommandLine {
+    argFile.parent?.let { Files.createDirectories(it) }
+    writeKotlincArgFile(argFile, args)
+    return KotlincCommandLine(
+        args = listOf("@${argFile.toAbsolutePath()}"),
+        outputJar = outputJar,
+    )
+}
+
 class KotlincCommandLineBuilder(
     private val outputJar: Path,
 ) {
     private val sources = mutableListOf<Path>()
     private val classpath = linkedSetOf<Path>()
-    private var classpathArgFile: Path? = null
     private var jvmTarget: String = DEFAULT_JVM_TARGET
     private var noStdLib: Boolean = false
 
@@ -42,10 +52,6 @@ class KotlincCommandLineBuilder(
         classpath.add(entry)
     }
 
-    fun withClasspathArgFile(path: Path) = apply {
-        classpathArgFile = path
-    }
-
     fun withJvmTarget(target: String) = apply {
         require(target.isNotBlank()) { "JVM target must not be blank" }
         jvmTarget = target
@@ -63,19 +69,8 @@ class KotlincCommandLineBuilder(
 
         if (classpath.isNotEmpty()) {
             val cp = classpath.joinToString(File.pathSeparator) { it.toString() }
-            val argFile = classpathArgFile
-            if (argFile != null) {
-                argFile.parent?.let { Files.createDirectories(it) }
-                CommandLineWrapperUtil.writeArgumentsFile(
-                    argFile.toFile(),
-                    listOf("-classpath", cp),
-                    StandardCharsets.UTF_8,
-                )
-                args.add("@${argFile.toAbsolutePath()}")
-            } else {
-                args.add("-classpath")
-                args.add(cp)
-            }
+            args.add("-classpath")
+            args.add(cp)
         }
 
         args.add("-jvm-target")

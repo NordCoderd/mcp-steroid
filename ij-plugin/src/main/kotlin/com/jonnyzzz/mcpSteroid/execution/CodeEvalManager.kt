@@ -10,6 +10,7 @@ import com.jonnyzzz.mcpSteroid.koltinc.KotlincCommandLine
 import com.jonnyzzz.mcpSteroid.koltinc.builder
 import com.jonnyzzz.mcpSteroid.koltinc.kotlincProcessClient
 import com.jonnyzzz.mcpSteroid.koltinc.scriptClassLoaderFactory
+import com.jonnyzzz.mcpSteroid.koltinc.toArgFile
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import kotlinx.coroutines.sync.Mutex
@@ -65,10 +66,10 @@ class CodeEvalManager(
             val cmd = KotlincCommandLine
                 .builder(outputJar)
                 .withNoStdLib(true)
-                .withClasspathArgFile(classpathArgsFile)
                 .addClasspathEntries(compileClasspath)
                 .addSource(inputKt)
                 .build()
+                .toArgFile(classpathArgsFile)
 
             val kotlincResult = kotlincProcessClient.kotlinc(
                 cmd.args,

@@ -134,13 +134,59 @@ class KotlincCommandLineBuilderIntegrationTest : BasePlatformTestCase() {
         val commandLine = KotlincCommandLineBuilder(outputJar)
             .addSource(source)
             .addClasspathEntry(classpathDir)
-            .withClasspathArgFile(argFile)
             .build()
+            .toArgFile(argFile)
 
         assertTrue("Expected argfile to be created at $argFile", Files.exists(argFile))
         assertTrue(commandLine.args.any { it == "@${argFile.toAbsolutePath()}" })
         assertFalse("Expected -classpath to be omitted from command line when using argfile", commandLine.args.contains("-classpath"))
 
+        kotlincProcessClient.kotlinc(commandLine.args)
+
+        assertTrue("Expected output jar at ${commandLine.outputJar}", Files.exists(commandLine.outputJar))
+        ZipFile(commandLine.outputJar.toFile()).use { zip ->
+            assertNotNull("Expected MainKt.class in jar", zip.getEntry("MainKt.class"))
+        }
+    }
+
+    fun testCompilesJarWithClasspathArgFileContainingSpaces(): Unit = timeoutRunBlocking(90.seconds) {
+        val root = Files.createTempDirectory("kotlinc-spaces")
+        val outputJar = root.resolve("out/spaces.jar")
+
+        // Create a directory with a space in the name, simulating "JPA Model" plugin path
+        val spacedDir = root.resolve("JPA Model/classes")
+        val classpathDir = createClassDirectoryAt(spacedDir, KotlincCommandLineBuilderIntegrationTest::class.java)
+
+        val source = root.resolve("Main.kt")
+        Files.writeString(
+            source,
+            """
+            import ${KotlincCommandLineBuilderIntegrationTest::class.java.name}
+
+            fun main(): String = ${KotlincCommandLineBuilderIntegrationTest::class.java.name}::class.java.name
+            """.trimIndent(),
+            StandardCharsets.UTF_8,
+        )
+
+        val argFile = root.resolve("kotlinc.args")
+        val commandLine = KotlincCommandLineBuilder(outputJar)
+            .addSource(source)
+            .addClasspathEntry(classpathDir)
+            .build()
+            .toArgFile(argFile)
+
+        // Verify the argfile uses whole-arg quoting (not IntelliJ per-character style)
+        val argFileContent = Files.readString(argFile)
+        assertTrue(
+            "Argfile should contain quoted classpath due to space in path, but was: $argFileContent",
+            argFileContent.contains("\"")
+        )
+        assertFalse(
+            "Argfile should NOT use per-character quoting (IntelliJ style), but was: $argFileContent",
+            argFileContent.contains("\" \"")
+        )
+
+        // Actually compile with kotlinc to verify the argfile is parsed correctly
         kotlincProcessClient.kotlinc(commandLine.args)
 
         assertTrue("Expected output jar at ${commandLine.outputJar}", Files.exists(commandLine.outputJar))
@@ -178,7 +224,10 @@ class KotlincCommandLineBuilderIntegrationTest : BasePlatformTestCase() {
     }
 
     private fun createClassDirectory(root: Path, klass: Class<*>): Path {
-        val outputDir = root.resolve("class-dir")
+        return createClassDirectoryAt(root.resolve("class-dir"), klass)
+    }
+
+    private fun createClassDirectoryAt(outputDir: Path, klass: Class<*>): Path {
         val resourcePath = klass.name.replace('.', '/') + ".class"
         val target = outputDir.resolve(resourcePath)
         Files.createDirectories(target.parent)
