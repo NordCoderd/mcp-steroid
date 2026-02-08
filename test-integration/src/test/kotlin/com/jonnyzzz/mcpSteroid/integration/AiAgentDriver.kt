@@ -58,20 +58,38 @@ class AiAgentDriver(
     )
 
     fun waitForMcpReady() {
-        val mcpInit = """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}"""
+        val mcpUrl = "http://localhost:${IntelliJDriver.MCP_STEROID_PORT.containerPort}/mcp"
 
+        // First wait for the server to be reachable via a simple GET health check.
+        // This avoids creating orphan sessions from repeated initialize requests.
         waitFor(300_000, "Wait for MCP Steroid ready") {
             val result = scope.runInContainer(
                 listOf(
-                    "curl", "-s", "-f", "-X", "POST",
-                    "http://localhost:${IntelliJDriver.MCP_STEROID_PORT.containerPort}/mcp",
-                    "-H", "Content-Type: application/json",
-                    "-d", mcpInit,
+                    "curl", "-s", "-f",
+                    mcpUrl,
+                    "-H", "Accept: application/json",
                 ),
                 timeoutSeconds = 5,
             )
             result.exitCode == 0
         }
-        println("[IDE-AGENT] MCP Steroid is ready")
+
+        // Verify the MCP protocol works with a proper initialize handshake
+        val mcpInit = """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"integration-test","version":"1.0"}}}"""
+        val result = scope.runInContainer(
+            listOf(
+                "curl", "-s", "-f", "-X", "POST",
+                mcpUrl,
+                "-H", "Content-Type: application/json",
+                "-H", "Accept: application/json",
+                "-d", mcpInit,
+            ),
+            timeoutSeconds = 10,
+        )
+        check(result.exitCode == 0) {
+            "MCP initialize handshake failed (exit ${result.exitCode}): ${result.output}"
+        }
+
+        println("[IDE-AGENT] MCP Steroid is ready at $mcpUrl")
     }
 }

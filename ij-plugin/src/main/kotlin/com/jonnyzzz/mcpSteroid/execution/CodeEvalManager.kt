@@ -84,8 +84,10 @@ class CodeEvalManager(
                 }
 
                 if (compilerError.isNotEmpty()) {
-                    // If there's a compiler error, it's a failure
-                    resultBuilder.reportFailed("Compiler Errors/Warnings:\n$compilerError")
+                    // Log stderr output (warnings/errors) for transparency.
+                    // Actual failure is determined by the exit code check below,
+                    // since stderr may contain mere warnings that don't block compilation.
+                    resultBuilder.logMessage("Compiler Errors/Warnings:\n$compilerError")
                 }
 
                 if (compilerOutput.isNotEmpty() || compilerError.isNotEmpty()) {

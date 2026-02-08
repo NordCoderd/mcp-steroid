@@ -1312,4 +1312,146 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertFalse(content.text.trimStart().startsWith("---"))
     }
 
+    /**
+     * Tests the complete MCP handshake that real agents perform:
+     * 1. GET health check (with Claude CLI Accept header)
+     * 2. POST initialize (get session ID)
+     * 3. POST notifications/initialized (with session ID, no response expected)
+     * 4. POST tools/list (with session ID)
+     * 5. POST tools/call (with session ID)
+     *
+     * This test ensures the server handles the full lifecycle correctly,
+     * including the notification step that creates no response body.
+     */
+    fun testFullAgentHandshakeWithNotification(): Unit = timeoutRunBlocking(60.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Step 1: GET health check (like Claude CLI does before connecting)
+        val healthResponse = client.get(server.mcpUrl) {
+            header("Accept", "application/json, text/event-stream")
+            header("User-Agent", "claude-code/2.0.67")
+        }
+        assertEquals(HttpStatusCode.OK, healthResponse.status)
+        val healthBody = healthResponse.bodyAsText()
+        assertTrue("Health check should return server name", healthBody.contains("mcp-steroid"))
+
+        // Step 2: POST initialize
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "application/json, text/event-stream")
+            header("User-Agent", "claude-code/2.0.67")
+            setBody("""{"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{"roots":{}},"clientInfo":{"name":"claude-code","version":"2.0.67"}},"jsonrpc":"2.0","id":0}""")
+        }
+        assertEquals(HttpStatusCode.OK, initResponse.status)
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Server must return session ID", sessionId)
+
+        val initRpc = McpJson.decodeFromString<JsonRpcResponse>(initResponse.bodyAsText())
+        assertNull("Initialize should not error", initRpc.error)
+        val initResult = McpJson.decodeFromJsonElement<InitializeResult>(initRpc.result!!)
+        assertEquals(MCP_PROTOCOL_VERSION, initResult.protocolVersion)
+
+        // Step 3: POST notifications/initialized (no id = notification)
+        val notifyResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "application/json, text/event-stream")
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"method":"notifications/initialized","jsonrpc":"2.0"}""")
+        }
+        assertEquals(
+            "notifications/initialized should return 202 Accepted",
+            HttpStatusCode.Accepted,
+            notifyResponse.status
+        )
+        // No new session ID should be returned for notification with valid session
+        assertNull(
+            "No new session ID for notification with valid session",
+            notifyResponse.headers[McpHttpTransport.SESSION_HEADER]
+        )
+
+        // Step 4: POST tools/list with session ID
+        val toolsResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "application/json, text/event-stream")
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":1,"method":"tools/list"}""")
+        }
+        assertEquals(HttpStatusCode.OK, toolsResponse.status)
+        val toolsRpc = McpJson.decodeFromString<JsonRpcResponse>(toolsResponse.bodyAsText())
+        assertNull("tools/list should succeed", toolsRpc.error)
+        val toolsList = McpJson.decodeFromJsonElement<ToolsListResult>(toolsRpc.result!!)
+        assertTrue("Should have steroid tools", toolsList.tools.any { it.name.startsWith("steroid_") })
+
+        // Step 5: POST tools/call steroid_list_projects (with session ID)
+        val callResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            header("Accept", "application/json, text/event-stream")
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"steroid_list_projects"}}""")
+        }
+        assertEquals(HttpStatusCode.OK, callResponse.status)
+        val callRpc = McpJson.decodeFromString<JsonRpcResponse>(callResponse.bodyAsText())
+        assertNull("tools/call should not return JSON-RPC error", callRpc.error)
+        val callResult = McpJson.decodeFromJsonElement<ToolCallResult>(callRpc.result!!)
+        assertFalse("steroid_list_projects should succeed", callResult.isError)
+    }
+
+    /**
+     * Tests that the server correctly handles requests without Accept header.
+     * While the MCP spec says clients MUST include Accept, the server should be
+     * lenient for backwards compatibility (some tools/curl don't set it).
+     */
+    fun testPostWithoutAcceptHeader(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        val initResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            // Deliberately NOT setting Accept header
+            setBody(buildInitializeRequest())
+        }
+
+        assertEquals(
+            "POST without Accept header should still succeed",
+            HttpStatusCode.OK,
+            initResponse.status
+        )
+        val sessionId = initResponse.headers[McpHttpTransport.SESSION_HEADER]
+        assertNotNull("Should still create session", sessionId)
+    }
+
+    /**
+     * Tests that the MCP-Protocol-Version header is included in responses.
+     * Per MCP 2025-11-25 spec, the server should include this in all responses.
+     */
+    fun testProtocolVersionHeaderInResponses(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+
+        // Check GET response
+        val getResponse = client.get(server.mcpUrl) {
+            header("Accept", "application/json")
+        }
+        assertEquals(HttpStatusCode.OK, getResponse.status)
+        assertEquals(
+            "GET response should include protocol version header",
+            MCP_PROTOCOL_VERSION,
+            getResponse.headers[McpHttpTransport.PROTOCOL_VERSION_HEADER]
+        )
+
+        // Check POST response
+        val postResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            setBody(buildInitializeRequest())
+        }
+        assertEquals(HttpStatusCode.OK, postResponse.status)
+        assertEquals(
+            "POST response should include protocol version header",
+            MCP_PROTOCOL_VERSION,
+            postResponse.headers[McpHttpTransport.PROTOCOL_VERSION_HEADER]
+        )
+    }
+
 }
