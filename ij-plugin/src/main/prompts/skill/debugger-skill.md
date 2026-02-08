@@ -31,7 +31,7 @@ Avoid long waits or sleeps inside a single call; prefer multiple short polls.
 
 **Breakpoints**
 - `XDebuggerManager.getInstance(project).breakpointManager`
-- `XDebuggerUtil.getLineBreakpointTypes()` + `addLineBreakpoint(...)`
+- `XDebuggerUtil.getInstance().toggleLineBreakpoint(project, file, lineIndex)` (on EDT)
 
 **Sessions**
 - `XDebuggerManager.getInstance(project).currentSession`
@@ -57,7 +57,9 @@ The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex cal
 - `currentSession` is null until a debug run starts.
 - Thread/stack info is only available while the session is suspended.
 - `computeStackFrames` is async; use `suspendCancellableCoroutine` to await results.
+- `suspendCancellableCoroutine` import: `kotlinx.coroutines.suspendCancellableCoroutine`.
 - Start run configurations on EDT (use `withContext(Dispatchers.EDT)`).
+- `ProgramRunnerUtil` import: `com.intellij.execution.ProgramRunnerUtil` (not `com.intellij.execution.runners.ProgramRunnerUtil`).
 - **Import errors**: Use exact imports from docs - `XValuePresentation` is in `presentation` subpackage!
 
 ## Related Resources

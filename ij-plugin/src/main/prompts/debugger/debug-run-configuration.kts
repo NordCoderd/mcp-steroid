@@ -12,6 +12,7 @@ val settings = runManager.allSettings.firstOrNull { it.name == configurationName
     ?: error("Run configuration not found: $configurationName")
 
 val executor = DefaultDebugExecutor.getDebugExecutorInstance()
+// IntelliJ 253 package: com.intellij.execution.ProgramRunnerUtil
 withContext(Dispatchers.EDT) {
     ProgramRunnerUtil.executeConfiguration(settings, executor)
 }

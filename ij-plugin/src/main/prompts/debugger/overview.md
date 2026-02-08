@@ -19,11 +19,13 @@ long script with waits.
 
 ## Tips
 
+- Use `mcp-steroid://debugger/set-line-breakpoint` for breakpoint setup (preferred API: `toggleLineBreakpoint` on EDT).
+- Use `mcp-steroid://debugger/debug-run-configuration` for debug launch (uses `com.intellij.execution.ProgramRunnerUtil`).
 - Stop debug sessions when done: use debug-session-control or
   withContext(Dispatchers.EDT) { XDebuggerManager.getInstance(project).debugSessions.forEach { it.stop() } }
-- Line numbers are 1-based in these examples (match the editor gutter).
+- API calls use 0-indexed lines; editor line 7 means API line 6.
 - `debug-list-threads` and `debug-thread-dump` require a suspended session.
-- Use `DefaultDebugExecutor` and `ProgramRunnerUtil` to start debug configs.
+- Use `DefaultDebugExecutor` and `com.intellij.execution.ProgramRunnerUtil` to start debug configs.
 
 ---
 
