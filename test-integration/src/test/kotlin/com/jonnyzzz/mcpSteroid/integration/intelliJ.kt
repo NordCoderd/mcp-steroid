@@ -200,9 +200,9 @@ class IntelliJDriver(
             timeoutSeconds = 30,
         ).assertExitCode(0)
 
-        // Ensure kotlinc and other bundled binaries are executable
+        // Ensure kotlinc and other bundled binaries are executable (best-effort, may find nothing)
         driver.runInContainer(
-            listOf("bash", "-c", "find $pluginsGuestDir -name 'kotlinc' -type f -exec chmod +x {} +"),
+            listOf("bash", "-c", "find $pluginsGuestDir -name 'kotlinc' -type f -exec chmod +x {} + 2>/dev/null || true"),
             timeoutSeconds = 10,
         )
     }

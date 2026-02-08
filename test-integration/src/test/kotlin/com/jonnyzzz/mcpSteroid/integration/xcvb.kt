@@ -248,22 +248,32 @@ class XcvbDriver(
 
     /** Capture a rectangular region of the screen to a file inside the container. */
     fun screenshotRegion(x: Int, y: Int, width: Int, height: Int, filename: String) {
+        require(filename.matches(Regex("[a-zA-Z0-9._-]+"))) {
+            "filename must be alphanumeric with dots/dashes/underscores only, got: $filename"
+        }
         val destPath = "$videoDirInContainer/$filename"
-        driver.runInContainer(
+        val result = driver.runInContainer(
             listOf(
-                "bash", "-c",
-                "import -window root -crop ${width}x${height}+${x}+${y} $destPath",
+                "import", "-window", "root",
+                "-crop", "${width}x${height}+${x}+${y}",
+                destPath,
             ),
             timeoutSeconds = 10,
         )
+        if (result.exitCode != 0) {
+            error("[xcvb] screenshotRegion failed (exit ${result.exitCode}): ${result.output}${result.stderr}")
+        }
     }
 
     /** Copy text to the X11 clipboard. */
     fun clipboardCopy(text: String) {
-        driver.runInContainer(
+        val result = driver.runInContainer(
             listOf("bash", "-c", "echo -n ${shellEscape(text)} | xclip -selection clipboard"),
             timeoutSeconds = 5,
         )
+        if (result.exitCode != 0) {
+            error("[xcvb] clipboardCopy failed (exit ${result.exitCode}): ${result.output}${result.stderr}")
+        }
     }
 
     /** Read text from the X11 clipboard. */
