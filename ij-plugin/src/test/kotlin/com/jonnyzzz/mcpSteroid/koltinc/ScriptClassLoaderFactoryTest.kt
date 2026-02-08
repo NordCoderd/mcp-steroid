@@ -26,6 +26,18 @@ class ScriptClassLoaderFactoryTest : BasePlatformTestCase() {
         )
     }
 
+    fun testIdeClasspathContainsProgramRunnerUtilEntry(): Unit = timeoutRunBlocking(30.seconds) {
+        val ideEntries = scriptClassLoaderFactory.ideClasspath()
+        assertTrue("Expected ideClasspath to contain entries", ideEntries.isNotEmpty())
+
+        val programRunnerUtilClass = Class.forName("com.intellij.execution.ProgramRunnerUtil")
+        val resourceEntry = classpathEntryFromResource(programRunnerUtilClass)
+        assertTrue(
+            "Expected ideClasspath to contain ProgramRunnerUtil classpath entry: $resourceEntry",
+            ideEntries.any { it.normalize() == resourceEntry.normalize() },
+        )
+    }
+
     fun testExecCodeClassloaderLoadsClassFromJar(): Unit = timeoutRunBlocking(30.seconds) {
         val root = Files.createTempDirectory("script-classloader")
         val resourceEntry = classpathEntryFromResource(javaClass)
