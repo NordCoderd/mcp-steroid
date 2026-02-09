@@ -477,6 +477,7 @@ Context provided in the script body:
   - `mcp.steroid.review.mode`: `ALWAYS` (default), `TRUSTED`, `NEVER`
   - `mcp.steroid.review.timeout`: Review timeout in seconds
   - `mcp.steroid.execution.timeout`: Script execution timeout
+  - `mcp.steroid.dialog.killer.enabled`: Automatically close modal dialogs before code execution (default: `true`)
   - `mcp.steroid.demo.enabled`: Enable demo mode overlay (default: `false`)
   - `mcp.steroid.demo.minDisplayTime`: Minimum overlay display time in ms
   - `mcp.steroid.demo.maxLines`: Maximum overlay log lines
