@@ -76,6 +76,8 @@ RUN mkdir -p /opt/idea && chmod a+rwx /opt && \
 
 # Video streaming server (serves growing MP4 over HTTP for live preview)
 COPY video-server.js /usr/local/bin/video-server.js
+COPY run-agent.sh /usr/local/bin/run-agent.sh
+RUN chmod +x /usr/local/bin/run-agent.sh
 
 # Desktop wallpaper
 COPY wallpaper.jpg /usr/share/images/mcp-steroid-wallpaper.jpg
