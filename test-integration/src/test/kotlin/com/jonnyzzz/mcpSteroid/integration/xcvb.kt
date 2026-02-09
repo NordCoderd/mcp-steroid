@@ -203,55 +203,67 @@ class XcvbDriver(
         return proc
     }
 
-    /**
-     * Arrange IntelliJ window to the left half of the 4K display.
-     *
-     * Layout target:
-     * - IntelliJ: left half (0,0)-(1920x2160)
-     * - Agent terminals: right center half (1920,540)-(1920x1080)
-     */
-    fun scheduleIdeWindowLayout(projectNameHint: String? = null) {
-        val titlePatterns = buildList {
-            if (!projectNameHint.isNullOrBlank()) add(projectNameHint)
-            add("IntelliJ IDEA")
-            add("idea")
-        }
 
-        val layoutThread = thread(start = true, isDaemon = true, name = "xcvb-ide-layout") {
-            runCatching {
-                val initialWindowId = waitForWindowIdByPatterns(
-                    titlePatterns = titlePatterns,
-                    timeoutMs = 120_000L,
-                ) ?: run {
-                    println("[xcvb] WARNING: failed to place IntelliJ window to left half")
-                    return@runCatching
-                }
-                var windowId: String = initialWindowId
 
-                while (!Thread.currentThread().isInterrupted) {
-                    val placed = applyWindowRect(windowId, IDE_WINDOW_RECT)
-                    if (!placed) {
-                        windowId = waitForWindowIdByPatterns(
-                            titlePatterns = titlePatterns,
-                            timeoutMs = 10_000L,
-                        ) ?: break
-                        continue
-                    }
-                    // Keep IntelliJ above all windows during recording.
-                    runDriverCommand(
-                        listOf("xdotool", "windowraise", windowId),
-                        timeoutSeconds = 5,
-                    )
-                    Thread.sleep(400)
-                }
-            }.onFailure { t ->
-                println("[xcvb] WARNING: IntelliJ layout setup failed: ${t.message}")
+    fun listWindows(): List<WindowInfo> {
+        // Run a shell script to list all windows with their geometry and title efficiently
+        // Output format: ID|X|Y|WIDTH|HEIGHT|TITLE
+        val d = '$'
+        val script = """
+            for id in ${d}(xdotool search --name "" 2>/dev/null); do
+              unset X Y WIDTH HEIGHT
+              name=${d}(xdotool getwindowname "${d}id" 2>/dev/null)
+              eval ${d}(xdotool getwindowgeometry --shell "${d}id" 2>/dev/null)
+              if [ -n "${d}X" ] && [ -n "${d}Y" ] && [ -n "${d}WIDTH" ] && [ -n "${d}HEIGHT" ]; then
+                echo "${d}id|${d}X|${d}Y|${d}WIDTH|${d}HEIGHT|${d}name"
+              fi
+            done
+        """.trimIndent()
+
+        val result = driver.runInContainer(
+            listOf("bash", "-c", script),
+            timeoutSeconds = 5,
+        )
+        if (result.exitCode != 0) return emptyList()
+
+        return result.output.lineSequence()
+            .filter { it.isNotBlank() }
+            .mapNotNull { line ->
+                val parts = line.split('|', limit = 6)
+                if (parts.size < 6) return@mapNotNull null
+                val id = parts[0]
+                val x = parts[1].toIntOrNull() ?: return@mapNotNull null
+                val y = parts[2].toIntOrNull() ?: return@mapNotNull null
+                val width = parts[3].toIntOrNull() ?: return@mapNotNull null
+                val height = parts[4].toIntOrNull() ?: return@mapNotNull null
+                val title = parts[5]
+                WindowInfo(id, title, WindowRect(x, y, width, height))
             }
-        }
+            .toList()
+    }
 
-        lifetime.registerCleanupAction {
-            layoutThread.interrupt()
-        }
+    fun updateLayout(window: WindowInfo, rect: WindowRect): Boolean {
+        return updateLayout(window.id, rect)
+    }
+
+    fun updateLayout(windowId: String, rect: WindowRect): Boolean {
+        val move = runDriverCommand(
+            listOf("xdotool", "windowmove", "--sync", windowId, rect.x.toString(), rect.y.toString()),
+            timeoutSeconds = 5,
+        )
+        if (move.exitCode != 0) return false
+
+        val resize = runDriverCommand(
+            listOf("xdotool", "windowsize", "--sync", windowId, rect.width.toString(), rect.height.toString()),
+            timeoutSeconds = 5,
+        )
+        if (resize.exitCode != 0) return false
+
+        runDriverCommand(
+            listOf("xdotool", "windowraise", windowId),
+            timeoutSeconds = 5,
+        )
+        return true
     }
 
     // ── Visible console ────────────────────────────────────────────────
@@ -461,7 +473,7 @@ class XcvbDriver(
         while (System.currentTimeMillis() < deadline) {
             for (pattern in titlePatterns) {
                 val windowId = findFirstWindowIdByName(pattern) ?: continue
-                if (applyWindowRect(windowId, rect)) {
+                if (updateLayout(windowId, rect)) {
                     println("[xcvb] Positioned window '$pattern' ($windowId) to ${rect.width}x${rect.height}+${rect.x}+${rect.y}")
                     return true
                 }
@@ -480,41 +492,6 @@ class XcvbDriver(
         return result.output.lineSequence()
             .map { it.trim() }
             .firstOrNull { it.isNotEmpty() }
-    }
-
-    private fun waitForWindowIdByPatterns(
-        titlePatterns: List<String>,
-        timeoutMs: Long,
-    ): String? {
-        val deadline = System.currentTimeMillis() + timeoutMs
-        while (System.currentTimeMillis() < deadline) {
-            for (pattern in titlePatterns) {
-                val windowId = findFirstWindowIdByName(pattern) ?: continue
-                if (windowId.isNotBlank()) return windowId
-            }
-            Thread.sleep(250)
-        }
-        return null
-    }
-
-    private fun applyWindowRect(windowId: String, rect: WindowRect): Boolean {
-        val move = runDriverCommand(
-            listOf("xdotool", "windowmove", "--sync", windowId, rect.x.toString(), rect.y.toString()),
-            timeoutSeconds = 5,
-        )
-        if (move.exitCode != 0) return false
-
-        val resize = runDriverCommand(
-            listOf("xdotool", "windowsize", "--sync", windowId, rect.width.toString(), rect.height.toString()),
-            timeoutSeconds = 5,
-        )
-        if (resize.exitCode != 0) return false
-
-        runDriverCommand(
-            listOf("xdotool", "windowraise", windowId),
-            timeoutSeconds = 5,
-        )
-        return true
     }
 
     private fun runDriverCommand(args: List<String>, timeoutSeconds: Long) =
@@ -576,12 +553,7 @@ class XcvbDriver(
         const val DISPLAY_WIDTH = 3840
         const val DISPLAY_HEIGHT = 2160
         val VIDEO_STREAMING_PORT = ContainerPort(8765)
-        val IDE_WINDOW_RECT = WindowRect(
-            x = 0,
-            y = 0,
-            width = DISPLAY_WIDTH / 2,
-            height = DISPLAY_HEIGHT,
-        )
+
         val AGENT_CONSOLE_RECT = WindowRect(
             x = DISPLAY_WIDTH / 2,
             y = DISPLAY_HEIGHT / 4,
@@ -600,6 +572,12 @@ data class WindowRect(
     val y: Int,
     val width: Int,
     val height: Int,
+)
+
+data class WindowInfo(
+    val id: String,
+    val title: String,
+    val rect: WindowRect,
 )
 
 /**

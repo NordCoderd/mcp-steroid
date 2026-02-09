@@ -9,8 +9,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
 import java.nio.file.Files.createLink
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import kotlin.io.path.exists
 
 /**
@@ -49,8 +47,7 @@ fun IdeContainer.Companion.create(
     projectName: String = "test-project",
 ): IdeContainer {
     val runDir = run {
-        val timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'Z'HH-mm-ss-SSS").format(LocalDateTime.now())
-        val file = File(IdeTestFolders.testOutputDir, "run-$timestamp-$dockerFileBase")
+        val file = File(IdeTestFolders.testOutputDir, "run-$dockerFileBase")
         file.mkdirs()
         file
     }
@@ -96,7 +93,6 @@ fun IdeContainer.Companion.create(
     ijDriver.mountProjectFiles(projectName)
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
     val ijContainer = ijDriver.startIde()
-    xcvb.scheduleIdeWindowLayout(projectNameHint = projectName)
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
 
@@ -135,8 +131,7 @@ fun IdeContainer.Companion.createWithGitRepo(
     cloneTimeoutSeconds: Long = 300,
 ): IdeContainer {
     val runDir = run {
-        val timestamp = DateTimeFormatter.ofPattern("yyyy-MM-dd'Z'HH-mm-ss-SSS").format(LocalDateTime.now())
-        val file = File(IdeTestFolders.testOutputDir, "run-$timestamp-$dockerFileBase")
+        val file = File(IdeTestFolders.testOutputDir, "run-$dockerFileBase")
         file.mkdirs()
         file
     }
@@ -181,10 +176,9 @@ fun IdeContainer.Companion.createWithGitRepo(
     ijDriver.cloneGitRepo(gitRepoUrl, timeoutSeconds = cloneTimeoutSeconds)
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
     val ijContainer = ijDriver.startIde()
-    val repoNameHint = gitRepoUrl.substringAfterLast('/').substringBeforeLast(".git")
-    xcvb.scheduleIdeWindowLayout(projectNameHint = repoNameHint)
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
+
 
     val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
     val mcpUrl = session.aiAgentDriver.mcpSteroidHostUrl

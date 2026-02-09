@@ -26,6 +26,7 @@ class VisibleConsoleContainerDriver(
     private val geometry: String = "200x50+0+0",
     private val windowRect: WindowRect? = null,
 ) : ContainerDriver {
+    override val containerId: String get() = delegate.containerId
     private val counter = AtomicInteger(0)
 
     override fun mapContainerPortToHostPort(port: ContainerPort): Int =
