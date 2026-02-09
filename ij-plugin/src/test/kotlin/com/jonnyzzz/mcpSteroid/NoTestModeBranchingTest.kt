@@ -7,6 +7,7 @@ import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
 import java.nio.file.Files
 import java.nio.file.Paths
 import kotlin.time.Duration.Companion.seconds
@@ -15,8 +16,7 @@ class NoTestModeBranchingTest : BasePlatformTestCase() {
     override fun runInDispatchThread(): Boolean = false
 
     fun testNoIsUnitTestModeUsageInProject(): Unit = timeoutRunBlocking(30.seconds) {
-        val repoPath = System.getProperty("user.dir") ?: error("Working directory is missing")
-        val srcPath = Paths.get(repoPath, "src").toString()
+        val srcPath = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("src").toString()
         val srcRoot = readAction { LocalFileSystem.getInstance().refreshAndFindFileByPath(srcPath) }
             ?: error("Project src directory is missing: $srcPath")
         val kotlinFiles = readAction { collectKotlinFiles(srcRoot) }
