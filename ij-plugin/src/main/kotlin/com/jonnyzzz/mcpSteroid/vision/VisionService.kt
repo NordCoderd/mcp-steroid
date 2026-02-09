@@ -23,6 +23,7 @@ import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
+import java.nio.file.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import javax.swing.SwingUtilities
@@ -61,9 +62,9 @@ data class ScreenshotArtifacts(
     //TODO: include content-type
     val imageBytes: ByteArray,
     //TODO: use imports
-    val imagePath: java.nio.file.Path,
-    val treePath: java.nio.file.Path,
-    val metaPath: java.nio.file.Path,
+    val imagePath: Path,
+    val treePath: Path,
+    val metaPath: Path,
     val meta: ScreenshotMeta,
 ) {
     override fun equals(other: Any?): Boolean {
@@ -83,6 +84,13 @@ data class ScreenshotArtifacts(
         result = 31 * result + metaPath.hashCode()
         result = 31 * result + meta.hashCode()
         return result
+    }
+
+    fun logMessages() = buildList {
+        add("window_id: ${meta.windowId}")
+        add("Screenshot saved to $imagePath")
+        add("Component tree saved to $treePath")
+        add("Screenshot metadata saved to $metaPath")
     }
 }
 

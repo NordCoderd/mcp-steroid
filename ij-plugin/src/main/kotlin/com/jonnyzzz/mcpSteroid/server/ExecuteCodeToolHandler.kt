@@ -180,26 +180,6 @@ class ExecuteCodeToolHandler : McpRegistrar {
         }
             ?: return errorResult("Project not found: $projectName")
 
-        // Kill any pending modal dialogs before execution
-        // This prevents execution failures when dialogs are blocking the IDE
-        val dialogKillerResult = DialogKiller.killProjectDialogs(
-            project = project,
-            executionId = ExecutionId(taskId),
-        )
-
-        if (dialogKillerResult.dialogsClosed > 0) {
-            // Log dialog killer activity in the tool result
-            // This will be visible in the MCP response before the actual execution output
-            context.mcpProgressReporter.report(
-                "Dialog Killer: Closed ${dialogKillerResult.dialogsClosed} modal dialog(s) before execution"
-            )
-            if (dialogKillerResult.screenshotPath != null) {
-                context.mcpProgressReporter.report(
-                    "Dialog screenshot saved: ${dialogKillerResult.screenshotPath}"
-                )
-            }
-        }
-
         val execCodeParams = ExecCodeParams(
             taskId = taskId,
             code = code,
@@ -212,13 +192,15 @@ class ExecuteCodeToolHandler : McpRegistrar {
             .service<ExecutionManager>()
             .executeWithProgress(execCodeParams)
 
-        analyticsBeacon.capture(
-            event = "exec_code",
-            project = project,
-            properties = mapOf(
-                "result" to if (result.isError) "error" else "success"
+        runCatching {
+            analyticsBeacon.capture(
+                event = "exec_code",
+                project = project,
+                properties = mapOf(
+                    "result" to if (result.isError) "error" else "success"
+                )
             )
-        )
+        }
 
         return result
     }

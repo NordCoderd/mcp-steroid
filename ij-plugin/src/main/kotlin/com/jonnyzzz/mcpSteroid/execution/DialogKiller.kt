@@ -1,33 +1,28 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.execution
 
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.asContextElement
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.DialogWrapperDialog
+import com.intellij.openapi.ui.ExitActionType
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.WindowManager
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.vision.VisionService
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
+import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.awt.Window
-
-/**
- * Result of dialog killer operation.
- */
-data class DialogKillerResult(
-    /** Number of dialogs that were closed */
-    val dialogsClosed: Int,
-    /** Screenshot path if dialogs were found and killed, null otherwise */
-    val screenshotPath: String? = null,
-    /** Error message if screenshot capture failed */
-    val screenshotError: String? = null,
-)
+import kotlin.coroutines.CoroutineContext
+import kotlin.coroutines.EmptyCoroutineContext
 
 /**
  * Utility for closing pending modal dialogs before code execution.
@@ -43,18 +38,20 @@ data class DialogKillerResult(
  * 7. Logs all actions to the IDE log
  * 8. Protects against infinite loops by tracking closed dialog identities
  */
-object DialogKiller {
+
+suspend inline fun dialogKiller() = serviceAsync<DialogKiller>()
+
+@Service(Service.Level.APP)
+class DialogKiller {
     private val log = Logger.getInstance(DialogKiller::class.java)
 
-    /** Maximum iterations to prevent infinite loops */
-    private const val MAX_ITERATIONS = 20
+    //Allow only 1 process at a time
+    private val mutex = Semaphore(1)
 
-    /**
-     * Check if dialog killer is enabled via registry.
-     */
-    fun isEnabled(): Boolean {
-        return Registry.`is`("mcp.steroid.dialog.killer.enabled", true)
-    }
+    private suspend fun <T> withEDTAnyModalityContext(
+        context: CoroutineContext = EmptyCoroutineContext,
+        block: suspend CoroutineScope.() -> T
+    ): T = withContext(Dispatchers.EDT + ModalityState.any().asContextElement() + context, block)
 
     /**
      * Kill all modal dialogs owned by the project frame.
@@ -69,10 +66,14 @@ object DialogKiller {
     suspend fun killProjectDialogs(
         project: Project,
         executionId: ExecutionId,
-    ): DialogKillerResult {
-        if (!isEnabled()) {
-            log.info("Dialog killer is disabled via registry")
-            return DialogKillerResult(dialogsClosed = 0)
+        logMessage: (String) -> Unit,
+    ) {
+        if (ApplicationManager.getApplication().isHeadlessEnvironment) {
+            return
+        }
+
+        if (!Registry.`is`("mcp.steroid.dialog.killer.enabled", true)) {
+            return
         }
 
         // Check modal state first (quick check without EDT)
@@ -80,135 +81,80 @@ object DialogKiller {
             ModalityState.current() != ModalityState.nonModal()
         }
 
-        if (!isModalState) {
-            log.info("No modal dialogs detected (modality state is NON_MODAL)")
-            return DialogKillerResult(dialogsClosed = 0)
+        if (!isModalState) return
+        return mutex.withPermit {
+            withContext(Dispatchers.IO + CoroutineName("DialogKiller")) {
+                coroutineScope {
+                    val isModalState = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+                        ModalityState.current() != ModalityState.nonModal()
+                    }
+
+                    if (!isModalState) return@coroutineScope
+
+                    try {
+                        doLookupDialogs(executionId, project, logMessage)
+                    } catch (e: Throwable) {
+                        if (e is ProcessCanceledException) throw e
+                        log.warn("Failed to kill dialogs. ${e.message}", e)
+                    }
+                }
+            }
         }
+    }
+
+    private suspend fun doLookupDialogs(
+        executionId: ExecutionId,
+        project: Project,
+        logMessage: (String) -> Unit,
+        iteration: Int = 0,
+    ) {
+        if (iteration > 5) return
 
         log.info("Modal state detected, starting dialog killer (execution: $executionId)")
 
         // Get project frame (quick EDT task with ModalityState.any())
-        val projectFrame = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+        val projectFrame = withEDTAnyModalityContext {
             WindowManager.getInstance().getFrame(project)
+        } ?: return
+
+        // Yield to allow other coroutines to run
+        yield()
+
+        // Find and pick ONE dialog to close in a single EDT task with ModalityState.any()
+        // IMPORTANT: All dialog inspection must be on EDT!
+        val dialogToClose = withEDTAnyModalityContext {
+            findDialogsOwnedBy(projectFrame)
+                .map { it to dialogDepth(it) }
+                .maxByOrNull { it.second }?.first
         }
 
-        if (projectFrame == null) {
-            log.warn("Cannot find project frame for project: ${project.name}")
-            return DialogKillerResult(dialogsClosed = 0)
+        if (dialogToClose == null) {
+            log.info("No more new dialogs found (iteration $iteration)")
+            return
         }
 
-        // Track closed dialog identities to prevent infinite loops
-        val closedDialogIdentities = mutableSetOf<DialogIdentity>()
-        var screenshotPath: String? = null
-        var screenshotError: String? = null
-        var totalClosed = 0
-        var iteration = 0
-
-        try {
-            // Iteratively close dialogs ONE AT A TIME until no more are found or max iterations reached
-            // After each close, we re-check for dialogs to allow EDT to process side effects
-            while (iteration < MAX_ITERATIONS) {
-                iteration++
-
-                // Yield to allow other coroutines to run
-                yield()
-
-                // Find and pick ONE dialog to close in a single EDT task with ModalityState.any()
-                // IMPORTANT: All dialog inspection must be on EDT!
-                val dialogToClose = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                    val dialogs = findDialogsOwnedBy(projectFrame)
-
-                    // Filter out dialogs we've already tried to close (must be on EDT!)
-                    val newDialogs = dialogs.filter { dialog ->
-                        val identity = DialogIdentity.from(dialog)
-                        identity !in closedDialogIdentities
-                    }
-
-                    if (newDialogs.isEmpty()) {
-                        null  // No more dialogs to close
-                    } else {
-                        // Sort by hierarchy depth and pick the DEEPEST one (child dialog)
-                        // Closing leaf dialogs first prevents cascading closures
-                        sortDialogsByDepth(newDialogs).firstOrNull()
-                    }
-                }
-
-                if (dialogToClose == null) {
-                    log.info("No more new dialogs found (iteration $iteration)")
-                    break
-                }
-
-                // TODO: Capture screenshot on first iteration
-                // Currently disabled because VisionService.capture() uses withContext(Dispatchers.EDT)
-                // without ModalityState.any(), which hangs when modal dialogs are present.
-                // Need to make VisionService modal-aware before re-enabling screenshot capture.
-                if (false && iteration == 1) {
-                    val (path, error) = captureDialogScreenshot(project, executionId)
-                    screenshotPath = path
-                    screenshotError = error
-                }
-
-                // Mark this dialog as processed before closing (must be on EDT for DialogIdentity.from)
-                val identity = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                    DialogIdentity.from(dialogToClose)
-                }
-                closedDialogIdentities.add(identity)
-
-                log.info("Found dialog to close (iteration $iteration)")
-
-                // Close the dialog in a dedicated EDT launch with ModalityState.any()
-                val closed = closeDialog(dialogToClose, 1, 1, executionId)
-                if (closed) {
-                    totalClosed++
-                }
-
-                // Wait 500ms after closing to give EDT time to process any delayed tasks
-                // This is CRITICAL - closing a dialog may schedule more EDT tasks
-                // The delay allows the message pump to fully process the closure
-                kotlinx.coroutines.delay(500)
-
-                // Yield to give other coroutines a chance to run
-                yield()
-            }
-
-            if (iteration >= MAX_ITERATIONS) {
-                log.warn("Dialog killer stopped after $MAX_ITERATIONS iterations (infinite loop protection)")
-            }
-
-            if (screenshotPath != null) {
-                log.info("Dialog screenshot saved to: $screenshotPath")
-            }
-
-            log.info("Dialog killer completed: $totalClosed dialog(s) closed in $iteration iteration(s)")
-
-            return DialogKillerResult(
-                dialogsClosed = totalClosed,
-                screenshotPath = screenshotPath,
-                screenshotError = screenshotError,
-            )
-        } catch (e: Exception) {
-            log.error("Dialog killer failed: ${e.message}", e)
-            return DialogKillerResult(
-                dialogsClosed = totalClosed,
-                screenshotPath = screenshotPath,
-                screenshotError = e.message,
-            )
+        runCatching {
+            VisionService.capture(project, executionId).logMessages().forEach { logMessage(it) }
         }
+
+        // Close the dialog in a dedicated EDT launch with ModalityState.any()
+        closeDialog(dialogToClose, 1, 1, executionId)
+
+        yield()
+        doLookupDialogs(executionId, project, logMessage, iteration + 1)
     }
 
     /**
      * Close a single dialog and verify closure.
      * Runs on EDT with ModalityState.any() to work even when dialogs are present.
-     *
-     * @return true if dialog was successfully closed
      */
     private suspend fun closeDialog(
         dialog: DialogWrapper,
         index: Int,
         total: Int,
         executionId: ExecutionId
-    ): Boolean {
-        return withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    ) {
+        withEDTAnyModalityContext {
             try {
                 val window = dialog.window
                 val title = (window as? java.awt.Frame)?.title
@@ -221,27 +167,16 @@ object DialogKiller {
                 val wasShowing = window?.isShowing == true
                 if (!wasShowing) {
                     log.info("Dialog already hidden: '$title'")
-                    return@withContext false
+                    return@withEDTAnyModalityContext false
                 }
 
                 // Close the dialog
-                dialog.doCancelAction()
+                dialog.close(DialogWrapper.CANCEL_EXIT_CODE, ExitActionType.CANCEL)
 
-                // Give UI time to process the close event
-                // (Not using delay here to avoid blocking EDT)
-
-                // Verify closure
-                val stillShowing = window?.isShowing == true
-                if (!stillShowing) {
-                    log.info("✓ Closed dialog: '$title'")
-                    true
-                } else {
-                    log.warn("Dialog still showing after doCancelAction(): '$title'")
-                    false
-                }
+                //let it pump events!
+                delay(10)
             } catch (e: Exception) {
-                log.error("Failed to close dialog: ${e.message}", e)
-                false
+                log.warn("Failed to close dialog: ${e.message}", e)
             }
         }
     }
@@ -252,32 +187,34 @@ object DialogKiller {
      *
      * This runs on EDT but is kept small and fast.
      */
-    private fun findDialogsOwnedBy(ownerWindow: Window): List<DialogWrapper> {
-        val result = mutableListOf<DialogWrapper>()
+    private suspend fun findDialogsOwnedBy(ownerWindow: Window): List<DialogWrapper> {
+        return withEDTAnyModalityContext {
+            val result = mutableListOf<DialogWrapper>()
 
-        // Get all windows in the JVM
-        val allWindows = Window.getWindows()
+            // Get all windows in the JVM
+            val allWindows = Window.getWindows()
 
-        for (window in allWindows) {
-            // Check if this window is a DialogWrapperDialog
-            if (window !is DialogWrapperDialog) continue
+            for (window in allWindows) {
+                // Check if this window is a DialogWrapperDialog
+                if (window !is DialogWrapperDialog) continue
 
-            // Only consider dialogs that are currently showing
-            if (!window.isShowing) continue
+                // Only consider dialogs that are currently showing
+                if (!window.isShowing) continue
 
-            // Check if this window is owned by the project frame (directly or transitively)
-            if (!isOwnedBy(window, ownerWindow)) continue
+                // Check if this window is owned by the project frame (directly or transitively)
+                if (!isOwnedBy(window, ownerWindow)) continue
 
-            // Get the DialogWrapper - handle nullable case
-            val dialogWrapper = window.dialogWrapper ?: continue
+                // Get the DialogWrapper - handle nullable case
+                val dialogWrapper = window.dialogWrapper ?: continue
 
-            // Only include modal dialogs
-            if (!dialogWrapper.isModal) continue
+                // Only include modal dialogs
+                if (!dialogWrapper.isModal) continue
 
-            result.add(dialogWrapper)
+                result.add(dialogWrapper)
+            }
+
+            result
         }
-
-        return result
     }
 
     /**
@@ -290,14 +227,18 @@ object DialogKiller {
     private fun sortDialogsByDepth(dialogs: List<DialogWrapper>): List<DialogWrapper> {
         return dialogs.sortedByDescending { dialog ->
             // Calculate depth: count how many owner windows we need to traverse to reach root
-            var depth = 0
-            var current: Window? = dialog.window
-            while (current?.owner != null) {
-                depth++
-                current = current.owner
-            }
-            depth
+            dialogDepth(dialog)
         }
+    }
+
+    private fun dialogDepth(dialog: DialogWrapper): Int {
+        var depth = 0
+        var current: Window? = dialog.window
+        while (current?.owner != null) {
+            depth++
+            current = current.owner
+        }
+        return depth
     }
 
     /**
@@ -312,51 +253,5 @@ object DialogKiller {
             current = current.owner
         }
         return false
-    }
-
-    /**
-     * Capture a screenshot of the IDE with the dialogs visible.
-     * Returns a pair of (screenshot path, error message).
-     */
-    private suspend fun captureDialogScreenshot(
-        project: Project,
-        executionId: ExecutionId,
-    ): Pair<String?, String?> {
-        return try {
-            // Create a special execution ID for dialog screenshots
-            // Use executionId.executionId to get the string value, not toString()
-            val dialogExecutionId = ExecutionId("${executionId.executionId}-dialog-killer")
-
-            // Capture screenshot using VisionService
-            val artifacts = VisionService.capture(project, dialogExecutionId)
-
-            // Return the screenshot path
-            Pair(artifacts.imagePath.toAbsolutePath().toString(), null)
-        } catch (e: Exception) {
-            log.warn("Failed to capture dialog screenshot: ${e.message}", e)
-            Pair(null, e.message ?: "Unknown error")
-        }
-    }
-
-    /**
-     * Identity of a dialog for tracking purposes.
-     * Uses window hashCode and title to identify the same dialog across iterations.
-     */
-    private data class DialogIdentity(
-        val windowHashCode: Int,
-        val title: String,
-    ) {
-        companion object {
-            fun from(dialog: DialogWrapper): DialogIdentity {
-                val window = dialog.window
-                val title = (window as? java.awt.Frame)?.title
-                    ?: (window as? java.awt.Dialog)?.title
-                    ?: ""
-                return DialogIdentity(
-                    windowHashCode = System.identityHashCode(window),
-                    title = title,
-                )
-            }
-        }
     }
 }

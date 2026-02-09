@@ -61,6 +61,16 @@ class ExecutionManager(
                 try {
                     builder.logMessage("execution_id: ${executionId.executionId}\n use it to report feedback: steroid_execute_feedback")
 
+                    runCatching {
+                        // Kill any pending modal dialogs before execution
+                        // This prevents execution failures when dialogs are blocking the IDE
+                        dialogKiller().killProjectDialogs(
+                            project = project,
+                            executionId = executionId,
+                            builder::logMessage,
+                        )
+                    }
+
                     val finalResult = project.service<ReviewManager>().requestReview(executionId, exec, builder)
                     if (!finalResult) {
                         yield()

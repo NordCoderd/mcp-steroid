@@ -100,10 +100,7 @@ class VisionScreenshotToolHandler : McpRegistrar {
             val imageBase64 = Base64.getEncoder().encodeToString(artifacts.imageBytes)
             builder.addContent(ContentItem.Image(data = imageBase64, mimeType = "image/png"))
 
-            log("window_id: ${artifacts.meta.windowId}")
-            log("Screenshot saved to ${artifacts.imagePath}")
-            log("Component tree saved to ${artifacts.treePath}")
-            log("Screenshot metadata saved to ${artifacts.metaPath}")
+            artifacts.logMessages().forEach { log(it) }
         } catch (e: Exception) {
             val message = "Screenshot capture failed: ${e.message}"
             builder.addTextContent("ERROR: $message").markAsError()
