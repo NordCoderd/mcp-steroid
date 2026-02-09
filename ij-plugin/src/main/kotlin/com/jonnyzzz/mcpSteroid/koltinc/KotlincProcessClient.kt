@@ -9,6 +9,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.SystemInfoRt
+import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.mcpSteroid.PluginDescriptorProvider
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -18,6 +19,8 @@ inline val kotlincProcessClient: KotlincProcessClient get() = service()
 
 @Service(Service.Level.APP)
 class KotlincProcessClient {
+    private val log = thisLogger()
+
     fun kotlinc(args: List<String>, workingDir: Path? = null): ProcessOutput {
         val executable = resolveExecutable()
         val commandLine = if (SystemInfoRt.isWindows) {
@@ -50,8 +53,19 @@ class KotlincProcessClient {
     }
 
     private fun resolveExecutable(): KotlincExecutable {
-        val plugin = PluginDescriptorProvider.getInstance().descriptor
-        val kotlincRoot = plugin.pluginPath.resolve("kotlinc")
+        val customHome = Registry.stringValue("mcp.steroid.kotlinc.home").takeIf { it.isNotBlank() }
+        val kotlincRoot = if (customHome != null) {
+            val path = Path.of(customHome)
+            if (!Files.isDirectory(path)) {
+                throw IllegalStateException("Custom kotlinc home does not exist: $customHome")
+            }
+            log.info("Using external kotlinc home: $customHome")
+            path
+        } else {
+            val plugin = PluginDescriptorProvider.getInstance().descriptor
+            plugin.pluginPath.resolve("kotlinc")
+        }
+
         val bin = if (SystemInfoRt.isWindows) "bin/kotlinc.bat" else "bin/kotlinc"
         val executable = kotlincRoot.resolve(bin)
 

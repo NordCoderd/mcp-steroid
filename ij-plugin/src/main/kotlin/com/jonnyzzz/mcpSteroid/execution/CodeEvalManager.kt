@@ -6,6 +6,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.mcpSteroid.koltinc.KotlincCommandLine
 import com.jonnyzzz.mcpSteroid.koltinc.builder
 import com.jonnyzzz.mcpSteroid.koltinc.kotlincProcessClient
@@ -64,9 +65,14 @@ class CodeEvalManager(
             (compilerDir / "classpath.txt").writeLines(compileClasspath.map { it.toString() })
             val classpathArgsFile = compilerDir / "kotlinc.args"
 
+            val extraParams = Registry.stringValue("mcp.steroid.kotlinc.parameters")
+                .split("\\s+".toRegex())
+                .filter { it.isNotBlank() }
+
             val cmd = KotlincCommandLine
                 .builder(outputJar)
                 .withNoStdLib(true)
+                .withExtraParameters(extraParams)
                 .addClasspathEntries(compileClasspath)
                 .addSource(inputKt)
                 .build()

@@ -34,6 +34,7 @@ class KotlincCommandLineBuilder(
     private val classpath = linkedSetOf<Path>()
     private var jvmTarget: String = DEFAULT_JVM_TARGET
     private var noStdLib: Boolean = false
+    private val extraParameters = mutableListOf<String>()
 
     fun addSource(source: Path) = apply {
         require(Files.exists(source)) { "Source file does not exist: $source" }
@@ -61,6 +62,10 @@ class KotlincCommandLineBuilder(
         noStdLib = enabled
     }
 
+    fun withExtraParameters(params: List<String>) = apply {
+        extraParameters.addAll(params)
+    }
+
     fun build(): KotlincCommandLine {
         require(sources.isNotEmpty()) { "No Kotlin source files provided" }
         outputJar.parent?.let { Files.createDirectories(it) }
@@ -79,6 +84,8 @@ class KotlincCommandLineBuilder(
         if (noStdLib) {
             args.add("-no-stdlib")
         }
+
+        args.addAll(extraParameters)
 
         args.add("-d")
         args.add(outputJar.toString())

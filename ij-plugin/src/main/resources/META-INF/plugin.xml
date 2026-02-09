@@ -124,6 +124,12 @@
         <registryKey key="mcp.steroid.analytics.enabled" defaultValue="true"
             description="Toggles minimalistic analytics from the plugin"/>
 
+        <!-- Kotlinc configuration -->
+        <registryKey key="mcp.steroid.kotlinc.parameters" defaultValue=""
+            description="Additional kotlinc command-line parameters (space-separated). For example: -Xskip-metadata-version-check"/>
+        <registryKey key="mcp.steroid.kotlinc.home" defaultValue=""
+            description="Path to external kotlinc home directory. When set, overrides the bundled kotlinc. Useful when the IDE ships a newer Kotlin version than the plugin bundles."/>
+
         <!-- Start MCP server when IDE is ready -->
         <postStartupActivity
                 implementation="com.jonnyzzz.mcpSteroid.server.SteroidsMcpServerStartupActivity"/>

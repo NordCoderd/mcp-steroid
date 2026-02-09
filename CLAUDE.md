@@ -162,6 +162,9 @@ Main APIs for synchronous return from blocking code:
 
 IntelliJ MCP Steroid - an MCP server plugin for IntelliJ IDEA that exposes IDE APIs to LLM agents via Kotlin code execution.
 
+- **GitHub**: https://github.com/jonnyzzz/intellij-mcp-steroids
+- **Issues**: https://github.com/jonnyzzz/intellij-mcp-steroids/issues
+
 ## Key Documentation
 
 - [README.md](../../README.md) - Full API documentation and architecture
@@ -487,6 +490,8 @@ Context provided in the script body:
   - `mcp.steroid.storage.path`: Override storage path (empty = `.idea/mcp-steroid`)
   - `mcp.steroid.idea.description.enabled`: Generate `.idea/mcp-steroid.md` (default: `true`)
   - `mcp.steroid.analytics.enabled`: Enable minimalistic analytics (default: `true`)
+  - `mcp.steroid.kotlinc.parameters`: Additional kotlinc command-line parameters, space-separated (default: empty). For example: `-Xskip-metadata-version-check`
+  - `mcp.steroid.kotlinc.home`: Path to external kotlinc home directory (default: empty, uses bundled). Useful when the IDE ships a newer Kotlin version than the plugin bundles.
 
 ### Script Preprocessing (CodeButcher)
 
