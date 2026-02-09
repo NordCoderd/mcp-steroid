@@ -1,8 +1,5 @@
-import com.intellij.ide.util.gotoByName.*
-import com.intellij.navigation.NavigationItem
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.*
-import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.PsiShortNamesCache
 
 

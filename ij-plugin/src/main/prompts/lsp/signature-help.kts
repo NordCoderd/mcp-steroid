@@ -1,4 +1,3 @@
-import com.intellij.lang.parameterInfo.ParameterInfoHandler
 import com.intellij.lang.parameterInfo.LanguageParameterInfo
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.psi.*

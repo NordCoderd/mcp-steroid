@@ -1,7 +1,5 @@
-import com.intellij.lang.documentation.DocumentationProvider
 import com.intellij.lang.LanguageDocumentation
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.util.PsiTreeUtil

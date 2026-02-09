@@ -1,8 +1,8 @@
 import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.lang.LanguageStructureViewBuilder
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.util.Disposer
 import com.intellij.psi.*
-import com.intellij.psi.util.PsiTreeUtil
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.kt"  // TODO: Set your file path
@@ -34,32 +34,35 @@ val result = readAction {
             appendLine("-".repeat(30))
 
             val model = structureViewBuilder.createStructureViewModel(null)
-            val root = model.root
+            try {
+                val root = model.root
 
-            fun printElement(element: com.intellij.ide.structureView.StructureViewTreeElement, indent: String = "") {
-                val value = element.value
-                val presentation = element.presentation
-                val name = presentation.presentableText ?: (value as? PsiNamedElement)?.name ?: "?"
-                val icon = presentation.getIcon(false)?.toString() ?: ""
-                val location = presentation.locationString ?: ""
+                fun printElement(element: com.intellij.ide.structureView.StructureViewTreeElement, indent: String = "") {
+                    val value = element.value
+                    val presentation = element.presentation
+                    val name = presentation.presentableText ?: (value as? PsiNamedElement)?.name ?: "?"
+                    val location = presentation.locationString ?: ""
 
-                // Get line number if possible
-                val lineInfo = if (value is PsiElement && document != null) {
-                    val line = document.getLineNumber(value.textOffset) + 1
-                    ":$line"
-                } else ""
+                    // Get line number if possible
+                    val lineInfo = if (value is PsiElement && document != null) {
+                        val line = document.getLineNumber(value.textOffset) + 1
+                        ":$line"
+                    } else ""
 
-                appendLine("$indent$name$lineInfo $location".trim())
+                    appendLine("$indent$name$lineInfo $location".trim())
 
-                element.children.forEach { child ->
-                    if (child is com.intellij.ide.structureView.StructureViewTreeElement) {
-                        printElement(child, "$indent  ")
+                    element.children.forEach { child ->
+                        if (child is com.intellij.ide.structureView.StructureViewTreeElement) {
+                            printElement(child, "$indent  ")
+                        }
                     }
                 }
-            }
 
-            printElement(root)
-            appendLine()
+                printElement(root)
+                appendLine()
+            } finally {
+                Disposer.dispose(model)
+            }
         }
 
         // Method 2: Direct PSI traversal

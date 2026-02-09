@@ -1,6 +1,3 @@
-import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
-import com.intellij.codeInsight.daemon.impl.HighlightInfo
-import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.codeInsight.intention.IntentionManager
 import com.intellij.codeInspection.*
 import com.intellij.codeInspection.ex.LocalInspectionToolWrapper

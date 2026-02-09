@@ -1,7 +1,5 @@
-import com.intellij.codeInsight.completion.*
-import com.intellij.codeInsight.lookup.LookupElement
+import com.intellij.codeInsight.completion.CompletionContributor
 import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiManager
 
 // Configuration - modify these for your use case
@@ -35,9 +33,6 @@ val result = readAction {
     val element = psiFile.findElementAt(offset)
         ?: psiFile.findElementAt(offset - 1)
         ?: return@readAction "No element at position ($line:$column)"
-
-    // Collect completions manually by analyzing context
-    val completions = mutableListOf<String>()
 
     // Get completion contributor for this file type
     val contributors = CompletionContributor.forLanguage(psiFile.language)

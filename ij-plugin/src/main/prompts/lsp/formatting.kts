@@ -27,25 +27,25 @@ if (error != null) {
 }
 
 if (dryRun) {
-    // For dry run, we need to work with a copy
-    val formattedPreview = readAction {
+    // For dry run, work with a copy so the original file is not modified
+    val copy = readAction {
         val virtualFile = findFile(filePath)!!
         val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-            ?: return@readAction "Cannot parse file: $filePath"
-
-        // Create a copy of the PSI file for preview
-        val copy = psiFile.copy()
-
-        val codeStyleManager = CodeStyleManager.getInstance(project)
-
-        // Format the copy (in-memory only)
-        try {
-            codeStyleManager.reformat(copy)
-            copy.text
-        } catch (e: Exception) {
-            "Error during formatting preview: ${e.message}"
-        }
+            ?: return@readAction null
+        psiFile.copy()
     }
+
+    if (copy == null) {
+        println("Cannot parse file: $filePath")
+        return
+    }
+
+    // Format the copy (reformat modifies PSI, so it needs write access)
+    writeAction {
+        CodeStyleManager.getInstance(project).reformat(copy)
+    }
+
+    val formattedPreview = readAction { copy.text }
 
     println("Format Preview")
     println("=============")
@@ -87,23 +87,22 @@ if (dryRun) {
     println("(Dry run - no changes made. Set dryRun=false to format)")
 } else {
     // Actually format the file
-    writeAction {
-        val virtualFile = findFile(filePath)!!
-        val psiFile = PsiManager.getInstance(project).findFile(virtualFile)!!
-        val document = FileDocumentManager.getInstance().getDocument(virtualFile)!!
+    val virtualFile = findFile(filePath)!!
+    val psiFile = readAction { PsiManager.getInstance(project).findFile(virtualFile) }
+        ?: return println("Cannot parse file: $filePath")
+    val document = FileDocumentManager.getInstance().getDocument(virtualFile)
+        ?: return println("Cannot get document for: $filePath")
 
+    WriteCommandAction.runWriteCommandAction(project, "Format Document", null, {
         val codeStyleManager = CodeStyleManager.getInstance(project)
+        codeStyleManager.reformat(psiFile)
+        PsiDocumentManager.getInstance(project).commitDocument(document)
+        FileDocumentManager.getInstance().saveDocument(document)
+    })
 
-        WriteCommandAction.runWriteCommandAction(project, "Format Document", null, {
-            codeStyleManager.reformat(psiFile)
-            PsiDocumentManager.getInstance(project).commitDocument(document)
-            FileDocumentManager.getInstance().saveDocument(document)
-        })
-
-        println("Format Complete")
-        println("===============")
-        println()
-        println("File: $filePath")
-        println("File has been formatted according to project code style.")
-    }
+    println("Format Complete")
+    println("===============")
+    println()
+    println("File: $filePath")
+    println("File has been formatted according to project code style.")
 }
