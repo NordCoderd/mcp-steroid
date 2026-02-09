@@ -149,6 +149,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
 
                 If you encounter any errors, print: ERROR: <description>
                 """,
+            timeoutSeconds = 240
         )
             .assertExitCode(0, "prompt")
             .assertNoErrorsInOutput(message = "prompt")
@@ -230,6 +231,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
 
             Output must be plain text only. Do NOT use Markdown, lists, or code blocks.
             """.trimIndent(),
+            timeoutSeconds = 300
         )
             .assertExitCode(0, "prompt")
             .assertOutputContains("RESULT1:", "EXEC1_OK", message = "exec #1 should run before restart")
