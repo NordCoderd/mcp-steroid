@@ -6,16 +6,8 @@ _build:
   render: always
 ---
 
-<div class="warning">
-<p><strong>A newer version is available!</strong> <a href="/release-0.87.0/">v0.87.0</a> has been released with significant improvements:</p>
-<ul>
-<li>Plugin no longer expires — the time-bomb has been removed</li>
-<li>New skills & resources system with auto-generated documentation</li>
-<li>Fix for project paths with spaces</li>
-<li>MCP session stability improvements</li>
-<li>Reduced storage noise</li>
-</ul>
-<p><strong><a href="/release-0.87.0/">Upgrade to v0.87.0 &rarr;</a></strong></p>
+<div class="success">
+<p><strong>Welcome to the MCP Steroid Preview!</strong> Congratulations on getting early access to the plugin. We're excited to have you as part of our preview program!</p>
 </div>
 
 **Release Date:** February 1, 2026
@@ -25,7 +17,7 @@ _build:
 This is an **early preview version** of MCP Steroid. Thank you for helping us test and improve the plugin!
 
 <div class="warning">
-<p><strong>Important:</strong> This preview build has expired. Please <a href="/release-0.87.0/">upgrade to v0.87.0</a>.</p>
+<p><strong>Important:</strong> This preview build will expire on <strong>February 11, 2026</strong> (10 days after release). After expiration, you'll need to obtain a new build to continue using the plugin.</p>
 </div>
 
 Note: this preview plugin is currently tested only on macOS.
