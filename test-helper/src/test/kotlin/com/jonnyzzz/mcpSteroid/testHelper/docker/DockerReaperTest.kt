@@ -201,10 +201,10 @@ class DockerReaperTest {
                 cmd = listOf("sleep", "infinity")
             )
 
-            // List containers by session filter
+            // List containers by session filter (use --no-trunc for full IDs)
             val result = processRunner.run(
                 listOf(
-                    "docker", "ps", "-q",
+                    "docker", "ps", "--no-trunc", "-q",
                     "--filter", DockerSessionLabels.createSessionFilter()
                 ),
                 description = "List session containers",
