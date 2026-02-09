@@ -4,7 +4,6 @@ package com.jonnyzzz.mcpSteroid.integration
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Timeout
@@ -36,6 +35,8 @@ class KeycloakArchitectureTest {
             appendLine()
             appendLine("You MUST use steroid_execute_code to search and navigate the code.")
             appendLine("Do NOT rely on general knowledge — find actual file paths and class names in the project.")
+            appendLine("After your first steroid_execute_code call, include this in your final response:")
+            appendLine("TOOL_EVIDENCE: <copy the line starting with Execution ID: ...>")
             appendLine()
             appendLine("At the end, output these markers on separate lines:")
             appendLine("AUTH_FLOW_FOUND: yes")
@@ -47,8 +48,8 @@ class KeycloakArchitectureTest {
 
         val combined = result.output + "\n" + result.stderr
 
-        // Agent must have used MCP Steroid execute_code tool
-        result.assertOutputContains("steroid_execute_code", message = "agent must use steroid_execute_code")
+        // Agent must show evidence of MCP Steroid execute_code usage
+        assertUsedExecuteCodeEvidence(combined)
 
         // Agent must mention authentication-related Keycloak concepts
         val authPatterns = listOf(
@@ -87,6 +88,8 @@ class KeycloakArchitectureTest {
             appendLine()
             appendLine("You MUST use steroid_execute_code to search and navigate the code.")
             appendLine("Do NOT rely on general knowledge — find actual file paths in the project.")
+            appendLine("After your first steroid_execute_code call, include this in your final response:")
+            appendLine("TOOL_EVIDENCE: <copy the line starting with Execution ID: ...>")
             appendLine()
             appendLine("At the end, output these markers on separate lines:")
             appendLine("MODULE_STRUCTURE_FOUND: yes")
@@ -98,8 +101,8 @@ class KeycloakArchitectureTest {
 
         val combined = result.output + "\n" + result.stderr
 
-        // Agent must have used MCP Steroid execute_code tool
-        result.assertOutputContains("steroid_execute_code", message = "agent must use steroid_execute_code")
+        // Agent must show evidence of MCP Steroid execute_code usage
+        assertUsedExecuteCodeEvidence(combined)
 
         // Agent must mention token/OIDC-related concepts
         val tokenPatterns = listOf(
@@ -144,6 +147,8 @@ class KeycloakArchitectureTest {
             appendLine()
             appendLine("You MUST use steroid_execute_code to search and navigate the code.")
             appendLine("Do NOT rely on general knowledge — find actual file paths and class names in the project.")
+            appendLine("After your first steroid_execute_code call, include this in your final response:")
+            appendLine("TOOL_EVIDENCE: <copy the line starting with Execution ID: ...>")
             appendLine()
             appendLine("At the end, output these markers on separate lines:")
             appendLine("SPI_FOUND: yes")
@@ -155,8 +160,8 @@ class KeycloakArchitectureTest {
 
         val combined = result.output + "\n" + result.stderr
 
-        // Agent must have used MCP Steroid execute_code tool
-        result.assertOutputContains("steroid_execute_code", message = "agent must use steroid_execute_code")
+        // Agent must show evidence of MCP Steroid execute_code usage
+        assertUsedExecuteCodeEvidence(combined)
 
         // Agent must mention SPI-related concepts
         val spiPatterns = listOf(
@@ -179,6 +184,24 @@ class KeycloakArchitectureTest {
         }
 
         println("[TEST] Agent '$agentName' successfully investigated the SPI architecture")
+    }
+
+    private fun assertUsedExecuteCodeEvidence(combined: String) {
+        val toolEvidencePatterns = listOf(
+            "Execution ID:",
+            "execution_id:",
+            "tool mcp-steroid.steroid_execute_code",
+            "steroid_execute_code(",
+            "TOOL_EVIDENCE:"
+        )
+
+        val hasToolEvidence = toolEvidencePatterns.any { pattern ->
+            combined.contains(pattern, ignoreCase = true)
+        }
+        check(hasToolEvidence) {
+            "Agent must show evidence of steroid_execute_code usage.\n" +
+                    "Expected one of: $toolEvidencePatterns\nOutput:\n$combined"
+        }
     }
 
     companion object {

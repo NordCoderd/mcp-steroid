@@ -52,6 +52,8 @@ class DebuggerDemoTest {
             appendLine("7. Identify the root cause of the bug")
             appendLine()
             appendLine("Use ONLY steroid_execute_code (no screenshots or UI interaction).")
+            appendLine("After your first steroid_execute_code call, include this in your final response:")
+            appendLine("TOOL_EVIDENCE: <copy the line starting with Execution ID: ...>")
             appendLine()
             appendLine("At the end of your analysis, output these markers on separate lines:")
             appendLine("BUG_FOUND: yes")
@@ -65,8 +67,8 @@ class DebuggerDemoTest {
 
         val combined = result.output + "\n" + result.stderr
 
-        // Agent must have used MCP Steroid execute_code tool
-        result.assertOutputContains("steroid_execute_code", message = "agent must use steroid_execute_code")
+        // Agent must show evidence of MCP Steroid execute_code usage
+        assertUsedExecuteCodeEvidence(combined)
 
         // Agent must mention sortedByDescending in its analysis
         result.assertOutputContains("sortedByDescending", message = "agent must mention sortedByDescending")
@@ -86,6 +88,25 @@ class DebuggerDemoTest {
         }
 
         println("[TEST] Agent '$agentName' successfully identified the sortedByDescending bug")
+    }
+
+    private fun assertUsedExecuteCodeEvidence(combined: String) {
+        val toolEvidencePatterns = listOf(
+            "Execution ID:",
+            "execution_id:",
+            "tool mcp-steroid.steroid_execute_code",
+            "steroid_execute_code(",
+            "TOOL_EVIDENCE:"
+        )
+
+        val hasToolEvidence = toolEvidencePatterns.any { pattern ->
+            combined.contains(pattern, ignoreCase = true)
+        }
+
+        check(hasToolEvidence) {
+            "Agent must show evidence of steroid_execute_code usage.\n" +
+                    "Expected one of: $toolEvidencePatterns\nOutput:\n$combined"
+        }
     }
 
     companion object {
