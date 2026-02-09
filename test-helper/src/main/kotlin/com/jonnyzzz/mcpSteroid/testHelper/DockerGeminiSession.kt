@@ -64,6 +64,8 @@ class DockerGeminiSession(
     }
 
     companion object : AIAgentCompanion<DockerGeminiSession>("gemini-cli") {
+        const val DISPLAY_NAME = "Gemini"
+
         override fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
             val keyFile = File(System.getProperty("user.home"), ".vertex")

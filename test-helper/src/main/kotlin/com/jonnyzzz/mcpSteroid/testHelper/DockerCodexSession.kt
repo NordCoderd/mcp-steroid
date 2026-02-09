@@ -76,6 +76,8 @@ class DockerCodexSession(
     }
 
     companion object : AIAgentCompanion<DockerCodexSession>("codex-cli") {
+        const val DISPLAY_NAME = "Codex"
+
         override fun readApiKey(): String {
             System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
             val keyFile = File(System.getProperty("user.home"), ".openai")

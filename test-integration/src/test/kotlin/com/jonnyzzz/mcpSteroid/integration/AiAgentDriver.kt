@@ -16,6 +16,11 @@ class AiAgentDriver(
         scope.withGuestWorkDir(intellijDriver.getGuestProjectDir())
     }
 
+    private fun scopeForAgent(windowTitle: String): ContainerDriver {
+        val base = scope
+        return (base as? VisibleConsoleContainerDriver)?.withConsoleTitle(windowTitle) ?: base
+    }
+
     /** Host port mapped to the MCP Steroid server inside the container. */
     val mcpSteroidHostPort: Int
         get() = scope.mapContainerPortToHostPort(IntelliJDriver.MCP_STEROID_PORT)
@@ -52,9 +57,9 @@ class AiAgentDriver(
     }
 
     private val agentFactories: Map<String, () -> AiAgentSession> = mapOf(
-        "claude" to { prepareAIAgent(DockerClaudeSession.create(scope)) },
-        "codex" to { prepareAIAgent(DockerCodexSession.create(scope)) },
-        "gemini" to { prepareAIAgent(DockerGeminiSession.create(scope)) },
+        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME))) },
+        "codex" to { prepareAIAgent(DockerCodexSession.create(scopeForAgent(DockerCodexSession.DISPLAY_NAME))) },
+        "gemini" to { prepareAIAgent(DockerGeminiSession.create(scopeForAgent(DockerGeminiSession.DISPLAY_NAME))) },
     )
 
     fun waitForMcpReady() {

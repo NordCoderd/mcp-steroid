@@ -84,6 +84,8 @@ class DockerClaudeSession(
     }
 
     companion object : AIAgentCompanion<DockerClaudeSession>("claude-cli") {
+        const val DISPLAY_NAME = "Claude Code"
+
         override fun readApiKey(): String {
             System.getenv("ANTHROPIC_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
             val keyFile = File(System.getProperty("user.home"), ".anthropic")
