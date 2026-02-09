@@ -1,11 +1,9 @@
 import com.intellij.codeInsight.completion.CompletionContributor
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiManager
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.kt"  // TODO: Set your file path
-val line = 10      // 1-based line number
-val column = 15    // 1-based column number (position where completion is triggered)
+val line = 10      // TODO: 1-based line number
+val column = 15    // TODO: 1-based column number (position where completion is triggered)
 val maxResults = 20  // Maximum number of results to return
 
 

@@ -1,7 +1,4 @@
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.*
 import com.intellij.psi.search.PsiShortNamesCache
-
 
 // Helper function for camelCase matching
 fun matchesQuery(name: String, query: String): Boolean {
@@ -19,7 +16,7 @@ fun matchesQuery(name: String, query: String): Boolean {
 
 // Configuration - modify these for your use case
 val query = "Main"      // TODO: Set your search query
-val searchType = "class"  // "class", "symbol", or "file"
+val searchType = "class"  // TODO: "class", "symbol", or "file"
 val maxResults = 20
 
 

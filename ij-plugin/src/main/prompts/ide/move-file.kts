@@ -1,8 +1,3 @@
-import com.intellij.openapi.application.writeIntentReadAction
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiDirectory
-import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiManager
 import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesProcessor
 
 data class MoveData(

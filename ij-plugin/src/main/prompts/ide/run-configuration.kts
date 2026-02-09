@@ -2,8 +2,6 @@ import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.ExecutorRegistry
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 // Configuration - modify these for your use case
 val runConfigName = ""  // Leave empty to list only

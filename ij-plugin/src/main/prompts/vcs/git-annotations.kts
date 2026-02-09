@@ -1,6 +1,5 @@
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
-import com.intellij.openapi.vfs.LocalFileSystem
 
 // Configure: path to the file you want to annotate
 val filePath = project.basePath + "/src/main/kotlin/com/example/MyClass.kt"

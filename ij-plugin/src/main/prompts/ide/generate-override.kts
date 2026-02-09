@@ -1,11 +1,5 @@
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.psi.PsiClass
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiMethod
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.TypeConversionUtil
-import com.intellij.psi.PsiSubstitutor
 import com.intellij.codeInsight.generation.GenerateMembersUtil
 import com.intellij.codeInsight.generation.OverrideImplementUtil
 

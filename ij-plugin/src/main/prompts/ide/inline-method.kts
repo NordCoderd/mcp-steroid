@@ -1,17 +1,10 @@
-import com.intellij.openapi.application.writeIntentReadAction
-import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiMethod
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.inline.InlineMethodProcessor
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.java" // TODO: Set your file path
-val line = 10     // 1-based line number
-val column = 15   // 1-based column number
+val line = 10     // TODO: 1-based line number
+val column = 15   // TODO: 1-based column number
 val inlineThisOnly = false
 val deleteDeclaration = true
 val dryRun = true

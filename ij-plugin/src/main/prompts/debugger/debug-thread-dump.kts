@@ -1,9 +1,7 @@
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.frame.XExecutionStack
 import com.intellij.xdebugger.frame.XStackFrame
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
-
 
 val session = XDebuggerManager.getInstance(project).currentSession
     ?: error("No debug session. Start one first.")

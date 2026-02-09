@@ -1,9 +1,3 @@
-import com.intellij.openapi.application.writeIntentReadAction
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.JavaPsiFacade
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiMethod
-import com.intellij.psi.PsiType
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.changeSignature.ChangeSignatureProcessor
 import com.intellij.refactoring.changeSignature.ParameterInfoImpl
@@ -17,11 +11,11 @@ data class MethodData(
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.java" // TODO: Set your file path
-val line = 10     // 1-based line number
-val column = 15   // 1-based column number
-val newParameterName = "extra"
-val newParameterType = "int"
-val newParameterDefaultValue = "0"
+val line = 10     // TODO: 1-based line number
+val column = 15   // TODO: 1-based column number
+val newParameterName = "extra"  // TODO: Set parameter name
+val newParameterType = "int"  // TODO: Set parameter type
+val newParameterDefaultValue = "0"  // TODO: Set default value
 val dryRun = true
 
 

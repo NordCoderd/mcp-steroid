@@ -1,8 +1,5 @@
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.codeInsight.generation.GenerateMembersUtil
-import com.intellij.psi.PsiDocumentManager
 
 // Configuration - modify these for your use case
 val classFqn = "com.example.Sample" // TODO: Set class FQN

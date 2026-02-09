@@ -1,8 +1,3 @@
-import com.intellij.openapi.application.writeIntentReadAction
-import com.intellij.psi.JavaPsiFacade
-import com.intellij.psi.PsiField
-import com.intellij.psi.PsiMember
-import com.intellij.psi.PsiMethod
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.refactoring.memberPullUp.PullUpProcessor
 import com.intellij.refactoring.util.DocCommentPolicy

@@ -9,13 +9,9 @@ import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
 import com.intellij.execution.ui.RunContentManager
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.xdebugger.XDebuggerManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.withContext
 
-
-val configurationName = "DemoTestByJonnyzzz (Debug)"
-val testClass = "com.jonnyzzz.mcpSteroid.ocr.DemoTestByJonnyzzz"
+val configurationName = "DemoTestByJonnyzzz (Debug)"  // TODO: Set your run configuration name
+val testClass = "com.jonnyzzz.mcpSteroid.ocr.DemoTestByJonnyzzz"  // TODO: Set your test class FQN
 
 val runManager = RunManager.getInstance(project)
 val settings = runManager.allSettings.firstOrNull { it.name == configurationName }

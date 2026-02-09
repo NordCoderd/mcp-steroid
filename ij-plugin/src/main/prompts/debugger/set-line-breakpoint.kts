@@ -1,14 +1,10 @@
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.xdebugger.breakpoints.XLineBreakpoint
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerUtil
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.nio.file.Paths
 
-
 val filePath = "src/main/kotlin/com/jonnyzzz/mcpSteroid/execution/ExecutionManager.kt"
-val lineNumberInEditor = 49
+val lineNumberInEditor = 49  // TODO: Set your value
 
 val projectRoot = project.basePath ?: error("Project basePath is null")
 val absolutePath = Paths.get(projectRoot, filePath).toString()

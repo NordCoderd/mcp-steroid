@@ -1,13 +1,10 @@
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiMethod
 import com.intellij.psi.search.searches.MethodReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.java" // TODO: Set your file path
-val line = 10     // 1-based line number
-val column = 15   // 1-based column number
+val line = 10     // TODO: 1-based line number
+val column = 15   // TODO: 1-based column number
 val maxResults = 20
 
 

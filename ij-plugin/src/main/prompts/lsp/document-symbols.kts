@@ -1,8 +1,6 @@
 import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.lang.LanguageStructureViewBuilder
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Disposer
-import com.intellij.psi.*
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.kt"  // TODO: Set your file path

@@ -2,11 +2,9 @@ import com.intellij.execution.RunManager
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.executors.DefaultRunExecutor
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 // Configuration - CUSTOMIZE THIS
-val configurationName = "All Tests"  // Change to your test config name
+val configurationName = "All Tests"  // TODO: Change to your test config name
 val executorId = DefaultRunExecutor.EXECUTOR_ID  // or DefaultDebugExecutor.EXECUTOR_ID
 
 

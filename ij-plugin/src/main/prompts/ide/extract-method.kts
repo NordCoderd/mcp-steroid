@@ -1,19 +1,12 @@
-import com.intellij.openapi.application.writeIntentReadAction
-import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiStatement
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.extractMethod.ExtractMethodHandler
 import com.intellij.refactoring.extractMethod.ExtractMethodProcessor
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.java" // TODO: Set your file path
-val startLine = 10 // 1-based start line of selection
-val endLine = 12   // 1-based end line of selection
-val newMethodName = "extractedMethod"
+val startLine = 10 // TODO: 1-based start line of selection
+val endLine = 12   // TODO: 1-based end line of selection
+val newMethodName = "extractedMethod"  // TODO: Set the new method name
 val dryRun = true
 
 

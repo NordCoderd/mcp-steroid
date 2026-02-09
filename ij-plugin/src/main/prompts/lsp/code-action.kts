@@ -1,16 +1,13 @@
 import com.intellij.codeInsight.intention.IntentionManager
 import com.intellij.codeInspection.*
 import com.intellij.codeInspection.ex.LocalInspectionToolWrapper
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.profile.codeInspection.InspectionProjectProfileManager
-import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.psi.PsiErrorElement
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.kt"  // TODO: Set your file path
-val line = 10      // 1-based line number
-val column = 15    // 1-based column number
+val line = 10      // TODO: 1-based line number
+val column = 15    // TODO: 1-based column number
 
 
 // Find the virtual file

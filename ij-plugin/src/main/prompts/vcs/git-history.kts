@@ -1,5 +1,4 @@
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
-import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.vcsUtil.VcsUtil
 
 // Configure: path to the file you want history for

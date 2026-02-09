@@ -1,13 +1,9 @@
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.util.PsiTreeUtil
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.kt"  // TODO: Set your file path
-val line = 10      // 1-based line number
-val column = 15    // 1-based column number
+val line = 10      // TODO: 1-based line number
+val column = 15    // TODO: 1-based column number
 
 
 val result = readAction {

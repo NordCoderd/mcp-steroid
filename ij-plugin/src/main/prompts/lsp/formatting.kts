@@ -1,7 +1,3 @@
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 
 // Configuration - modify these for your use case

@@ -1,10 +1,3 @@
-import com.intellij.openapi.application.writeIntentReadAction
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.psi.JavaDirectoryService
-import com.intellij.psi.JavaPsiFacade
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiManager
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.refactoring.extractInterface.ExtractInterfaceProcessor
 import com.intellij.refactoring.util.DocCommentPolicy
@@ -12,9 +5,9 @@ import com.intellij.refactoring.util.classMembers.MemberInfo
 
 // Configuration - modify these for your use case
 val sourceClassFqn = "com.example.Source" // TODO: Set class FQN
-val interfaceName = "NewInterface"
+val interfaceName = "NewInterface"  // TODO: Set interface name
 val targetDirPath = "/path/to/target/dir" // TODO: Set target directory
-val memberName = "methodToExtract"
+val memberName = "methodToExtract"  // TODO: Set member name
 val dryRun = true
 
 

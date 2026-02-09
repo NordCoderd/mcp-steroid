@@ -1,12 +1,10 @@
 import com.intellij.lang.parameterInfo.LanguageParameterInfo
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.*
 import com.intellij.psi.util.PsiTreeUtil
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.kt"  // TODO: Set your file path
-val line = 10      // 1-based line number (inside function call)
-val column = 20    // 1-based column number (inside parentheses)
+val line = 10      // TODO: 1-based line number (inside function call)
+val column = 20    // TODO: 1-based column number (inside parentheses)
 
 
 val result = readAction {

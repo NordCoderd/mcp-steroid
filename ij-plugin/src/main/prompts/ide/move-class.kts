@@ -1,6 +1,3 @@
-import com.intellij.openapi.application.writeIntentReadAction
-import com.intellij.psi.JavaPsiFacade
-import com.intellij.psi.PsiManager
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.refactoring.PackageWrapper
 import com.intellij.refactoring.move.moveClassesOrPackages.MoveClassesOrPackagesProcessor

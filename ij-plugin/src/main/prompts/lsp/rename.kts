@@ -1,9 +1,3 @@
-import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiNamedElement
-import com.intellij.psi.PsiReference
 import com.intellij.psi.search.LocalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
@@ -11,8 +5,8 @@ import com.intellij.refactoring.rename.RenamePsiElementProcessor
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.kt"  // TODO: Set your file path
-val line = 10      // 1-based line number where symbol is defined
-val column = 15    // 1-based column number
+val line = 10      // TODO: 1-based line number where symbol is defined
+val column = 15    // TODO: 1-based column number
 val newName = "newSymbolName"  // TODO: Set the new name
 val dryRun = true  // Set to false to actually perform the rename
 

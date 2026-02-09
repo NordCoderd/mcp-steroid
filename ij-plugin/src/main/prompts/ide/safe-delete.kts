@@ -1,15 +1,11 @@
-import com.intellij.openapi.application.writeIntentReadAction
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiNamedElement
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.safeDelete.SafeDeleteProcessor
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.java" // TODO: Set your file path
-val line = 10     // 1-based line number
-val column = 15   // 1-based column number
+val line = 10     // TODO: 1-based line number
+val column = 15   // TODO: 1-based column number
 val dryRun = true
 
 

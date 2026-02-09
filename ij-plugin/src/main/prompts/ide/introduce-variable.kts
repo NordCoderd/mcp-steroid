@@ -1,17 +1,9 @@
-import com.intellij.openapi.editor.EditorFactory
-import com.intellij.openapi.fileEditor.FileDocumentManager
-import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiExpression
-import com.intellij.psi.PsiManager
-import com.intellij.psi.PsiType
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.introduceVariable.IntroduceVariableBase
 import com.intellij.refactoring.introduceVariable.IntroduceVariableHandler
 import com.intellij.refactoring.introduceVariable.IntroduceVariableSettings
 import com.intellij.refactoring.introduceVariable.InputValidator
 import com.intellij.refactoring.ui.TypeSelectorManagerImpl
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 data class ExpressionData(
     val expression: PsiExpression,
@@ -22,9 +14,9 @@ data class ExpressionData(
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.java" // TODO: Set your file path
-val line = 10     // 1-based line number
-val column = 15   // 1-based column number
-val newVariableName = "extracted"
+val line = 10     // TODO: 1-based line number
+val column = 15   // TODO: 1-based column number
+val newVariableName = "extracted"  // TODO: Set the variable name
 val dryRun = true
 
 
