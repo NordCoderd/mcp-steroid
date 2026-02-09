@@ -8,17 +8,18 @@ import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 
 class AiAgentDriver(
-    scope: ContainerDriver,
+    container: ContainerDriver,
     val intellijDriver: IntelliJDriver,
-    val connectMcpSteroid: Boolean = true
+    val connectMcpSteroid: Boolean = true,
+    private val xcvbDriver: XcvbDriver,
 ) {
     private val scope by lazy {
-        scope.withGuestWorkDir(intellijDriver.getGuestProjectDir())
+        container.withGuestWorkDir(intellijDriver.getGuestProjectDir())
     }
 
     private fun scopeForAgent(windowTitle: String): ContainerDriver {
         val base = scope
-        return (base as? VisibleConsoleContainerDriver)?.withConsoleTitle(windowTitle) ?: base
+        return xcvbDriver.wrapForAgentConsole(base, windowTitle)
     }
 
     /** Host port mapped to the MCP Steroid server inside the container. */

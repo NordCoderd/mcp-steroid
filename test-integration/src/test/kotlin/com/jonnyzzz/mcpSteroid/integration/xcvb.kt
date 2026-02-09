@@ -219,13 +219,30 @@ class XcvbDriver(
 
         val layoutThread = thread(start = true, isDaemon = true, name = "xcvb-ide-layout") {
             runCatching {
-                val positioned = waitForWindowAndPlace(
+                val initialWindowId = waitForWindowIdByPatterns(
                     titlePatterns = titlePatterns,
-                    rect = IDE_WINDOW_RECT,
                     timeoutMs = 120_000L,
-                )
-                if (!positioned) {
+                ) ?: run {
                     println("[xcvb] WARNING: failed to place IntelliJ window to left half")
+                    return@runCatching
+                }
+                var windowId: String = initialWindowId
+
+                while (!Thread.currentThread().isInterrupted) {
+                    val placed = applyWindowRect(windowId, IDE_WINDOW_RECT)
+                    if (!placed) {
+                        windowId = waitForWindowIdByPatterns(
+                            titlePatterns = titlePatterns,
+                            timeoutMs = 10_000L,
+                        ) ?: break
+                        continue
+                    }
+                    // Keep IntelliJ above all windows during recording.
+                    runDriverCommand(
+                        listOf("xdotool", "windowraise", windowId),
+                        timeoutSeconds = 5,
+                    )
+                    Thread.sleep(400)
                 }
             }.onFailure { t ->
                 println("[xcvb] WARNING: IntelliJ layout setup failed: ${t.message}")
@@ -261,8 +278,8 @@ class XcvbDriver(
             "xterm",
             "-title", title,
             "-geometry", geometry,
-            "-fa", "JetBrains Mono",
-            "-fs", "11",
+            "-fa", "JetBrains Mono:style=Bold",
+            "-fs", "22",
             "-bg", "black",
             "-fg", "white",
             "-e",
@@ -312,6 +329,22 @@ class XcvbDriver(
         windowRect: WindowRect? = null,
     ): ContainerDriver {
         return VisibleConsoleContainerDriver(delegate, this, title, geometry, windowRect)
+    }
+
+    /**
+     * Wrap a container driver so commands can be shown in the right-side
+     * demo console area for a specific agent.
+     */
+    fun wrapForAgentConsole(
+        delegate: ContainerDriver,
+        title: String,
+    ): ContainerDriver {
+        return withVisibleConsole(
+            delegate = delegate,
+            title = title,
+            geometry = AGENT_CONSOLE_GEOMETRY,
+            windowRect = AGENT_CONSOLE_RECT,
+        )
     }
 
     // ── Input control via xdotool ──────────────────────────────────────
@@ -447,6 +480,21 @@ class XcvbDriver(
         return result.output.lineSequence()
             .map { it.trim() }
             .firstOrNull { it.isNotEmpty() }
+    }
+
+    private fun waitForWindowIdByPatterns(
+        titlePatterns: List<String>,
+        timeoutMs: Long,
+    ): String? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            for (pattern in titlePatterns) {
+                val windowId = findFirstWindowIdByName(pattern) ?: continue
+                if (windowId.isNotBlank()) return windowId
+            }
+            Thread.sleep(250)
+        }
+        return null
     }
 
     private fun applyWindowRect(windowId: String, rect: WindowRect): Boolean {

@@ -49,6 +49,12 @@ class VisibleConsoleContainerDriver(
         timeoutSeconds: Long,
         extraEnvVars: Map<String, String>,
     ): ProcessResult {
+        val showConsole = shouldShowConsole(extraEnvVars)
+        val forwardedEnv = extraEnvVars - ENABLE_CONSOLE_ENV
+        if (!showConsole) {
+            return delegate.runInContainer(args, workingDir, timeoutSeconds, forwardedEnv)
+        }
+
         val idx = counter.incrementAndGet()
         val logFile = "/tmp/visible-console-$idx.log"
 
@@ -66,7 +72,7 @@ class VisibleConsoleContainerDriver(
                 "bash", "-c",
                 "${escapeForBash(args)} 2>&1 | tee -a $logFile; exit \${PIPESTATUS[0]}",
             )
-            return delegate.runInContainer(wrappedArgs, workingDir, timeoutSeconds, extraEnvVars)
+            return delegate.runInContainer(wrappedArgs, workingDir, timeoutSeconds, forwardedEnv)
         } finally {
             // Give xterm a moment to display the final output
             Thread.sleep(500)
@@ -80,7 +86,11 @@ class VisibleConsoleContainerDriver(
         workingDir: String?,
         extraEnvVars: Map<String, String>,
     ): RunningContainerProcess {
-        val proc = delegate.runInContainerDetached(args, workingDir, extraEnvVars)
+        val showConsole = shouldShowConsole(extraEnvVars)
+        val forwardedEnv = extraEnvVars - ENABLE_CONSOLE_ENV
+        val proc = delegate.runInContainerDetached(args, workingDir, forwardedEnv)
+
+        if (!showConsole) return proc
 
         // Open an xterm that tails the detached process stdout
         xcvb.runInVisibleConsole(
@@ -109,10 +119,19 @@ class VisibleConsoleContainerDriver(
         "VisibleConsole($delegate)"
 
     companion object {
+        const val ENABLE_CONSOLE_ENV = "MCP_STEROID_VISIBLE_CONSOLE"
+
         private fun escapeForBash(args: List<String>): String {
             return args.joinToString(" ") { arg ->
                 "'" + arg.replace("'", "'\\''") + "'"
             }
+        }
+
+        private fun shouldShowConsole(extraEnvVars: Map<String, String>): Boolean {
+            val raw = extraEnvVars[ENABLE_CONSOLE_ENV] ?: return false
+            return raw.equals("1", ignoreCase = true) ||
+                    raw.equals("true", ignoreCase = true) ||
+                    raw.equals("yes", ignoreCase = true)
         }
     }
 }
