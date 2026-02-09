@@ -34,7 +34,7 @@
   <ellipse cx="960" cy="1240" rx="1100" ry="700" fill="url(#glowLeft)"/>
   <ellipse cx="2880" cy="920" rx="1080" ry="680" fill="url(#glowRight)"/>
 
-  <g transform="translate(1440, 600)">
+  <g transform="translate(960, 200) scale(2.0)">
     <!-- Logo Circle with Shadow -->
     <circle cx="480" cy="400" r="280" fill="white" filter="url(#logoShadow)"/>
 
