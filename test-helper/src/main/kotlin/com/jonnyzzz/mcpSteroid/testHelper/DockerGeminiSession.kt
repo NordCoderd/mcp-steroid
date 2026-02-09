@@ -14,22 +14,6 @@ class DockerGeminiSession(
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
-    private fun buildAgentEnv(visibleConsole: Boolean): Map<String, String> {
-        return buildMap {
-            put("GEMINI_API_KEY", apiKey)
-            put("GOOGLE_API_KEY", apiKey)
-            if (debug) {
-                put("GEMINI_DEBUG", "1")
-                put("MCP_DEBUG", "1")
-                put("DEBUG", "*")
-            }
-            if (visibleConsole) {
-                put(VISIBLE_CONSOLE_ENV, "1")
-            }
-            put("RUNS_DIR", "/tmp/agent-runs")
-            put("MESSAGE_BUS", "/tmp/MESSAGE-BUS.md")
-        }
-    }
 
     override fun registerMcp(mcpUrl: String, mcpName: String) : AiAgentSession {
         var command = geminiMcpAddCommand(mcpUrl, mcpName)
@@ -37,9 +21,6 @@ class DockerGeminiSession(
 
         require(command[0] == "gemini")
         command = command.drop(1)
-        command += "--scope"
-        command += "user"
-        command += "--trust"
 
         runInContainer(args = command.toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
@@ -48,11 +29,7 @@ class DockerGeminiSession(
         return this
     }
 
-    fun runInContainer(
-        vararg args: String,
-        timeoutSeconds: Long = 120,
-        visibleConsole: Boolean = false,
-    ): ProcessResult {
+    fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
         val geminiArgs = buildList {
             add("gemini")
             if (debug) {
@@ -60,10 +37,19 @@ class DockerGeminiSession(
             }
             addAll(args.toList())
         }
+        val env = buildMap {
+            put("GEMINI_API_KEY", apiKey)
+            if (debug) {
+                put("GEMINI_DEBUG", "1")
+                put("MCP_DEBUG", "1")
+                put("DEBUG", "*")
+            }
+        }
+
         return session.runInContainer(
             args = geminiArgs,
             timeoutSeconds = timeoutSeconds,
-            extraEnvVars = buildAgentEnv(visibleConsole = visibleConsole),
+            extraEnvVars = env
         )
     }
 
@@ -71,25 +57,21 @@ class DockerGeminiSession(
         return runInContainer(
             "--yolo", // Auto-approve all tool calls
             prompt,
-            visibleConsole = true,
             timeoutSeconds = timeoutSeconds
         )
     }
 
     companion object : AIAgentCompanion<DockerGeminiSession>("gemini-cli") {
         const val DISPLAY_NAME = "Gemini"
-        private const val VISIBLE_CONSOLE_ENV = "MCP_STEROID_VISIBLE_CONSOLE"
 
         override fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
-            listOf(".vertes", ".vertex").forEach { filename ->
-                val keyFile = File(System.getProperty("user.home"), filename)
-                if (keyFile.exists()) {
-                    val content = keyFile.readText().trim()
-                    if (content.isNotBlank()) return content
-                }
+            val keyFile = File(System.getProperty("user.home"), ".vertex")
+            if (keyFile.exists()) {
+                val content = keyFile.readText().trim()
+                if (content.isNotBlank()) return content
             }
-            error("GEMINI_API_KEY required (set env or ~/.vertes or ~/.vertex)")
+            error("GEMINI_API_KEY required (set env or ~/.vertex)")
         }
 
         override fun createImpl(

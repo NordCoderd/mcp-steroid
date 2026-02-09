@@ -18,23 +18,6 @@ class DockerCodexSession(
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
-    private fun buildAgentEnv(visibleConsole: Boolean): Map<String, String> {
-        return buildMap {
-            put("OPENAI_API_KEY", apiKey)
-            put("CODEX_API_KEY", apiKey)
-
-            if (debug) {
-                put("CODEX_DEBUG", "1")
-                put("MCP_DEBUG", "1")
-                put("DEBUG", "*")
-            }
-            if (visibleConsole) {
-                put(VISIBLE_CONSOLE_ENV, "1")
-            }
-            put("RUNS_DIR", "/tmp/agent-runs")
-            put("MESSAGE_BUS", "/tmp/MESSAGE-BUS.md")
-        }
-    }
 
     override fun registerMcp(mcpUrl: String, mcpName: String) : AiAgentSession{
         var command = codexMcpAddCommand(mcpUrl, mcpName)
@@ -53,19 +36,24 @@ class DockerCodexSession(
      * Run a codex command inside the Docker container.
      * Note: Codex doesn't support --verbose flag like Claude does.
      */
-    fun runInContainer(
-        vararg args: String,
-        timeoutSeconds: Long = 120,
-        visibleConsole: Boolean = false,
-    ): ProcessResult {
+    fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
         val codexArgs = buildList {
             add("codex")
             addAll(args.toList())
         }
+        val extraEnvVars = buildMap {
+            put("OPENAI_API_KEY", apiKey)
+            put("CODEX_API_KEY", apiKey)
+
+            if (debug) {
+                put("CODEX_DEBUG", "1")
+                put("MCP_DEBUG", "1")
+                put("DEBUG", "*")
+            }
+        }
         return session.runInContainer(
             codexArgs,
-            timeoutSeconds = timeoutSeconds,
-            extraEnvVars = buildAgentEnv(visibleConsole = visibleConsole),
+            timeoutSeconds = timeoutSeconds, extraEnvVars = extraEnvVars
         )
     }
 
@@ -84,7 +72,6 @@ class DockerCodexSession(
 
         return runInContainer(
             *codexArgs.toTypedArray(),
-            visibleConsole = true,
             timeoutSeconds = timeoutSeconds
         )
     }

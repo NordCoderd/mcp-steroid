@@ -1,6 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.aiAgents
 
+import kotlin.collections.plus
+
 private const val DEFAULT_SERVER_NAME = "mcp-steroid"
 
 fun genericMcpServersJson(serverUrl: String, serverName: String = DEFAULT_SERVER_NAME) = buildString {
@@ -15,7 +17,7 @@ fun genericMcpServersJson(serverUrl: String, serverName: String = DEFAULT_SERVER
 }
 
 fun geminiMcpAddCommand(serverUrl: String, serverName: String = DEFAULT_SERVER_NAME): String {
-    return "gemini mcp add $serverName --type http $serverUrl"
+    return "gemini mcp add $serverName --type http $serverUrl --scope user --trust"
 }
 
 fun codexMcpAddCommand(serverUrl: String, serverName: String = DEFAULT_SERVER_NAME): String {
