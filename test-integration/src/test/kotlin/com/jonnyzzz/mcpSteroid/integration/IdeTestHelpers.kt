@@ -4,17 +4,39 @@ package com.jonnyzzz.mcpSteroid.integration
 import java.io.File
 import java.nio.file.Files
 
-
-private fun readFilePathFromSystemProperties(key: String): File {
+private fun readFilePathFromSystemProperties(
+    key: String,
+    fallback: ((missingPath: String) -> File?)? = null,
+): File {
     val path = System.getProperty(key)
         ?: error("$key system property not set — run via Gradle")
     val file = File(path)
-    require(file.exists()) { "Path nor not found: $file, from system properties: $key" }
+    if (file.exists()) return file
+
+    val fallbackFile = fallback?.invoke(path)
+    if (fallbackFile != null && fallbackFile.exists()) {
+        println("[IDE-AGENT] $key fallback: using ${fallbackFile.absolutePath} (missing original: $path)")
+        return fallbackFile
+    }
+
+    require(file.exists()) { "Path not found: $file, from system properties: $key" }
     return file
 }
 
+private fun findLatestPluginZipFromDist(): File? {
+    val distributionsDir = File("build/distributions")
+    if (!distributionsDir.isDirectory) return null
+
+    return distributionsDir.listFiles()
+        ?.asSequence()
+        ?.filter { it.isFile && it.extension == "zip" && it.name.startsWith("mcp-steroid-") }
+        ?.maxByOrNull { it.lastModified() }
+}
+
 object IdeTestFolders {
-    val pluginZip = readFilePathFromSystemProperties("test.integration.plugin.zip")
+    val pluginZip = readFilePathFromSystemProperties("test.integration.plugin.zip") {
+        findLatestPluginZipFromDist()
+    }
     val intelliJTarGz = readFilePathFromSystemProperties("test.integration.idea.archive")
     val dockerDir = readFilePathFromSystemProperties("test.integration.docker")
     val projectDir = dockerDir

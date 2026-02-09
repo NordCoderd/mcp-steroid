@@ -3,9 +3,11 @@ package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jonnyzzz.mcpSteroid.TestResultBuilder
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import kotlinx.serialization.json.buildJsonObject
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Tests for McpScriptContext implementation.
@@ -134,5 +136,18 @@ class McpScriptContextTest : BasePlatformTestCase() {
         Disposer.dispose(context.disposable)
 
         assertTrue("Should be disposed after dispose()", context.isDisposed)
+    }
+
+    fun testFindProjectFilesByGlob(): Unit = timeoutRunBlocking(30.seconds) {
+        val (context, _) = createContext()
+
+        myFixture.addFileToProject("src/main/kotlin/demo/First.kt", "package demo\nclass First")
+        myFixture.addFileToProject("src/main/kotlin/demo/Second.kt", "package demo\nclass Second")
+        myFixture.addFileToProject("src/main/resources/demo.txt", "demo")
+
+        val files = context.findProjectFiles("**/*.kt")
+        val names = files.map { it.name }.sorted()
+
+        assertEquals(listOf("First.kt", "Second.kt"), names)
     }
 }

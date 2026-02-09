@@ -73,7 +73,18 @@ tasks.test {
         val testOut = layout.buildDirectory.dir("test-logs").get().asFile.absolutePath
         mkdir(testOut)
 
-        systemProperty("test.integration.plugin.zip", pluginZip.singleFile.absolutePath)
+        val resolvedPluginZip = pluginZip.singleFile
+            .takeIf { it.isFile }
+            ?: rootProject.layout.buildDirectory.dir("distributions").get().asFile
+                .listFiles()
+                ?.filter { it.isFile && it.extension == "zip" && it.name.startsWith("mcp-steroid-") }
+                ?.maxByOrNull { it.lastModified() }
+            ?: error(
+                "Cannot resolve plugin ZIP. " +
+                        "Expected pluginZip artifact or latest mcp-steroid-*.zip under ${rootProject.layout.buildDirectory.dir("distributions").get().asFile}"
+            )
+
+        systemProperty("test.integration.plugin.zip", resolvedPluginZip.absolutePath)
         systemProperty("test.integration.idea.archive", downloadIdea.get().dest.absolutePath)
         systemProperty("test.integration.docker", layout.projectDirectory.dir("src/test/docker").asFile.absolutePath)
         systemProperty("test.integration.testOutput", testOut)

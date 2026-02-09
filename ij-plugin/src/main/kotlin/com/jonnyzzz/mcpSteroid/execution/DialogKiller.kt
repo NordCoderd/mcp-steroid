@@ -100,7 +100,8 @@ object DialogKiller {
                 // Capture screenshot before closing dialogs
                 val (screenshotPath, screenshotError) = captureDialogScreenshot(project, executionId)
 
-                // Close all dialogs
+                // Close all dialogs and track successful closures
+                var successfullyClosed = 0
                 dialogsToClose.forEachIndexed { index, dialog ->
                     try {
                         val window = dialog.window
@@ -109,8 +110,23 @@ object DialogKiller {
                             ?: "Unknown"
 
                         log.warn("Closing dialog ${index + 1}/${dialogsToClose.size}: '$title' (execution: $executionId)")
-                        dialog.doCancelAction()
-                        log.info("Closed dialog: '$title'")
+
+                        // Check if dialog is still showing before attempting to close
+                        val wasShowing = window?.isShowing == true
+                        if (wasShowing) {
+                            dialog.doCancelAction()
+
+                            // Verify the dialog was actually closed
+                            val stillShowing = window?.isShowing == true
+                            if (!stillShowing) {
+                                successfullyClosed++
+                                log.info("Closed dialog: '$title'")
+                            } else {
+                                log.warn("Dialog still showing after doCancelAction(): '$title'")
+                            }
+                        } else {
+                            log.info("Dialog already hidden: '$title'")
+                        }
                     } catch (e: Exception) {
                         log.error("Failed to close dialog: ${e.message}", e)
                     }
@@ -121,7 +137,7 @@ object DialogKiller {
                 }
 
                 DialogKillerResult(
-                    dialogsClosed = dialogsToClose.size,
+                    dialogsClosed = successfullyClosed,
                     screenshotPath = screenshotPath,
                     screenshotError = screenshotError,
                 )
@@ -134,6 +150,7 @@ object DialogKiller {
 
     /**
      * Find all DialogWrapper instances that are owned (directly or transitively) by the given window.
+     * Only returns dialogs that are currently showing and modal.
      */
     private fun findDialogsOwnedBy(ownerWindow: Window): List<DialogWrapper> {
         val result = mutableListOf<DialogWrapper>()
@@ -145,11 +162,18 @@ object DialogKiller {
             // Check if this window is a DialogWrapperDialog
             if (window !is DialogWrapperDialog) continue
 
+            // Only consider dialogs that are currently showing
+            if (!window.isShowing) continue
+
             // Check if this window is owned by the project frame (directly or transitively)
             if (!isOwnedBy(window, ownerWindow)) continue
 
-            // Get the DialogWrapper
-            val dialogWrapper = window.dialogWrapper
+            // Get the DialogWrapper - handle nullable case
+            val dialogWrapper = window.dialogWrapper ?: continue
+
+            // Only include modal dialogs
+            if (!dialogWrapper.isModal) continue
+
             result.add(dialogWrapper)
         }
 
@@ -180,7 +204,8 @@ object DialogKiller {
     ): Pair<String?, String?> {
         return try {
             // Create a special execution ID for dialog screenshots
-            val dialogExecutionId = ExecutionId("$executionId-dialog-killer")
+            // Use executionId.executionId to get the string value, not toString()
+            val dialogExecutionId = ExecutionId("${executionId.executionId}-dialog-killer")
 
             // Capture screenshot using VisionService
             val artifacts = VisionService.capture(project, dialogExecutionId)

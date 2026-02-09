@@ -19,6 +19,8 @@ long script with waits.
 
 ## Tips
 
+- If `steroid_execute_code` returns `Project not found`, call `steroid_list_projects` and reuse the exact `project_name`.
+- Do not hardcode line numbers; locate the target statement by text (for example, the `sortedByDescending` call) before placing breakpoints.
 - Use `mcp-steroid://debugger/set-line-breakpoint` for breakpoint setup (preferred API: `toggleLineBreakpoint` on EDT).
 - Use `mcp-steroid://debugger/debug-run-configuration` for debug launch (uses `com.intellij.execution.ProgramRunnerUtil`).
 - Stop debug sessions when done: use debug-session-control or
@@ -26,6 +28,15 @@ long script with waits.
 - API calls use 0-indexed lines; editor line 7 means API line 6.
 - `debug-list-threads` and `debug-thread-dump` require a suspended session.
 - Use `DefaultDebugExecutor` and `com.intellij.execution.ProgramRunnerUtil` to start debug configs.
+
+## Failure-Recovery Pattern
+
+When a debugger script fails with unresolved imports/APIs or runtime setup errors:
+
+1. Stop and split work into short stateful calls (breakpoint setup -> debug launch -> inspect).
+2. Reuse existing debugger resources instead of inventing large custom scripts.
+3. If debug setup still fails, do one final source-level diagnosis call and report root cause clearly.
+4. Always include execute_code evidence (`Execution ID` / `execution_id`) in the final answer.
 
 ---
 

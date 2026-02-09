@@ -3,7 +3,9 @@ package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
@@ -11,6 +13,9 @@ import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.psi.search.GlobalSearchScope
 import kotlinx.serialization.json.JsonElement
+import java.io.File
+import java.nio.file.FileSystems
+import java.nio.file.Path
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
 import com.intellij.openapi.application.readAction as intellijReadAction
@@ -382,6 +387,53 @@ interface McpScriptContext {
     fun findProjectFile(relativePath: String): VirtualFile? {
         val basePath = project.basePath ?: return null
         return findFile("$basePath/$relativePath")
+    }
+
+    /**
+     * Find project files by a glob pattern relative to the project root.
+     *
+     * Uses Java NIO glob matching. Common glob patterns:
+     * - starstar-slash-star.kt for all Kotlin files recursively
+     * - src/main/starstar-slash-Demo-star.kt for demo classes
+     * - star.md for markdown files in root
+     *
+     * Returns files sorted by absolute path for deterministic results.
+     */
+    @Suppress("unused")
+    suspend fun findProjectFiles(globPattern: String): List<VirtualFile> {
+        if (globPattern.isBlank()) return emptyList()
+
+        val projectRoot = project.guessProjectDir()
+            ?: project.basePath?.let(::findFile)
+            ?: return emptyList()
+
+        val primaryMatcher = try {
+            FileSystems.getDefault().getPathMatcher("glob:$globPattern")
+        } catch (_: IllegalArgumentException) {
+            return emptyList()
+        }
+
+        val fallbackMatcher = runCatching {
+            val adjusted = globPattern.replace('/', File.separatorChar)
+            if (adjusted == globPattern) null else FileSystems.getDefault().getPathMatcher("glob:$adjusted")
+        }.getOrNull()
+
+        return readAction {
+            val matches = mutableListOf<VirtualFile>()
+            VfsUtilCore.iterateChildrenRecursively(projectRoot, null) { file ->
+                val relativePathText = VfsUtilCore.getRelativePath(file, projectRoot, '/')
+                    ?: return@iterateChildrenRecursively true
+                val relativePath = runCatching { Path.of(relativePathText) }
+                    .getOrElse { return@iterateChildrenRecursively true }
+
+                if (primaryMatcher.matches(relativePath) || (fallbackMatcher?.matches(relativePath) == true)) {
+                    matches += file
+                }
+                true
+            }
+
+            matches.sortedBy { it.path }
+        }
     }
 
     /**
