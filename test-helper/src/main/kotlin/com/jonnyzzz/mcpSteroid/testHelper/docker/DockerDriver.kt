@@ -68,12 +68,6 @@ class DockerDriver(
             add("-d")
             add("--add-host=host.docker.internal:host-gateway")
 
-            // Add session labels for cleanup tracking
-            DockerSessionLabels.createLabels().forEach { (key, value) ->
-                add("--label")
-                add("$key=$value")
-            }
-
             (environmentVariables + extraEnvVars).forEach { (key, value) ->
                 add("-e")
                 add("$key=$value")
@@ -109,17 +103,10 @@ class DockerDriver(
 
         println("[$logPrefix] Container started: $containerId")
 
-        // Ensure Ryuk reaper is started
-        RyukReaper.getInstance().start(workDir)
-
-        // Register with Ryuk for cleanup on connection loss
-        RyukReaper.getInstance().registerContainer(containerId)
-
         // Register normal cleanup action
         lifetime.registerCleanupAction {
             println("[$logPrefix] Stopping and removing container: $containerId")
             killContainer(containerId)
-            RyukReaper.getInstance().unregisterContainer(containerId)
         }
 
         return containerId
