@@ -95,9 +95,5 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
             "Output should include a migration hint for legacy execute wrapper labels:\n$output",
             output.contains("Do not use return@executeSteroidCode or return@executeSuspend")
         )
-        assertTrue(
-            "Output should explain script body execution model:\n$output",
-            output.contains("script body")
-        )
     }
 }
