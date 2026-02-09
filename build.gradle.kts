@@ -3,6 +3,7 @@
 import com.jonnyzzz.mcpSteroid.gradle.CompilePromptsTask
 import com.jonnyzzz.mcpSteroid.gradle.GenerateMetadataTask
 import de.undercouch.gradle.tasks.download.Download
+import org.gradle.api.tasks.testing.Test
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import java.net.HttpURLConnection
 import java.net.URI
@@ -138,7 +139,15 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
-        systemProperty("mcp.steroid.test.projectHome", layout.projectDirectory.asFile.absolutePath)
+    }
+}
+
+val testProjectHomeProperty = "mcp.steroid.test.projectHome"
+val testProjectHomePath = rootProject.layout.projectDirectory.asFile.absolutePath
+
+allprojects {
+    tasks.withType<Test>().configureEach {
+        systemProperty(testProjectHomeProperty, testProjectHomePath)
     }
 }
 
