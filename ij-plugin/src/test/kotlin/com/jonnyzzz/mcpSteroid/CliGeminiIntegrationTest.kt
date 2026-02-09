@@ -43,4 +43,20 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
                 .assertOutputContains(mcpName, message = "mcp list should contain registered server")
         }
     }
+
+
+    override fun testDiscoversSteroidTools() {
+        //needed to make test runner work
+        super.testDiscoversSteroidTools()
+    }
+
+    override fun testSystemPropertyCanBeRead() {
+        //needed to make test runner work
+        super.testSystemPropertyCanBeRead()
+    }
+
+    override fun testExecSessionReset() {
+        //needed to make test runner work
+        super.testExecSessionReset()
+    }
 }

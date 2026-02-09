@@ -44,7 +44,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
      *
      * If any of these fail, the test fails. Do not weaken these assertions.
      */
-    fun testDiscoversSteroidTools(): Unit = timeoutRunBlocking(300.seconds) {
+    open fun testDiscoversSteroidTools(): Unit = timeoutRunBlocking(300.seconds) {
         val session = newAiSession()
 
         // Run Claude in print mode to discover tools
@@ -123,7 +123,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
      * 2. Asks AI to read it via steroid_execute_code
      * 3. Verifies AI's output contains the correct value
      */
-    fun testSystemPropertyCanBeRead(): Unit = timeoutRunBlocking(300.seconds) {
+    open fun testSystemPropertyCanBeRead(): Unit = timeoutRunBlocking(300.seconds) {
         val session = newAiSession()
 
         // Set a system property with a random value
@@ -160,31 +160,6 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             )
     }
 
-    protected fun runExecCode(
-        session: AiAgentSession,
-        code: String,
-        marker: String,
-    ): ProcessResult {
-        return session.runPrompt(
-            """
-            You are testing MCP integration. You MUST use steroid_execute_code.
-            Call steroid_execute_code with this code:
-            ```
-            $code
-            ```
-
-            After execution, find the line that contains "$marker" in the tool output
-            and print it as: RESULT: <that line>
-
-            Output must be plain text only. Do NOT use Markdown, lists, or code blocks.
-            If a step fails, print ERROR: <reason>.
-            """.trimIndent(),
-        )
-            .assertExitCode(0, "prompt")
-            .assertNoErrorsInOutput(message = "prompt")
-            .assertOutputContains(marker, message = "steroid_execute_code should output '$marker'")
-    }
-
     /**
      * Tests that `forgetAllForTest()` truly restarts the MCP server, breaking the
      * HTTP connection, and that the agent can recover and continue on the restarted server.
@@ -196,7 +171,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
      * Call #3 runs on the restarted server with a fresh session. It verifies
      * that session count is 1 (only the agent's new reconnected session).
      */
-    fun testExecSessionReset(): Unit = timeoutRunBlocking(360.seconds) {
+    open fun testExecSessionReset(): Unit = timeoutRunBlocking(360.seconds) {
         val session = newAiSession()
 
         session.runPrompt(

@@ -68,4 +68,19 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
             .assertOutputContains("Status:", "Connected", message = "MCP server registration")
             .assertNoErrorsInOutput(message = "MCP server registration")
     }
+
+    override fun testDiscoversSteroidTools() {
+        //needed to make test runner work
+        super.testDiscoversSteroidTools()
+    }
+
+    override fun testSystemPropertyCanBeRead() {
+        //needed to make test runner work
+        super.testSystemPropertyCanBeRead()
+    }
+
+    override fun testExecSessionReset() {
+        //needed to make test runner work
+        super.testExecSessionReset()
+    }
 }
