@@ -7,7 +7,9 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
+import org.junit.jupiter.api.Assertions
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -262,7 +264,20 @@ class IntelliJDriver(
         }.toString()
 
         // Execute the tool call
-        return executeMcpRequest(mcpUrl, sessionId, toolCallRequest)
+        val run = executeMcpRequest(mcpUrl, sessionId, toolCallRequest)
+        val data = Json { }.parseToJsonElement(run)
+
+        data.jsonObject["result"]?.jsonObject["content"]?.jsonArray?.forEach {
+            it.jsonObject["text"]?.jsonPrimitive?.contentOrNull?.let { println("[MCP LOG]: $it ") }
+        }
+
+        Assertions.assertEquals(
+            data.jsonObject["result"]?.jsonObject["isError"]?.jsonPrimitive?.booleanOrNull,
+            false
+        )
+
+
+        return run
     }
 
     /**
@@ -328,10 +343,13 @@ class IntelliJDriver(
             error("MCP request failed (exit ${result.exitCode}): ${result.output}")
         }
 
-        return result.output.trim()
+        val j = result.output.trim()
+        return Json.encodeToString(Json.parseToJsonElement(j))
     }
 
     companion object {
         val MCP_STEROID_PORT = ContainerPort(6754)
+
+        private val Json = Json { prettyPrint = true }
     }
 }

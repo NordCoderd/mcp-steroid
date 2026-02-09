@@ -72,24 +72,17 @@ class DialogKiller {
             return
         }
 
-        if (!Registry.`is`("mcp.steroid.dialog.killer.enabled", true)) {
+        if (!Registry.`is`("mcp.steroid.dialog.killer.enabled")) {
             return
         }
 
-        // Check modal state first (quick check without EDT)
-        val isModalState = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-            ModalityState.current() != ModalityState.nonModal()
-        }
-
-        if (!isModalState) return
         return mutex.withPermit {
             withContext(Dispatchers.IO + CoroutineName("DialogKiller")) {
                 coroutineScope {
-                    val isModalState = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                        ModalityState.current() != ModalityState.nonModal()
-                    }
 
-                    if (!isModalState) return@coroutineScope
+                    val canPumpEdtNonModel = canPumpEdtNonModel()
+
+                    if (canPumpEdtNonModel) return@coroutineScope
 
                     try {
                         doLookupDialogs(executionId, project, logMessage)
@@ -101,6 +94,14 @@ class DialogKiller {
             }
         }
     }
+
+    suspend fun canPumpEdtNonModel(): Boolean = this.runCatching {
+        withTimeout(100) {
+            async(Dispatchers.EDT) {
+                true
+            }.await()
+        }
+    }.getOrNull() == true
 
     private suspend fun doLookupDialogs(
         executionId: ExecutionId,
