@@ -2,10 +2,10 @@
 package com.jonnyzzz.mcpSteroid.integration
 
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import java.io.File
-import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
-import kotlin.test.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 
 class XcvbVideoPipelineTest {
     @Test
@@ -30,7 +30,7 @@ class XcvbVideoPipelineTest {
 
     @Test
     fun `ffmpeg live recording command rejects invalid values`() {
-        assertFailsWith<IllegalArgumentException> {
+        assertThrows<IllegalArgumentException> {
             buildFfmpegLiveRecordingCommand(
                 display = ":99",
                 outputPath = "/tmp/out.mp4",
@@ -38,7 +38,7 @@ class XcvbVideoPipelineTest {
                 keyframeIntervalSeconds = 1,
             )
         }
-        assertFailsWith<IllegalArgumentException> {
+        assertThrows<IllegalArgumentException> {
             buildFfmpegLiveRecordingCommand(
                 display = ":99",
                 outputPath = "/tmp/out.mp4",
