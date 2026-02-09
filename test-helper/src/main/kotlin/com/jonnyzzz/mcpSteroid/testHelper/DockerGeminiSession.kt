@@ -3,16 +3,34 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddCommand
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import java.io.File
+import java.util.Base64
 
 /**
  * Manages a Gemini CLI session running inside a Docker container.
  */
 class DockerGeminiSession(
-    private val session: ContainerDriver,
+    private val session: ContainerProcessRunner,
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
+    private fun buildAgentEnv(visibleConsole: Boolean): Map<String, String> {
+        return buildMap {
+            put("GEMINI_API_KEY", apiKey)
+            put("GOOGLE_API_KEY", apiKey)
+            if (debug) {
+                put("GEMINI_DEBUG", "1")
+                put("MCP_DEBUG", "1")
+                put("DEBUG", "*")
+            }
+            if (visibleConsole) {
+                put(VISIBLE_CONSOLE_ENV, "1")
+            }
+            put("RUNS_DIR", "/tmp/agent-runs")
+            put("MESSAGE_BUS", "/tmp/MESSAGE-BUS.md")
+        }
+    }
 
     override fun registerMcp(mcpUrl: String, mcpName: String) : AiAgentSession {
         var command = geminiMcpAddCommand(mcpUrl, mcpName)
@@ -31,7 +49,11 @@ class DockerGeminiSession(
         return this
     }
 
-    fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
+    fun runInContainer(
+        vararg args: String,
+        timeoutSeconds: Long = 120,
+        visibleConsole: Boolean = false,
+    ): ProcessResult {
         val geminiArgs = buildList {
             add("gemini")
             if (debug) {
@@ -39,41 +61,65 @@ class DockerGeminiSession(
             }
             addAll(args.toList())
         }
-        val env = buildMap {
-            put("GEMINI_API_KEY", apiKey)
-            if (debug) {
-                put("GEMINI_DEBUG", "1")
-                put("MCP_DEBUG", "1")
-                put("DEBUG", "*")
-            }
-        }
-
         return session.runInContainer(
             args = geminiArgs,
             timeoutSeconds = timeoutSeconds,
-            extraEnvVars = env
+            extraEnvVars = buildAgentEnv(visibleConsole = visibleConsole),
+        )
+    }
+
+    private fun runPromptWithUnifiedRunner(
+        prompt: String,
+        timeoutSeconds: Long,
+    ): ProcessResult? {
+        val env = buildAgentEnv(visibleConsole = false)
+        val hasRunner = session.runInContainer(
+            listOf("bash", "-lc", "command -v run-agent.sh >/dev/null 2>&1"),
+            timeoutSeconds = 5,
+            extraEnvVars = env,
+        ).exitCode == 0
+        if (!hasRunner) return null
+
+        val promptPath = "/tmp/agent-prompt-gemini-${System.currentTimeMillis()}.md"
+        val encodedPrompt = Base64.getEncoder().encodeToString(prompt.toByteArray(Charsets.UTF_8))
+        val writePromptScript = "echo '$encodedPrompt' | base64 -d > '$promptPath'"
+        session.runInContainer(
+            listOf("bash", "-lc", writePromptScript),
+            timeoutSeconds = 10,
+            extraEnvVars = buildAgentEnv(visibleConsole = false),
+        )
+        return session.runInContainer(
+            args = listOf("bash", "-lc", "run-agent.sh gemini . $promptPath"),
+            timeoutSeconds = timeoutSeconds,
+            extraEnvVars = buildAgentEnv(visibleConsole = true),
         )
     }
 
     override fun runPrompt(prompt: String, timeoutSeconds: Long): ProcessResult {
+        runPromptWithUnifiedRunner(prompt, timeoutSeconds)?.let { return it }
+
         return runInContainer(
             "--yolo", // Auto-approve all tool calls
             prompt,
+            visibleConsole = true,
             timeoutSeconds = timeoutSeconds
         )
     }
 
     companion object : AIAgentCompanion<DockerGeminiSession>("gemini-cli") {
         const val DISPLAY_NAME = "Gemini"
+        private const val VISIBLE_CONSOLE_ENV = "MCP_STEROID_VISIBLE_CONSOLE"
 
         override fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
-            val keyFile = File(System.getProperty("user.home"), ".vertex")
-            if (keyFile.exists()) {
-                val content = keyFile.readText().trim()
-                if (content.isNotBlank()) return content
+            listOf(".vertes", ".vertex").forEach { filename ->
+                val keyFile = File(System.getProperty("user.home"), filename)
+                if (keyFile.exists()) {
+                    val content = keyFile.readText().trim()
+                    if (content.isNotBlank()) return content
+                }
             }
-            error("GEMINI_API_KEY required (set env or ~/.vertex)")
+            error("GEMINI_API_KEY required (set env or ~/.vertes or ~/.vertex)")
         }
 
         override fun createImpl(

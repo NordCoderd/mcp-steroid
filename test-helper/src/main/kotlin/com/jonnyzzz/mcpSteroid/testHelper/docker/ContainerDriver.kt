@@ -11,19 +11,12 @@ import java.io.File
  * Provides common functionality for building images, starting/stopping containers,
  * and running commands.
  */
-interface ContainerDriver {
+interface ContainerDriver : ContainerProcessRunner {
     fun mapContainerPortToHostPort(port: ContainerPort): Int
 
     fun withGuestWorkDir(guestWorkDir: String): ContainerDriver
     fun withSecretPattern(secretPattern: String): ContainerDriver
     fun withEnv(key: String, value: String): ContainerDriver
-
-    fun runInContainer(
-        args: List<String>,
-        workingDir: String? = null,
-        timeoutSeconds: Long = 30,
-        extraEnvVars: Map<String, String> = emptyMap()
-    ): ProcessResult
 
     fun mkdirs(guestPath: String) = runInContainer(listOf("mkdir", "-p", guestPath))
 
@@ -52,6 +45,15 @@ interface ContainerDriver {
     fun mapGuestPathToHostPath(path: String) : File
 
     companion object
+}
+
+interface ContainerProcessRunner {
+    fun runInContainer(
+        args: List<String>,
+        workingDir: String? = null,
+        timeoutSeconds: Long = 30,
+        extraEnvVars: Map<String, String> = emptyMap(),
+    ): ProcessResult
 }
 
 fun ContainerDriver.Companion.startDockerSession(

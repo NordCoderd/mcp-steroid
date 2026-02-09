@@ -3,7 +3,9 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddCommand
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import java.io.File
+import java.util.Base64
 
 /**
  * Manages a Claude CLI session running inside a Docker container.
@@ -11,10 +13,24 @@ import java.io.File
  * MCP server registrations from affecting the local Claude config.
  */
 class DockerClaudeSession(
-    private val session: ContainerDriver,
+    private val session: ContainerProcessRunner,
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
+    private fun buildAgentEnv(visibleConsole: Boolean): Map<String, String> {
+        return buildMap {
+            put("ANTHROPIC_API_KEY", apiKey)
+            if (debug) {
+                put("CLAUDE_CODE_DEBUG", "1")
+                put("DEBUG", "*")
+            }
+            if (visibleConsole) {
+                put(VISIBLE_CONSOLE_ENV, "1")
+            }
+            put("RUNS_DIR", "/tmp/agent-runs")
+            put("MESSAGE_BUS", "/tmp/MESSAGE-BUS.md")
+        }
+    }
 
     override fun registerMcp(mcpUrl: String, mcpName : String) : AiAgentSession {
         var command = claudeMcpAddCommand(mcpUrl, mcpName)
@@ -33,7 +49,11 @@ class DockerClaudeSession(
      * Run a claude command inside the Docker container.
      * Debug mode is always enabled to see MCP connection details.
      */
-    fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
+    fun runInContainer(
+        vararg args: String,
+        timeoutSeconds: Long = 120,
+        visibleConsole: Boolean = false,
+    ): ProcessResult {
         val claudeArgs = buildList {
             add("claude")
             if (debug) {
@@ -46,13 +66,34 @@ class DockerClaudeSession(
         return session.runInContainer(
             args = claudeArgs,
             timeoutSeconds = timeoutSeconds,
-            extraEnvVars = buildMap {
-                put("ANTHROPIC_API_KEY", apiKey)
-                if (debug) {
-                    put("CLAUDE_CODE_DEBUG", "1")
-                    put("DEBUG", "*")
-                }
-            }
+            extraEnvVars = buildAgentEnv(visibleConsole = visibleConsole),
+        )
+    }
+
+    private fun runPromptWithUnifiedRunner(
+        prompt: String,
+        timeoutSeconds: Long,
+    ): ProcessResult? {
+        val env = buildAgentEnv(visibleConsole = false)
+        val hasRunner = session.runInContainer(
+            listOf("bash", "-lc", "command -v run-agent.sh >/dev/null 2>&1"),
+            timeoutSeconds = 5,
+            extraEnvVars = env,
+        ).exitCode == 0
+        if (!hasRunner) return null
+
+        val promptPath = "/tmp/agent-prompt-claude-${System.currentTimeMillis()}.md"
+        val encodedPrompt = Base64.getEncoder().encodeToString(prompt.toByteArray(Charsets.UTF_8))
+        val writePromptScript = "echo '$encodedPrompt' | base64 -d > '$promptPath'"
+        session.runInContainer(
+            listOf("bash", "-lc", writePromptScript),
+            timeoutSeconds = 10,
+            extraEnvVars = buildAgentEnv(visibleConsole = false),
+        )
+        return session.runInContainer(
+            args = listOf("bash", "-lc", "run-agent.sh claude . $promptPath"),
+            timeoutSeconds = timeoutSeconds,
+            extraEnvVars = buildAgentEnv(visibleConsole = true),
         )
     }
 
@@ -70,6 +111,8 @@ class DockerClaudeSession(
         prompt: String,
         timeoutSeconds: Long,
     ): ProcessResult {
+        runPromptWithUnifiedRunner(prompt, timeoutSeconds)?.let { return it }
+
         val claudeArgs = buildList {
             // Permission mode, necessary to allow MCP
             add("--permission-mode")
@@ -79,12 +122,14 @@ class DockerClaudeSession(
         }
         return runInContainer(
             *claudeArgs.toTypedArray(),
+            visibleConsole = true,
             timeoutSeconds = timeoutSeconds
         )
     }
 
     companion object : AIAgentCompanion<DockerClaudeSession>("claude-cli") {
         const val DISPLAY_NAME = "Claude Code"
+        private const val VISIBLE_CONSOLE_ENV = "MCP_STEROID_VISIBLE_CONSOLE"
 
         override fun readApiKey(): String {
             System.getenv("ANTHROPIC_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
