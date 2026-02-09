@@ -23,6 +23,7 @@ long script with waits.
 - Do not hardcode line numbers; locate the target statement by text (for example, the `sortedByDescending` call) before placing breakpoints.
 - Use `mcp-steroid://debugger/set-line-breakpoint` for breakpoint setup (preferred API: `toggleLineBreakpoint` on EDT).
 - Use `mcp-steroid://debugger/debug-run-configuration` for debug launch (uses `com.intellij.execution.ProgramRunnerUtil`).
+- UI calls like `FileEditorManager.openFile(...)` must run on EDT (`withContext(Dispatchers.EDT)`).
 - Stop debug sessions when done: use debug-session-control or
   withContext(Dispatchers.EDT) { XDebuggerManager.getInstance(project).debugSessions.forEach { it.stop() } }
 - API calls use 0-indexed lines; editor line 7 means API line 6.
@@ -33,10 +34,12 @@ long script with waits.
 ## API Contracts (2025.3+)
 
 - Run/debug launch: use `ProgramRunnerUtil.executeConfiguration(settings, executor)` with a real `Executor` (`DefaultDebugExecutor.getDebugExecutorInstance()` or `ExecutorRegistry.getInstance().getExecutorById(...)`).
+- For `ApplicationConfiguration`, set entry point via `mainClassName = "..."` (avoid `setMainClassName(...)`).
 - Run config creation: prefer `RunManager.createConfiguration(name, factory)` then `RunManager.addConfiguration(settings)`; choose storage via `settings.storeInDotIdeaFolder()` or `settings.storeInLocalWorkspace()` before add.
 - Breakpoints: use `XDebuggerUtil.getInstance().toggleLineBreakpoint(project, file, line)` instead of internal/impl helpers.
 - Session control: use `XDebuggerManager.getInstance(project).currentSession`, then `pause()`, `resume()`, `stepOver(...)`, `stop()`.
-- Expression evaluation is callback-based: `XDebuggerEvaluator.evaluate(String|XExpression, XEvaluationCallback, XSourcePosition?)` returns `Unit` and does not return the value directly.
+- Expression evaluation is callback-based: `XDebuggerEvaluator.evaluate(String|XExpression, XDebuggerEvaluator.XEvaluationCallback, XSourcePosition?)` returns `Unit` and does not return the value directly. Use nested callback type `XDebuggerEvaluator.XEvaluationCallback` (there is no top-level `XEvaluationCallback` class to import).
+- Build expressions with `XDebuggerUtil.getInstance().createExpression(text, null, null, com.intellij.xdebugger.evaluation.EvaluationMode.EXPRESSION)`; avoid `com.intellij.xdebugger.impl.XExpressionImpl`.
 - PSI/VFS lookups (for example `FilenameIndex`, `PsiManager`, documents) must run in `readAction { ... }`.
 
 ## Failure-Recovery Pattern
@@ -45,7 +48,7 @@ When a debugger script fails with unresolved imports/APIs or runtime setup error
 
 1. Stop and split work into short stateful calls (breakpoint setup -> debug launch -> inspect).
 2. Reuse existing debugger resources instead of inventing large custom scripts.
-3. If debug setup still fails, do one final source-level diagnosis call and report root cause clearly.
+3. If debug setup still fails, do one final source-level diagnosis call, print the exact buggy line text from the `Document`, and report root cause clearly.
 4. Always include execute_code evidence (`Execution ID` / `execution_id`) in the final answer.
 
 ---

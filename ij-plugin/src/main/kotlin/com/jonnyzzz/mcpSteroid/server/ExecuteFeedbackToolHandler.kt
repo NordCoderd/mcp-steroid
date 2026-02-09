@@ -10,6 +10,7 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallParams
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
 import com.jonnyzzz.mcpSteroid.storage.ExecutionStorage
+import com.jonnyzzz.mcpSteroid.updates.analyticsBeacon
 import kotlinx.serialization.json.*
 
 /**
@@ -128,6 +129,28 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
                 executionStorage.writeCodeExecutionData(executionId, "explanation.txt", explanation)
             }
         }
+
+        // Capture feedback event
+        analyticsBeacon.capture(
+            event = "execute_feedback",
+            project = project,
+            properties = mapOf(
+                "success_rating" to successRating,
+                "has_explanation" to (explanation != null),
+                "has_code" to (code != null)
+            )
+        )
+
+        // Capture status score (convert 0.0-1.0 to 0-100)
+        val score = (successRating * 100).toInt()
+        analyticsBeacon.captureScore(
+            score = score,
+            context = "feedback",
+            project = project,
+            properties = mapOf(
+                "task_id" to taskId
+            )
+        )
 
         return ToolCallResult(
             content = listOf(ContentItem.Text(text = "ACK!"))

@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.application.ApplicationInfo
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
@@ -10,7 +9,6 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager.getInstance
 import com.intellij.openapi.util.registry.Registry
-import java.util.UUID
 import com.jonnyzzz.mcpSteroid.execution.DialogKiller
 import com.jonnyzzz.mcpSteroid.execution.ExecutionManager
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
@@ -214,15 +212,11 @@ class ExecuteCodeToolHandler : McpRegistrar {
             .service<ExecutionManager>()
             .executeWithProgress(execCodeParams)
 
-        val projectId = PropertiesComponent.getInstance(project).let { props ->
-            props.getValue("mcp.steroid.analytics.project.id")
-                ?: UUID.randomUUID().toString().also { props.setValue("mcp.steroid.analytics.project.id", it) }
-        }
         analyticsBeacon.capture(
-            "exec_code",
-            mapOf(
-                "result" to if (result.isError) "error" else "success",
-                "project" to projectId,
+            event = "exec_code",
+            project = project,
+            properties = mapOf(
+                "result" to if (result.isError) "error" else "success"
             )
         )
 

@@ -59,14 +59,17 @@ The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex cal
 - `computeStackFrames` is async; use `suspendCancellableCoroutine` to await results.
 - `suspendCancellableCoroutine` import: `kotlinx.coroutines.suspendCancellableCoroutine`.
 - Start run configurations on EDT (use `withContext(Dispatchers.EDT)`).
+- UI calls like `FileEditorManager.openFile(...)` must run on EDT.
 - `ProgramRunnerUtil` import: `com.intellij.execution.ProgramRunnerUtil` (not `com.intellij.execution.runners.ProgramRunnerUtil`).
 - **Import errors**: Use exact imports from docs - `XValuePresentation` is in `presentation` subpackage!
 - `XDebuggerEvaluator.evaluate(...)` is callback-based; do not assign its return value.
+- The callback type is nested: `XDebuggerEvaluator.XEvaluationCallback` (not a top-level `XEvaluationCallback` import).
 - For run config creation, use `RunManager.createConfiguration(name, factory)` + `RunManager.addConfiguration(settings)` (avoid deprecated add/store shortcuts).
 - Keep breakpoint API usage on `XDebuggerUtil` public methods; avoid `impl`/`internal` helpers from `xdebugger-impl`.
 - Wrap `FilenameIndex`, PSI, and document access in `readAction {}`.
 - In `steroid_execute_code`, do not use `return@executeSteroidCode`; scripts are already the suspend body.
 - Do not fetch `mcp-steroid://...` URIs via HTTP/web tools; load them via MCP resources.
+- For final bug reports, print and reuse the exact source line from `Document` text; do not infer or rewrite it from memory.
 
 ## Related Resources
 

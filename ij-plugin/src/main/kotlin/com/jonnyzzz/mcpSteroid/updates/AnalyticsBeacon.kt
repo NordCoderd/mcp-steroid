@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.mcpSteroid.PluginDescriptorProvider
@@ -37,6 +38,8 @@ inline val analyticsBeacon: AnalyticsBeacon get() = service()
  * - Plugin version
  * - Project ID (random UUID, no real project name)
  * - exec_code call events (success / error)
+ * - execute_feedback events (success rating, explanation summary)
+ * - status_score events (0-100 score as dedicated metric)
  *
  * Registry key: mcp.steroid.analytics.enabled (default: true)
  */
@@ -89,16 +92,43 @@ class AnalyticsBeacon(
         posthog?.flush()
     }
 
-    fun capture(event: String, properties: Map<String, Any> = emptyMap()) {
+    fun capture(event: String, project: Project? = null, properties: Map<String, Any> = emptyMap()) {
         if (!Registry.`is`("mcp.steroid.analytics.enabled", true)) return
 
         coroutineScope.launch(Dispatchers.IO) {
             try {
-                sendEventInternal(event, properties)
+                val enrichedProps = properties.toMutableMap()
+
+                // Add project ID if project is provided
+                if (project != null) {
+                    val projectId = getOrCreateProjectId(project)
+                    enrichedProps["project"] = projectId
+                }
+
+                sendEventInternal(event, enrichedProps)
             } catch (e: Exception) {
                 log.debug("Analytics capture failed", e)
             }
         }
+    }
+
+    /**
+     * Capture a status score event (0-100).
+     * This is a dedicated event type for tracking success/quality metrics.
+     *
+     * @param score Score from 0 to 100
+     * @param context Additional context (e.g., "code_execution", "feedback")
+     * @param project Project to associate with this score
+     * @param properties Additional properties to include
+     */
+    fun captureScore(score: Int, context: String, project: Project? = null, properties: Map<String, Any> = emptyMap()) {
+        require(score in 0..100) { "Score must be between 0 and 100, got: $score" }
+
+        val enrichedProps = properties.toMutableMap()
+        enrichedProps["score"] = score
+        enrichedProps["context"] = context
+
+        capture("status_score", project, enrichedProps)
     }
 
     @TestOnly
@@ -127,5 +157,11 @@ class AnalyticsBeacon(
         val props = PropertiesComponent.getInstance()
         return props.getValue("mcp.steroid.analytics.distinct.id")
             ?: UUID.randomUUID().toString().also { props.setValue("mcp.steroid.analytics.distinct.id", it) }
+    }
+
+    private fun getOrCreateProjectId(project: Project): String {
+        val props = PropertiesComponent.getInstance(project)
+        return props.getValue("mcp.steroid.analytics.project.id")
+            ?: UUID.randomUUID().toString().also { props.setValue("mcp.steroid.analytics.project.id", it) }
     }
 }
