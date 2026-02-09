@@ -20,6 +20,7 @@ MCP Steroid can be configured via IntelliJ's Registry (`Help > Find Action > Reg
 | `mcp.steroid.review.mode` | `ALWAYS` | Code review mode: `ALWAYS` (default), or `NEVER`. |
 | `mcp.steroid.review.timeout` | `600` | Review timeout in seconds. |
 | `mcp.steroid.execution.timeout` | `600` | Script execution timeout in seconds. |
+| `mcp.steroid.dialog.killer.enabled` | `true` | Automatically close modal dialogs before code execution. Prevents execution failures when dialogs are blocking the IDE. |
 
 ## Storage
 
@@ -44,7 +45,40 @@ MCP Steroid can be configured via IntelliJ's Registry (`Help > Find Action > Reg
 |-------------|---------|-------------|
 | `mcp.steroid.updates.enabled` | `true` | Enable automatic update checks. |
 
+---
 
+## Dialog Killer
+
+The **Dialog Killer** feature automatically closes modal dialogs before code execution. This prevents execution failures when dialogs (like Settings, refactoring confirmations, or error messages) are blocking the IDE.
+
+### How It Works
+
+When you call `steroid_execute_code`:
+
+1. **Detection**: Checks if a modal dialog is currently open using `ModalityState`
+2. **Screenshot**: Captures a screenshot of the dialog for debugging (saved to `.idea/mcp-steroid/{execution-id}-dialog-killer/`)
+3. **Closure**: Closes all modal dialogs owned by the project frame using `doCancelAction()`
+4. **Logging**: Reports the activity via IDE log and MCP progress messages
+5. **Execution**: Proceeds with your code execution normally
+
+### When to Disable
+
+You might want to disable the dialog killer (`mcp.steroid.dialog.killer.enabled = false`) if:
+
+- You're intentionally working with dialogs and want them to remain open
+- You're testing dialog-related functionality
+- You want to see what dialogs the IDE is showing during development
+
+### Screenshot Location
+
+When dialogs are detected and closed, a screenshot is automatically saved to:
+```
+.idea/mcp-steroid/{execution-id}-dialog-killer/screenshot.png
+```
+
+This helps you understand what was blocking the IDE and verify the dialog killer is working correctly.
+
+---
 
 > **Note:** When the plugin starts, it writes the server URL to `.idea/mcp-steroid.md` in each open project. The first line contains the URL (for example, `http://127.0.0.1:6315/mcp`). This file is your MCP client's connection target.
 
