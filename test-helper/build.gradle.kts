@@ -23,4 +23,5 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+    systemProperty("mcp.steroid.test.projectHome", rootProject.layout.projectDirectory.asFile.absolutePath)
 }
