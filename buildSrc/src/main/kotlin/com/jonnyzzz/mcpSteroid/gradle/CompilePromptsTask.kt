@@ -42,6 +42,7 @@ abstract class CompilePromptsTask : DefaultTask() {
             .mapValues { (_, clazzes) -> groupByArticle(clazzes) }
 
         // Second pass: generate article classes with see-also content, then index classes
+        val allStandalonePrompts = mutableListOf<GeneratedPromptClazz>()
         val indexes = promptClasses.groupBy { it.folder }
             .map { (folder, clazzes) ->
                 val articles = folderArticles[folder] ?: emptyList()
@@ -59,11 +60,15 @@ abstract class CompilePromptsTask : DefaultTask() {
 
                 val usedPromptNames = allArticleClasses.flatMap { it.article?.allClasses ?: emptyList() }.map { it.path }.toSortedSet()
                 val standaloneFiles = clazzes.filter { it.path !in usedPromptNames }
+                allStandalonePrompts.addAll(standaloneFiles)
 
                 ctx.generateIndexClazz(folder, standaloneFiles, allArticleClasses)
             }
 
         ctx.generateIndexClazz(indexes)
+
+        // Generate test that validates all mcp-steroid:// URI references in prompt content
+        ctx.generateResourceUriValidationTest(allStandalonePrompts)
     }
 }
 
