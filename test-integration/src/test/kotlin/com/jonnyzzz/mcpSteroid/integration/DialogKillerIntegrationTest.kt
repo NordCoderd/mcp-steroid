@@ -37,10 +37,14 @@ class DialogKillerIntegrationTest {
         // Wait for MCP server to be ready
         session.aiAgentDriver.waitForMcpReady()
 
+        println("=" . repeat(80))
         println("[TEST] IDE ready, MCP server at: ${session.aiAgentDriver.mcpSteroidHostUrl}")
+        println("=" . repeat(80))
 
+        // ========================================
         // Step 1: Open Settings dialog
-        println("[TEST] Step 1: Opening Settings dialog...")
+        // ========================================
+        println("\n[TEST] ===== STEP 1: Opening Settings Dialog =====")
         val openDialogResult = session.intellijDriver.mcpExecuteCode(
             code = """
                 // Open Settings dialog
@@ -59,34 +63,58 @@ class DialogKillerIntegrationTest {
                     dataContext
                 )
 
+                // Disable modal cancellation for this execution (we WANT the dialog to stay open)
+                doNotCancelOnModalityStateChange()
+
                 showSettingsAction.actionPerformed(event)
 
                 // Wait for dialog to appear
-                kotlinx.coroutines.delay(1500)
+                kotlinx.coroutines.delay(2000)
 
                 // Check modal state
                 val isModal = withContext(com.intellij.openapi.application.Dispatchers.EDT) {
                     com.intellij.openapi.application.ModalityState.current() != com.intellij.openapi.application.ModalityState.nonModal()
                 }
 
-                println("Modal state after opening Settings: ${"$"}isModal")
+                println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                println("✓ Settings dialog opened")
+                println("✓ Modal state: ${"$"}isModal")
+                println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
                 if (!isModal) {
-                    println("WARNING: Settings dialog may not have opened (no modal state detected)")
+                    error("Settings dialog did not open - modal state not detected")
                 }
             """.trimIndent(),
             taskId = "test-open-dialog",
             reason = "Open Settings dialog to test dialog killer"
         )
 
-        println("[TEST] Open dialog result: $openDialogResult")
+        println("\n[TEST] Step 1 Result:")
+        println(openDialogResult)
 
-        // Step 2: Execute code again - dialog killer should automatically close the dialog
-        println("[TEST] Step 2: Executing code with dialog killer enabled...")
+        // Verify step 1 succeeded
+        val json = Json { ignoreUnknownKeys = true }
+        val openResultJson = json.parseToJsonElement(openDialogResult).jsonObject
+        val openResult = openResultJson["result"]?.jsonObject ?: error("No result in open dialog response")
+        val openIsError = openResult["isError"]?.jsonPrimitive?.content?.toBoolean() ?: false
+        check(!openIsError) { "Failed to open Settings dialog:\n$openDialogResult" }
+
+        println("[TEST] ✓ Settings dialog is now open and blocking")
+
+        // ========================================
+        // Step 2: Execute code - dialog killer should close the dialog FIRST
+        // ========================================
+        println("\n[TEST] ===== STEP 2: Trigger Dialog Killer =====")
+        println("[TEST] Executing code with dialog killer enabled...")
+        println("[TEST] Expected: Dialog killer should detect modal state and close the dialog BEFORE execution")
+
         val dialogKillerResult = session.intellijDriver.mcpExecuteCode(
             code = """
                 // This code should execute successfully because dialog killer will close the Settings dialog first
-                println("✅ Code executed successfully - dialog killer worked!")
+                println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+                println("✓ Code execution started successfully")
+                println("✓ This means dialog killer closed the blocking dialog!")
+                println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 
                 // Verify modal state is cleared
                 val isModal = withContext(com.intellij.openapi.application.Dispatchers.EDT) {
@@ -99,16 +127,24 @@ class DialogKillerIntegrationTest {
                     error("Dialog killer failed - modal state still active!")
                 }
 
-                println("✅ Modal state cleared successfully")
+                println("✓ Modal state cleared successfully")
+                println("✓ Dialog killer test PASSED!")
             """.trimIndent(),
             taskId = "test-dialog-killer",
             reason = "Verify dialog killer closed the Settings dialog"
         )
 
-        println("[TEST] Dialog killer result: $dialogKillerResult")
+        println("\n[TEST] Step 2 Result (FULL MCP OUTPUT):")
+        println("=" . repeat(80))
+        println(dialogKillerResult)
+        println("=" . repeat(80))
+
+        // ========================================
+        // Step 3: Validate the MCP output
+        // ========================================
+        println("\n[TEST] ===== STEP 3: Validate MCP Output =====")
 
         // Parse and verify the result
-        val json = Json { ignoreUnknownKeys = true }
         val resultJson = json.parseToJsonElement(dialogKillerResult).jsonObject
         val result = resultJson["result"]?.jsonObject ?: error("No result in response")
         val isError = result["isError"]?.jsonPrimitive?.content?.toBoolean() ?: false
@@ -118,14 +154,36 @@ class DialogKillerIntegrationTest {
             "Dialog killer test failed - execution returned error:\n$dialogKillerResult"
         }
 
-        // Verify output contains success message
+        // Verify output contains success messages
         val content = result.toString()
-        check(content.contains("Code executed successfully")) {
+        check(content.contains("Code execution started successfully")) {
             "Dialog killer test failed - expected success message not found in output:\n$content"
         }
 
-        println("[TEST] ✅ Dialog killer integration test PASSED!")
-        println("[TEST] Successfully verified that dialog killer closes modal dialogs before execution")
+        check(content.contains("Modal state cleared")) {
+            "Dialog killer test failed - modal state was not cleared:\n$content"
+        }
+
+        // Check for dialog killer activity in the output
+        // The dialog killer should log progress messages via mcpProgressReporter
+        println("\n[TEST] Checking for dialog killer activity in MCP output...")
+        if (dialogKillerResult.contains("Dialog Killer") || dialogKillerResult.contains("dialog(s)") || dialogKillerResult.contains("closed")) {
+            println("[TEST] ✓ Found dialog killer activity in MCP output")
+        } else {
+            println("[TEST] ⚠️  Dialog killer activity not explicitly mentioned in output")
+            println("[TEST] This might be expected if progress messages are not included in the result")
+        }
+
+        println("\n" + "=" . repeat(80))
+        println("[TEST] ✅✅✅ DIALOG KILLER INTEGRATION TEST PASSED! ✅✅✅")
+        println("=" . repeat(80))
+        println("[TEST] Summary:")
+        println("[TEST]   1. Settings dialog was opened (modal state detected)")
+        println("[TEST]   2. Execute_code was called with dialog blocking")
+        println("[TEST]   3. Dialog killer automatically closed the dialog")
+        println("[TEST]   4. Code execution succeeded")
+        println("[TEST]   5. Modal state was cleared")
+        println("=" . repeat(80))
     }
 
     @Test
