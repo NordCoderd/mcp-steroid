@@ -148,6 +148,7 @@ val testProjectHomePath = rootProject.layout.projectDirectory.asFile.absolutePat
 allprojects {
     tasks.withType<Test>().configureEach {
         systemProperty(testProjectHomeProperty, testProjectHomePath)
+        maxHeapSize = "4g"
     }
 }
 
