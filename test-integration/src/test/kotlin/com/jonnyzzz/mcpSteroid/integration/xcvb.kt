@@ -203,19 +203,18 @@ class XcvbDriver(
         return proc
     }
 
-
-
     fun listWindows(): List<WindowInfo> {
         // Run a shell script to list all windows with their geometry and title efficiently
-        // Output format: ID|X|Y|WIDTH|HEIGHT|TITLE
+        // Output format: ID|X|Y|WIDTH|HEIGHT|PID|TITLE
         val d = '$'
         val script = """
             for id in ${d}(xdotool search --name "" 2>/dev/null); do
-              unset X Y WIDTH HEIGHT
+              unset X Y WIDTH HEIGHT PID
               name=${d}(xdotool getwindowname "${d}id" 2>/dev/null)
               eval ${d}(xdotool getwindowgeometry --shell "${d}id" 2>/dev/null)
+              pid=${d}(xdotool getwindowpid "${d}id" 2>/dev/null)
               if [ -n "${d}X" ] && [ -n "${d}Y" ] && [ -n "${d}WIDTH" ] && [ -n "${d}HEIGHT" ]; then
-                echo "${d}id|${d}X|${d}Y|${d}WIDTH|${d}HEIGHT|${d}name"
+                echo "${d}id|${d}X|${d}Y|${d}WIDTH|${d}HEIGHT|${d}pid|${d}name"
               fi
             done
         """.trimIndent()
@@ -229,15 +228,16 @@ class XcvbDriver(
         return result.output.lineSequence()
             .filter { it.isNotBlank() }
             .mapNotNull { line ->
-                val parts = line.split('|', limit = 6)
-                if (parts.size < 6) return@mapNotNull null
+                val parts = line.split('|', limit = 7)
+                if (parts.size < 7) return@mapNotNull null
                 val id = parts[0]
                 val x = parts[1].toIntOrNull() ?: return@mapNotNull null
                 val y = parts[2].toIntOrNull() ?: return@mapNotNull null
                 val width = parts[3].toIntOrNull() ?: return@mapNotNull null
                 val height = parts[4].toIntOrNull() ?: return@mapNotNull null
-                val title = parts[5]
-                WindowInfo(id, title, WindowRect(x, y, width, height))
+                val pid = parts[5]
+                val title = parts[6]
+                WindowInfo(id, title, WindowRect(x, y, width, height), pid)
             }
             .toList()
     }
@@ -578,6 +578,7 @@ data class WindowInfo(
     val id: String,
     val title: String,
     val rect: WindowRect,
+    val pid: String,
 )
 
 /**
