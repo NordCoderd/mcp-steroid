@@ -12,6 +12,8 @@ import java.io.File
  * and running commands.
  */
 interface ContainerDriver : ContainerProcessRunner {
+    val containerId: String
+
     fun mapContainerPortToHostPort(port: ContainerPort): Int
 
     fun withGuestWorkDir(guestWorkDir: String): ContainerDriver
@@ -94,6 +96,9 @@ fun startContainerDriver(
 ): ContainerDriver {
     val containerId = scope.startContainer(lifetime, imageName, extraEnvVars, volumes, ports)
 
+    // Register with reaper for cleanup on crash/SIGKILL
+    DockerReaper.registerContainer(containerId, scope.workDir)
+
     val hostPorts = ports.associate { p ->
         p.containerPort to scope.queryMappedPort(containerId, p.containerPort)
     }
@@ -116,7 +121,7 @@ data class ContainerPort(
 
 private class ContainerDriverImpl(
     private val scope: DockerDriver,
-    private val containerId: String,
+    override val containerId: String,
     private val imageName: String,
     private val volumes: List<ContainerVolume> = emptyList(),
     private val hostPorts: Map<Int, Int> = emptyMap(),

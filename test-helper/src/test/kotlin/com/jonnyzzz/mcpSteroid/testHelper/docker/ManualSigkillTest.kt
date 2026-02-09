@@ -12,7 +12,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
  * 1. Run this test
  * 2. It will print the PID and container ID
  * 3. Open another terminal and run: kill -9 <PID>
- * 4. Wait 5+ seconds
+ * 4. Wait 4+ seconds (3s ping timeout + cleanup time)
  * 5. Check that the container is gone: docker ps -a | grep <container-id>
  */
 fun main() {
@@ -30,8 +30,12 @@ fun main() {
 
     val lifetime = CloseableStackHost()
 
+    // Start the reaper
+    println("\n[1] Starting reaper...")
+    DockerReaper.start(workDir)
+
     // Start a container
-    println("\n[1] Starting test container...")
+    println("\n[2] Starting test container...")
     val containerId = driver.startContainer(
         lifetime = lifetime,
         imageName = "alpine:latest",
@@ -39,12 +43,14 @@ fun main() {
         cmd = listOf("sleep", "infinity")
     )
 
+    // Register with reaper
+    DockerReaper.registerContainer(containerId, workDir)
+
     // Print info
     val pid = ProcessHandle.current().pid()
-    println("\n[2] Container started successfully!")
+    println("\n[3] Container started successfully!")
     println("    Container ID: $containerId")
     println("    Process PID:  $pid")
-    println("    Session ID:   ${DockerSessionLabels.SESSION_ID}")
 
     // Verify container is running
     Thread.sleep(2000)
@@ -61,7 +67,7 @@ fun main() {
         System.exit(1)
     }
 
-    println("\n[3] Container verified running: $checkResult")
+    println("\n[4] Container verified running: $checkResult")
 
     // Instructions
     println("\n" + "=".repeat(80))
@@ -70,12 +76,12 @@ fun main() {
     println("1. Open a new terminal")
     println("2. Run this command to kill the process:")
     println("   kill -9 $pid")
-    println("3. Wait 6-7 seconds for Ryuk to detect and cleanup")
+    println("3. Wait 4+ seconds for reaper to detect and cleanup")
     println("4. Verify container is gone with:")
     println("   docker ps -a | grep ${containerId.take(12)}")
     println("   (Should return nothing)")
-    println("5. Verify Ryuk container also cleaned up:")
-    println("   docker ps | grep ryuk")
+    println("5. Verify reaper container also exited:")
+    println("   docker ps | grep mcp-steroid-reaper")
     println("   (Should return nothing)")
     println("=".repeat(80))
     println("\nWaiting for kill -9 signal... (this process will not exit normally)")
