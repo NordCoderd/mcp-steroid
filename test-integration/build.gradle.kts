@@ -66,6 +66,7 @@ tasks.test {
         showStandardStreams = true
     }
     systemProperty("junit.jupiter.execution.timeout.default", "15m")
+    systemProperty("mcp.steroid.test.projectHome", rootProject.layout.projectDirectory.asFile.absolutePath)
 
     dependsOn(pluginZip)
     dependsOn(downloadIdea)

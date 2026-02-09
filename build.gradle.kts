@@ -138,6 +138,7 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
+        systemProperty("mcp.steroid.test.projectHome", layout.projectDirectory.asFile.absolutePath)
     }
 }
 

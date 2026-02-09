@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
+import com.jonnyzzz.mcpSteroid.testHelper.McpResourceUris
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import org.junit.jupiter.api.AfterAll
@@ -38,12 +39,13 @@ class DebuggerDemoTest {
     private fun runDebuggerDemo(agentName: String) {
         val agent: AiAgentSession? = session.aiAgentDriver.aiAgents[agentName]
         assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        val debuggerOverviewUri = McpResourceUris.debuggerOverview
 
         val prompt = buildString {
             appendLine("Debug the file DemoByJonnyzzz.kt in this project to find the bug in the leaderboard function.")
             appendLine()
             appendLine("Execution strategy (mandatory):")
-            appendLine("- First read MCP resource: mcp-steroid://debugger/overview via read_mcp_resource")
+            appendLine("- First read MCP resource: $debuggerOverviewUri via read_mcp_resource")
             appendLine("- Do NOT call list_mcp_resources/resources/list; do not enumerate all resources")
             appendLine("- First call steroid_list_projects and reuse that exact project_name")
             appendLine("- If any steroid_execute_code call returns 'Project not found', call steroid_list_projects again and switch to the returned project_name")
@@ -63,7 +65,7 @@ class DebuggerDemoTest {
             appendLine("8. The root cause must be about sortedByDescending returning a new list whose result is ignored/not assigned")
             appendLine()
             appendLine("Allowed MCP calls in this scenario:")
-            appendLine("- read_mcp_resource (only for mcp-steroid://debugger/overview)")
+            appendLine("- read_mcp_resource (only for $debuggerOverviewUri)")
             appendLine("- steroid_list_projects (project discovery)")
             appendLine("- steroid_execute_code (IDE actions)")
             appendLine("Do not call list_mcp_resources/resources/list.")
