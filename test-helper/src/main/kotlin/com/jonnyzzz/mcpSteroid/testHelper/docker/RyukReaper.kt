@@ -54,7 +54,7 @@ class RyukReaper private constructor() {
                     "--privileged",
                     "-v", "/var/run/docker.sock:/var/run/docker.sock",
                     "-p", "0:8080",
-                    "testcontainers/ryuk:0.5.1"
+                    "testcontainers/ryuk:latest"
                 ),
                 description = "Start Ryuk reaper",
                 workingDir = workDir,

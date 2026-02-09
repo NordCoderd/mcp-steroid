@@ -154,7 +154,7 @@ class RyukReaperTest {
             val ryukResult = processRunner.run(
                 listOf(
                     "docker", "ps",
-                    "--filter", "ancestor=testcontainers/ryuk:0.5.1",
+                    "--filter", "ancestor=testcontainers/ryuk:latest",
                     "--format", "{{.ID}}"
                 ),
                 description = "Check Ryuk container",
