@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.execution
 import com.intellij.openapi.components.service
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.getExecutionIdFromResult
 import com.jonnyzzz.mcpSteroid.setServerPortProperties
 import com.jonnyzzz.mcpSteroid.testExecParams
@@ -67,5 +68,36 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
         assertTrue(
             "output.jsonl should contain compilation error info:\n$outputContent",
             outputContent.contains("Script compilation/evaluation failed") || outputContent.contains("Compiler Errors/Warnings"))
+    }
+
+    fun testCompilationErrorIncludesExecuteWrapperMigrationHintForExecuteSteroidCode(): Unit = timeoutRunBlocking(30.seconds) {
+        assertMigrationHintForLegacyExecuteLabel("executeSteroidCode")
+    }
+
+    fun testCompilationErrorIncludesExecuteWrapperMigrationHintForExecuteSuspend(): Unit = timeoutRunBlocking(30.seconds) {
+        assertMigrationHintForLegacyExecuteLabel("executeSuspend")
+    }
+
+    private suspend fun assertMigrationHintForLegacyExecuteLabel(labelName: String) {
+        val invalidCode = """
+            println("before")
+            return@$labelName
+        """.trimIndent()
+
+        val result = manager.executeWithProgress(testExecParams(invalidCode))
+        assertTrue("Execution should fail", result.isError)
+
+        val output = result.content
+            .filterIsInstance<ContentItem.Text>()
+            .joinToString("\n") { it.text }
+
+        assertTrue(
+            "Output should include a migration hint for legacy execute wrapper labels:\n$output",
+            output.contains("Do not use return@executeSteroidCode or return@executeSuspend")
+        )
+        assertTrue(
+            "Output should explain script body execution model:\n$output",
+            output.contains("script body")
+        )
     }
 }

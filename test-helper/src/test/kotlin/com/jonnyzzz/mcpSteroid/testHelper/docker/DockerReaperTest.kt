@@ -46,11 +46,12 @@ class DockerReaperTest {
         val lifetime = CloseableStackHost()
 
         try {
-            // Start a simple container
+            // Start a simple container with sleep to keep it running
             val containerId = driver.startContainer(
                 lifetime = lifetime,
                 imageName = "alpine:latest",
-                extraEnvVars = emptyMap()
+                extraEnvVars = emptyMap(),
+                cmd = listOf("sleep", "infinity")
             )
 
             // Verify container has session labels
@@ -104,7 +105,8 @@ class DockerReaperTest {
         val containerId = driver.startContainer(
             lifetime = lifetime,
             imageName = "alpine:latest",
-            extraEnvVars = emptyMap()
+            extraEnvVars = emptyMap(),
+            cmd = listOf("sleep", "infinity")
         )
 
         // Verify container is running
@@ -138,11 +140,12 @@ class DockerReaperTest {
         val lifetime = CloseableStackHost()
 
         try {
-            // Start a container
+            // Start a container with sleep to keep it running
             val containerId = driver.startContainer(
                 lifetime = lifetime,
                 imageName = "alpine:latest",
-                extraEnvVars = emptyMap()
+                extraEnvVars = emptyMap(),
+                cmd = listOf("sleep", "infinity")
             )
 
             println("Started container: $containerId")
@@ -184,16 +187,18 @@ class DockerReaperTest {
         val lifetime = CloseableStackHost()
 
         try {
-            // Start multiple containers
+            // Start multiple containers with sleep to keep them running
             val container1 = driver.startContainer(
                 lifetime = lifetime,
                 imageName = "alpine:latest",
-                extraEnvVars = emptyMap()
+                extraEnvVars = emptyMap(),
+                cmd = listOf("sleep", "infinity")
             )
             val container2 = driver.startContainer(
                 lifetime = lifetime,
                 imageName = "alpine:latest",
-                extraEnvVars = emptyMap()
+                extraEnvVars = emptyMap(),
+                cmd = listOf("sleep", "infinity")
             )
 
             // List containers by session filter

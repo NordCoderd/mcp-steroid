@@ -60,6 +60,7 @@ class DockerDriver(
         extraEnvVars: Map<String, String> = emptyMap(),
         volumes: List<ContainerVolume> = emptyList(),
         ports: List<ContainerPort> = emptyList(),
+        cmd: List<String> = emptyList(),
     ): String {
         val command = buildList {
             add("docker")
@@ -89,6 +90,9 @@ class DockerDriver(
             }
 
             add(imageName)
+
+            // Add container command if specified
+            addAll(cmd)
         }
 
         val result = processRunner.run(

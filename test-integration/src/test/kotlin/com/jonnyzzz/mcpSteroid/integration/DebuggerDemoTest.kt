@@ -83,7 +83,8 @@ class DebuggerDemoTest {
         // Agent must show evidence of MCP Steroid execute_code usage
         assertUsedExecuteCodeEvidence(combined)
 
-        check(combined.contains("BUG_FOUND: yes", ignoreCase = true)) {
+        val bugFound = findMarkerValue(combined, "BUG_FOUND")
+        check(bugFound != null && bugFound.equals("yes", ignoreCase = true)) {
             "Agent did not output required marker 'BUG_FOUND: yes'.\nOutput:\n$combined"
         }
 
@@ -112,11 +113,12 @@ class DebuggerDemoTest {
         }
 
         val ignoredReturnPatterns = listOf(
-            "ignor", "unused", "discard", "return value", "not assigned", "not used"
+            "ignor", "unused", "discard", "return value", "not assigned", "not assigned back", "not used"
         )
         val returnsNewListPatterns = listOf(
             "new list", "returns new", "does not modify", "doesn't modify",
             "not in place", "immutable", "original list", "original unsorted list",
+            "new sorted list", "sorted copy",
         )
 
         val mentionsIgnoredReturn = ignoredReturnPatterns.any { pattern ->
@@ -148,11 +150,14 @@ class DebuggerDemoTest {
     }
 
     private fun findMarkerValue(output: String, marker: String): String? {
-        val markerPrefix = "$marker:"
-        return output.lineSequence()
-            .firstOrNull { line -> line.trimStart().startsWith(markerPrefix, ignoreCase = true) }
-            ?.substringAfter(':')
+        val markerRegex = Regex(
+            pattern = """(?im)^\s*[*_`>#-]*\s*${Regex.escape(marker)}\s*:\s*(.+?)\s*[*_`]*\s*$"""
+        )
+        return markerRegex.find(output)
+            ?.groupValues
+            ?.getOrNull(1)
             ?.trim()
+            ?.trim('*', '_', '`')
             ?.takeIf { it.isNotEmpty() }
     }
 

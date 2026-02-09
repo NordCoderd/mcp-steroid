@@ -212,14 +212,6 @@ listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
     }
 }
 
-tasks.buildPlugin {
-    val dir = layout.buildDirectory.dir("distributions")
-    doFirst {
-        delete(dir)
-        mkdir(dir)
-    }
-}
-
 // Expose plugin .zip for consumption by test-integration module
 val pluginZipElements by configurations.creating {
     isCanBeConsumed = true
@@ -227,6 +219,34 @@ val pluginZipElements by configurations.creating {
     attributes {
         attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "plugin-zip"))
     }
+}
+
+val cleanupOldPluginZips by tasks.registering {
+    group = "intellij platform"
+    description = "Keep only the latest plugin ZIP in build/distributions"
+    doNotTrackState("Deletes stale timestamped ZIP artifacts from build/distributions")
+    doLast {
+        val currentZip = tasks.buildPlugin.get().archiveFile.get().asFile
+        val distributionsDir = currentZip.parentFile ?: return@doLast
+        val baseName = rootProject.name
+
+        distributionsDir.listFiles()
+            ?.asSequence()
+            ?.filter { it.isFile && it.extension == "zip" }
+            ?.filter { it != currentZip }
+            ?.filter { it.name.startsWith("$baseName-") }
+            ?.forEach { staleZip ->
+                if (staleZip.delete()) {
+                    println("Deleted stale plugin ZIP: ${staleZip.name}")
+                } else {
+                    println("Failed to delete stale plugin ZIP: ${staleZip.name}")
+                }
+            }
+    }
+}
+
+tasks.buildPlugin {
+    finalizedBy(cleanupOldPluginZips)
 }
 
 artifacts {

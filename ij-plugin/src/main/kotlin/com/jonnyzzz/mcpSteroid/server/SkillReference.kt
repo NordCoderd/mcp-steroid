@@ -56,7 +56,33 @@ class SkillReference {
      */
     fun errorHint(errorMessage: String): String {
         val hint = when {
-            errorMessage.contains("Unresolved reference") ->
+            errorMessage.contains("unresolved label", ignoreCase = true) &&
+                (errorMessage.contains("executeSteroidCode", ignoreCase = true) ||
+                    errorMessage.contains("executeSuspend", ignoreCase = true)) ->
+                "TIP: Do not use return@executeSteroidCode or return@executeSuspend. Your script is already the suspend function body. " +
+                    "Use plain return (or return@withContext inside withContext blocks)."
+
+            errorMessage.contains("ApplicationConfiguration", ignoreCase = true) &&
+                errorMessage.contains("constructor", ignoreCase = true) &&
+                errorMessage.contains("protected", ignoreCase = true) ->
+                "TIP: Do not construct ApplicationConfiguration(...) directly. Reuse an existing run configuration " +
+                    "or create one via RunManager.createConfiguration(...) using ApplicationConfigurationType factory."
+
+            errorMessage.contains("actual type is 'PsiFile', but 'VirtualFile' was expected", ignoreCase = true) ||
+                (errorMessage.contains("unresolved reference 'path'", ignoreCase = true) &&
+                    errorMessage.contains("PsiFile", ignoreCase = true)) ||
+                (errorMessage.contains("unresolved reference 'url'", ignoreCase = true) &&
+                    errorMessage.contains("PsiFile", ignoreCase = true)) ->
+                "TIP: Use VirtualFile-based APIs. Find files with FilenameIndex.getVirtualFilesByName(...) " +
+                    "or convert psiFile.virtualFile before calling FileDocumentManager/getting path/url."
+
+            errorMessage.contains("unresolved reference 'findFiles'", ignoreCase = true) ||
+                errorMessage.contains("unresolved reference 'contentsToByteArray'", ignoreCase = true) ->
+                "TIP: findFiles(...) is not available in script context. Use findProjectFiles(globPattern) " +
+                    "or FilenameIndex.getVirtualFilesByName(...), then read content with VfsUtilCore.loadText(virtualFile) " +
+                    "or readAction { psiFile.text }."
+
+            errorMessage.contains("Unresolved reference", ignoreCase = true) ->
                 "TIP: Add missing top-level imports if needed. Imports are optional but must appear before code statements."
 
             errorMessage.contains("Dumb mode") || errorMessage.contains("smart mode") ->

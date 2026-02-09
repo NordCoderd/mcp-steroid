@@ -28,6 +28,16 @@ long script with waits.
 - API calls use 0-indexed lines; editor line 7 means API line 6.
 - `debug-list-threads` and `debug-thread-dump` require a suspended session.
 - Use `DefaultDebugExecutor` and `com.intellij.execution.ProgramRunnerUtil` to start debug configs.
+- In `steroid_execute_code`, do not use `return@executeSteroidCode` or `return@executeSuspend`; use plain `return`.
+
+## API Contracts (2025.3+)
+
+- Run/debug launch: use `ProgramRunnerUtil.executeConfiguration(settings, executor)` with a real `Executor` (`DefaultDebugExecutor.getDebugExecutorInstance()` or `ExecutorRegistry.getInstance().getExecutorById(...)`).
+- Run config creation: prefer `RunManager.createConfiguration(name, factory)` then `RunManager.addConfiguration(settings)`; choose storage via `settings.storeInDotIdeaFolder()` or `settings.storeInLocalWorkspace()` before add.
+- Breakpoints: use `XDebuggerUtil.getInstance().toggleLineBreakpoint(project, file, line)` instead of internal/impl helpers.
+- Session control: use `XDebuggerManager.getInstance(project).currentSession`, then `pause()`, `resume()`, `stepOver(...)`, `stop()`.
+- Expression evaluation is callback-based: `XDebuggerEvaluator.evaluate(String|XExpression, XEvaluationCallback, XSourcePosition?)` returns `Unit` and does not return the value directly.
+- PSI/VFS lookups (for example `FilenameIndex`, `PsiManager`, documents) must run in `readAction { ... }`.
 
 ## Failure-Recovery Pattern
 

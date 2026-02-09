@@ -87,8 +87,8 @@ object DialogKiller {
 
         log.info("Modal state detected, starting dialog killer (execution: $executionId)")
 
-        // Get project frame (quick EDT task)
-        val projectFrame = withContext(Dispatchers.EDT) {
+        // Get project frame (quick EDT task with ModalityState.any())
+        val projectFrame = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             WindowManager.getInstance().getFrame(project)
         }
 
@@ -105,57 +105,70 @@ object DialogKiller {
         var iteration = 0
 
         try {
-            // Iteratively close dialogs until no more are found or max iterations reached
+            // Iteratively close dialogs ONE AT A TIME until no more are found or max iterations reached
+            // After each close, we re-check for dialogs to allow EDT to process side effects
             while (iteration < MAX_ITERATIONS) {
                 iteration++
 
                 // Yield to allow other coroutines to run
                 yield()
 
-                // Find dialogs in a small EDT task
-                val dialogsToClose = withContext(Dispatchers.EDT) {
-                    findDialogsOwnedBy(projectFrame)
+                // Find and pick ONE dialog to close in a single EDT task with ModalityState.any()
+                // IMPORTANT: All dialog inspection must be on EDT!
+                val dialogToClose = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+                    val dialogs = findDialogsOwnedBy(projectFrame)
+
+                    // Filter out dialogs we've already tried to close (must be on EDT!)
+                    val newDialogs = dialogs.filter { dialog ->
+                        val identity = DialogIdentity.from(dialog)
+                        identity !in closedDialogIdentities
+                    }
+
+                    if (newDialogs.isEmpty()) {
+                        null  // No more dialogs to close
+                    } else {
+                        // Sort by hierarchy depth and pick the DEEPEST one (child dialog)
+                        // Closing leaf dialogs first prevents cascading closures
+                        sortDialogsByDepth(newDialogs).firstOrNull()
+                    }
                 }
 
-                // Filter out dialogs we've already tried to close
-                val newDialogs = dialogsToClose.filter { dialog ->
-                    val identity = DialogIdentity.from(dialog)
-                    identity !in closedDialogIdentities
-                }
-
-                if (newDialogs.isEmpty()) {
+                if (dialogToClose == null) {
                     log.info("No more new dialogs found (iteration $iteration)")
                     break
                 }
 
-                // Capture screenshot on first iteration only
-                if (iteration == 1) {
+                // TODO: Capture screenshot on first iteration
+                // Currently disabled because VisionService.capture() uses withContext(Dispatchers.EDT)
+                // without ModalityState.any(), which hangs when modal dialogs are present.
+                // Need to make VisionService modal-aware before re-enabling screenshot capture.
+                if (false && iteration == 1) {
                     val (path, error) = captureDialogScreenshot(project, executionId)
                     screenshotPath = path
                     screenshotError = error
                 }
 
-                log.info("Found ${newDialogs.size} new dialog(s) to close (iteration $iteration)")
-
-                // Sort dialogs by hierarchy depth (deepest first = child dialogs first)
-                val sortedDialogs = sortDialogsByDepth(newDialogs)
-
-                // Close dialogs one at a time with yielding
-                for ((index, dialog) in sortedDialogs.withIndex()) {
-                    // Yield between dialog closures to allow message pump to work
-                    yield()
-
-                    val identity = DialogIdentity.from(dialog)
-                    closedDialogIdentities.add(identity)
-
-                    val closed = closeDialog(dialog, index + 1, newDialogs.size, executionId)
-                    if (closed) {
-                        totalClosed++
-                    }
-
-                    // Yield after closing to let the UI update
-                    yield()
+                // Mark this dialog as processed before closing (must be on EDT for DialogIdentity.from)
+                val identity = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+                    DialogIdentity.from(dialogToClose)
                 }
+                closedDialogIdentities.add(identity)
+
+                log.info("Found dialog to close (iteration $iteration)")
+
+                // Close the dialog in a dedicated EDT launch with ModalityState.any()
+                val closed = closeDialog(dialogToClose, 1, 1, executionId)
+                if (closed) {
+                    totalClosed++
+                }
+
+                // Wait 500ms after closing to give EDT time to process any delayed tasks
+                // This is CRITICAL - closing a dialog may schedule more EDT tasks
+                // The delay allows the message pump to fully process the closure
+                kotlinx.coroutines.delay(500)
+
+                // Yield to give other coroutines a chance to run
+                yield()
             }
 
             if (iteration >= MAX_ITERATIONS) {
