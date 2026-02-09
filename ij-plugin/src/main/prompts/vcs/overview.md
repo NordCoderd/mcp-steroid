@@ -16,7 +16,6 @@ Each example is a complete script for `steroid_execute_code`.
 | Resource | Description |
 |----------|-------------|
 | `mcp-steroid://vcs/git-history` | Get commit history for a file |
-| `mcp-steroid://vcs/git-log` | Get detailed commit log with messages and diffs |
 
 ## Usage
 
@@ -79,7 +78,6 @@ val root = vcsManager.getVcsRootFor(virtualFile)
 ### VCS Examples
 - [Git Annotations](mcp-steroid://vcs/git-annotations) - Get blame/annotations for files
 - [Git History](mcp-steroid://vcs/git-history) - Get commit history
-- [Git Log](mcp-steroid://vcs/git-log) - Get detailed commit log with diffs
 
 ### Related Example Guides
 - [IDE Examples](mcp-steroid://ide/overview) - IDE power operations
