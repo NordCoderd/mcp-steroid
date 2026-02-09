@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="3840" height="2160" viewBox="0 0 3840 2160" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="3840" y2="2160" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F2EFF6"/>
+      <stop offset="0.52" stop-color="#ECE8F2"/>
+      <stop offset="1" stop-color="#F5F1F7"/>
+    </linearGradient>
+    <radialGradient id="glowMain" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1920 1080) rotate(90) scale(980 1680)">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowLeft" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(960 1240) rotate(90) scale(700 1100)">
+      <stop offset="0" stop-color="#D2CCDC" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#D2CCDC" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowRight" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(2880 920) rotate(90) scale(680 1080)">
+      <stop offset="0" stop-color="#E2D8E9" stop-opacity="0.24"/>
+      <stop offset="1" stop-color="#E2D8E9" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="logoShadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#9B88B7" flood-opacity="0.24"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#B7A6CC" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect width="3840" height="2160" fill="url(#bg)"/>
+  <rect width="3840" height="2160" fill="url(#glowMain)"/>
+  <ellipse cx="960" cy="1240" rx="1100" ry="700" fill="url(#glowLeft)"/>
+  <ellipse cx="2880" cy="920" rx="1080" ry="680" fill="url(#glowRight)"/>
+
+  <g filter="url(#logoShadow)">
+    <image
+      x="1440"
+      y="600"
+      width="960"
+      height="960"
+      preserveAspectRatio="xMidYMid meet"
+      xlink:href="round-logo-center.svg"
+      href="round-logo-center.svg"
+    />
+  </g>
+</svg>
