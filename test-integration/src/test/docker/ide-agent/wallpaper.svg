@@ -21,6 +21,12 @@
       <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#9B88B7" flood-opacity="0.24"/>
       <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#B7A6CC" flood-opacity="0.35"/>
     </filter>
+    
+    <!-- Brand Gradient for Logo -->
+    <linearGradient id="brandGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6B57FF"/>
+      <stop offset="100%" stop-color="#FE2857"/>
+    </linearGradient>
   </defs>
 
   <rect width="3840" height="2160" fill="url(#bg)"/>
@@ -28,15 +34,22 @@
   <ellipse cx="960" cy="1240" rx="1100" ry="700" fill="url(#glowLeft)"/>
   <ellipse cx="2880" cy="920" rx="1080" ry="680" fill="url(#glowRight)"/>
 
-  <g filter="url(#logoShadow)">
-    <image
-      x="1440"
-      y="600"
-      width="960"
-      height="960"
-      preserveAspectRatio="xMidYMid meet"
-      xlink:href="round-logo-center.svg"
-      href="round-logo-center.svg"
-    />
+  <g transform="translate(1440, 600)">
+    <!-- Logo Circle with Shadow -->
+    <circle cx="480" cy="400" r="280" fill="white" filter="url(#logoShadow)"/>
+
+    <!-- Lightning Bolt -->
+    <g transform="translate(160, 80) scale(16)">
+       <path d="M22 23H26L18 30V22H14L22 10V23Z" fill="url(#brandGradient)"/>
+    </g>
+
+    <!-- Title Text -->
+    <text x="480" y="780" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="700" font-size="48" fill="url(#brandGradient)" letter-spacing="-0.5">MCP Steroid</text>
+
+    <!-- Tagline Text -->
+    <text x="480" y="830" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="400" font-size="20" fill="#666666">Give AI the whole IDE, not just the files</text>
+  
+    <!-- Social Text -->
+    <text x="480" y="870" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="400" font-size="16" fill="#888888">follow @jonnyzzz and https://linkedin.com/in/jonnyzzz</text>
   </g>
 </svg>
