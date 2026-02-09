@@ -203,6 +203,40 @@ class XcvbDriver(
         return proc
     }
 
+    /**
+     * Arrange IntelliJ window to the left half of the 4K display.
+     *
+     * Layout target:
+     * - IntelliJ: left half (0,0)-(1920x2160)
+     * - Agent terminals: right center half (1920,540)-(1920x1080)
+     */
+    fun scheduleIdeWindowLayout(projectNameHint: String? = null) {
+        val titlePatterns = buildList {
+            if (!projectNameHint.isNullOrBlank()) add(projectNameHint)
+            add("IntelliJ IDEA")
+            add("idea")
+        }
+
+        val layoutThread = thread(start = true, isDaemon = true, name = "xcvb-ide-layout") {
+            runCatching {
+                val positioned = waitForWindowAndPlace(
+                    titlePatterns = titlePatterns,
+                    rect = IDE_WINDOW_RECT,
+                    timeoutMs = 120_000L,
+                )
+                if (!positioned) {
+                    println("[xcvb] WARNING: failed to place IntelliJ window to left half")
+                }
+            }.onFailure { t ->
+                println("[xcvb] WARNING: IntelliJ layout setup failed: ${t.message}")
+            }
+        }
+
+        lifetime.registerCleanupAction {
+            layoutThread.interrupt()
+        }
+    }
+
     // ── Visible console ────────────────────────────────────────────────
 
     /**
@@ -219,6 +253,7 @@ class XcvbDriver(
         args: List<String>,
         title: String = "Agent Console",
         geometry: String = "200x50+0+0",
+        windowRect: WindowRect? = null,
         workingDir: String? = null,
         extraEnvVars: Map<String, String> = emptyMap(),
     ): RunningContainerProcess {
@@ -234,11 +269,28 @@ class XcvbDriver(
         ) + args
 
         println("[xcvb] Starting visible console '$title': ${args.joinToString(" ")}")
-        return driver.runInContainerDetached(
+        val process = driver.runInContainerDetached(
             xtermArgs,
             workingDir = workingDir,
             extraEnvVars = extraEnvVars,
         )
+
+        if (windowRect != null) {
+            thread(start = true, isDaemon = true, name = "xcvb-layout-${title.take(16)}") {
+                runCatching {
+                    val positioned = waitForWindowAndPlace(
+                        titlePatterns = listOf(title),
+                        rect = windowRect,
+                        timeoutMs = 10_000L,
+                    )
+                    if (!positioned) {
+                        println("[xcvb] WARNING: failed to place visible console '$title'")
+                    }
+                }
+            }
+        }
+
+        return process
     }
 
     /**
@@ -257,8 +309,9 @@ class XcvbDriver(
         delegate: ContainerDriver,
         title: String = "Agent",
         geometry: String = "200x50+0+0",
+        windowRect: WindowRect? = null,
     ): ContainerDriver {
-        return VisibleConsoleContainerDriver(delegate, this, title, geometry)
+        return VisibleConsoleContainerDriver(delegate, this, title, geometry, windowRect)
     }
 
     // ── Input control via xdotool ──────────────────────────────────────
@@ -366,6 +419,59 @@ class XcvbDriver(
         return "'" + s.replace("'", "'\\''") + "'"
     }
 
+    private fun waitForWindowAndPlace(
+        titlePatterns: List<String>,
+        rect: WindowRect,
+        timeoutMs: Long,
+    ): Boolean {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            for (pattern in titlePatterns) {
+                val windowId = findFirstWindowIdByName(pattern) ?: continue
+                if (applyWindowRect(windowId, rect)) {
+                    println("[xcvb] Positioned window '$pattern' ($windowId) to ${rect.width}x${rect.height}+${rect.x}+${rect.y}")
+                    return true
+                }
+            }
+            Thread.sleep(250)
+        }
+        return false
+    }
+
+    private fun findFirstWindowIdByName(namePattern: String): String? {
+        val result = runDriverCommand(
+            listOf("bash", "-lc", "xdotool search --name ${shellEscape(namePattern)} 2>/dev/null | head -n 1"),
+            timeoutSeconds = 5,
+        )
+        if (result.exitCode != 0) return null
+        return result.output.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotEmpty() }
+    }
+
+    private fun applyWindowRect(windowId: String, rect: WindowRect): Boolean {
+        val move = runDriverCommand(
+            listOf("xdotool", "windowmove", "--sync", windowId, rect.x.toString(), rect.y.toString()),
+            timeoutSeconds = 5,
+        )
+        if (move.exitCode != 0) return false
+
+        val resize = runDriverCommand(
+            listOf("xdotool", "windowsize", "--sync", windowId, rect.width.toString(), rect.height.toString()),
+            timeoutSeconds = 5,
+        )
+        if (resize.exitCode != 0) return false
+
+        runDriverCommand(
+            listOf("xdotool", "windowraise", windowId),
+            timeoutSeconds = 5,
+        )
+        return true
+    }
+
+    private fun runDriverCommand(args: List<String>, timeoutSeconds: Long) =
+        driver.runInContainer(args, timeoutSeconds = timeoutSeconds)
+
     /**
      * Wait for the video streaming server to become ready, log its URL,
      * and open the dashboard in the default browser on macOS.
@@ -419,18 +525,43 @@ class XcvbDriver(
     }
 
     companion object {
+        const val DISPLAY_WIDTH = 3840
+        const val DISPLAY_HEIGHT = 2160
         val VIDEO_STREAMING_PORT = ContainerPort(8765)
+        val IDE_WINDOW_RECT = WindowRect(
+            x = 0,
+            y = 0,
+            width = DISPLAY_WIDTH / 2,
+            height = DISPLAY_HEIGHT,
+        )
+        val AGENT_CONSOLE_RECT = WindowRect(
+            x = DISPLAY_WIDTH / 2,
+            y = DISPLAY_HEIGHT / 4,
+            width = DISPLAY_WIDTH / 2,
+            height = DISPLAY_HEIGHT / 2,
+        )
+        const val AGENT_CONSOLE_GEOMETRY = "220x58+1920+540"
 
         /** Default path where the xcvb skill file is deployed inside containers. */
         const val SKILL_GUEST_PATH = "/home/agent/.skills/xcvb-display-control.md"
     }
 }
 
+data class WindowRect(
+    val x: Int,
+    val y: Int,
+    val width: Int,
+    val height: Int,
+)
+
 /**
  * Build FFmpeg command line for live MP4 recording optimized for early playback.
  *
  * Keeping keyframes at 1-second cadence prevents 20-50s startup delays where
  * fragmented MP4 playback waits for the next keyframe-based fragment.
+ *
+ * Note: x264 defaults to keyint=250 (25s at 10fps). We must override keyint
+ * explicitly via x264 params so fragmented MP4 can emit 1-second fragments.
  */
 internal fun buildFfmpegLiveRecordingCommand(
     display: String,
@@ -448,14 +579,19 @@ internal fun buildFfmpegLiveRecordingCommand(
         "ffmpeg", "-nostdin", "-y",
         "-f", "x11grab", "-video_size", "3840x2160",
         "-framerate", frameRate.toString(), "-i", display,
-        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-tune", "zerolatency",
+        "-crf", "28",
         "-pix_fmt", "yuv420p",
+        "-r", frameRate.toString(),
         "-g", gopSize.toString(),
         "-keyint_min", gopSize.toString(),
-        "-sc_threshold", "0",
-        "-force_key_frames", "expr:gte(t,n_forced*$keyframeIntervalSeconds)",
+        "-x264-params", "keyint=$gopSize:min-keyint=$gopSize:scenecut=0:rc-lookahead=0",
         "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+        "-frag_duration", "1000000",
         "-flush_packets", "1",
+        "-fflags", "+flush_packets",
         outputPath,
     )
 }

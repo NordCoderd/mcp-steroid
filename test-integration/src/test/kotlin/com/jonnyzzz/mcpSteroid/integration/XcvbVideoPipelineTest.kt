@@ -19,8 +19,13 @@ class XcvbVideoPipelineTest {
 
         assertEquals("10", argValue(args, "-g"), "GOP should be 1 second at 10fps")
         assertEquals("10", argValue(args, "-keyint_min"), "Minimum keyframe interval should match GOP")
-        assertEquals("0", argValue(args, "-sc_threshold"), "Scene-cut keyframes should be disabled for deterministic fragments")
-        assertEquals("expr:gte(t,n_forced*1)", argValue(args, "-force_key_frames"))
+        assertEquals("zerolatency", argValue(args, "-tune"), "Encoder should favor low-latency delivery")
+        assertEquals("1000000", argValue(args, "-frag_duration"), "Fragment duration should be 1 second")
+        assertEquals(
+            "keyint=10:min-keyint=10:scenecut=0:rc-lookahead=0",
+            argValue(args, "-x264-params"),
+            "x264 GOP settings should force 1-second keyframe cadence"
+        )
         assertEquals(
             "frag_keyframe+empty_moov+default_base_moof",
             argValue(args, "-movflags"),
@@ -53,12 +58,12 @@ class XcvbVideoPipelineTest {
         val script = readVideoServerScript()
 
         assertTrue(
-            script.contains("Watingin for video to start..."),
+            script.contains("Waiting for video to start..."),
             "Viewer should render waiting text before stream playback"
         )
         assertTrue(
-            script.contains("class=\"moving-brand\""),
-            "Viewer should include moving MCP Steroid branding"
+            !script.contains("class=\"moving-brand\""),
+            "Viewer should not include moving MCP Steroid text overlay"
         )
         assertTrue(
             script.contains("<video id=\"video\" autoplay muted controls"),
@@ -67,6 +72,18 @@ class XcvbVideoPipelineTest {
         assertTrue(
             script.contains("id=\"speedSelect\""),
             "Viewer should expose playback speed selector"
+        )
+        assertTrue(
+            script.contains("enterServerDownState"),
+            "Viewer should enter a stable shutdown state when server becomes unavailable"
+        )
+        assertTrue(
+            script.contains("window.close()"),
+            "Viewer should attempt to auto-close the browser window when server is down"
+        )
+        assertTrue(
+            !script.contains("Watingin for video to start..."),
+            "Viewer should not contain the old typo"
         )
     }
 

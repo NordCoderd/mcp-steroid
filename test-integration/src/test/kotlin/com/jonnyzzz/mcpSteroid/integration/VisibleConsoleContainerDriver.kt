@@ -24,6 +24,7 @@ class VisibleConsoleContainerDriver(
     private val xcvb: XcvbDriver,
     private val consoleTitle: String = "Agent",
     private val geometry: String = "200x50+0+0",
+    private val windowRect: WindowRect? = null,
 ) : ContainerDriver {
     private val counter = AtomicInteger(0)
 
@@ -31,13 +32,16 @@ class VisibleConsoleContainerDriver(
         delegate.mapContainerPortToHostPort(port)
 
     override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver =
-        VisibleConsoleContainerDriver(delegate.withGuestWorkDir(guestWorkDir), xcvb, consoleTitle, geometry)
+        VisibleConsoleContainerDriver(delegate.withGuestWorkDir(guestWorkDir), xcvb, consoleTitle, geometry, windowRect)
 
     override fun withSecretPattern(secretPattern: String): ContainerDriver =
-        VisibleConsoleContainerDriver(delegate.withSecretPattern(secretPattern), xcvb, consoleTitle, geometry)
+        VisibleConsoleContainerDriver(delegate.withSecretPattern(secretPattern), xcvb, consoleTitle, geometry, windowRect)
 
     override fun withEnv(key: String, value: String): ContainerDriver =
-        VisibleConsoleContainerDriver(delegate.withEnv(key, value), xcvb, consoleTitle, geometry)
+        VisibleConsoleContainerDriver(delegate.withEnv(key, value), xcvb, consoleTitle, geometry, windowRect)
+
+    fun withConsoleTitle(title: String): VisibleConsoleContainerDriver =
+        VisibleConsoleContainerDriver(delegate, xcvb, title, geometry, windowRect)
 
     override fun runInContainer(
         args: List<String>,
@@ -49,10 +53,11 @@ class VisibleConsoleContainerDriver(
         val logFile = "/tmp/visible-console-$idx.log"
 
         // Start a tail -f in an xterm before the command runs
-        val tailProc = xcvb.runInVisibleConsole(
+        xcvb.runInVisibleConsole(
             args = listOf("bash", "-c", "touch $logFile && tail -f $logFile"),
-            title = "$consoleTitle #$idx: ${args.firstOrNull() ?: "cmd"}",
+            title = "$consoleTitle #$idx",
             geometry = geometry,
+            windowRect = windowRect,
         )
 
         try {
@@ -65,7 +70,8 @@ class VisibleConsoleContainerDriver(
         } finally {
             // Give xterm a moment to display the final output
             Thread.sleep(500)
-            tailProc.kill("TERM")
+            // Keep the final output visible in the recording; let terminal close naturally.
+            // If this process lingers longer than needed it will be cleaned up with container lifetime.
         }
     }
 
@@ -78,9 +84,10 @@ class VisibleConsoleContainerDriver(
 
         // Open an xterm that tails the detached process stdout
         xcvb.runInVisibleConsole(
-            args = listOf("bash", "-c", "tail -f ${proc.stdoutPath} 2>/dev/null || sleep 3600"),
-            title = "$consoleTitle: ${proc.name}",
+            args = listOf("bash", "-c", "while [ ! -f ${proc.stdoutPath} ]; do sleep 0.1; done; tail -f ${proc.stdoutPath}"),
+            title = consoleTitle,
             geometry = geometry,
+            windowRect = windowRect,
         )
 
         return proc

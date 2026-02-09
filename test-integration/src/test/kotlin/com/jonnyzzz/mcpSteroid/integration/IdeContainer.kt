@@ -82,6 +82,12 @@ fun IdeContainer.Companion.create(
     xcvb.deploySkill()
 
     container = xcvb.withDisplay(container)
+    val agentVisibleScope = xcvb.withVisibleConsole(
+        delegate = container,
+        title = "Agent",
+        geometry = XcvbDriver.AGENT_CONSOLE_GEOMETRY,
+        windowRect = XcvbDriver.AGENT_CONSOLE_RECT,
+    )
 
     val ijDriver = IntelliJDriver(
         lifetime,
@@ -92,8 +98,9 @@ fun IdeContainer.Companion.create(
     ijDriver.mountProjectFiles(projectName)
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
     val ijContainer = ijDriver.startIde()
+    xcvb.scheduleIdeWindowLayout(projectNameHint = projectName)
 
-    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
+    val session = IdeContainer(lifetime, agentVisibleScope, ijDriver, xcvb, ijContainer)
 
     // Write info file with all ports and URLs for external tools
     val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
@@ -166,6 +173,12 @@ fun IdeContainer.Companion.createWithGitRepo(
     xcvb.deploySkill()
 
     container = xcvb.withDisplay(container)
+    val agentVisibleScope = xcvb.withVisibleConsole(
+        delegate = container,
+        title = "Agent",
+        geometry = XcvbDriver.AGENT_CONSOLE_GEOMETRY,
+        windowRect = XcvbDriver.AGENT_CONSOLE_RECT,
+    )
 
     val ijDriver = IntelliJDriver(
         lifetime,
@@ -176,8 +189,10 @@ fun IdeContainer.Companion.createWithGitRepo(
     ijDriver.cloneGitRepo(gitRepoUrl, timeoutSeconds = cloneTimeoutSeconds)
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
     val ijContainer = ijDriver.startIde()
+    val repoNameHint = gitRepoUrl.substringAfterLast('/').substringBeforeLast(".git")
+    xcvb.scheduleIdeWindowLayout(projectNameHint = repoNameHint)
 
-    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
+    val session = IdeContainer(lifetime, agentVisibleScope, ijDriver, xcvb, ijContainer)
 
     val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
     val mcpUrl = session.aiAgentDriver.mcpSteroidHostUrl

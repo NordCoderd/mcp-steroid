@@ -31,11 +31,6 @@ function getVideoStat() {
   }
 }
 
-function isVideoReady() {
-  const stat = getVideoStat();
-  return !!stat && stat.size >= 128;
-}
-
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -84,24 +79,6 @@ function serveHtml(_req, res) {
     position: absolute;
     inset: 0;
     background: linear-gradient(180deg, rgba(4, 7, 12, 0.62), rgba(4, 7, 12, 0.78));
-  }
-  .moving-brand {
-    position: fixed;
-    left: -10vw;
-    bottom: 8vh;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    font-size: clamp(26px, 6vw, 96px);
-    color: rgba(214, 228, 255, 0.2);
-    text-shadow: 0 0 28px rgba(39, 113, 255, 0.35);
-    pointer-events: none;
-    z-index: 1;
-    animation: drift 14s linear infinite alternate;
-  }
-  @keyframes drift {
-    from { transform: translateX(0); }
-    to { transform: translateX(26vw); }
   }
   .header {
     position: fixed;
@@ -242,7 +219,6 @@ function serveHtml(_req, res) {
 </head>
 <body>
   <div class="background" aria-hidden="true"></div>
-  <div class="moving-brand" aria-hidden="true">MCP Steroid</div>
 
   <div class="header">
     <span class="title">MCP Steroid</span>
@@ -255,7 +231,7 @@ function serveHtml(_req, res) {
 
   <div class="waiting" id="waiting">
     <div class="waiting-card">
-      <div class="wait-main">Watingin for video to start...</div>
+      <div class="wait-main">Waiting for video to start...</div>
       <div class="wait-sub" id="waitSub">Preparing stream...</div>
     </div>
   </div>
@@ -285,15 +261,72 @@ function serveHtml(_req, res) {
   const playPause = document.getElementById('playPause');
   const speedSelect = document.getElementById('speedSelect');
 
+  const STATUS_POLL_INTERVAL_MS = 300;
+  const MAX_STATUS_FAILURES = 6;
+  const AUTO_CLOSE_DELAY_MS = 2500;
+
   let streamRequested = false;
+  let streamRetryTimer = null;
+  let statusPollTimer = null;
+  let autoCloseTimer = null;
+  let consecutiveStatusFailures = 0;
+  let serverDown = false;
+  let lastStatusText = '';
 
   function setWaitingSubtext(text) {
     waitSub.textContent = text;
   }
 
+  function setStatusText(text) {
+    if (lastStatusText === text) return;
+    lastStatusText = text;
+    statusText.textContent = text;
+  }
+
   function enablePlaybackControls() {
     playPause.disabled = false;
     speedSelect.disabled = false;
+  }
+
+  function disablePlaybackControls() {
+    playPause.disabled = true;
+    speedSelect.disabled = true;
+  }
+
+  function clearUiTimers() {
+    if (streamRetryTimer != null) {
+      clearTimeout(streamRetryTimer);
+      streamRetryTimer = null;
+    }
+    if (statusPollTimer != null) {
+      clearInterval(statusPollTimer);
+      statusPollTimer = null;
+    }
+  }
+
+  function enterServerDownState(waitingMessage) {
+    if (serverDown) return;
+    serverDown = true;
+
+    clearUiTimers();
+
+    dot.className = 'dot stopped';
+    setStatusText('server stopped');
+
+    video.pause();
+    video.removeAttribute('src');
+    video.classList.remove('visible');
+    waiting.classList.remove('hidden');
+
+    setWaitingSubtext(waitingMessage || 'Video server stopped. Closing window...');
+    disablePlaybackControls();
+
+    autoCloseTimer = setTimeout(() => {
+      window.close();
+      setTimeout(() => {
+        window.location.replace('about:blank');
+      }, 350);
+    }, AUTO_CLOSE_DELAY_MS);
   }
 
   function showVideo() {
@@ -303,7 +336,7 @@ function serveHtml(_req, res) {
   }
 
   function startVideoStream() {
-    if (streamRequested) return;
+    if (serverDown || streamRequested) return;
     streamRequested = true;
 
     setWaitingSubtext('Connecting to stream...');
@@ -314,11 +347,26 @@ function serveHtml(_req, res) {
     video.play().catch(() => {});
   }
 
+  function scheduleStreamRetry(delayMs) {
+    if (serverDown) return;
+    if (streamRetryTimer != null) return;
+    streamRetryTimer = setTimeout(() => {
+      streamRetryTimer = null;
+      streamRequested = false;
+      startVideoStream();
+    }, delayMs);
+  }
+
+  video.addEventListener('loadedmetadata', () => {
+    showVideo();
+  });
+
   video.addEventListener('loadeddata', () => {
     showVideo();
   });
 
   video.addEventListener('playing', () => {
+    if (serverDown) return;
     showVideo();
     playPause.textContent = 'Pause';
   });
@@ -328,10 +376,11 @@ function serveHtml(_req, res) {
   });
 
   video.addEventListener('error', () => {
-    streamRequested = false;
+    if (serverDown) return;
     video.classList.remove('visible');
     waiting.classList.remove('hidden');
     setWaitingSubtext('Stream not ready yet, retrying...');
+    scheduleStreamRetry(300);
   });
 
   playPause.addEventListener('click', () => {
@@ -350,36 +399,42 @@ function serveHtml(_req, res) {
   video.playbackRate = Number(speedSelect.value) || 1;
 
   async function checkStatus() {
+    if (serverDown) return;
     try {
       const r = await fetch('/status', {cache: 'no-store'});
       const data = await r.json();
+      consecutiveStatusFailures = 0;
 
       if (data.running) {
         dot.className = 'dot running';
-        statusText.textContent = 'test running';
+        setStatusText('test running');
       } else {
-        dot.className = 'dot stopped';
-        statusText.textContent = 'test stopped';
+        enterServerDownState('Test completed. Closing window...');
+        return;
       }
 
       if (!data.videoReady) {
         setWaitingSubtext('Preparing stream... ' + (data.videoBytes || 0) + ' bytes');
       } else if (!video.classList.contains('visible')) {
-        setWaitingSubtext('Video stream is ready, starting playback...');
-      }
-
-      if (data.videoReady && !streamRequested) {
-        startVideoStream();
+        setWaitingSubtext('Video stream is ready, waiting for first frame...');
       }
     } catch (_) {
+      consecutiveStatusFailures += 1;
+      if (consecutiveStatusFailures >= MAX_STATUS_FAILURES) {
+        enterServerDownState('Video server unavailable. Closing window...');
+        return;
+      }
+
       dot.className = 'dot stopped';
-      statusText.textContent = 'server unreachable';
+      setStatusText('reconnecting...');
       setWaitingSubtext('Video server unavailable, retrying...');
+      scheduleStreamRetry(500);
     }
   }
 
+  startVideoStream();
   checkStatus();
-  setInterval(checkStatus, 500);
+  statusPollTimer = setInterval(checkStatus, STATUS_POLL_INTERVAL_MS);
 </script>
 </body>
 </html>`;
@@ -399,7 +454,7 @@ function serveStatus(_req, res) {
   });
   res.end(JSON.stringify({
     running: true,
-    videoReady: !!stat && stat.size >= 128,
+    videoReady: !!stat && stat.size > 0,
     videoBytes: stat ? stat.size : 0,
     runId: RUN_ID,
   }));
@@ -420,27 +475,28 @@ function serveBackground(_req, res) {
 }
 
 function serveVideo(_req, res) {
-  if (!isVideoReady()) {
-    res.writeHead(503, {'Content-Type': 'text/plain'});
-    res.end('Video file not ready');
-    return;
-  }
-
-  // Stream with chunked transfer encoding (no Content-Length) so the
-  // browser keeps receiving new data as ffmpeg writes it.
+  // Keep the response open and start streaming bytes as soon as they appear.
+  // This avoids 503/reconnect loops and reduces first-frame latency.
   res.writeHead(200, {
     'Content-Type': 'video/mp4',
     'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
   });
 
   let position = 0;
+  let nextTick = null;
+
+  function scheduleNext(delayMs) {
+    if (res.destroyed) return;
+    nextTick = setTimeout(sendChunk, delayMs);
+  }
 
   function sendChunk() {
     if (res.destroyed) return;
 
     const stat = getVideoStat();
     if (!stat) {
-      res.end();
+      scheduleNext(100);
       return;
     }
 
@@ -452,19 +508,23 @@ function serveVideo(_req, res) {
       });
       stream.on('end', () => {
         position = currentSize;
-        setTimeout(sendChunk, 200);
+        scheduleNext(75);
       });
       stream.on('error', () => {
-        res.end();
+        scheduleNext(150);
       });
     } else {
-      setTimeout(sendChunk, 200);
+      scheduleNext(100);
     }
   }
 
   sendChunk();
 
   res.on('close', () => {
+    if (nextTick != null) {
+      clearTimeout(nextTick);
+      nextTick = null;
+    }
     console.log('[video-server] Client disconnected from video stream');
   });
 }
