@@ -17,7 +17,7 @@ class DockerClaudeSession(
     private val debug: Boolean = false,
 ) : AiAgentSession {
 
-    override fun registerMcp(mcpUrl: String, mcpName : String) : AiAgentSession {
+    override fun registerMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         var command = claudeMcpAddCommand(mcpUrl, mcpName)
             .split(" ")
 
@@ -97,10 +97,7 @@ class DockerClaudeSession(
             error("ANTHROPIC_API_KEY is required for Claude CLI tests (set env or ~/.anthropic)")
         }
 
-        override fun createImpl(
-            session: ContainerDriver,
-            apiKey: String
-        ): DockerClaudeSession {
+        override fun createImpl(session: ContainerDriver, apiKey: String): DockerClaudeSession {
             return DockerClaudeSession(session.withSecretPattern(apiKey), apiKey)
         }
     }
