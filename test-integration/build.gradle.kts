@@ -70,6 +70,10 @@ tasks.test {
     dependsOn(pluginZip)
     dependsOn(downloadIdea)
     doFirst {
+        // Long-running integration runs can be interrupted, leaving corrupted
+        // Gradle binary test result blobs that later fail with EOFException.
+        delete(layout.buildDirectory.dir("test-results/test/binary"))
+
         val testOut = layout.buildDirectory.dir("test-logs").get().asFile.absolutePath
         mkdir(testOut)
 
