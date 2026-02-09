@@ -5,7 +5,6 @@ import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddCommand
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import java.io.File
-import java.util.Base64
 
 /**
  * Manages a Claude CLI session running inside a Docker container.
@@ -70,33 +69,6 @@ class DockerClaudeSession(
         )
     }
 
-    private fun runPromptWithUnifiedRunner(
-        prompt: String,
-        timeoutSeconds: Long,
-    ): ProcessResult? {
-        val env = buildAgentEnv(visibleConsole = false)
-        val hasRunner = session.runInContainer(
-            listOf("bash", "-lc", "command -v run-agent.sh >/dev/null 2>&1"),
-            timeoutSeconds = 5,
-            extraEnvVars = env,
-        ).exitCode == 0
-        if (!hasRunner) return null
-
-        val promptPath = "/tmp/agent-prompt-claude-${System.currentTimeMillis()}.md"
-        val encodedPrompt = Base64.getEncoder().encodeToString(prompt.toByteArray(Charsets.UTF_8))
-        val writePromptScript = "echo '$encodedPrompt' | base64 -d > '$promptPath'"
-        session.runInContainer(
-            listOf("bash", "-lc", writePromptScript),
-            timeoutSeconds = 10,
-            extraEnvVars = buildAgentEnv(visibleConsole = false),
-        )
-        return session.runInContainer(
-            args = listOf("bash", "-lc", "run-agent.sh claude . $promptPath"),
-            timeoutSeconds = timeoutSeconds,
-            extraEnvVars = buildAgentEnv(visibleConsole = true),
-        )
-    }
-
     /**
      * Run claude in non-interactive mode with a prompt.
      *
@@ -111,8 +83,6 @@ class DockerClaudeSession(
         prompt: String,
         timeoutSeconds: Long,
     ): ProcessResult {
-        runPromptWithUnifiedRunner(prompt, timeoutSeconds)?.let { return it }
-
         val claudeArgs = buildList {
             // Permission mode, necessary to allow MCP
             add("--permission-mode")
