@@ -12,22 +12,21 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * Test for DockerReaper cleanup mechanism.
+ * Test for Ryuk-based Docker cleanup mechanism.
  *
  * This test verifies that:
  * 1. Containers are labeled with session information
- * 2. Containers are registered with the reaper
- * 3. Cleanup works via normal path (CloseableStack)
- * 4. Orphaned container detection works
+ * 2. Normal cleanup via CloseableStack works
+ * 3. Ryuk reaper starts and connects properly
  */
-class DockerReaperTest {
+class RyukReaperTest {
     private lateinit var workDir: File
     private lateinit var driver: DockerDriver
     private val processRunner = ProcessRunner("TEST", emptyList())
 
     @BeforeEach
     fun setUp() {
-        workDir = createTempDirectory("docker-reaper-test")
+        workDir = createTempDirectory("ryuk-reaper-test")
         driver = DockerDriver(
             workDir = workDir,
             logPrefix = "TEST",
@@ -38,6 +37,12 @@ class DockerReaperTest {
 
     @AfterEach
     fun tearDown() {
+        // Shutdown Ryuk if started
+        try {
+            RyukReaper.getInstance().shutdown()
+        } catch (e: Exception) {
+            // Ignore
+        }
         workDir.deleteRecursively()
     }
 
@@ -46,7 +51,7 @@ class DockerReaperTest {
         val lifetime = CloseableStackHost()
 
         try {
-            // Start a simple container with sleep to keep it running
+            // Start a container with sleep to keep it running
             val containerId = driver.startContainer(
                 lifetime = lifetime,
                 imageName = "alpine:latest",
@@ -133,14 +138,11 @@ class DockerReaperTest {
     }
 
     @Test
-    fun `test orphaned container detection and cleanup`() {
-        // Clean up any existing orphaned containers first
-        DockerReaper.getInstance().cleanupOrphanedContainers()
-
+    fun `test Ryuk reaper starts and registers session`() {
         val lifetime = CloseableStackHost()
 
         try {
-            // Start a container with sleep to keep it running
+            // Start a container (this should start Ryuk automatically)
             val containerId = driver.startContainer(
                 lifetime = lifetime,
                 imageName = "alpine:latest",
@@ -148,78 +150,23 @@ class DockerReaperTest {
                 cmd = listOf("sleep", "infinity")
             )
 
-            println("Started container: $containerId")
-
-            // Manually unregister from reaper to simulate orphaned state
-            // (but don't actually kill it)
-            DockerReaper.getInstance().unregisterContainer(containerId)
-
-            // Verify container is still running
-            val beforeResult = processRunner.run(
-                listOf("docker", "ps", "-q", "--filter", "id=$containerId"),
-                description = "Check container before orphan cleanup",
-                workingDir = workDir,
-                timeoutSeconds = 5
-            )
-            assertTrue(beforeResult.output.trim().isNotEmpty(), "Container should be running")
-
-            // Now clean it up via normal path
-            driver.killContainer(containerId)
-
-            // Verify container is gone
-            val afterResult = processRunner.run(
-                listOf("docker", "ps", "-aq", "--filter", "id=$containerId"),
-                description = "Check container after cleanup",
-                workingDir = workDir,
-                timeoutSeconds = 5
-            )
-            assertTrue(afterResult.output.trim().isEmpty(), "Container should be removed")
-
-            println("Orphaned container test completed successfully")
-        } finally {
-            // Ensure cleanup
-            lifetime.closeAllStacks()
-        }
-    }
-
-    @Test
-    fun `test list containers by session filter`() {
-        val lifetime = CloseableStackHost()
-
-        try {
-            // Start multiple containers with sleep to keep them running
-            val container1 = driver.startContainer(
-                lifetime = lifetime,
-                imageName = "alpine:latest",
-                extraEnvVars = emptyMap(),
-                cmd = listOf("sleep", "infinity")
-            )
-            val container2 = driver.startContainer(
-                lifetime = lifetime,
-                imageName = "alpine:latest",
-                extraEnvVars = emptyMap(),
-                cmd = listOf("sleep", "infinity")
-            )
-
-            // List containers by session filter (use --no-trunc for full IDs)
-            val result = processRunner.run(
+            // Verify Ryuk container is running
+            val ryukResult = processRunner.run(
                 listOf(
-                    "docker", "ps", "--no-trunc", "-q",
-                    "--filter", DockerSessionLabels.createSessionFilter()
+                    "docker", "ps",
+                    "--filter", "ancestor=testcontainers/ryuk:0.5.1",
+                    "--format", "{{.ID}}"
                 ),
-                description = "List session containers",
+                description = "Check Ryuk container",
                 workingDir = workDir,
                 timeoutSeconds = 5
             )
 
-            assertEquals(0, result.exitCode, "Failed to list containers: ${result.stderr}")
+            assertTrue(ryukResult.exitCode == 0, "Failed to check Ryuk: ${ryukResult.stderr}")
+            assertTrue(ryukResult.output.trim().isNotEmpty(), "Ryuk container should be running")
 
-            val containerIds = result.output.trim().lines().filter { it.isNotBlank() }
-            assertTrue(containerIds.size >= 2, "Expected at least 2 containers, found ${containerIds.size}")
-            assertTrue(containerIds.contains(container1), "Container 1 not found in session")
-            assertTrue(containerIds.contains(container2), "Container 2 not found in session")
-
-            println("Found ${containerIds.size} containers in session: $containerIds")
+            println("Ryuk reaper is running: ${ryukResult.output.trim()}")
+            println("Test container registered: $containerId")
         } finally {
             lifetime.closeAllStacks()
         }

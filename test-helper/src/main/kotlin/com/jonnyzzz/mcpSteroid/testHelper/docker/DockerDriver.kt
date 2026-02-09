@@ -109,14 +109,17 @@ class DockerDriver(
 
         println("[$logPrefix] Container started: $containerId")
 
-        // Register with the reaper for shutdown hook cleanup
-        DockerReaper.getInstance().registerContainer(containerId)
+        // Ensure Ryuk reaper is started
+        RyukReaper.getInstance().start(workDir)
+
+        // Register with Ryuk for cleanup on connection loss
+        RyukReaper.getInstance().registerContainer(containerId)
 
         // Register normal cleanup action
         lifetime.registerCleanupAction {
             println("[$logPrefix] Stopping and removing container: $containerId")
             killContainer(containerId)
-            DockerReaper.getInstance().unregisterContainer(containerId)
+            RyukReaper.getInstance().unregisterContainer(containerId)
         }
 
         return containerId

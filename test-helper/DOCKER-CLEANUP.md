@@ -1,178 +1,186 @@
 # Docker Container Cleanup Mechanism
 
-This document describes the Docker container cleanup mechanism implemented in the test-helper module, inspired by the Testcontainers Java library.
+This document describes the Ryuk-based Docker container cleanup mechanism implemented in the test-helper module.
 
 ## Overview
 
-The cleanup mechanism ensures that Docker containers created during tests are properly cleaned up, even if the test process crashes, is killed, or exits abnormally. This prevents orphaned containers from accumulating on the Docker host.
+The cleanup mechanism uses **testcontainers/ryuk** with socket-based communication to ensure Docker containers are cleaned up even when the test process crashes or is killed with SIGKILL.
 
-## Architecture
+## How It Works
 
-The implementation consists of three main components:
+### Socket-Based Cleanup (Handles SIGKILL)
+
+1. **Ryuk Container**: Starts `testcontainers/ryuk:0.5.1` with Docker socket mounted
+2. **TCP Connection**: Java process connects to Ryuk on port 8080
+3. **Ping Messages**: Java sends "ping\n" every 1 second over the socket
+4. **Registration**: Container IDs are registered via session label filter
+5. **Death Detection**: If no ping for 5 seconds OR connection breaks, Ryuk kills all registered containers
+6. **OS-Level**: When process dies (even SIGKILL), OS closes the socket automatically
+
+### Architecture
+
+```
+Test Process                    Ryuk Container
+    |                                |
+    |------ Connect TCP ------------>|
+    |<------ ACK -------------------|
+    |                                |
+    |------ label=sessionId=UUID --->|
+    |<------ ACK -------------------|
+    |                                |
+    |------ ping ------------------>| (every 1 second)
+    |------ ping ------------------>|
+    |                                |
+    [SIGKILL / Crash]                |
+    X (socket closed by OS)          |
+                                     | (5 sec timeout)
+                                     |---> docker kill <containers>
+```
+
+## Components
 
 ### 1. DockerSessionLabels
 
 Manages Docker labels for tracking containers:
 
-- **Base Label**: `com.jonnyzzz.mcpSteroid.test=true` - Identifies all test containers
-- **Session ID Label**: `com.jonnyzzz.mcpSteroid.test.sessionId=<uuid>` - Unique per JVM process
-- **Process ID Label**: `com.jonnyzzz.mcpSteroid.test.pid=<pid>` - Process that created the container
-- **Created At Label**: `com.jonnyzzz.mcpSteroid.test.createdAt=<timestamp>` - Creation timestamp
+- **Session ID**: `com.jonnyzzz.mcpSteroid.test.sessionId=<uuid>`
+- **Process ID**: `com.jonnyzzz.mcpSteroid.test.pid=<pid>`
+- **Created At**: `com.jonnyzzz.mcpSteroid.test.createdAt=<timestamp>`
+- **Base Label**: `com.jonnyzzz.mcpSteroid.test=true`
 
-All containers started by `DockerDriver` are automatically labeled with these values.
+### 2. RyukReaper
 
-### 2. DockerReaper
+Manages the Ryuk container lifecycle and socket communication:
 
-A singleton cleanup manager that:
-
-- **Registers containers** when they are created
-- **Unregisters containers** when they are cleaned up normally
-- **Installs a JVM shutdown hook** (once per process) to clean up on exit
-- **Provides orphaned container detection** to find and clean up containers from dead processes
-
-The reaper runs cleanup in two phases:
-
-1. **Shutdown Hook**: Attempts to clean up all registered containers when the JVM exits
-2. **Session Filter**: Uses Docker labels to find and remove any containers from this session
+- Starts Ryuk container with Docker socket mounted (`-v /var/run/docker.sock:/var/run/docker.sock`)
+- Connects to Ryuk via TCP socket
+- Sends ping messages every 1 second
+- Registers session filter with Ryuk
+- Handles cleanup when connection is lost
 
 ### 3. DockerDriver Integration
 
-The `DockerDriver` automatically:
+Automatically:
+- Labels all containers with session metadata
+- Starts Ryuk reaper on first container
+- Registers containers with Ryuk
+- Provides normal cleanup via CloseableStack
 
-- Adds session labels to all containers
-- Registers containers with the reaper
-- Unregisters containers on normal cleanup (via `CloseableStack`)
-
-## How It Works
-
-### Normal Operation
+## Usage
 
 ```kotlin
-val lifetime = CloseableStack()
+val lifetime = CloseableStackHost()
 val driver = DockerDriver(workDir, "TEST")
 
-// Start a container
+// Start container - Ryuk automatically started
 val containerId = driver.startContainer(
     lifetime = lifetime,
-    imageName = "alpine:latest"
+    imageName = "alpine:latest",
+    cmd = listOf("sleep", "infinity")
 )
 
 // Container is:
 // 1. Labeled with session ID and PID
-// 2. Registered with DockerReaper
-// 3. Registered with CloseableStack
+// 2. Registered with Ryuk via socket
+// 3. Monitored by ping messages
+// 4. Registered with CloseableStack for normal cleanup
 
 // Normal cleanup
-lifetime.close()  // Cleans up container and unregisters from reaper
+lifetime.closeAllStacks()
+
+// If process crashes/SIGKILL:
+// - OS closes socket
+// - Ryuk detects loss after 5 seconds
+// - Ryuk kills all containers with session label
 ```
 
-### Crash Recovery
+## Why Ryuk?
 
-If the test process crashes before `lifetime.close()`:
+### JVM Shutdown Hooks DON'T Work For:
+- ❌ SIGKILL (`kill -9`)
+- ❌ Hard crashes (segfault, OOM)
+- ❌ Power loss
+- ❌ Force-quit in some environments
 
-1. JVM shutdown hook fires
-2. `DockerReaper.performCleanup()` runs
-3. All registered containers are killed and removed
-4. Session filter catches any containers that were missed
+### Ryuk Socket-Based Approach Works For:
+- ✅ SIGKILL - OS closes socket
+- ✅ Hard crashes - OS closes socket
+- ✅ SIGTERM - Normal cleanup + socket close
+- ✅ Uncaught exceptions - Normal cleanup + socket close
 
-### Orphaned Container Cleanup
+## Configuration
 
-To clean up containers from previous test runs that failed:
-
-```kotlin
-DockerReaper.getInstance().cleanupOrphanedContainers()
+Ryuk container is started with:
+```bash
+docker run -d --privileged \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -p 0:8080 \
+  testcontainers/ryuk:0.5.1
 ```
 
-This scans for containers with the test base label and checks if their creator process is still alive. Dead processes' containers are cleaned up.
+- **Port**: 8080 (mapped to random host port)
+- **Timeout**: 5 seconds after last ping or connection loss
+- **Ping Interval**: 1 second
 
-## Comparison with Testcontainers
+## Protocol
 
-Our implementation is inspired by Testcontainers but simplified for our use case:
+### Line-Based Communication
 
-| Feature | Testcontainers | Our Implementation |
-|---------|---------------|-------------------|
-| Container Labels | ✅ `org.testcontainers.sessionId` | ✅ `com.jonnyzzz.mcpSteroid.test.sessionId` |
-| JVM Shutdown Hook | ✅ Via ResourceReaper | ✅ Via DockerReaper |
-| Ryuk Reaper Container | ✅ TCP death detection | ❌ Not implemented |
-| Process Death Detection | ✅ Via Ryuk | ✅ Via ProcessHandle |
-| Network Cleanup | ✅ Yes | ❌ Not implemented |
-| Volume Cleanup | ✅ Yes | ❌ Not implemented |
+**Registration**:
+```
+Client: label=com.jonnyzzz.mcpSteroid.test.sessionId=<uuid>\n
+Server: ACK\n
+```
 
-### Why No Ryuk?
+**Ping Loop**:
+```
+Client: ping\n
+Client: ping\n
+Client: ping\n
+...
+```
 
-Testcontainers uses a "Ryuk" sidecar container that:
-
-- Listens on TCP port 8080
-- Accepts connections from test processes
-- Cleans up when connection dies after timeout
-
-We chose **not** to implement Ryuk because:
-
-1. **Simpler**: JVM shutdown hooks work well for our use case
-2. **Less overhead**: No additional container needed
-3. **Fewer dependencies**: No TCP server/client code
-4. **Process death detection**: We use Java's `ProcessHandle` API instead
-
-If we need more robust cleanup in the future (e.g., handling SIGKILL), we can implement Ryuk-style TCP monitoring.
+**Cleanup Trigger**:
+- No ping for 5 seconds
+- Socket closed/disconnected
+- Ryuk executes: `docker ps -aq --filter label=<sessionId> | xargs docker rm -f`
 
 ## Testing
 
-See `DockerReaperTest.kt` for comprehensive tests:
-
+See `RyukReaperTest.kt` for tests:
 - ✅ Container has session labels
-- ✅ Cleanup via CloseableStack works
-- ✅ Orphaned container detection works
-- ✅ Session filter lists containers correctly
+- ✅ Normal cleanup via CloseableStack works
+- ✅ Ryuk reaper starts and registers session
 
-## Usage Recommendations
+## CI/CD Recommendations
 
-### For Test Developers
-
-1. **Always use CloseableStack** for container lifecycle management
-2. **Call cleanupOrphanedContainers()** at the start of test suites to clean up from previous runs
-3. **Don't disable the reaper** - it's a safety net for abnormal exits
-
-### For CI/CD
-
-Add a cleanup step before tests:
-
+### Pre-Test Cleanup
 ```bash
-# Clean up any orphaned containers
+# Clean up orphaned Ryuk containers
+docker ps -aq --filter "ancestor=testcontainers/ryuk:0.5.1" | xargs -r docker rm -f
+
+# Clean up orphaned test containers
 docker ps -aq --filter "label=com.jonnyzzz.mcpSteroid.test=true" | xargs -r docker rm -f
 ```
 
+### Post-Test Cleanup
+```bash
+# Ensure all test containers are removed
+docker ps -aq --filter "label=com.jonnyzzz.mcpSteroid.test=true" | xargs -r docker rm -f
+```
+
+## Advantages Over JVM Shutdown Hooks
+
+| Scenario | JVM Shutdown Hook | Ryuk Socket |
+|----------|------------------|-------------|
+| Normal exit | ✅ Works | ✅ Works |
+| SIGTERM | ✅ Works | ✅ Works |
+| SIGKILL | ❌ Doesn't run | ✅ Works (OS closes socket) |
+| Hard crash | ❌ Doesn't run | ✅ Works (OS closes socket) |
+| Exception | ✅ Works | ✅ Works |
+
 ## References
 
-### Testcontainers Resources
-
-- [Ryuk and Resource Cleanup](https://deepwiki.com/testcontainers/testcontainers-python/3.8-ryuk-and-resource-cleanup)
-- [Testcontainers Java - Custom Configuration](https://java.testcontainers.org/features/configuration/)
-- [Resource Reaper - Testcontainers for .NET](https://dotnet.testcontainers.org/api/resource_reaper/)
-- [Garbage Collector - Testcontainers for Go](https://golang.testcontainers.org/features/garbage_collector/)
-- [Ryuk the Resource Reaper - Worldline Blog](https://blog.worldline.tech/2023/01/04/ryuk.html)
-- [testcontainers/ryuk - Docker Hub](https://hub.docker.com/r/testcontainers/ryuk)
-- [ResourceReaper.java - GitHub](https://github.com/testcontainers/testcontainers-java/blob/main/core/src/main/java/org/testcontainers/utility/ResourceReaper.java)
-- [DockerClientFactory.java - GitHub](https://github.com/testcontainers/testcontainers-java/blob/main/core/src/main/java/org/testcontainers/DockerClientFactory.java)
-- [moby-ryuk GitHub Repository](https://github.com/testcontainers/moby-ryuk)
-
-### Key Implementation Patterns from Testcontainers
-
-1. **Session ID**: UUID generated once per JVM process
-2. **Docker Labels**: Applied to all containers for filtering
-3. **JVM Shutdown Hooks**: Registered once using `AtomicBoolean.compareAndSet()`
-4. **Concurrent Data Structures**: `ConcurrentHashMap.newKeySet()` for thread-safe tracking
-5. **Docker Filters**: `--filter label=key=value` for querying containers
-
-## Future Enhancements
-
-Possible improvements if needed:
-
-1. **Ryuk Implementation**: TCP-based death detection for SIGKILL handling
-2. **Network Cleanup**: Track and clean up Docker networks
-3. **Volume Cleanup**: Track and clean up Docker volumes
-4. **Timeout-based Cleanup**: Clean up containers older than X hours
-5. **Metrics**: Track cleanup success/failure rates
-
-## License
-
-Same as the parent project.
+- [testcontainers/ryuk](https://github.com/testcontainers/moby-ryuk)
+- [Testcontainers Java](https://github.com/testcontainers/testcontainers-java)
+- [Ryuk Docker Hub](https://hub.docker.com/r/testcontainers/ryuk)
