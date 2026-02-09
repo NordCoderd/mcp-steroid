@@ -1,8 +1,4 @@
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
-import com.intellij.openapi.vcs.FilePath
-import com.intellij.openapi.vcs.history.VcsHistoryProvider
-import com.intellij.openapi.vcs.history.VcsHistorySession
-import com.intellij.openapi.vcs.history.VcsFileRevision
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.vcsUtil.VcsUtil
 

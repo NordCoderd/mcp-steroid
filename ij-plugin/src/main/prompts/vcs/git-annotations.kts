@@ -1,8 +1,5 @@
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vcs.ProjectLevelVcsManager
-import com.intellij.openapi.vcs.annotate.AnnotationProvider
-import com.intellij.openapi.vcs.annotate.FileAnnotation
-import com.intellij.openapi.vcs.history.VcsRevisionNumber
 import com.intellij.openapi.vfs.LocalFileSystem
 
 // Configure: path to the file you want to annotate
@@ -41,28 +38,29 @@ if (annotation == null) {
     return
 }
 
-// Print line-by-line annotations
-val lineCount = annotation.lineCount
-println("Total lines: $lineCount")
-println()
-println("Line | Revision | Author | Date | Content Preview")
-println("-----|----------|--------|------|----------------")
+try {
+    // Print line-by-line annotations
+    val lineCount = annotation.lineCount
+    println("Total lines: $lineCount")
+    println()
+    println("Line | Revision | Author | Date | Content Preview")
+    println("-----|----------|--------|------|----------------")
 
-// Read file content for preview
-val content = String(virtualFile.contentsToByteArray()).lines()
+    // Read file content for preview
+    val content = String(virtualFile.contentsToByteArray()).lines()
 
-for (lineNum in 0 until minOf(lineCount, 50)) { // Limit to first 50 lines
-    val revision = annotation.getLineRevisionNumber(lineNum)
-    val author = annotation.getLineAuthorValue(lineNum)
-    val date = annotation.getLineDate(lineNum)
-    val contentPreview = content.getOrNull(lineNum)?.take(40) ?: ""
+    for (lineNum in 0 until minOf(lineCount, 50)) { // Limit to first 50 lines
+        val revision = annotation.getLineRevisionNumber(lineNum)
+        val author = annotation.getLineAuthorValue(lineNum)
+        val date = annotation.getLineDate(lineNum)
+        val contentPreview = content.getOrNull(lineNum)?.take(40) ?: ""
 
-    println("${lineNum + 1} | ${revision?.asString()?.take(8) ?: "?"} | ${author ?: "?"} | ${date ?: "?"} | $contentPreview")
+        println("${lineNum + 1} | ${revision?.asString()?.take(8) ?: "?"} | ${author ?: "?"} | ${date ?: "?"} | $contentPreview")
+    }
+
+    if (lineCount > 50) {
+        println("... (${lineCount - 50} more lines)")
+    }
+} finally {
+    Disposer.dispose(annotation)
 }
-
-if (lineCount > 50) {
-    println("... (${lineCount - 50} more lines)")
-}
-
-// Clean up
-Disposer.dispose(annotation)
