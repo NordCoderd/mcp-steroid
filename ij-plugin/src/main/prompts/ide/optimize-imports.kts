@@ -25,11 +25,10 @@ if (psiFile == null || document == null) {
 val originalText = document.text
 
 if (dryRun) {
-    val preview = readAction {
-        val copy = psiFile.copy() as PsiFile
-        JavaCodeStyleManager.getInstance(project).optimizeImports(copy)
-        copy.text
-    }
+    // Copy file in readAction, then optimize in writeAction (PSI modification needs write access)
+    val copy = readAction { psiFile.copy() as PsiFile }
+    writeAction { JavaCodeStyleManager.getInstance(project).optimizeImports(copy) }
+    val preview = readAction { copy.text }
 
     println("Optimize Imports Preview")
     println("=======================")
