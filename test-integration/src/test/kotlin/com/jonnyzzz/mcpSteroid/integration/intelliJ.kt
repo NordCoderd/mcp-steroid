@@ -7,6 +7,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
+import kotlinx.serialization.json.*
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -216,6 +217,118 @@ class IntelliJDriver(
             listOf("bash", "-c", "find $pluginsGuestDir -name 'kotlinc' -type f -exec chmod +x {} + 2>/dev/null || true"),
             timeoutSeconds = 10,
         )
+    }
+
+    /**
+     * Execute Kotlin code via steroid_execute_code tool.
+     *
+     * This makes a direct HTTP call to the MCP server, bypassing AI agents.
+     * Useful for integration tests that need reliable, deterministic behavior.
+     *
+     * @param code Kotlin code to execute (suspend function body)
+     * @param taskId Task identifier (default: "integration-test")
+     * @param reason Human-readable reason for execution
+     * @param timeout Timeout in seconds (default: 600)
+     * @param projectName Project name (default: "test-project")
+     * @return MCP tool result as JSON string
+     */
+    fun mcpExecuteCode(
+        code: String,
+        taskId: String = "integration-test",
+        reason: String = "Integration test execution",
+        timeout: Int = 600,
+        projectName: String = "test-project",
+    ): String {
+        val mcpUrl = "http://localhost:${MCP_STEROID_PORT.containerPort}/mcp"
+
+        // First, initialize MCP session
+        val sessionId = mcpInitialize(mcpUrl)
+
+        // Build the tool call request using kotlinx.serialization
+        val toolCallRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 2)
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", projectName)
+                    put("code", code)
+                    put("task_id", taskId)
+                    put("reason", reason)
+                    put("timeout", timeout)
+                }
+            }
+            put("method", "tools/call")
+        }.toString()
+
+        // Execute the tool call
+        return executeMcpRequest(mcpUrl, sessionId, toolCallRequest)
+    }
+
+    /**
+     * Initialize MCP session and return session ID.
+     */
+    private fun mcpInitialize(mcpUrl: String): String {
+        val initRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 1)
+            put("method", "initialize")
+            putJsonObject("params") {
+                put("protocolVersion", "2025-11-25")
+                putJsonObject("capabilities") { }
+                putJsonObject("clientInfo") {
+                    put("name", "integration-test")
+                    put("version", "1.0")
+                }
+            }
+        }.toString()
+
+        executeMcpRequest(mcpUrl, null, initRequest)
+
+        // Return a session ID (the server will manage the actual session)
+        return "test-session-${System.currentTimeMillis()}"
+    }
+
+    /**
+     * Execute an MCP request via curl in the container.
+     */
+    private fun executeMcpRequest(
+        mcpUrl: String,
+        sessionId: String?,
+        requestBody: String
+    ): String {
+        // Create curl command
+        val curlCommand = buildList {
+            add("curl")
+            add("-s")  // Silent
+            add("-X")
+            add("POST")
+            add(mcpUrl)
+            add("-H")
+            add("Content-Type: application/json")
+            add("-H")
+            add("Accept: application/json")
+
+            // Add session cookie if present
+            if (sessionId != null) {
+                add("-H")
+                add("Cookie: mcp_session=$sessionId")
+            }
+
+            add("-d")
+            add(requestBody)
+        }
+
+        val result = driver.runInContainer(
+            curlCommand,
+            timeoutSeconds = 30,
+        )
+
+        if (result.exitCode != 0) {
+            error("MCP request failed (exit ${result.exitCode}): ${result.output}")
+        }
+
+        return result.output.trim()
     }
 
     companion object {
