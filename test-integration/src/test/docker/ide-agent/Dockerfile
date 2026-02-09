@@ -7,6 +7,7 @@ RUN apt-get update && \
         x11-utils \
         fluxbox \
         fonts-dejavu \
+        fonts-jetbrains-mono \
         ffmpeg \
         scrot \
         feh \

@@ -27,6 +27,7 @@ class XcvbDriver(
      */
     private val videoInternalDir = "/tmp/xcvb-video"
     private val videoInternalPath = "$videoInternalDir/recording.mp4"
+    private val wallpaperImagePath = "/usr/share/images/mcp-steroid-wallpaper.jpg"
 
     fun withDisplay(container: ContainerDriver): ContainerDriver {
         return container.withEnv("DISPLAY", DISPLAY)
@@ -72,15 +73,9 @@ class XcvbDriver(
         val hostVideoFile = driver.mapGuestPathToHostPath(videoGuestPath)
         println("[xcvb] Starting video recording (container-local: $videoInternalPath, host: $hostVideoFile)...")
         val proc = driver.runInContainerDetached(
-            listOf(
-                "ffmpeg", "-nostdin", "-y",
-                "-f", "x11grab", "-video_size", "3840x2160",
-                "-framerate", "10", "-i", DISPLAY,
-                "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-                "-pix_fmt", "yuv420p",
-                "-movflags", "frag_keyframe+empty_moov",
-                "-flush_packets", "1",
-                videoInternalPath,
+            buildFfmpegLiveRecordingCommand(
+                display = DISPLAY,
+                outputPath = videoInternalPath,
             ),
         )
 
@@ -164,7 +159,14 @@ class XcvbDriver(
         val hostPort = driver.mapContainerPortToHostPort(VIDEO_STREAMING_PORT)
         println("[xcvb] Starting video streaming server at http://localhost:$hostPort/")
         return driver.runInContainerDetached(
-            listOf("node", "/usr/local/bin/video-server.js", videoInternalPath, VIDEO_STREAMING_PORT.containerPort.toString(), runId),
+            listOf(
+                "node",
+                "/usr/local/bin/video-server.js",
+                videoInternalPath,
+                VIDEO_STREAMING_PORT.containerPort.toString(),
+                runId,
+                wallpaperImagePath,
+            ),
         )
     }
 
@@ -224,7 +226,7 @@ class XcvbDriver(
             "xterm",
             "-title", title,
             "-geometry", geometry,
-            "-fa", "DejaVu Sans Mono",
+            "-fa", "JetBrains Mono",
             "-fs", "11",
             "-bg", "black",
             "-fg", "white",
@@ -422,4 +424,38 @@ class XcvbDriver(
         /** Default path where the xcvb skill file is deployed inside containers. */
         const val SKILL_GUEST_PATH = "/home/agent/.skills/xcvb-display-control.md"
     }
+}
+
+/**
+ * Build FFmpeg command line for live MP4 recording optimized for early playback.
+ *
+ * Keeping keyframes at 1-second cadence prevents 20-50s startup delays where
+ * fragmented MP4 playback waits for the next keyframe-based fragment.
+ */
+internal fun buildFfmpegLiveRecordingCommand(
+    display: String,
+    outputPath: String,
+    frameRate: Int = 10,
+    keyframeIntervalSeconds: Int = 1,
+): List<String> {
+    require(frameRate > 0) { "frameRate must be > 0, got: $frameRate" }
+    require(keyframeIntervalSeconds > 0) {
+        "keyframeIntervalSeconds must be > 0, got: $keyframeIntervalSeconds"
+    }
+    val gopSize = frameRate * keyframeIntervalSeconds
+
+    return listOf(
+        "ffmpeg", "-nostdin", "-y",
+        "-f", "x11grab", "-video_size", "3840x2160",
+        "-framerate", frameRate.toString(), "-i", display,
+        "-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+        "-pix_fmt", "yuv420p",
+        "-g", gopSize.toString(),
+        "-keyint_min", gopSize.toString(),
+        "-sc_threshold", "0",
+        "-force_key_frames", "expr:gte(t,n_forced*$keyframeIntervalSeconds)",
+        "-movflags", "frag_keyframe+empty_moov+default_base_moof",
+        "-flush_packets", "1",
+        outputPath,
+    )
 }
