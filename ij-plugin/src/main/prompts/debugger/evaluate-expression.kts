@@ -62,6 +62,10 @@ suspend fun evaluateExpression(
     }
 
     // Phase 3: Compute presentation to get formatted text
+    // IMPORTANT: For complex objects (e.g., collections with toString()),
+    // the presentation may initially return "Collecting data..." while
+    // the async toString() invocation completes via BatchEvaluator.
+    // We must poll until we get the final presentation.
     val presentationDeferred = CompletableDeferred<String>()
     value.computePresentation(object : XValueNode {
         override fun setPresentation(icon: Icon?, type: String?, text: String, hasChildren: Boolean) {
@@ -74,11 +78,45 @@ suspend fun evaluateExpression(
         override fun isObsolete() = false
     }, XValuePlace.TOOLTIP)
 
-    return try {
+    val initialResult = try {
         withTimeout(timeout.seconds) { presentationDeferred.await() }
     } catch (e: Exception) {
-        "ERR: Presentation timeout - ${e.message}"
+        return "ERR: Presentation timeout - ${e.message}"
     }
+
+    // Phase 4: If we got "Collecting data...", poll for the final presentation.
+    // This happens for complex objects where toString() is invoked asynchronously.
+    if (initialResult.contains("Collecting data")) {
+        // Poll by re-evaluating presentation up to 10 times with 200ms delays
+        repeat(10) { attempt ->
+            kotlinx.coroutines.delay(200)
+            val retryDeferred = CompletableDeferred<String>()
+            value.computePresentation(object : XValueNode {
+                override fun setPresentation(icon: Icon?, type: String?, text: String, hasChildren: Boolean) {
+                    retryDeferred.complete(text)
+                }
+                override fun setPresentation(icon: Icon?, pres: XValuePresentation, hasChildren: Boolean) {
+                    retryDeferred.complete(XValuePresentationUtil.computeValueText(pres))
+                }
+                override fun setFullValueEvaluator(e: XFullValueEvaluator) {}
+                override fun isObsolete() = false
+            }, XValuePlace.TOOLTIP)
+
+            val result = try {
+                withTimeout(5.seconds) { retryDeferred.await() }
+            } catch (e: Exception) {
+                return "ERR: Retry presentation timeout - ${e.message}"
+            }
+
+            if (!result.contains("Collecting data")) {
+                return result
+            }
+        }
+        // After 10 retries, still collecting - return what we have
+        return initialResult
+    }
+
+    return initialResult
 }
 // --- End of helper ---
 

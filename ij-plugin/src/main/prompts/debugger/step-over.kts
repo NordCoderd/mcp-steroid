@@ -11,6 +11,9 @@ println("Before step: ${beforePos?.file?.name}:$beforeLine")
 // Step over must run on EDT.
 // After stepOver(), session.isSuspended becomes false (doResume clears it).
 // We then wait for re-suspension at a new position.
+// IMPORTANT: After step-over, the suspend context changes, which invalidates
+// old XValue instances. If you evaluate expressions after step-over, you'll
+// get fresh JavaValue instances that need async rendering for complex objects.
 withContext(Dispatchers.EDT) {
     session.stepOver(false)
 }
