@@ -28,6 +28,10 @@ class IdeContainer(
     val xcvbContainer: XcvbDriver,
     val intellij: RunningContainerProcess,
 ) {
+    fun listWindows(): List<WindowInfo> {
+        return xcvbContainer.listWindows()
+    }
+
     //TODO: we need an option to start MCP Steroid connection to agents or not
     val aiAgentDriver = AiAgentDriver(
         container = scope,

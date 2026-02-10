@@ -3,7 +3,6 @@ package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
@@ -94,6 +93,12 @@ class DialogKillerIntegrationTest {
             taskId = "test-open-dialog",
             reason = "Open Settings dialog to test dialog killer"
         )
+
+        val windows = session.listWindows()
+
+        windows.forEach {
+            println("[WINDOW] $it")
+        }
 
         println("\n[TEST] Step 1 Result:")
         val data = Json { }.parseToJsonElement(run)
