@@ -6,9 +6,8 @@ import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.McpResourceUris
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
-import org.junit.jupiter.api.AfterAll
+import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assumptions.assumeTrue
-import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import java.util.concurrent.TimeUnit
@@ -19,10 +18,19 @@ import java.util.concurrent.TimeUnit
  * Runs AI agents inside a Docker container with IntelliJ IDEA + MCP Steroid plugin.
  * The agent is asked to debug DemoByJonnyzzz.kt and find the sortedByDescending bug.
  *
+ * Each test creates its own IdeContainer for full isolation.
  * The container is kept alive after the test for debugging (removed on next run).
  * Video is always recorded and mounted to the host for live preview.
  */
 class DebuggerDemoTest {
+    private val lifetime by lazy {
+        CloseableStackHost()
+    }
+
+    @AfterEach
+    fun tearDown() {
+        lifetime.closeAllStacks()
+    }
 
     @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
@@ -37,9 +45,17 @@ class DebuggerDemoTest {
     fun `gemini finds sortedByDescending bug via debugger`() = runDebuggerDemo("gemini")
 
     private fun runDebuggerDemo(agentName: String) {
+        val session = IdeContainer.create(
+            lifetime, "ide-agent",
+            consoleTitle = "Debugger Demo ($agentName)",
+        )
+        val console = session.console
+
         val agent: AiAgentSession? = session.aiAgentDriver.aiAgents[agentName]
         assumeTrue(agent != null, "Agent '$agentName' is not configured")
         val debuggerOverviewUri = McpResourceUris.debuggerOverview
+
+        console.writeStep(1, "Building prompt for $agentName")
 
         val prompt = buildString {
             appendLine("Debug the file DemoByJonnyzzz.kt in this project to find the bug in the leaderboard function.")
@@ -80,9 +96,13 @@ class DebuggerDemoTest {
             appendLine("Do not use alternative labels like 'Buggy line' or 'Root cause'.")
         }
 
+        console.writeStep(2, "Running agent prompt")
+
         val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
         val output = result.output
         val combined = output + "\n" + result.stderr
+
+        console.writeStep(3, "Validating agent output")
 
         // If CLI timed out but the agent already emitted required markers, keep validating the output.
         val hasFinalMarkers = hasAnyMarkerLine(output, "BUG_FOUND", "Bug found") &&
@@ -129,7 +149,7 @@ class DebuggerDemoTest {
 
         val ignoredReturnPatterns = listOf(
             "ignor", "unused", "discard", "return value", "not assigned", "not assigned back", "not used",
-            "isn't assigned", "isn’t assigned", "ignored/not assigned",
+            "isn't assigned", "isn't assigned", "ignored/not assigned",
         )
         val returnsNewListPatterns = listOf(
             "new list", "returns new", "does not modify", "doesn't modify",
@@ -151,6 +171,9 @@ class DebuggerDemoTest {
         check(!rootCause.contains("it.first", ignoreCase = true)) {
             "ROOT_CAUSE should not claim a selector bug (`it.first` vs `it.score`).\nOutput:\n$combined"
         }
+
+        console.writeSuccess("Agent '$agentName' identified the sortedByDescending bug")
+        console.writeHeader("PASSED")
 
         println("[TEST] Agent '$agentName' successfully identified the sortedByDescending bug")
     }
@@ -192,34 +215,6 @@ class DebuggerDemoTest {
                     !lowered.contains("copy the") &&
                     !lowered.contains("one line description") &&
                     !lowered.contains("exact buggy source line")
-        }
-    }
-
-    companion object {
-        @JvmStatic
-        val lifetime by lazy {
-            CloseableStackHost()
-        }
-
-        val session by lazy {
-            IdeContainer.create(
-                lifetime,
-                "ide-agent",
-            )
-        }
-
-        @JvmStatic
-        @BeforeAll
-        fun beforeAll() {
-            // Trigger session creation (IDE start, MCP readiness)
-            // The aiAgents lazy property will also call waitForMcpReady()
-            session.toString()
-        }
-
-        @JvmStatic
-        @AfterAll
-        fun tearDown() {
-            lifetime.closeAllStacks()
         }
     }
 }
