@@ -104,7 +104,8 @@ private fun positionProjectWindow(xcvb: XcvbDriver, ijDriver: IntelliJDriver) {
     println("[IDE] Positioning project window to left 2/3 (${width}x${height}+${x}+${y})...")
 
     // Retry: the project may not be registered yet right after MCP server readiness.
-    waitFor(60_000, "Position project window") {
+    // IntelliJ may take a while to open and register the Gradle project by its name.
+    waitFor(120_000, "Position project window") {
         val result = ijDriver.mcpExecuteCode(
             projectName = "demo-project",
             code = """
