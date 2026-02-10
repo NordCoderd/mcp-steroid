@@ -266,6 +266,30 @@ class XcvbDriver(
         return true
     }
 
+    /**
+     * Query the usable screen area from the window manager.
+     * Uses `xprop` to read the `_NET_WORKAREA` property from the X root window,
+     * which excludes taskbars, panels, and other reserved areas.
+     *
+     * Falls back to the full display size if the property is not available.
+     */
+    fun getWorkArea(): WindowRect {
+        val result = runDriverCommand(
+            listOf("xprop", "-root", "_NET_WORKAREA"),
+            timeoutSeconds = 5,
+        )
+        if (result.exitCode == 0) {
+            // Output format: _NET_WORKAREA(CARDINAL) = 0, 0, 3840, 2140
+            val match = Regex("""(\d+),\s*(\d+),\s*(\d+),\s*(\d+)""").find(result.output)
+            if (match != null) {
+                val (x, y, w, h) = match.destructured
+                return WindowRect(x.toInt(), y.toInt(), w.toInt(), h.toInt())
+            }
+        }
+        // Fallback to full display
+        return WindowRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT)
+    }
+
     // ── Visible console ────────────────────────────────────────────────
 
     /**

@@ -38,13 +38,20 @@ class IdeContainer(
      * Uses IntelliJ's AWT frame API to reposition and resize the window.
      * The remaining 1/3 on the right is reserved for agent consoles.
      *
+     * Queries the actual usable screen area from the window manager (excluding taskbars)
+     * instead of using raw display dimensions.
+     *
      * Must be called after [AiAgentDriver.waitForMcpReady].
      */
     fun positionProjectWindow() {
-        val width = XcvbDriver.DISPLAY_WIDTH * 2 / 3
-        val height = XcvbDriver.DISPLAY_HEIGHT
+        val workArea = xcvbContainer.getWorkArea()
+        val width = workArea.width * 2 / 3
+        val height = workArea.height
+        val x = workArea.x
+        val y = workArea.y
 
-        println("[IDE] Positioning project window to left 2/3 (${width}x${height}+0+0)...")
+        println("[IDE] Work area: $workArea")
+        println("[IDE] Positioning project window to left 2/3 (${width}x${height}+${x}+${y})...")
         intellijDriver.mcpExecuteCode(
             projectName = "project-home",
             code = """
@@ -54,7 +61,7 @@ class IdeContainer(
                 val frame = WindowManager.getInstance().getFrame(project)
                     ?: error("No frame found for project")
 
-                frame.bounds = Rectangle(0, 0, $width, $height)
+                frame.bounds = Rectangle($x, $y, $width, $height)
                 println("Window positioned: ${'$'}{frame.bounds}")
             """.trimIndent(),
             taskId = "position-window",
