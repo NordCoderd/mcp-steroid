@@ -18,11 +18,14 @@ class AiAgentDriver(
         container.withGuestWorkDir(intellijDriver.getGuestProjectDir())
     }
 
-    private fun scopeForAgent(windowTitle: String): ContainerDriver {
+    private fun scopeForAgent(windowTitle: String, useStreamJsonFilter: Boolean = false): ContainerDriver {
         val base = scope
         return if (console != null) {
-            // When console is available, use pumping runner to show output there
-            ConsolePumpingContainerDriver(base, console, windowTitle)
+            val filterScript = if (useStreamJsonFilter) {
+                ConsolePumpingContainerDriver.deployStreamJsonFilter(base)
+                ConsolePumpingContainerDriver.STREAM_JSON_FILTER_PATH
+            } else null
+            ConsolePumpingContainerDriver(base, console, windowTitle, consoleFilterScript = filterScript)
         } else {
             // Fallback: use visible xterm console
             xcvbDriver.wrapForAgentConsole(base, windowTitle)
@@ -71,7 +74,7 @@ class AiAgentDriver(
     }
 
     private val agentFactories: Map<String, () -> AiAgentSession> = mapOf(
-        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME)), DockerClaudeSession.DISPLAY_NAME) },
+        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME, useStreamJsonFilter = true)), DockerClaudeSession.DISPLAY_NAME) },
         "codex" to { prepareAIAgent(DockerCodexSession.create(scopeForAgent(DockerCodexSession.DISPLAY_NAME)), DockerCodexSession.DISPLAY_NAME) },
         "gemini" to { prepareAIAgent(DockerGeminiSession.create(scopeForAgent(DockerGeminiSession.DISPLAY_NAME)), DockerGeminiSession.DISPLAY_NAME) },
     )

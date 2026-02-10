@@ -54,11 +54,16 @@ class ConsoleAwareAgentSession(
  * stdout is pumped with cyan prefix; stderr is pumped with red prefix.
  * The tee approach ensures output is both captured in [ProcessResult]
  * for assertions and visible in the console xterm window in real-time.
+ *
+ * When [consoleFilterScript] is set (a path to a Python filter inside the
+ * container), the pump pipes raw output through the filter before displaying.
+ * This is used to convert NDJSON (stream-json) to human-readable text.
  */
 class ConsolePumpingContainerDriver(
     private val delegate: ContainerDriver,
     private val console: ConsoleDriver,
     private val agentName: String,
+    private val consoleFilterScript: String? = null,
 ) : ContainerDriver {
     override val containerId: String get() = delegate.containerId
     private val counter = AtomicInteger(0)
@@ -67,13 +72,13 @@ class ConsolePumpingContainerDriver(
         delegate.mapContainerPortToHostPort(port)
 
     override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver =
-        ConsolePumpingContainerDriver(delegate.withGuestWorkDir(guestWorkDir), console, agentName)
+        ConsolePumpingContainerDriver(delegate.withGuestWorkDir(guestWorkDir), console, agentName, consoleFilterScript)
 
     override fun withSecretPattern(secretPattern: String): ContainerDriver =
-        ConsolePumpingContainerDriver(delegate.withSecretPattern(secretPattern), console, agentName)
+        ConsolePumpingContainerDriver(delegate.withSecretPattern(secretPattern), console, agentName, consoleFilterScript)
 
     override fun withEnv(key: String, value: String): ContainerDriver =
-        ConsolePumpingContainerDriver(delegate.withEnv(key, value), console, agentName)
+        ConsolePumpingContainerDriver(delegate.withEnv(key, value), console, agentName, consoleFilterScript)
 
     override fun runInContainer(
         args: List<String>,
@@ -85,8 +90,11 @@ class ConsolePumpingContainerDriver(
         val slug = agentName.lowercase().replace(" ", "-")
         val combinedLog = "/tmp/agent-$slug-$idx-combined.log"
 
-        // Single pump for combined output
-        val pump = console.startFilePump(combinedLog, "[$agentName]", ConsoleDriver.CYAN)
+        // Single pump for combined output, with optional filter for readable display
+        val pump = console.startFilePump(
+            combinedLog, "[$agentName]", ConsoleDriver.CYAN,
+            filterScript = consoleFilterScript,
+        )
 
         try {
             // Write a tee-wrapper script that copies each line to BOTH stdout
@@ -140,6 +148,59 @@ class ConsolePumpingContainerDriver(
     override fun toString(): String = "ConsolePumping[$agentName]($delegate)"
 
     companion object {
+        /** Container path where the stream-json filter is deployed. */
+        const val STREAM_JSON_FILTER_PATH = "/tmp/stream-json-filter.py"
+
+        /**
+         * Deploy a Python filter script that converts Claude's stream-json NDJSON
+         * output to human-readable console text.
+         *
+         * Extracts:
+         * - Assistant text from content_block_delta events (streamed incrementally)
+         * - Tool use names (e.g. ">> steroid_execute_code")
+         * - Skips raw JSON, system events, and full tool results
+         */
+        fun deployStreamJsonFilter(container: ContainerDriver) {
+            val filterScript = """
+                #!/usr/bin/env python3
+                import sys, json
+
+                for line in sys.stdin:
+                    line = line.rstrip('\n\r')
+                    if not line:
+                        continue
+                    if not line.lstrip().startswith('{'):
+                        print(line, flush=True)
+                        continue
+                    try:
+                        obj = json.loads(line)
+                        t = obj.get('type', '')
+                        if t == 'content_block_delta':
+                            text = obj.get('delta', {}).get('text', '')
+                            if text:
+                                for part in text.split('\n'):
+                                    part = part.rstrip()
+                                    if part:
+                                        print(part, flush=True)
+                        elif t == 'tool_use':
+                            name = obj.get('name', '?')
+                            inp = obj.get('input', {})
+                            detail = ''
+                            if name == 'steroid_execute_code':
+                                reason = inp.get('reason', '')
+                                if reason:
+                                    detail = f' ({reason})'
+                            elif name == 'read_mcp_resource':
+                                uri = inp.get('uri', '')
+                                if uri:
+                                    detail = f' ({uri})'
+                            print(f'>> {name}{detail}', flush=True)
+                    except (json.JSONDecodeError, KeyError, TypeError):
+                        pass
+            """.trimIndent()
+            container.writeFileInContainer(STREAM_JSON_FILTER_PATH, filterScript)
+        }
+
         private fun escapeForBash(args: List<String>): String {
             return args.joinToString(" ") { arg ->
                 "'" + arg.replace("'", "'\\''") + "'"
