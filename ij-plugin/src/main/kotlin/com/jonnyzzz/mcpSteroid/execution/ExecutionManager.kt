@@ -119,13 +119,21 @@ class ExecutionManager(
 
     private fun responseBuilder(parentScope: CoroutineScope, executionId: ExecutionId, mcpProgress: McpProgressReporter) = object : ExecutionResultBuilder {
         private val responseBuilder = ToolCallResult.builder().setExecutionId(executionId)
-        private val innerScope = CoroutineScope(parentScope.coroutineContext + Dispatchers.IO.limitedParallelism(1))
+        // Supervised job for tracking storage writes - must be completed before build() returns
+        private val storageJob = SupervisorJob(parentScope.coroutineContext[Job])
+        private val innerScope = CoroutineScope(parentScope.coroutineContext + Dispatchers.IO.limitedParallelism(1) + storageJob)
         private var failed = false
 
         override val isFailed: Boolean
             get() = failed
 
-        fun build() = responseBuilder.build()
+        suspend fun build(): ToolCallResult {
+            // Wait for all storage writes to complete before returning the result
+            // This prevents data loss if the parent scope is cancelled immediately
+            storageJob.complete()
+            storageJob.join()
+            return responseBuilder.build()
+        }
 
         override fun logMessage(message: String) {
             responseBuilder.addTextContent(message)

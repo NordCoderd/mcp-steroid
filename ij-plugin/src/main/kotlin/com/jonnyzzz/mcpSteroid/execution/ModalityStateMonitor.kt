@@ -59,6 +59,11 @@ class ModalityStateMonitor(
     // Channel that receives modal dialog info when a dialog appears
     private val modalDialogChannel = Channel<ModalDialogInfo>(Channel.CONFLATED)
 
+    // Supervised scope for screenshot captures - cancelled when disposable is disposed
+    private val screenshotScope = CoroutineScope(SupervisorJob() + Dispatchers.IO).also { scope ->
+        Disposer.register(disposable) { scope.cancel() }
+    }
+
     private var isMonitoring = false
     private var cancelOnModality = true
 
@@ -74,9 +79,9 @@ class ModalityStateMonitor(
                 val basicInfo = ModalDialogInfo(modalEntity = modalEntity)
                 modalDialogChannel.trySend(basicInfo)
 
-                // Try to capture screenshot asynchronously, but don't block
-                @OptIn(DelicateCoroutinesApi::class)
-                GlobalScope.launch(Dispatchers.IO) {
+                // Try to capture screenshot asynchronously in supervised scope
+                // This scope is cancelled in stop() to prevent resource leaks
+                screenshotScope.launch {
                     if (!isMonitoring || project.isDisposed) return@launch
                     try {
                         val info = captureModalDialog(modalEntity)
@@ -109,6 +114,8 @@ class ModalityStateMonitor(
      */
     fun stop() {
         isMonitoring = false
+        // Cancel pending screenshot captures first to prevent resource leaks
+        screenshotScope.cancel()
         modalDialogChannel.close()
         // Don't dispose here - parent will handle it
     }
