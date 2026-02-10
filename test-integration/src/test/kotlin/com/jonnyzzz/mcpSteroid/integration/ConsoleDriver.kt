@@ -41,7 +41,7 @@ class ConsoleDriver private constructor(
     }
 
     fun writeSuccess(text: String) {
-        writeLine("${GREEN}OK$RESET $text")
+        writeLine(" ${GREEN}OK$RESET $text")
     }
 
     fun writeError(text: String) {
@@ -155,7 +155,7 @@ class ConsoleDriver private constructor(
             val rect = WindowRect(
                 x = workArea.x + workArea.width * 2 / 3 + 2,
                 y = workArea.y,
-                width = workArea.width / 3 - 2,
+                width = workArea.width / 3 - 4,  // 2px gap on left and right
                 height = workArea.height,
             )
 
