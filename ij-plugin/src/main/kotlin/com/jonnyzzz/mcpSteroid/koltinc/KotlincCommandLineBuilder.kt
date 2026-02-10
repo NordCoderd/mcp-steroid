@@ -72,6 +72,8 @@ class KotlincCommandLineBuilder(
 
         val args = mutableListOf<String>()
 
+        args.addAll(extraParameters)
+
         if (classpath.isNotEmpty()) {
             val cp = classpath.joinToString(File.pathSeparator) { it.toString() }
             args.add("-classpath")
@@ -84,8 +86,6 @@ class KotlincCommandLineBuilder(
         if (noStdLib) {
             args.add("-no-stdlib")
         }
-
-        args.addAll(extraParameters)
 
         args.add("-d")
         args.add(outputJar.toString())

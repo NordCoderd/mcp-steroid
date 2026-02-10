@@ -490,8 +490,28 @@ Context provided in the script body:
   - `mcp.steroid.storage.path`: Override storage path (empty = `.idea/mcp-steroid`)
   - `mcp.steroid.idea.description.enabled`: Generate `.idea/mcp-steroid.md` (default: `true`)
   - `mcp.steroid.analytics.enabled`: Enable minimalistic analytics (default: `true`)
-  - `mcp.steroid.kotlinc.parameters`: Additional kotlinc command-line parameters, space-separated (default: empty). For example: `-Xskip-metadata-version-check`
-  - `mcp.steroid.kotlinc.home`: Path to external kotlinc home directory (default: empty, uses bundled). Useful when the IDE ships a newer Kotlin version than the plugin bundles.
+  - `mcp.steroid.kotlinc.parameters`: Additional kotlinc command-line parameters (default: empty). Parsed with `ParametersListUtil.parse()` so quoted values are supported (e.g. `"-Xopt=value with spaces"`). See [Kotlinc Workaround](#kotlinc-version-mismatch-workaround) below.
+  - `mcp.steroid.kotlinc.home`: Path to an external kotlinc home directory (default: empty, uses bundled). When set, overrides the bundled compiler. See [Kotlinc Workaround](#kotlinc-version-mismatch-workaround) below.
+
+### Kotlinc Version-Mismatch Workaround
+
+The plugin bundles a Kotlin compiler (currently 2.2.x). When the IDE ships a newer Kotlin version
+(e.g. 2025.2+ bundles Kotlin 2.4), the metadata produced by the IDE's Kotlin plugin is newer than
+what the bundled compiler can read. This causes compilation errors like
+`Module was compiled with an incompatible version of Kotlin`.
+
+> **Note:** `-Xskip-metadata-version-check` does **not** help here — the gap between Kotlin 2.2 and
+> 2.4 metadata is too large for this flag to bridge.
+
+**Workaround options** (configured via **Help > Find Action > Registry**):
+
+1. **Point at an external kotlinc** — set `mcp.steroid.kotlinc.home` to the IDE's bundled Kotlin
+   compiler directory (e.g. `<IDE>/plugins/Kotlin/kotlinc`). The plugin will use that compiler
+   instead of its own bundled one.
+
+2. **Pass extra compiler flags** — set `mcp.steroid.kotlinc.parameters` to any additional flags
+   the external or bundled compiler may need. The value is parsed with
+   `ParametersListUtil.parse()`, so quoting is respected.
 
 ### Script Preprocessing (CodeButcher)
 
