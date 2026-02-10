@@ -67,12 +67,20 @@ class DialogKiller {
         project: Project,
         executionId: ExecutionId,
         logMessage: (String) -> Unit,
+        forceEnabled: Boolean? = null,
     ) {
         if (ApplicationManager.getApplication().isHeadlessEnvironment) {
             return
         }
 
-        if (!Registry.`is`("mcp.steroid.dialog.killer.enabled")) {
+        // forceEnabled == false → skip entirely
+        // forceEnabled == true → skip registry check, force enable
+        // forceEnabled == null → use registry setting (default behavior)
+        if (forceEnabled == false) {
+            return
+        }
+
+        if (forceEnabled == null && !Registry.`is`("mcp.steroid.dialog.killer.enabled")) {
             return
         }
 

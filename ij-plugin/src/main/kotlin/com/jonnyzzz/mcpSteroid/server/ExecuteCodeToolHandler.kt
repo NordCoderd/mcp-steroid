@@ -32,6 +32,9 @@ data class ExecCodeParams(
     /** If true, cancel execution when a modal dialog appears and return a screenshot. Default true. */
     val cancelOnModal: Boolean = true,
 
+    /** Controls pre-execution dialog killer: null = use registry default, true = force enable, false = force disable. */
+    val dialogKiller: Boolean? = null,
+
     val rawParams: JsonObject,
 )
 
@@ -126,6 +129,10 @@ class ExecuteCodeToolHandler : McpRegistrar {
                         put("type", "integer")
                         put("description", "Execution timeout in seconds (default: 600, configurable via mcp.steroid.execution.timeout registry key)")
                     }
+                    putJsonObject("dialog_killer") {
+                        put("type", "boolean")
+                        put("description", "Override pre-execution dialog killer: true = force enable, false = force disable. Default: use registry setting (mcp.steroid.dialog.killer.enabled).")
+                    }
                     putJsonObject("required_plugins") {
                         put("type", "array")
                         putJsonObject("items") {
@@ -161,6 +168,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
             ?: return errorResult("Missing required parameter: task_id")
         val reason = args["reason"]?.jsonPrimitive?.contentOrNull
         val timeout = args["timeout"]?.jsonPrimitive?.intOrNull ?: Registry.intValue("mcp.steroid.execution.timeout", 600)
+        val dialogKiller = args["dialog_killer"]?.jsonPrimitive?.booleanOrNull
         val requiredPlugins = args["required_plugins"]
             ?.jsonArray
             ?.mapNotNull { it.jsonPrimitive.contentOrNull }
@@ -185,6 +193,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
             code = code,
             reason = reason ?: "No reason provided",
             timeout = timeout,
+            dialogKiller = dialogKiller,
             rawParams = params.arguments
         )
 

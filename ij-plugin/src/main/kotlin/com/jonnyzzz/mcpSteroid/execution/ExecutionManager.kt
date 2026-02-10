@@ -67,7 +67,8 @@ class ExecutionManager(
                         dialogKiller().killProjectDialogs(
                             project = project,
                             executionId = executionId,
-                            builder::logMessage,
+                            logMessage = builder::logMessage,
+                            forceEnabled = exec.dialogKiller,
                         )
                     }
 
