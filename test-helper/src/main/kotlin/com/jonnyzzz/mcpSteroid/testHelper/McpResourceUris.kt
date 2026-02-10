@@ -6,6 +6,9 @@ object McpResourceUris {
     private const val SCHEME_SEPARATOR = "://"
 
     val debuggerOverview: String = buildUri("debugger/overview")
+    val debuggerEvaluateExpression: String = buildUri("debugger/evaluate-expression")
+    val debuggerWaitForSuspend: String = buildUri("debugger/wait-for-suspend")
+    val debuggerStepOver: String = buildUri("debugger/step-over")
 
     private fun buildUri(path: String): String = "$SCHEME$SCHEME_SEPARATOR$path"
 }

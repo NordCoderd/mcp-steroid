@@ -1,29 +1,34 @@
 ---
 name: intellij-mcp-steroid-debugger
-description: Use IntelliJ debugger APIs via steroid_execute_code to set breakpoints, start debug sessions, pause/resume, inspect threads, and build thread dumps.
+description: Use IntelliJ debugger APIs via steroid_execute_code to set breakpoints, start debug sessions, evaluate variables, step through code, and inspect threads.
 ---
 
 # IntelliJ Debugger Skill
 
-Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions and inspect runtime state.
+Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions, evaluate variables, and step through code.
 
 ## Quickstart
 
-1) Load `mcp-steroid://debugger/overview` and pick the examples you need.
-2) Set breakpoints (example: `mcp-steroid://debugger/set-line-breakpoint`).
-3) Start a debug run configuration (example: `mcp-steroid://debugger/debug-run-configuration`).
-4) Pause/resume and inspect session state (example: `mcp-steroid://debugger/debug-session-control`).
-5) List threads or build a thread dump (examples: `debug-list-threads`, `debug-thread-dump`).
+1) Load `mcp-steroid://debugger/overview` for the recommended workflow.
+2) Set breakpoints: `mcp-steroid://debugger/set-line-breakpoint`
+3) Create run config if needed: `mcp-steroid://debugger/create-application-config`
+4) Start debug session: `mcp-steroid://debugger/debug-run-configuration`
+5) Wait for breakpoint hit: `mcp-steroid://debugger/wait-for-suspend`
+6) **Evaluate variables**: `mcp-steroid://debugger/evaluate-expression`
+7) **Step over**: `mcp-steroid://debugger/step-over`
+8) Evaluate again to see changes.
 
 ## Stateful exec_code workflow
 
 `exec_code` is stateful. Split debugger work into multiple short calls:
 
 - Call #1: set breakpoints
-- Call #2: start debug run
-- Call #3+: poll `XDebuggerManager.currentSession` and check `isSuspended`
-- Call #4: list threads / top frames
-- Call #5: thread dump (optional)
+- Call #2: create run config (if needed) + start debug run
+- Call #3: wait for suspend (poll `isSuspended`)
+- Call #4: evaluate variables at breakpoint
+- Call #5: step over
+- Call #6: evaluate again to compare before/after
+- Call #7: stop debugger
 
 Avoid long waits or sleeps inside a single call; prefer multiple short polls.
 
@@ -45,11 +50,14 @@ Avoid long waits or sleeps inside a single call; prefer multiple short polls.
 ## Expression Evaluation
 
 **CRITICAL**: Do NOT write your own evaluation helper! Copy the complete `evaluateExpression()`
-function from `docs/DEBUG_SCRIPT.md` with ALL imports. Common import mistakes:
+function from `mcp-steroid://debugger/evaluate-expression` with ALL imports.
 
-- ❌ `com.intellij.xdebugger.frame.XValuePresentation` (wrong package)
-- ✅ `com.intellij.xdebugger.frame.presentation.XValuePresentation` (correct)
+Common import mistakes:
+- `com.intellij.xdebugger.frame.XValuePresentation` (wrong package)
+- `com.intellij.xdebugger.frame.presentation.XValuePresentation` (correct)
+- `XDebugValue` or `XDebuggerEvaluationResult` (do NOT exist - the correct type is `XValue`)
 
+The callback receives `XValue` (from `com.intellij.xdebugger.frame`), NOT `XDebugValue`.
 The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex callback implementations.
 
 ## Common pitfalls
@@ -61,9 +69,10 @@ The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex cal
 - Start run configurations on EDT (use `withContext(Dispatchers.EDT)`).
 - UI calls like `FileEditorManager.openFile(...)` must run on EDT.
 - `ProgramRunnerUtil` import: `com.intellij.execution.ProgramRunnerUtil` (not `com.intellij.execution.runners.ProgramRunnerUtil`).
-- **Import errors**: Use exact imports from docs - `XValuePresentation` is in `presentation` subpackage!
+- **Import errors**: Use exact imports from the MCP resource examples - `XValuePresentation` is in `presentation` subpackage!
 - `XDebuggerEvaluator.evaluate(...)` is callback-based; do not assign its return value.
 - The callback type is nested: `XDebuggerEvaluator.XEvaluationCallback` (not a top-level `XEvaluationCallback` import).
+- The callback's `evaluated()` method receives `XValue`, NOT `XDebugValue` or `XDebuggerEvaluationResult`.
 - For run config creation, use `RunManager.createConfiguration(name, factory)` + `RunManager.addConfiguration(settings)` (avoid deprecated add/store shortcuts).
 - Keep breakpoint API usage on `XDebuggerUtil` public methods; avoid `impl`/`internal` helpers from `xdebugger-impl`.
 - Wrap `FilenameIndex`, PSI, and document access in `readAction {}`.
@@ -81,7 +90,11 @@ The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex cal
 ### Debugger Resources
 - [Debugger Overview](mcp-steroid://debugger/overview) - Complete debugger examples overview
 - [Set Line Breakpoint](mcp-steroid://debugger/set-line-breakpoint) - Create and manage breakpoints
+- [Create Application Config](mcp-steroid://debugger/create-application-config) - Create run configuration
 - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging a run config
+- [Wait for Suspend](mcp-steroid://debugger/wait-for-suspend) - Wait for breakpoint hit
+- [Evaluate Expression](mcp-steroid://debugger/evaluate-expression) - Evaluate variables at breakpoint
+- [Step Over](mcp-steroid://debugger/step-over) - Step through code
 - [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause, resume, and stop sessions
 - [List Threads](mcp-steroid://debugger/debug-list-threads) - Inspect execution stacks and threads
 - [Thread Dump](mcp-steroid://debugger/debug-thread-dump) - Generate complete thread dumps

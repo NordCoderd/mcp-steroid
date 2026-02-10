@@ -1,21 +1,46 @@
 # Debugger Examples
 
 These resources show how to drive IntelliJ's debugger APIs from `steroid_execute_code`.
-Use them as building blocks to set breakpoints, start a debug session, pause/resume,
-and inspect threads/stack frames.
+Use them as building blocks to set breakpoints, start a debug session, evaluate variables,
+step through code, and inspect threads/stack frames.
 
 Stateful exec_code note: the execute_code tool is stateful, so run these in multiple
-short calls (set breakpoints -> start debug -> pause -> inspect) rather than one
+short calls (set breakpoints -> start debug -> wait for suspend -> evaluate -> step) rather than one
 long script with waits.
+
+## Recommended Workflow
+
+Follow this sequence of resources for a complete debug session:
+
+1. `mcp-steroid://debugger/set-line-breakpoint` - set breakpoint on target line
+2. `mcp-steroid://debugger/create-application-config` - create run config (if needed)
+3. `mcp-steroid://debugger/debug-run-configuration` - start debug session
+4. `mcp-steroid://debugger/wait-for-suspend` - wait for breakpoint hit
+5. `mcp-steroid://debugger/evaluate-expression` - evaluate variables at breakpoint
+6. `mcp-steroid://debugger/step-over` - step to next line
+7. `mcp-steroid://debugger/evaluate-expression` - evaluate again to see changes
+
+Each step should be a separate `steroid_execute_code` call. Do NOT combine steps into one large script.
 
 ## Available resources
 
+### Setup
 - `mcp-steroid://debugger/set-line-breakpoint` - create a line breakpoint
+- `mcp-steroid://debugger/create-application-config` - create Application run configuration
 - `mcp-steroid://debugger/debug-run-configuration` - start a run configuration in Debug
-- `mcp-steroid://debugger/demo-debug-test` - end-to-end debug + test results demo
+
+### Inspection (the essential ones for finding bugs)
+- `mcp-steroid://debugger/wait-for-suspend` - wait for debugger to suspend at breakpoint
+- `mcp-steroid://debugger/evaluate-expression` - evaluate variables/expressions at breakpoint
+- `mcp-steroid://debugger/step-over` - step over current line and observe changes
+
+### Session management
 - `mcp-steroid://debugger/debug-session-control` - pause/resume/stop the current session
 - `mcp-steroid://debugger/debug-list-threads` - list execution stacks (threads)
 - `mcp-steroid://debugger/debug-thread-dump` - build a basic thread dump from stacks
+
+### Demos
+- `mcp-steroid://debugger/demo-debug-test` - end-to-end debug + test results demo
 
 ## Tips
 
@@ -23,6 +48,7 @@ long script with waits.
 - Do not hardcode line numbers; locate the target statement by text (for example, the `sortedByDescending` call) before placing breakpoints.
 - Use `mcp-steroid://debugger/set-line-breakpoint` for breakpoint setup (preferred API: `toggleLineBreakpoint` on EDT).
 - Use `mcp-steroid://debugger/debug-run-configuration` for debug launch (uses `com.intellij.execution.ProgramRunnerUtil`).
+- **For variable evaluation, always copy the `evaluateExpression()` helper from `mcp-steroid://debugger/evaluate-expression`**. Do NOT write your own evaluation code -- the callback API is tricky and easy to get wrong.
 - UI calls like `FileEditorManager.openFile(...)` must run on EDT (`withContext(Dispatchers.EDT)`).
 - Stop debug sessions when done: use debug-session-control or
   withContext(Dispatchers.EDT) { XDebuggerManager.getInstance(project).debugSessions.forEach { it.stop() } }
@@ -38,8 +64,9 @@ long script with waits.
 - Run config creation: prefer `RunManager.createConfiguration(name, factory)` then `RunManager.addConfiguration(settings)`; choose storage via `settings.storeInDotIdeaFolder()` or `settings.storeInLocalWorkspace()` before add.
 - Breakpoints: use `XDebuggerUtil.getInstance().toggleLineBreakpoint(project, file, line)` instead of internal/impl helpers.
 - Session control: use `XDebuggerManager.getInstance(project).currentSession`, then `pause()`, `resume()`, `stepOver(...)`, `stop()`.
-- Expression evaluation is callback-based: `XDebuggerEvaluator.evaluate(String|XExpression, XDebuggerEvaluator.XEvaluationCallback, XSourcePosition?)` returns `Unit` and does not return the value directly. Use nested callback type `XDebuggerEvaluator.XEvaluationCallback` (there is no top-level `XEvaluationCallback` class to import).
-- Build expressions with `XDebuggerUtil.getInstance().createExpression(text, null, null, com.intellij.xdebugger.evaluation.EvaluationMode.EXPRESSION)`; avoid `com.intellij.xdebugger.impl.XExpressionImpl`.
+- Expression evaluation is callback-based. **Do NOT write your own callback implementation -- copy the complete `evaluateExpression()` helper from `mcp-steroid://debugger/evaluate-expression`.**
+  Key types: `XDebuggerEvaluator.XEvaluationCallback` (nested, not top-level), callback receives `XValue` (from `com.intellij.xdebugger.frame`), presentation via `XValuePresentationUtil.computeValueText()`.
+- Step over: `session.stepOver(false)` on EDT, then wait for re-suspension.
 - PSI/VFS lookups (for example `FilenameIndex`, `PsiManager`, documents) must run in `readAction { ... }`.
 
 ## Failure-Recovery Pattern
@@ -63,9 +90,13 @@ When a debugger script fails with unresolved imports/APIs or runtime setup error
 ### Debugger Examples
 - [Debugger Overview](mcp-steroid://debugger/overview) - This document
 - [Set Line Breakpoint](mcp-steroid://debugger/set-line-breakpoint) - Create and manage breakpoints
+- [Create Application Config](mcp-steroid://debugger/create-application-config) - Create run configuration
 - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging
-- [Demo Debug Test](mcp-steroid://debugger/demo-debug-test) - End-to-end debug + test results demo
+- [Wait for Suspend](mcp-steroid://debugger/wait-for-suspend) - Wait for breakpoint hit
+- [Evaluate Expression](mcp-steroid://debugger/evaluate-expression) - Evaluate variables at breakpoint
+- [Step Over](mcp-steroid://debugger/step-over) - Step through code
 - [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause, resume, stop
+- [Demo Debug Test](mcp-steroid://debugger/demo-debug-test) - End-to-end debug + test results demo
 - [List Threads](mcp-steroid://debugger/debug-list-threads) - Inspect execution stacks
 - [Thread Dump](mcp-steroid://debugger/debug-thread-dump) - Generate thread dumps
 
