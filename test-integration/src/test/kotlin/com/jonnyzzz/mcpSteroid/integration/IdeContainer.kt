@@ -211,12 +211,13 @@ fun IdeContainer.Companion.create(
     println("=".repeat(60))
     println()
 
-    // Position project window before creating console so the console
-    // is visible during warmup on the right side of the screen
-    positionProjectWindow(xcvb, ijDriver)
-
-    // Create console (immutable, starts immediately)
+    // Create console first so all subsequent steps are visible in it
     val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
+
+    // Position IDE window (console shows the step)
+    console.writeStep(0, "Positioning IDE window...")
+    positionProjectWindow(xcvb, ijDriver)
+    console.writeSuccess("IDE window positioned")
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
 
@@ -321,12 +322,13 @@ fun IdeContainer.Companion.createWithGitRepo(
     println("=".repeat(60))
     println()
 
-    // Position project window before creating console so the console
-    // is visible during warmup on the right side of the screen
-    positionProjectWindow(xcvb, ijDriver)
-
-    // Create console (immutable, starts immediately)
+    // Create console first so all subsequent steps are visible in it
     val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
+
+    // Position IDE window (console shows the step)
+    console.writeStep(0, "Positioning IDE window...")
+    positionProjectWindow(xcvb, ijDriver)
+    console.writeSuccess("IDE window positioned")
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
 
