@@ -211,16 +211,15 @@ fun IdeContainer.Companion.create(
     println("=".repeat(60))
     println()
 
-    // Create console first so all subsequent steps are visible in it
-    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
-
-    // Position IDE window (console shows the step)
-    console.writeStep(0, "Positioning IDE window...")
+    // Position IDE window first (left 2/3 of screen)
     positionProjectWindow(xcvb, ijDriver)
-    console.writeSuccess("IDE window positioned")
+
+    // Create console window (right 1/3 of screen)
+    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
 
+    // Wait for indexing (shown in console)
     if (waitForProjectReady) {
         session.waitForProjectReady()
     }
@@ -322,16 +321,15 @@ fun IdeContainer.Companion.createWithGitRepo(
     println("=".repeat(60))
     println()
 
-    // Create console first so all subsequent steps are visible in it
-    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
-
-    // Position IDE window (console shows the step)
-    console.writeStep(0, "Positioning IDE window...")
+    // Position IDE window first (left 2/3 of screen)
     positionProjectWindow(xcvb, ijDriver)
-    console.writeSuccess("IDE window positioned")
+
+    // Create console window (right 1/3 of screen)
+    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
 
+    // Wait for indexing (shown in console)
     if (waitForProjectReady) {
         session.waitForProjectReady()
     }
