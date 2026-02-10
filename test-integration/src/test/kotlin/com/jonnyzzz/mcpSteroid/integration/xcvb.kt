@@ -316,7 +316,7 @@ class XcvbDriver(
             "-title", title,
             "-geometry", geometry,
             "-fa", "JetBrains Mono:style=Regular",
-            "-fs", "15",
+            "-fs", "16",
             "-bg", "black",
             "-fg", "white",
             "-e",
@@ -488,6 +488,12 @@ class XcvbDriver(
     private fun shellEscape(s: String): String {
         return "'" + s.replace("'", "'\\''") + "'"
     }
+
+    fun waitForWindowAndPlace(
+        titlePattern: String,
+        rect: WindowRect,
+        timeoutMs: Long,
+    ): Boolean = waitForWindowAndPlace(listOf(titlePattern), rect, timeoutMs)
 
     private fun waitForWindowAndPlace(
         titlePatterns: List<String>,

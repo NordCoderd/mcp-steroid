@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
@@ -37,11 +36,11 @@ class IdeContainer(
     }
 
     /**
-     * Move the IDE project window to the left 2/3 of the screen via MCP Steroid execute_code.
-     * Delegates to the standalone [positionProjectWindow] function.
+     * Move the IDE project window to the left 2/3 of the screen via xdotool.
+     * Runs asynchronously in a background thread.
      */
     fun positionProjectWindow() {
-        positionProjectWindow(xcvbContainer, intellijDriver)
+        positionProjectWindowAsync(xcvbContainer, console = console)
     }
 
     /**
@@ -84,46 +83,46 @@ class IdeContainer(
 }
 
 /**
- * Move the IDE project window to the left 2/3 of the screen via MCP Steroid execute_code.
- * Uses IntelliJ's AWT frame API to reposition and resize the window.
- * The remaining 1/3 on the right is reserved for agent consoles.
+ * Position the IDE project window to the left 2/3 of the screen using xdotool.
  *
- * Queries the actual usable screen area from the window manager (excluding taskbars)
- * instead of using raw display dimensions.
+ * Runs in a **background thread** and polls for the window by title pattern.
+ * This avoids the dependency on MCP server readiness that the old AWT-based
+ * approach had, allowing the window to be positioned as soon as it appears.
  *
- * Must be called after [AiAgentDriver.waitForMcpReady].
+ * @param windowTitlePattern xdotool name pattern to find the IDE window
  */
-private fun positionProjectWindow(xcvb: XcvbDriver, ijDriver: IntelliJDriver) {
+private fun positionProjectWindowAsync(
+    xcvb: XcvbDriver,
+    windowTitlePattern: String = "demo-project",
+    console: ConsoleDriver? = null,
+) {
     val workArea = xcvb.getWorkArea()
-    val width = workArea.width * 2 / 3
-    val height = workArea.height
-    val x = workArea.x
-    val y = workArea.y
+    val rect = WindowRect(
+        x = workArea.x,
+        y = workArea.y,
+        width = workArea.width * 2 / 3,
+        height = workArea.height,
+    )
 
     println("[IDE] Work area: $workArea")
-    println("[IDE] Positioning project window to left 2/3 (${width}x${height}+${x}+${y})...")
+    println("[IDE] Will position project window to left 2/3 (${rect.width}x${rect.height}+${rect.x}+${rect.y})...")
 
-    // Retry: the project may not be registered yet right after MCP server readiness.
-    // IntelliJ may take a while to open and register the Gradle project by its name.
-    waitFor(120_000, "Position project window") {
-        val result = ijDriver.mcpExecuteCode(
-            projectName = "demo-project",
-            code = """
-                import java.awt.Rectangle
-                import com.intellij.openapi.wm.WindowManager
-
-                val frame = WindowManager.getInstance().getFrame(project)
-                    ?: error("No frame found for project")
-
-                frame.bounds = Rectangle($x, $y, $width, $height)
-                println("Window positioned: ${'$'}{frame.bounds}")
-            """.trimIndent(),
-            taskId = "position-window",
-            reason = "Position project window to left 2/3 of screen",
-        )
-        result.exitCode == 0
+    kotlin.concurrent.thread(start = true, isDaemon = true, name = "ide-window-position") {
+        runCatching {
+            val positioned = xcvb.waitForWindowAndPlace(
+                titlePattern = windowTitlePattern,
+                rect = rect,
+                timeoutMs = 120_000L,
+            )
+            if (positioned) {
+                println("[IDE] Project window positioned via xdotool")
+                console?.writeSuccess("IDE window positioned")
+            } else {
+                println("[IDE] WARNING: failed to position project window via xdotool")
+                console?.writeError("Failed to position IDE window")
+            }
+        }
     }
-    println("[IDE] Project window positioned")
 }
 
 fun IdeContainer.Companion.create(
@@ -141,7 +140,6 @@ fun IdeContainer.Companion.create(
         file
     }
 
-    // Create all mount-point subdirectories
     println("[IDE-AGENT] Run directory: $runDir")
     val imageName = "$dockerFileBase-test"
     val scope = buildIdeImage(dockerFileBase, imageName)
@@ -173,6 +171,10 @@ fun IdeContainer.Companion.create(
 
     container = xcvb.withDisplay(container)
 
+    // Create console early — visible during IDE startup and warmup
+    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
+    console.writeInfo("Preparing IntelliJ IDEA...")
+
     val ijDriver = IntelliJDriver(
         lifetime,
         container,
@@ -181,10 +183,16 @@ fun IdeContainer.Companion.create(
 
     ijDriver.mountProjectFiles(projectName)
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
-    val ijContainer = ijDriver.startIde()
 
-    // Wait for MCP server readiness before creating console
-    // (this uses a temporary AiAgentDriver just for waiting + url computation)
+    console.writeInfo("Starting IntelliJ IDEA...")
+    val ijContainer = ijDriver.startIde()
+    console.writeSuccess("IntelliJ IDEA process started")
+
+    // Position IDE window as soon as it appears (async, via xdotool)
+    positionProjectWindowAsync(xcvb, console = console)
+
+    // Wait for MCP server readiness
+    console.writeInfo("Waiting for MCP Steroid server...")
     val tempAgentDriver = AiAgentDriver(
         container = container,
         intellijDriver = ijDriver,
@@ -192,6 +200,7 @@ fun IdeContainer.Companion.create(
         console = null,
     )
     tempAgentDriver.waitForMcpReady()
+    console.writeSuccess("MCP Steroid server ready")
 
     // Write info file with all ports and URLs for external tools
     val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
@@ -211,12 +220,6 @@ fun IdeContainer.Companion.create(
     println("  SESSION INFO:    $infoFile")
     println("=".repeat(60))
     println()
-
-    // Position IDE window first (left 2/3 of screen)
-    positionProjectWindow(xcvb, ijDriver)
-
-    // Create console window (right 1/3 of screen)
-    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
 
@@ -283,6 +286,10 @@ fun IdeContainer.Companion.createWithGitRepo(
 
     container = xcvb.withDisplay(container)
 
+    // Create console early — visible during git clone, IDE startup, and warmup
+    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
+    console.writeInfo("Cloning git repository...")
+
     val ijDriver = IntelliJDriver(
         lifetime,
         container,
@@ -290,10 +297,19 @@ fun IdeContainer.Companion.createWithGitRepo(
     )
 
     ijDriver.cloneGitRepo(gitRepoUrl, timeoutSeconds = cloneTimeoutSeconds)
+    console.writeSuccess("Repository cloned")
+
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
+
+    console.writeInfo("Starting IntelliJ IDEA...")
     val ijContainer = ijDriver.startIde()
+    console.writeSuccess("IntelliJ IDEA process started")
+
+    // Position IDE window as soon as it appears (async, via xdotool)
+    positionProjectWindowAsync(xcvb, console = console)
 
     // Wait for MCP server readiness
+    console.writeInfo("Waiting for MCP Steroid server...")
     val tempAgentDriver = AiAgentDriver(
         container = container,
         intellijDriver = ijDriver,
@@ -301,6 +317,7 @@ fun IdeContainer.Companion.createWithGitRepo(
         console = null,
     )
     tempAgentDriver.waitForMcpReady()
+    console.writeSuccess("MCP Steroid server ready")
 
     val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
     val mcpUrl = tempAgentDriver.mcpSteroidHostUrl
@@ -321,12 +338,6 @@ fun IdeContainer.Companion.createWithGitRepo(
     println("  SESSION INFO:    $infoFile")
     println("=".repeat(60))
     println()
-
-    // Position IDE window first (left 2/3 of screen)
-    positionProjectWindow(xcvb, ijDriver)
-
-    // Create console window (right 1/3 of screen)
-    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
 
