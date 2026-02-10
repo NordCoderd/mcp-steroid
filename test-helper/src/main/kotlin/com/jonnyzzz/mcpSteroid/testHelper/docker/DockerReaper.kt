@@ -74,6 +74,7 @@ object DockerReaper {
             imageName = IMAGE_NAME,
             volumes = listOf(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock")),
             ports = listOf(port8080),
+            autoRemove = true,
         )
 
         val reaperContainerId = containerDriver.containerId

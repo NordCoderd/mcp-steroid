@@ -93,8 +93,9 @@ fun startContainerDriver(
     extraEnvVars: Map<String, String> = emptyMap(),
     volumes: List<ContainerVolume> = listOf(),
     ports: List<ContainerPort> = listOf(),
+    autoRemove: Boolean = false,
 ): ContainerDriver {
-    val containerId = scope.startContainer(lifetime, imageName, extraEnvVars, volumes, ports)
+    val containerId = scope.startContainer(lifetime, imageName, extraEnvVars, volumes, ports, autoRemove = autoRemove)
 
     // Register with reaper for cleanup on crash/SIGKILL
     DockerReaper.registerContainer(containerId, scope.workDir)

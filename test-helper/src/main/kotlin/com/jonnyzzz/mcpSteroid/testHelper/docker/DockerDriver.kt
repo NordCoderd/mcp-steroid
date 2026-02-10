@@ -61,11 +61,13 @@ class DockerDriver(
         volumes: List<ContainerVolume> = emptyList(),
         ports: List<ContainerPort> = emptyList(),
         cmd: List<String> = emptyList(),
+        autoRemove: Boolean = false,
     ): String {
         val command = buildList {
             add("docker")
             add("run")
             add("-d")
+            if (autoRemove) add("--rm")
             add("--add-host=host.docker.internal:host-gateway")
 
             (environmentVariables + extraEnvVars).forEach { (key, value) ->
