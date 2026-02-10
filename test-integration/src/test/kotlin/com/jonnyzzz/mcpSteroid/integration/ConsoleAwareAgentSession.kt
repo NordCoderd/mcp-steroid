@@ -83,27 +83,28 @@ class ConsolePumpingContainerDriver(
     ): ProcessResult {
         val idx = counter.incrementAndGet()
         val slug = agentName.lowercase().replace(" ", "-")
-        val stdoutLog = "/tmp/agent-$slug-$idx-stdout.log"
-        val stderrLog = "/tmp/agent-$slug-$idx-stderr.log"
+        val combinedLog = "/tmp/agent-$slug-$idx-combined.log"
 
-        // Start pumps: stdout with agent prefix, stderr with red prefix
-        val stdoutPump = console.startFilePump(stdoutLog, "[$agentName]", ConsoleDriver.CYAN)
-        val stderrPump = console.startFilePump(stderrLog, "[$agentName]", ConsoleDriver.RED)
+        // Single pump for combined output (script merges stdout/stderr)
+        val pump = console.startFilePump(combinedLog, "[$agentName]", ConsoleDriver.CYAN)
 
         try {
-            // Wrap command to tee stdout and stderr to separate files.
-            // Process substitution keeps the streams separate for pumping.
+            // Wrap command in `script -qfc` to provide a PTY.
+            // CLI tools (claude, codex, gemini) buffer output when not on a TTY;
+            // script fakes a terminal so progress streams in real-time.
+            // `script` merges stdout/stderr, which is fine for console display.
+            // The entire command must be passed as a single string to -c.
             val escaped = escapeForBash(args)
+            val scriptCmd = escaped.replace("'", "'\\''")
             val wrappedArgs = listOf(
                 "bash", "-c",
-                "$escaped > >(tee $stdoutLog) 2> >(tee $stderrLog >&2); exit \${PIPESTATUS[0]}",
+                "script -qfc '$scriptCmd' /dev/null | tee $combinedLog; exit \${PIPESTATUS[0]}",
             )
             return delegate.runInContainer(wrappedArgs, workingDir, timeoutSeconds, extraEnvVars)
         } finally {
-            // Let pumps catch up with remaining output
+            // Let pump catch up with remaining output
             Thread.sleep(500)
-            stdoutPump.stop()
-            stderrPump.stop()
+            pump.stop()
         }
     }
 
