@@ -124,10 +124,11 @@ class ExecutionManager(
         // Supervised job for tracking storage writes - must be completed before build() returns
         private val storageJob = SupervisorJob()
         // Create child scope with proper context: inherit parent + add our elements
+        // Uses Dispatchers.IO for concurrent storage writes (no artificial parallelism limit)
         private val innerScope = CoroutineScope(
             parentScope.coroutineContext +
             storageJob +
-            Dispatchers.IO.limitedParallelism(1) +
+            Dispatchers.IO +
             CoroutineName("storage-$executionId") +
             ModalityState.any().asContextElement()
         )
