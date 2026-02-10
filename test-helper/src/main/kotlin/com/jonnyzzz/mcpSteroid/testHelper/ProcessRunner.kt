@@ -12,12 +12,24 @@ interface ProcessResult {
     val exitCode: Int?
     val output: String
     val stderr: String
+
+    /**
+     * Raw unprocessed output from the process.
+     *
+     * For agents that post-process output (e.g. Claude's stream-json mode),
+     * [output] contains the extracted final text for assertions, while
+     * [rawOutput] preserves the full original output (e.g. NDJSON events).
+     *
+     * For agents without post-processing, [rawOutput] equals [output].
+     */
+    val rawOutput: String get() = output
 }
 
 data class ProcessResultValue(
     override val exitCode: Int,
     override val output: String,
     override val stderr: String,
+    override val rawOutput: String = output,
 ) : ProcessResult
 
 fun ProcessResult.assertOutputContains(vararg expectedOutput: String, message: String = "") = apply {

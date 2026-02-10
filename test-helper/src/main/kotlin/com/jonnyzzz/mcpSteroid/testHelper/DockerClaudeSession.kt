@@ -60,12 +60,13 @@ class DockerClaudeSession(
     /**
      * Run claude in non-interactive mode with a prompt.
      *
+     * Uses `--output-format stream-json --verbose` so that tool calls, assistant
+     * messages, and progress events stream to stdout in real time (instead of only
+     * the final text response appearing at the end). The raw NDJSON output is
+     * post-processed to extract the final result text for test assertions.
+     *
      * @param prompt The prompt to send to Claude
      * @param timeoutSeconds Maximum time to wait for the command
-     *
-     * Note: Due to a bug in Claude CLI v1.0.73 (issue #5593), when using --mcp-config,
-     * we need to use "--" separator before the prompt to prevent argument parsing issues.
-     * See: https://github.com/anthropics/claude-code/issues/5593
      */
     override fun runPrompt(
         prompt: String,
@@ -75,12 +76,26 @@ class DockerClaudeSession(
             // Permission mode, necessary to allow MCP
             add("--permission-mode")
             add("bypassPermissions")
+            // Stream JSON events in real time for console visibility
+            add("--output-format")
+            add("stream-json")
+            add("--verbose")
             add("-p")
             add(prompt)
         }
-        return runInContainer(
+        val rawResult = runInContainer(
             *claudeArgs.toTypedArray(),
             timeoutSeconds = timeoutSeconds
+        )
+
+        // Extract the final result text from stream-json for assertion compatibility.
+        // The last JSON event with "type":"result" contains the final text in "result" field.
+        val resultText = extractStreamJsonResult(rawResult.output)
+        return ProcessResultValue(
+            exitCode = rawResult.exitCode ?: -1,
+            output = resultText,
+            stderr = rawResult.stderr,
+            rawOutput = rawResult.output,
         )
     }
 
@@ -99,6 +114,30 @@ class DockerClaudeSession(
 
         override fun createImpl(session: ContainerDriver, apiKey: String): DockerClaudeSession {
             return DockerClaudeSession(session.withSecretPattern(apiKey), apiKey)
+        }
+
+        /**
+         * Extract the final result text from Claude's stream-json NDJSON output.
+         * Looks for the last line containing `"type":"result"` and extracts the `"result"` field.
+         * Falls back to the raw output if parsing fails.
+         */
+        internal fun extractStreamJsonResult(rawOutput: String): String {
+            // Find the last "result" event line
+            val resultLine = rawOutput.lines().lastOrNull { line ->
+                line.contains("\"type\"") && line.contains("\"result\"") && line.trimStart().startsWith("{")
+            } ?: return rawOutput
+
+            // Extract the "result" field value using regex
+            // Matches: "result" : "..." with proper JSON string escaping
+            val resultRegex = Regex(""""result"\s*:\s*"((?:[^"\\]|\\.)*)"""")
+            val match = resultRegex.find(resultLine) ?: return rawOutput
+
+            return match.groupValues[1]
+                .replace("\\n", "\n")
+                .replace("\\r", "\r")
+                .replace("\\t", "\t")
+                .replace("\\\"", "\"")
+                .replace("\\\\", "\\")
         }
     }
 }
