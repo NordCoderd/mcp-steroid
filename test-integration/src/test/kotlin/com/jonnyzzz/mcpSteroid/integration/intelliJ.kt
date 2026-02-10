@@ -242,6 +242,7 @@ class IntelliJDriver(
         reason: String = "Integration test execution",
         timeout: Int = 600,
         projectName: String = "test-project",
+        dialogKiller: Boolean? = false,
     ): ProcessResult {
         val mcpUrl = "http://localhost:${MCP_STEROID_PORT.containerPort}/mcp"
 
@@ -260,6 +261,9 @@ class IntelliJDriver(
                     put("task_id", taskId)
                     put("reason", reason)
                     put("timeout", timeout)
+                    if (dialogKiller != null) {
+                        put("dialog_killer", dialogKiller)
+                    }
                 }
             }
             put("method", "tools/call")
