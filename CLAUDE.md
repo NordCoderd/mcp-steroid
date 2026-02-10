@@ -399,6 +399,61 @@ Run specific test class:
   - Tests daemon recovery after "Service is dying" errors
   - Tests retry logic with delays
 
+### Docker Integration Tests (test-integration/)
+
+End-to-end tests that run AI agents (Claude, Codex, Gemini) inside Docker containers
+with IntelliJ IDEA + MCP Steroid plugin. Each test creates a full IDE environment
+with Xvfb display, video recording, and a console window for real-time output.
+
+**Prerequisites:**
+- Docker running
+- API keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` (set env or `~/.anthropic`, `~/.openai`, `~/.vertex`)
+- Plugin ZIP built (`./gradlew buildPlugin`)
+
+**Running integration tests:**
+```bash
+# Run a specific agent's debugger test (use test method name)
+./gradlew :test-integration:test --tests '*DebuggerDemoTest.claude*'
+./gradlew :test-integration:test --tests '*DebuggerDemoTest.codex*'
+./gradlew :test-integration:test --tests '*DebuggerDemoTest.gemini*'
+
+# Run all debugger demo tests (all agents)
+./gradlew :test-integration:test --tests '*DebuggerDemoTest*'
+
+# Run dialog killer test
+./gradlew :test-integration:test --tests '*DialogKillerIntegrationTest*'
+
+# Run arena tests with specific instance
+./gradlew :test-integration:test --tests '*DpaiaArenaTest*' -Darena.test.instanceId=dpaia__empty__maven__springboot3-3
+```
+
+**Test output:**
+- Run directories: `test-integration/build/test-logs/run-{timestamp}-{runId}/`
+- Video recordings: `{run-dir}/video/recording.mp4`
+- IDE logs: `{run-dir}/intellij/`
+- Session info: `{run-dir}/session-info.txt` (ports, URLs)
+
+**Key test infrastructure classes:**
+- `IdeContainer` — Creates Docker container with IntelliJ IDEA, Xvfb, video recording, and console
+  - `IdeContainer.create()` — Standard project from `test-integration/src/test/docker/test-project/`
+  - `IdeContainer.createWithGitRepo()` — Clones external git repository as project
+- `ConsoleDriver` — Manages xterm console window (right 1/3 of screen) for real-time output
+- `ConsoleAwareAgentSession` — Wraps `AiAgentSession` to display prompts/status in console
+- `ConsolePumpingContainerDriver` — Wraps `ContainerDriver` to tee command output to console via file-based pump
+- `AiAgentDriver` — Initializes and manages AI agent sessions (Claude, Codex, Gemini)
+- `XcvbDriver` — Manages Xvfb display, video recording, window positioning
+- `IntelliJDriver` — Manages IntelliJ IDEA lifecycle, MCP execute_code via curl
+
+**Screen layout:** IDE occupies left 2/3, console occupies right 1/3, full screen height.
+
+**Test files:**
+- `DebuggerDemoTest.kt` — Each agent debugs DemoByJonnyzzz.kt to find sortedByDescending bug
+- `DialogKillerIntegrationTest.kt` — Tests automatic modal dialog dismissal
+- `DpaiaArenaTest.kt` — Runs dpaia.dev arena test cases against AI agents
+- `WhatYouSeeTest.kt` — Tests agent awareness of IDE state
+- `KeycloakArchitectureTest.kt` — Architecture investigation against real-world project
+- `IdeContainerTest.kt` — Infrastructure smoke test
+
 ### Shell Scripts (integration-test/)
 
 - **test-sse-tools.sh** - Tests SSE transport via curl:
