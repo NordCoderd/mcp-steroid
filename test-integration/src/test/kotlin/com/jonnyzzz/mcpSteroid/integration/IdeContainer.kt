@@ -204,6 +204,7 @@ fun IdeContainer.Companion.create(
     })
     println()
     println("=".repeat(60))
+    println("  RUN DIR:         $runDir")
     println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
     println("  MCP STEROID:     $mcpUrl")
     println("  SESSION INFO:    $infoFile")
@@ -223,6 +224,7 @@ fun IdeContainer.Companion.create(
         session.waitForProjectReady()
     }
 
+    println("[IDE-AGENT] Session ready: $runDir")
     return session
 }
 
@@ -311,6 +313,7 @@ fun IdeContainer.Companion.createWithGitRepo(
     })
     println()
     println("=".repeat(60))
+    println("  RUN DIR:         $runDir")
     println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
     println("  MCP STEROID:     $mcpUrl")
     println("  GIT REPO:        $gitRepoUrl")
@@ -331,6 +334,7 @@ fun IdeContainer.Companion.createWithGitRepo(
         session.waitForProjectReady()
     }
 
+    println("[IDE-AGENT] Session ready: $runDir")
     return session
 }
 
@@ -354,11 +358,11 @@ private fun buildIdeImage(dockerFileBase: String, imageName: String): DockerDriv
         }
     }
 
-    val filesList = contextDir
-        .walkTopDown()
-        .joinToString("") { "\n - ${it.relativeTo(contextDir)}" }
-
-    println("[IDE-AGENT] Prepared context: $filesList")
+    val topLevelFiles = contextDir.listFiles()
+        ?.sortedBy { it.name }
+        ?.joinToString("") { "\n - ${it.name}" + if (it.isDirectory) "/" else "" }
+        ?: ""
+    println("[IDE-AGENT] Prepared context:$topLevelFiles")
 
     val scope = DockerDriver(contextDir, "IDE-AGENT")
 
