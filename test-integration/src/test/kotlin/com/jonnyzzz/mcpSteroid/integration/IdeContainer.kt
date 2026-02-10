@@ -33,16 +33,17 @@ class IdeContainer(
     }
 
     /**
-     * Move the IDE project window to the left half of the screen via MCP Steroid execute_code.
+     * Move the IDE project window to the left 2/3 of the screen via MCP Steroid execute_code.
      * Uses IntelliJ's AWT frame API to reposition and resize the window.
+     * The remaining 1/3 on the right is reserved for agent consoles.
      *
      * Must be called after [AiAgentDriver.waitForMcpReady].
      */
-    fun moveProjectWindowToLeftHalf() {
-        val halfWidth = XcvbDriver.DISPLAY_WIDTH / 2
-        val fullHeight = XcvbDriver.DISPLAY_HEIGHT
+    fun positionProjectWindow() {
+        val width = XcvbDriver.DISPLAY_WIDTH * 2 / 3
+        val height = XcvbDriver.DISPLAY_HEIGHT
 
-        println("[IDE] Moving project window to left half (${halfWidth}x${fullHeight}+0+0)...")
+        println("[IDE] Positioning project window to left 2/3 (${width}x${height}+0+0)...")
         intellijDriver.mcpExecuteCode(
             projectName = "project-home",
             code = """
@@ -52,13 +53,13 @@ class IdeContainer(
                 val frame = WindowManager.getInstance().getFrame(project)
                     ?: error("No frame found for project")
 
-                frame.bounds = Rectangle(0, 0, $halfWidth, $fullHeight)
-                println("Window moved to left half: ${'$'}{frame.bounds}")
+                frame.bounds = Rectangle(0, 0, $width, $height)
+                println("Window positioned: ${'$'}{frame.bounds}")
             """.trimIndent(),
-            taskId = "move-window",
-            reason = "Move project window to left half of screen",
+            taskId = "position-window",
+            reason = "Position project window to left 2/3 of screen",
         )
-        println("[IDE] Project window moved to left half")
+        println("[IDE] Project window positioned")
     }
 
     //TODO: we need an option to start MCP Steroid connection to agents or not
@@ -147,6 +148,9 @@ fun IdeContainer.Companion.create(
     println("=".repeat(60))
     println()
 
+    session.aiAgentDriver.waitForMcpReady()
+    session.positionProjectWindow()
+
     return session
 }
 
@@ -231,6 +235,9 @@ fun IdeContainer.Companion.createWithGitRepo(
     println("  SESSION INFO:    $infoFile")
     println("=".repeat(60))
     println()
+
+    session.aiAgentDriver.waitForMcpReady()
+    session.positionProjectWindow()
 
     return session
 }
