@@ -53,21 +53,26 @@ class IdeContainer(
 
         println("[IDE] Work area: $workArea")
         println("[IDE] Positioning project window to left 2/3 (${width}x${height}+${x}+${y})...")
-        intellijDriver.mcpExecuteCode(
-            projectName = "project-home",
-            code = """
-                import java.awt.Rectangle
-                import com.intellij.openapi.wm.WindowManager
 
-                val frame = WindowManager.getInstance().getFrame(project)
-                    ?: error("No frame found for project")
+        // Retry: the project may not be registered yet right after MCP server readiness.
+        waitFor(60_000, "Position project window") {
+            val result = intellijDriver.mcpExecuteCode(
+                projectName = "demo-project",
+                code = """
+                    import java.awt.Rectangle
+                    import com.intellij.openapi.wm.WindowManager
 
-                frame.bounds = Rectangle($x, $y, $width, $height)
-                println("Window positioned: ${'$'}{frame.bounds}")
-            """.trimIndent(),
-            taskId = "position-window",
-            reason = "Position project window to left 2/3 of screen",
-        ).assertExitCode(0)
+                    val frame = WindowManager.getInstance().getFrame(project)
+                        ?: error("No frame found for project")
+
+                    frame.bounds = Rectangle($x, $y, $width, $height)
+                    println("Window positioned: ${'$'}{frame.bounds}")
+                """.trimIndent(),
+                taskId = "position-window",
+                reason = "Position project window to left 2/3 of screen",
+            )
+            result.exitCode == 0
+        }
         println("[IDE] Project window positioned")
     }
 

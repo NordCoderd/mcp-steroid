@@ -20,7 +20,8 @@ class ConsoleDriver private constructor(
 
     fun writeLine(text: String) {
         val tempFile = "/tmp/console-line-${System.nanoTime()}"
-        container.writeFileInContainer(tempFile, "$text\n")
+        // writeFileInContainer uses heredoc which adds a trailing newline already
+        container.writeFileInContainer(tempFile, text)
         container.runInContainer(
             listOf("bash", "-c", "cat $tempFile >> $consoleFile && rm $tempFile"),
             timeoutSeconds = 5,
@@ -31,9 +32,9 @@ class ConsoleDriver private constructor(
 
     fun writeHeader(text: String) {
         writeLine("")
-        writeLine("$BOLD$CYAN${"═".repeat(40)}$RESET")
+        writeLine("$BOLD$CYAN${"=".repeat(40)}$RESET")
         writeLine("$BOLD$CYAN  $text$RESET")
-        writeLine("$BOLD$CYAN${"═".repeat(40)}$RESET")
+        writeLine("$BOLD$CYAN${"=".repeat(40)}$RESET")
         writeLine("")
     }
 
@@ -134,9 +135,12 @@ class ConsoleDriver private constructor(
                 height = workArea.height * 4 / 6,
             )
 
+            // Use a small initial geometry so xterm doesn't start oversized;
+            // xdotool will resize to the exact windowRect pixel dimensions.
             xcvbDriver.runInVisibleConsole(
                 args = listOf("tail", "-f", consoleFile),
                 title = title,
+                geometry = "80x30+0+0",
                 windowRect = rect,
             )
 

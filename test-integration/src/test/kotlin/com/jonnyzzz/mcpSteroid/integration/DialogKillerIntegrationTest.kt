@@ -48,14 +48,14 @@ class DialogKillerIntegrationTest {
 
         // Find the IDE process PID from the project window
         val idePid = session.listWindows()
-            .first { it.title == "project-home" && it.pid.isNotBlank() }
+            .first { it.title == "demo-project" && it.pid.isNotBlank() }
             .pid
         console.writeInfo("IDE PID: $idePid")
 
         // Step 1: Open Settings dialog and leave it open (dialog killer disabled)
         console.writeStep(1, "Opening Settings dialog")
         session.intellijDriver.mcpExecuteCode(
-            projectName = "project-home",
+            projectName = "demo-project",
             code = """
                 // Disable modal cancellation so the dialog stays open after this execution
                 doNotCancelOnModalityStateChange()
@@ -115,7 +115,7 @@ class DialogKillerIntegrationTest {
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
     fun `explicit dialog killer via script API`() = doTest("explicit") { session, _ ->
         session.intellijDriver.mcpExecuteCode(
-            projectName = "project-home",
+            projectName = "demo-project",
             code = """
                 import com.jonnyzzz.mcpSteroid.execution.dialogKiller
                 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
@@ -137,7 +137,7 @@ class DialogKillerIntegrationTest {
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
     fun `automatic dialog killer closes Settings dialog`() = doTest("automatic") { session, _ ->
         session.intellijDriver.mcpExecuteCode(
-            projectName = "project-home",
+            projectName = "demo-project",
             dialogKiller = true,
             code = """
                 println("Dialog killer should have closed the Settings dialog before this runs")
