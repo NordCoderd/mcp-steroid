@@ -5,6 +5,7 @@ data class Player(val name: String, val score: Int)
 
 fun leaderboard(players: MutableList<Player>): List<Player> {
     // Intention: sort players by score descending (highest first)
+    println("Sorting ${players.size} players by score...")
     players.sortedByDescending { it.score }
     return players
 }
