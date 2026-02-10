@@ -32,9 +32,9 @@ class ConsoleDriver private constructor(
 
     fun writeHeader(text: String) {
         writeLine("")
-        writeLine("$BOLD$CYAN${"=".repeat(40)}$RESET")
+        writeLine("$BOLD$CYAN${"═".repeat(40)}$RESET")
         writeLine("$BOLD$CYAN  $text$RESET")
-        writeLine("$BOLD$CYAN${"=".repeat(40)}$RESET")
+        writeLine("$BOLD$CYAN${"═".repeat(40)}$RESET")
         writeLine("")
     }
 

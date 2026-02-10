@@ -312,6 +312,7 @@ class XcvbDriver(
     ): RunningContainerProcess {
         val xtermArgs = mutableListOf(
             "xterm",
+            "-u8",
             "-title", title,
             "-geometry", geometry,
             "-fa", "JetBrains Mono:style=Bold",

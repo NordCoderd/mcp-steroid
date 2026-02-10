@@ -31,7 +31,12 @@ RUN apt-get update && \
         xdotool \
         xclip \
         xterm \
+        locales \
     && rm -rf /var/lib/apt/lists/*
+
+# Generate UTF-8 locale so xterm and CLI tools render non-ASCII correctly
+RUN sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && locale-gen
+ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 
 # Install JDK 21 (Eclipse Temurin via Adoptium APT)
 RUN curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor -o /etc/apt/keyrings/adoptium.gpg && \
