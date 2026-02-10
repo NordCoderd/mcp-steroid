@@ -18,6 +18,8 @@ import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import com.jonnyzzz.mcpSteroid.demo.executionEventBroadcaster
 import kotlinx.coroutines.*
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 
 interface ExecutionResultBuilder {
     val isFailed: Boolean
@@ -120,8 +122,15 @@ class ExecutionManager(
     private fun responseBuilder(parentScope: CoroutineScope, executionId: ExecutionId, mcpProgress: McpProgressReporter) = object : ExecutionResultBuilder {
         private val responseBuilder = ToolCallResult.builder().setExecutionId(executionId)
         // Supervised job for tracking storage writes - must be completed before build() returns
-        private val storageJob = SupervisorJob(parentScope.coroutineContext[Job])
-        private val innerScope = CoroutineScope(parentScope.coroutineContext + Dispatchers.IO.limitedParallelism(1) + storageJob)
+        private val storageJob = SupervisorJob()
+        // Create child scope with proper context: inherit parent + add our elements
+        private val innerScope = CoroutineScope(
+            parentScope.coroutineContext +
+            storageJob +
+            Dispatchers.IO.limitedParallelism(1) +
+            CoroutineName("storage-$executionId") +
+            ModalityState.any().asContextElement()
+        )
         private var failed = false
 
         override val isFailed: Boolean
