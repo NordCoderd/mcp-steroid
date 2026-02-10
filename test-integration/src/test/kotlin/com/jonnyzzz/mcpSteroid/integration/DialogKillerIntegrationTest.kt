@@ -41,6 +41,9 @@ class DialogKillerIntegrationTest {
         // Wait for MCP server to be ready
         session.aiAgentDriver.waitForMcpReady()
 
+        // Move IDE window to left half of screen
+        session.moveProjectWindowToLeftHalf()
+
         val run = session.intellijDriver.mcpExecuteCode(
             projectName = "project-home",  // Use the actual project name from IdeContainer
             code = """

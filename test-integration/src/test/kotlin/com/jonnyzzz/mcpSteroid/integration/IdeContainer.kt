@@ -32,6 +32,35 @@ class IdeContainer(
         return xcvbContainer.listWindows()
     }
 
+    /**
+     * Move the IDE project window to the left half of the screen via MCP Steroid execute_code.
+     * Uses IntelliJ's AWT frame API to reposition and resize the window.
+     *
+     * Must be called after [AiAgentDriver.waitForMcpReady].
+     */
+    fun moveProjectWindowToLeftHalf() {
+        val halfWidth = XcvbDriver.DISPLAY_WIDTH / 2
+        val fullHeight = XcvbDriver.DISPLAY_HEIGHT
+
+        println("[IDE] Moving project window to left half (${halfWidth}x${fullHeight}+0+0)...")
+        intellijDriver.mcpExecuteCode(
+            projectName = "project-home",
+            code = """
+                import java.awt.Rectangle
+                import com.intellij.openapi.wm.WindowManager
+
+                val frame = WindowManager.getInstance().getFrame(project)
+                    ?: error("No frame found for project")
+
+                frame.bounds = Rectangle(0, 0, $halfWidth, $fullHeight)
+                println("Window moved to left half: ${'$'}{frame.bounds}")
+            """.trimIndent(),
+            taskId = "move-window",
+            reason = "Move project window to left half of screen",
+        )
+        println("[IDE] Project window moved to left half")
+    }
+
     //TODO: we need an option to start MCP Steroid connection to agents or not
     val aiAgentDriver = AiAgentDriver(
         container = scope,
