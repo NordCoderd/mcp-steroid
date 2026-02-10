@@ -40,16 +40,20 @@ class DialogKillerIntegrationTest {
      * 4. Calls [closeAction] to close the dialog
      * 5. Verifies the Settings dialog is gone
      */
-    private fun doTest(closeAction: (IdeContainer, String) -> Unit) {
-        val session = IdeContainer.create(lifetime, "ide-agent")
+    private fun doTest(modeName: String, closeAction: (IdeContainer, String) -> Unit) {
+        val session = IdeContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer Test")
+        val console = session.console
+
+        console.writeInfo("Mode: $modeName")
 
         // Find the IDE process PID from the project window
         val idePid = session.listWindows()
             .first { it.title == "project-home" && it.pid.isNotBlank() }
             .pid
-        println("[TEST] IDE PID: $idePid")
+        console.writeInfo("IDE PID: $idePid")
 
         // Step 1: Open Settings dialog and leave it open (dialog killer disabled)
+        console.writeStep(1, "Opening Settings dialog")
         session.intellijDriver.mcpExecuteCode(
             projectName = "project-home",
             code = """
@@ -83,26 +87,33 @@ class DialogKillerIntegrationTest {
         ).assertExitCode(0)
 
         // Step 2: Verify Settings dialog appeared via xcvb window list
+        console.writeStep(2, "Verifying Settings dialog is visible")
         val windowsWithDialog = session.listWindows()
         val settingsWindow = windowsWithDialog.find { it.title == "Settings" && it.pid == idePid }
         println("[TEST] Windows after opening Settings:")
         windowsWithDialog.filter { it.pid == idePid }.forEach { println("  $it") }
         assertNotNull(settingsWindow, "Settings dialog should be visible")
+        console.writeSuccess("Settings dialog visible")
 
         // Step 3: Execute the close action
+        console.writeStep(3, "Running dialog killer ($modeName)")
         closeAction(session, idePid)
 
         // Step 4: Verify Settings dialog is gone via xcvb window list
+        console.writeStep(4, "Verifying Settings dialog is gone")
         val windowsAfterKiller = session.listWindows()
         val settingsAfterKiller = windowsAfterKiller.find { it.title == "Settings" && it.pid == idePid }
         println("[TEST] Windows after dialog killer:")
         windowsAfterKiller.filter { it.pid == idePid }.forEach { println("  $it") }
         assertNull(settingsAfterKiller, "Settings dialog should have been closed by dialog killer")
+        console.writeSuccess("Settings dialog closed")
+
+        console.writeHeader("PASSED")
     }
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `explicit dialog killer via script API`() = doTest { session, _ ->
+    fun `explicit dialog killer via script API`() = doTest("explicit") { session, _ ->
         session.intellijDriver.mcpExecuteCode(
             projectName = "project-home",
             code = """
@@ -124,7 +135,7 @@ class DialogKillerIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `automatic dialog killer closes Settings dialog`() = doTest { session, _ ->
+    fun `automatic dialog killer closes Settings dialog`() = doTest("automatic") { session, _ ->
         session.intellijDriver.mcpExecuteCode(
             projectName = "project-home",
             dialogKiller = true,

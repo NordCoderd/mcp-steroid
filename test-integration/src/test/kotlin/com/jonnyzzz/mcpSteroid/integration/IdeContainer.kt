@@ -28,6 +28,7 @@ class IdeContainer(
     val intellijDriver: IntelliJDriver,
     val xcvbContainer: XcvbDriver,
     val intellij: RunningContainerProcess,
+    val console: ConsoleDriver,
 ) {
     fun listWindows(): List<WindowInfo> {
         return xcvbContainer.listWindows()
@@ -75,6 +76,7 @@ class IdeContainer(
         container = scope,
         intellijDriver = intellijDriver,
         xcvbDriver = xcvbContainer,
+        console = console,
     )
 
     /** Convenience accessor for mouse/keyboard control inside the Xvfb session. */
@@ -87,6 +89,7 @@ fun IdeContainer.Companion.create(
     lifetime: CloseableStack,
     dockerFileBase: String,
     projectName: String = "test-project",
+    consoleTitle: String = "Test Console",
 ): IdeContainer {
     val runDir = run {
         val file = File(IdeTestFolders.testOutputDir, "run-$dockerFileBase")
@@ -136,11 +139,19 @@ fun IdeContainer.Companion.create(
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
     val ijContainer = ijDriver.startIde()
 
-    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
+    // Wait for MCP server readiness before creating console
+    // (this uses a temporary AiAgentDriver just for waiting + url computation)
+    val tempAgentDriver = AiAgentDriver(
+        container = container,
+        intellijDriver = ijDriver,
+        xcvbDriver = xcvb,
+        console = null,
+    )
+    tempAgentDriver.waitForMcpReady()
 
     // Write info file with all ports and URLs for external tools
     val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
-    val mcpUrl = session.aiAgentDriver.mcpSteroidHostUrl
+    val mcpUrl = tempAgentDriver.mcpSteroidHostUrl
     val infoFile = File(runDir, "session-info.txt")
     infoFile.writeText(buildString {
         appendLine("RUN_DIR=$runDir")
@@ -156,7 +167,10 @@ fun IdeContainer.Companion.create(
     println("=".repeat(60))
     println()
 
-    session.aiAgentDriver.waitForMcpReady()
+    // Create console (immutable, starts immediately)
+    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
+
+    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
     session.positionProjectWindow()
 
     return session
@@ -174,6 +188,7 @@ fun IdeContainer.Companion.createWithGitRepo(
     dockerFileBase: String,
     gitRepoUrl: String,
     cloneTimeoutSeconds: Long = 300,
+    consoleTitle: String = "Test Console",
 ): IdeContainer {
     val runDir = run {
         val file = File(IdeTestFolders.testOutputDir, "run-$dockerFileBase")
@@ -222,11 +237,17 @@ fun IdeContainer.Companion.createWithGitRepo(
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
     val ijContainer = ijDriver.startIde()
 
-    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer)
-
+    // Wait for MCP server readiness
+    val tempAgentDriver = AiAgentDriver(
+        container = container,
+        intellijDriver = ijDriver,
+        xcvbDriver = xcvb,
+        console = null,
+    )
+    tempAgentDriver.waitForMcpReady()
 
     val videoPort = container.mapContainerPortToHostPort(XcvbDriver.VIDEO_STREAMING_PORT)
-    val mcpUrl = session.aiAgentDriver.mcpSteroidHostUrl
+    val mcpUrl = tempAgentDriver.mcpSteroidHostUrl
     val infoFile = File(runDir, "session-info.txt")
     infoFile.writeText(buildString {
         appendLine("RUN_DIR=$runDir")
@@ -244,7 +265,10 @@ fun IdeContainer.Companion.createWithGitRepo(
     println("=".repeat(60))
     println()
 
-    session.aiAgentDriver.waitForMcpReady()
+    // Create console (immutable, starts immediately)
+    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
+
+    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
     session.positionProjectWindow()
 
     return session

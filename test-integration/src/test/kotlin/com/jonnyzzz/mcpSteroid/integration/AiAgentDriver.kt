@@ -12,6 +12,7 @@ class AiAgentDriver(
     val intellijDriver: IntelliJDriver,
     val connectMcpSteroid: Boolean = true,
     private val xcvbDriver: XcvbDriver,
+    private val console: ConsoleDriver? = null,
 ) {
     private val scope by lazy {
         container.withGuestWorkDir(intellijDriver.getGuestProjectDir())
@@ -19,7 +20,13 @@ class AiAgentDriver(
 
     private fun scopeForAgent(windowTitle: String): ContainerDriver {
         val base = scope
-        return xcvbDriver.wrapForAgentConsole(base, windowTitle)
+        return if (console != null) {
+            // When console is available, use pumping runner to show output there
+            ConsolePumpingContainerDriver(base, console, windowTitle)
+        } else {
+            // Fallback: use visible xterm console
+            xcvbDriver.wrapForAgentConsole(base, windowTitle)
+        }
     }
 
     /** Host port mapped to the MCP Steroid server inside the container. */
@@ -31,11 +38,17 @@ class AiAgentDriver(
 
     val mcpSteroidName: String = "mcp-steroid"
 
-    private fun prepareAIAgent(agent: AiAgentSession): AiAgentSession {
-        return if (connectMcpSteroid) {
+    private fun prepareAIAgent(agent: AiAgentSession, displayName: String): AiAgentSession {
+        val registered = if (connectMcpSteroid) {
             agent.registerMcp(mcpSteroidGuestUrl, mcpSteroidName)
         } else {
             agent
+        }
+        // Wrap with console-aware session if console is available
+        return if (console != null) {
+            ConsoleAwareAgentSession(registered, console, displayName)
+        } else {
+            registered
         }
     }
 
@@ -58,9 +71,9 @@ class AiAgentDriver(
     }
 
     private val agentFactories: Map<String, () -> AiAgentSession> = mapOf(
-        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME))) },
-        "codex" to { prepareAIAgent(DockerCodexSession.create(scopeForAgent(DockerCodexSession.DISPLAY_NAME))) },
-        "gemini" to { prepareAIAgent(DockerGeminiSession.create(scopeForAgent(DockerGeminiSession.DISPLAY_NAME))) },
+        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME)), DockerClaudeSession.DISPLAY_NAME) },
+        "codex" to { prepareAIAgent(DockerCodexSession.create(scopeForAgent(DockerCodexSession.DISPLAY_NAME)), DockerCodexSession.DISPLAY_NAME) },
+        "gemini" to { prepareAIAgent(DockerGeminiSession.create(scopeForAgent(DockerGeminiSession.DISPLAY_NAME)), DockerGeminiSession.DISPLAY_NAME) },
     )
 
     fun waitForMcpReady() {
