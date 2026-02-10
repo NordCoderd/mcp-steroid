@@ -2,12 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
+import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -35,16 +30,21 @@ class DialogKillerIntegrationTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
     fun `dialog killer closes Settings dialog`() {
-        // Start IDE container with full GUI
         val session = IdeContainer.create(lifetime, "ide-agent")
 
-        val run = session.intellijDriver.mcpExecuteCode(
-            projectName = "project-home",  // Use the actual project name from IdeContainer
+        // Find the IDE process PID from the project window
+        val idePid = session.listWindows()
+            .first { it.title == "project-home" && it.pid.isNotBlank() }
+            .pid
+        println("[TEST] IDE PID: $idePid")
+
+        // Step 1: Open Settings dialog and leave it open
+        session.intellijDriver.mcpExecuteCode(
+            projectName = "project-home",
             code = """
-                import kotlinx.coroutines.*
-                import com.jonnyzzz.mcpSteroid.execution.*
-                
-                // Open Settings dialog
+                // Disable modal cancellation so the dialog stays open after this execution
+                doNotCancelOnModalityStateChange()
+
                 val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
                 val showSettingsAction = actionManager.getAction("ShowSettings")
                     ?: error("ShowSettings action not found")
@@ -53,60 +53,46 @@ class DialogKillerIntegrationTest {
                     .add(com.intellij.openapi.actionSystem.CommonDataKeys.PROJECT, project)
                     .build()
 
-                val presentation = showSettingsAction.templatePresentation.clone()
-                val event = com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(
-                    "test",
-                    presentation,
-                    dataContext
-                )
-
-                // Disable modal cancellation for this execution (we WANT the dialog to stay open)
-                doNotCancelOnModalityStateChange()
-
-                // Open Settings dialog asynchronously so it doesn't block this execution from completing
+                // Open Settings dialog asynchronously so it doesn't block this execution
                 withContext(kotlinx.coroutines.Dispatchers.EDT) {
                     com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
-                        showSettingsAction.actionPerformed(event)
+                        showSettingsAction.actionPerformed(
+                            com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(
+                                "test", showSettingsAction.templatePresentation.clone(), dataContext
+                            )
+                        )
                     }
                 }
-                
-                suspend fun isModal() = dialogKiller().canPumpEdtNonModel()
-
-                require(isModal()) { "We must be modal now with settings" }
 
                 kotlinx.coroutines.delay(1000)
-                
-                // Now kill it!
-                dialogKiller().killProjectDialogs(
-                  project, 
-                  com.jonnyzzz.mcpSteroid.storage.ExecutionId("mock-id"), 
-                  ::println
-                )
-
-                kotlinx.coroutines.delay(1000)
-
-                require(!isModal()) { "We must NOT be modal now with settings" }
+                println("Settings dialog opened")
             """.trimIndent(),
-            taskId = "test-open-dialog",
-            reason = "Open Settings dialog to test dialog killer"
-        )
+            taskId = "open-settings",
+            reason = "Open Settings dialog",
+        ).assertExitCode(0)
 
-        val windows = session.listWindows()
+        // Verify Settings dialog appeared via xcvb window list
+        val windowsWithDialog = session.listWindows()
+        val settingsWindow = windowsWithDialog.find { it.title == "Settings" && it.pid == idePid }
+        println("[TEST] Windows after opening Settings:")
+        windowsWithDialog.filter { it.pid == idePid }.forEach { println("  $it") }
+        Assertions.assertNotNull(settingsWindow, "Settings dialog should be visible")
 
-        windows.forEach {
-            println("[WINDOW] $it")
-        }
+        // Step 2: Run another execute_code — the dialog killer should automatically close Settings
+        session.intellijDriver.mcpExecuteCode(
+            projectName = "project-home",
+            code = """
+                println("Dialog killer should have closed the Settings dialog before this runs")
+            """.trimIndent(),
+            taskId = "after-dialog-killer",
+            reason = "Trigger automatic dialog killer",
+        ).assertExitCode(0)
 
-        println("\n[TEST] Step 1 Result:")
-        val data = Json { }.parseToJsonElement(run)
-
-        data.jsonObject["result"]?.jsonObject["content"]?.jsonArray?.forEach {
-            it.jsonObject["text"]?.jsonPrimitive?.contentOrNull?.let { println("[MCP LOG]: $it ") }
-        }
-
-        Assertions.assertEquals(
-            data.jsonObject["result"]?.jsonObject["isError"]?.jsonPrimitive?.booleanOrNull,
-            false
-        )
+        // Verify Settings dialog is gone via xcvb window list
+        val windowsAfterKiller = session.listWindows()
+        val settingsAfterKiller = windowsAfterKiller.find { it.title == "Settings" && it.pid == idePid }
+        println("[TEST] Windows after dialog killer:")
+        windowsAfterKiller.filter { it.pid == idePid }.forEach { println("  $it") }
+        Assertions.assertNull(settingsAfterKiller, "Settings dialog should have been closed by dialog killer")
     }
 }

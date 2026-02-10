@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
+import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
@@ -58,7 +59,7 @@ class IdeContainer(
             """.trimIndent(),
             taskId = "position-window",
             reason = "Position project window to left 2/3 of screen",
-        )
+        ).assertExitCode(0)
         println("[IDE] Project window positioned")
     }
 

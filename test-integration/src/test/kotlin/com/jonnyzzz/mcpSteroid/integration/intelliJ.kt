@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
+import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver
@@ -9,7 +11,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
-import org.junit.jupiter.api.Assertions
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -119,6 +120,7 @@ class IntelliJDriver(
             appendLine("-Dmcp.steroid.server.host=0.0.0.0")
             appendLine("-Dmcp.steroid.server.port=${MCP_STEROID_PORT.containerPort}")
             appendLine("-Dmcp.steroid.review.mode=NEVER")
+            appendLine("-Dmcp.steroid.dialog.killer.enabled=true")
             appendLine("-Dmcp.steroid.updates.enabled=false")
             appendLine("-Dmcp.steroid.analytics.enabled=false")
             appendLine("-Dmcp.steroid.idea.description.enabled=false")
@@ -240,7 +242,7 @@ class IntelliJDriver(
         reason: String = "Integration test execution",
         timeout: Int = 600,
         projectName: String = "test-project",
-    ): String {
+    ): ProcessResult {
         val mcpUrl = "http://localhost:${MCP_STEROID_PORT.containerPort}/mcp"
 
         // First, initialize MCP session
@@ -263,21 +265,26 @@ class IntelliJDriver(
             put("method", "tools/call")
         }.toString()
 
-        // Execute the tool call
-        val run = executeMcpRequest(mcpUrl, sessionId, toolCallRequest)
+        // Execute the tool call (curl timeout must exceed the server-side execution timeout)
+        val run = executeMcpRequest(mcpUrl, sessionId, toolCallRequest, timeoutSeconds = timeout.toLong() + 30)
         val data = Json { }.parseToJsonElement(run)
 
-        data.jsonObject["result"]?.jsonObject["content"]?.jsonArray?.forEach {
-            it.jsonObject["text"]?.jsonPrimitive?.contentOrNull?.let { println("[MCP LOG]: $it ") }
+        val messages = buildString {
+            data.jsonObject["result"]?.jsonObject["content"]?.jsonArray?.forEach {
+                it.jsonObject["text"]?.jsonPrimitive?.contentOrNull?.let { text ->
+                    println("[MCP LOG]: $text ")
+                    appendLine(text)
+                }
+            }
         }
 
-        Assertions.assertEquals(
-            data.jsonObject["result"]?.jsonObject["isError"]?.jsonPrimitive?.booleanOrNull,
-            false
+        val isError = data.jsonObject["result"]?.jsonObject["isError"]?.jsonPrimitive?.booleanOrNull ?: true
+
+        return ProcessResultValue(
+            exitCode = if (isError) 1 else 0,
+            output = messages,
+            stderr = "",
         )
-
-
-        return run
     }
 
     /**
@@ -310,7 +317,8 @@ class IntelliJDriver(
     private fun executeMcpRequest(
         mcpUrl: String,
         sessionId: String?,
-        requestBody: String
+        requestBody: String,
+        timeoutSeconds: Long = 30,
     ): String {
         // Create curl command
         val curlCommand = buildList {
@@ -336,7 +344,7 @@ class IntelliJDriver(
 
         val result = driver.runInContainer(
             curlCommand,
-            timeoutSeconds = 30,
+            timeoutSeconds = timeoutSeconds,
         )
 
         if (result.exitCode != 0) {
