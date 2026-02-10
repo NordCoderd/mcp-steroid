@@ -209,7 +209,7 @@ class IntelliJDriver(
         driver.mkdirs(containerTempDir)
         driver.copyToContainer(pluginZipPath, containerTempZip)
         driver.runInContainer(
-            listOf("unzip", containerTempZip),
+            listOf("unzip", "-o", containerTempZip),
             workingDir = pluginsGuestDir,
             timeoutSeconds = 30,
         ).assertExitCode(0)
