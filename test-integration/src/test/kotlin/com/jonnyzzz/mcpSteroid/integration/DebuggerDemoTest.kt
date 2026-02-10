@@ -3,7 +3,6 @@ package com.jonnyzzz.mcpSteroid.integration
 
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
-import com.jonnyzzz.mcpSteroid.testHelper.McpResourceUris
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import org.junit.jupiter.api.AfterEach
@@ -55,13 +54,7 @@ class DebuggerDemoTest {
 
         val agent: AiAgentSession? = session.aiAgentDriver.aiAgents[agentName]
         assumeTrue(agent != null, "Agent '$agentName' is not configured")
-        val debuggerOverviewUri = McpResourceUris.debuggerOverview
-
         console.writeStep(1, "Building prompt for $agentName")
-
-        val evaluateExprUri = McpResourceUris.debuggerEvaluateExpression
-        val waitForSuspendUri = McpResourceUris.debuggerWaitForSuspend
-        val stepOverUri = McpResourceUris.debuggerStepOver
 
         val prompt = buildString {
             appendLine("# Task: Debug DemoByJonnyzzz.kt to find the bug")
@@ -147,6 +140,7 @@ class DebuggerDemoTest {
             appendLine("import com.intellij.xdebugger.impl.ui.tree.nodes.XValuePresentationUtil")
             appendLine("import kotlinx.coroutines.CompletableDeferred")
             appendLine("import kotlinx.coroutines.Dispatchers")
+            appendLine("import kotlinx.coroutines.future.await")
             appendLine("import kotlinx.coroutines.withTimeout")
             appendLine("import javax.swing.Icon")
             appendLine("import kotlin.time.Duration.Companion.seconds")
@@ -158,6 +152,8 @@ class DebuggerDemoTest {
             appendLine("        override fun errorOccurred(msg: String) { valueDeferred.completeExceptionally(Exception(msg)) }")
             appendLine("    }, null)")
             appendLine("    val value = withTimeout(30.seconds) { valueDeferred.await() }")
+            appendLine("    // Wait for value descriptor to be fully initialized (prevents 'Collecting data...' race)")
+            appendLine("    withTimeout(30.seconds) { value.isReady.await() }")
             appendLine("    val presentationDeferred = CompletableDeferred<String>()")
             appendLine("    value.computePresentation(object : XValueNode {")
             appendLine("        override fun setPresentation(icon: Icon?, type: String?, text: String, hasChildren: Boolean) { presentationDeferred.complete(text) }")
@@ -286,7 +282,7 @@ class DebuggerDemoTest {
         console.writeInfo("Checking: ROOT_CAUSE quality")
         val ignoredReturnPatterns = listOf(
             "ignor", "unused", "discard", "return value", "not assigned", "not assigned back", "not used",
-            "isn't assigned", "isn't assigned", "ignored/not assigned",
+            "isn't assigned", "ignored/not assigned", "not stored", "not captured", "thrown away", "result is lost",
         )
         val returnsNewListPatterns = listOf(
             "new list", "returns new", "does not modify", "doesn't modify",
@@ -310,10 +306,56 @@ class DebuggerDemoTest {
         }
         console.writeSuccess("ROOT_CAUSE quality validated")
 
+        // Validate debugger evidence: the agent must have actually used the debugger,
+        // not just read source code and guessed the answer.
+        console.writeInfo("Checking: debugger evidence (suspension + evaluation)")
+        assertDebuggerEvidence(combined, console)
+        console.writeSuccess("Debugger evidence validated")
+
         console.writeSuccess("Agent '$agentName' identified the sortedByDescending bug")
         console.writeHeader("PASSED")
 
         println("[TEST] Agent '$agentName' successfully identified the sortedByDescending bug")
+    }
+
+    /**
+     * Validates that the agent actually used the debugger (not just read source code).
+     * Checks for:
+     * 1. Suspension evidence — the debugger hit a breakpoint ("Suspended at:")
+     * 2. Evaluation evidence — the agent evaluated expressions at a breakpoint
+     *    (BEFORE_VALUE or AFTER_VALUE markers, or evaluateExpression / players.toString output)
+     */
+    private fun assertDebuggerEvidence(combined: String, console: ConsoleDriver) {
+        // Check for breakpoint suspension evidence
+        val suspendedPattern = Regex("""Suspended at:\s*\S+:\d+""")
+        val hasSuspension = suspendedPattern.containsMatchIn(combined)
+        if (hasSuspension) {
+            console.writeSuccess("Found breakpoint suspension evidence")
+        }
+
+        // Check for debugger evaluation evidence (BEFORE_VALUE / AFTER_VALUE from step+eval)
+        val hasBeforeValue = combined.contains("BEFORE_VALUE:", ignoreCase = true)
+        val hasAfterValue = combined.contains("AFTER_VALUE:", ignoreCase = true)
+        if (hasBeforeValue) console.writeSuccess("Found BEFORE_VALUE evidence")
+        if (hasAfterValue) console.writeSuccess("Found AFTER_VALUE evidence")
+
+        // Broader evaluation evidence: any expression evaluation output from the debugger
+        val evaluationPatterns = listOf(
+            "players =", "players.size =", "sorted result =",  // from evaluate-expression.kts
+            "players.toString()",  // the expression we ask the agent to evaluate
+            "After step:",  // from step-over
+        )
+        val hasEvalEvidence = evaluationPatterns.any { combined.contains(it, ignoreCase = true) }
+
+        // Must have suspension evidence + at least some evaluation evidence
+        check(hasSuspension) {
+            "Agent must show evidence of debugger suspension (expected 'Suspended at: <file>:<line>').\n" +
+                    "This proves the debugger actually hit a breakpoint.\nOutput:\n$combined"
+        }
+        check(hasBeforeValue || hasAfterValue || hasEvalEvidence) {
+            "Agent must show evidence of debugger expression evaluation.\n" +
+                    "Expected BEFORE_VALUE/AFTER_VALUE markers or expression evaluation output.\nOutput:\n$combined"
+        }
     }
 
     private fun assertUsedExecuteCodeEvidence(combined: String) {

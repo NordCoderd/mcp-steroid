@@ -8,11 +8,24 @@ import com.intellij.xdebugger.frame.presentation.XValuePresentation
 import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValuePresentationUtil
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withTimeout
 import javax.swing.Icon
 import kotlin.time.Duration.Companion.seconds
 
 // --- Reusable helper: copy this into your scripts ---
+
+/**
+ * Evaluates a debugger expression and returns its formatted string value.
+ *
+ * Phase 1: Uses CompletableDeferred to convert the callback-based
+ *   XDebuggerEvaluator.evaluate() into a suspend call.
+ * Phase 2: Awaits XValue.isReady (CompletableFuture) to ensure the value
+ *   descriptor is fully initialized before requesting presentation.
+ *   This prevents the "Collecting data..." race that occurs when
+ *   computePresentation runs before the JDI value is fetched.
+ * Phase 3: Requests the formatted text via computePresentation callback.
+ */
 suspend fun evaluateExpression(
     evaluator: XDebuggerEvaluator,
     expr: String,
@@ -36,7 +49,19 @@ suspend fun evaluateExpression(
         return "ERR: ${e.message}"
     }
 
-    // Phase 2: Compute presentation to get formatted text
+    // Phase 2: Wait for the value descriptor to be fully initialized.
+    // XValue.isReady() returns CompletableFuture<Void> that completes once
+    // the underlying JavaValue's ValueDescriptorImpl.calcValue() finishes.
+    // Without this, computePresentation may return "Collecting data..."
+    // because the JDI communication hasn't completed yet.
+    // Uses kotlinx.coroutines.future.await() for cancellation-safe waiting.
+    try {
+        withTimeout(timeout.seconds) { value.isReady.await() }
+    } catch (e: Exception) {
+        return "ERR: Value not ready - ${e.message}"
+    }
+
+    // Phase 3: Compute presentation to get formatted text
     val presentationDeferred = CompletableDeferred<String>()
     value.computePresentation(object : XValueNode {
         override fun setPresentation(icon: Icon?, type: String?, text: String, hasChildren: Boolean) {
