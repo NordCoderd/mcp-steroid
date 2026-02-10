@@ -135,7 +135,9 @@ class DialogKiller {
         }
 
         runCatching {
-            VisionService.capture(project, executionId).logMessages().forEach { logMessage(it) }
+            withTimeout(5_000) {
+                VisionService.capture(project, executionId).logMessages().forEach { logMessage(it) }
+            }
         }
 
         // Close the dialog in a dedicated EDT launch with ModalityState.any()

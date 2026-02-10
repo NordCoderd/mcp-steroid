@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.vision
 
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.IdeFocusManager
@@ -106,13 +108,14 @@ object VisionService {
         val storage = project.executionStorage
         val executionDir = storage.resolveExecutionDir(executionId)
 
-        // Capture component info on EDT
-        val capture = withContext(Dispatchers.EDT) { captureOnEdt(project, windowId) }
+        // Capture component info on EDT (use ModalityState.any() so this works even when modal dialogs are showing)
+        val edtAnyModality = Dispatchers.EDT + ModalityState.any().asContextElement()
+        val capture = withContext(edtAnyModality) { captureOnEdt(project, windowId) }
 
         // Create context for metadata providers (image is provided by ScreenshotImageProvider)
         val initialContext = ScreenCaptureContext(
             project = project,
-            component = withContext(Dispatchers.EDT) { resolveComponent(project, windowId) },
+            component = withContext(edtAnyModality) { resolveComponent(project, windowId) },
             executionDir = executionDir,
         )
 
