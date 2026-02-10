@@ -94,14 +94,16 @@ class ConsoleDriver private constructor(
             CYAN -> "36"
             else -> "36"
         }
-        val filterStage = if (filterScript != null) " | python3 $filterScript" else ""
+        val filterStage = if (filterScript != null) " | python3 -u $filterScript" else ""
         val script = buildString {
             appendLine("#!/bin/bash")
             appendLine("touch $filePath")
             // tail -F follows by name (handles truncation/replacement)
+            // -s 0.1 polls every 100ms instead of default 1s for smoother updates
             // optional filter transforms raw output (e.g. NDJSON) to readable text
+            // python3 -u ensures unbuffered output from the filter
             // awk flushes both stdout and the console file after each line
-            appendLine("tail -F $filePath 2>/dev/null$filterStage | awk '{printf \"\\033[${colorCode}m${awkPrefix}\\033[0m %s\\n\", \$0 >> \"$consoleFile\"; fflush(\"$consoleFile\")}'")
+            appendLine("tail -F -s 0.1 $filePath 2>/dev/null$filterStage | awk '{printf \"\\033[${colorCode}m${awkPrefix}\\033[0m %s\\n\", \$0 >> \"$consoleFile\"; fflush(\"$consoleFile\")}'")
         }
         container.writeFileInContainer(scriptPath, script, executable = true)
 
@@ -160,7 +162,7 @@ class ConsoleDriver private constructor(
             // Start xterm at the target position immediately (right 1/3);
             // xdotool will then resize to exact pixel dimensions.
             xcvbDriver.runInVisibleConsole(
-                args = listOf("tail", "-f", consoleFile),
+                args = listOf("tail", "-f", "-s", "0.1", consoleFile),
                 title = title,
                 geometry = "80x30+${rect.x}+${rect.y}",
                 windowRect = rect,
