@@ -19,11 +19,9 @@ class ConsoleDriver private constructor(
 ) {
 
     fun writeLine(text: String) {
-        val tempFile = "/tmp/console-line-${System.nanoTime()}"
-        // writeFileInContainer uses heredoc which adds a trailing newline already
-        container.writeFileInContainer(tempFile, text)
+        // Single docker exec call: heredoc append with quoted delimiter to prevent expansion
         container.runInContainer(
-            listOf("bash", "-c", "cat $tempFile >> $consoleFile && rm $tempFile"),
+            listOf("bash", "-c", "cat >> $consoleFile << 'CONSOLE_LINE_END'\n$text\nCONSOLE_LINE_END"),
             timeoutSeconds = 5,
         )
     }
@@ -68,6 +66,11 @@ class ConsoleDriver private constructor(
      * Start a background process in the container that pumps lines from [filePath]
      * to the console file, prefixing each line with a colored [prefix].
      *
+     * Uses `tail -F` (follows by name, handles truncation/replacement) and `awk`
+     * with explicit `fflush()` for immediate, unbuffered line-by-line display.
+     * The pump script is written to a file in the container to avoid shell escaping
+     * issues with variable expansion.
+     *
      * Returns a [PumpHandle] to stop the pump when the agent finishes.
      */
     fun startFilePump(
@@ -75,16 +78,28 @@ class ConsoleDriver private constructor(
         prefix: String,
         prefixColor: String = CYAN,
     ): PumpHandle {
-        // Shell script: tail -f the file, prefix each line, append to console.
-        // Uses IFS= read -r to preserve leading whitespace and special chars.
-        val script = buildString {
-            append("touch $filePath && tail -f $filePath | while IFS= read -r line; do ")
-            append("printf '${prefixColor}${prefix}${RESET} %s\\n' \"\$line\" >> $consoleFile; ")
-            append("done")
+        val scriptPath = "/tmp/pump-${System.nanoTime()}.sh"
+        val awkPrefix = prefix.replace("\\", "\\\\").replace("\"", "\\\"")
+        // Map ANSI color constant to SGR code number for awk printf
+        val colorCode = when (prefixColor) {
+            RED -> "31"
+            GREEN -> "32"
+            YELLOW -> "33"
+            BLUE -> "34"
+            CYAN -> "36"
+            else -> "36"
         }
+        val script = buildString {
+            appendLine("#!/bin/bash")
+            appendLine("touch $filePath")
+            // tail -F follows by name (handles truncation/replacement)
+            // awk flushes both stdout and the console file after each line
+            appendLine("tail -F $filePath 2>/dev/null | awk '{printf \"\\033[${colorCode}m${awkPrefix}\\033[0m %s\\n\", \$0 >> \"$consoleFile\"; fflush(\"$consoleFile\")}'")
+        }
+        container.writeFileInContainer(scriptPath, script, executable = true)
 
         val proc = container.runInContainerDetached(
-            listOf("bash", "-c", script),
+            listOf("bash", scriptPath),
         )
         return PumpHandle(container, proc)
     }
@@ -130,17 +145,17 @@ class ConsoleDriver private constructor(
             val workArea = xcvbDriver.getWorkArea()
             val rect = WindowRect(
                 x = workArea.x + workArea.width * 2 / 3 + 2,
-                y = workArea.y + workArea.height / 6,
+                y = workArea.y,
                 width = workArea.width / 3 - 2,
-                height = workArea.height * 4 / 6,
+                height = workArea.height,
             )
 
-            // Use a small initial geometry so xterm doesn't start oversized;
-            // xdotool will resize to the exact windowRect pixel dimensions.
+            // Start xterm at the target position immediately (right 1/3);
+            // xdotool will then resize to exact pixel dimensions.
             xcvbDriver.runInVisibleConsole(
                 args = listOf("tail", "-f", consoleFile),
                 title = title,
-                geometry = "80x30+0+0",
+                geometry = "80x30+${rect.x}+${rect.y}",
                 windowRect = rect,
             )
 

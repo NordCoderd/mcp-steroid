@@ -85,22 +85,25 @@ class ConsolePumpingContainerDriver(
         val slug = agentName.lowercase().replace(" ", "-")
         val combinedLog = "/tmp/agent-$slug-$idx-combined.log"
 
-        // Single pump for combined output (script merges stdout/stderr)
+        // Single pump for combined output
         val pump = console.startFilePump(combinedLog, "[$agentName]", ConsoleDriver.CYAN)
 
         try {
-            // Wrap command in `script -qfc` to provide a PTY.
-            // CLI tools (claude, codex, gemini) buffer output when not on a TTY;
-            // script fakes a terminal so progress streams in real-time.
-            // `script` merges stdout/stderr, which is fine for console display.
-            // The entire command must be passed as a single string to -c.
+            // Write a tee-wrapper script that copies each line to BOTH stdout
+            // (captured by docker exec for ProcessResult) and the log file
+            // (tailed by the pump for console display).
+            //
+            // awk with explicit fflush() ensures both stdout and the log file
+            // are flushed after every line, giving real-time streaming.
+            val teeScript = "/tmp/agent-$slug-$idx-tee.sh"
             val escaped = escapeForBash(args)
-            val scriptCmd = escaped.replace("'", "'\\''")
-            val wrappedArgs = listOf(
-                "bash", "-c",
-                "script -qfc '$scriptCmd' /dev/null | tee $combinedLog; exit \${PIPESTATUS[0]}",
-            )
-            return delegate.runInContainer(wrappedArgs, workingDir, timeoutSeconds, extraEnvVars)
+            val scriptContent = buildString {
+                appendLine("#!/bin/bash")
+                appendLine("$escaped 2>&1 | awk -v logfile=$combinedLog '{print; print >> logfile; fflush(); fflush(logfile)}'")
+                appendLine("exit \${PIPESTATUS[0]}")
+            }
+            delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
+            return delegate.runInContainer(listOf("bash", teeScript), workingDir, timeoutSeconds, extraEnvVars)
         } finally {
             // Let pump catch up with remaining output
             Thread.sleep(500)
