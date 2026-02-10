@@ -38,44 +38,35 @@ class IdeContainer(
 
     /**
      * Move the IDE project window to the left 2/3 of the screen via MCP Steroid execute_code.
-     * Uses IntelliJ's AWT frame API to reposition and resize the window.
-     * The remaining 1/3 on the right is reserved for agent consoles.
-     *
-     * Queries the actual usable screen area from the window manager (excluding taskbars)
-     * instead of using raw display dimensions.
-     *
-     * Must be called after [AiAgentDriver.waitForMcpReady].
+     * Delegates to the standalone [positionProjectWindow] function.
      */
     fun positionProjectWindow() {
-        val workArea = xcvbContainer.getWorkArea()
-        val width = workArea.width * 2 / 3
-        val height = workArea.height
-        val x = workArea.x
-        val y = workArea.y
+        positionProjectWindow(xcvbContainer, intellijDriver)
+    }
 
-        println("[IDE] Work area: $workArea")
-        println("[IDE] Positioning project window to left 2/3 (${width}x${height}+${x}+${y})...")
-
-        // Retry: the project may not be registered yet right after MCP server readiness.
-        waitFor(60_000, "Position project window") {
+    /**
+     * Wait for the IDE project to finish import and indexing.
+     * Polls via MCP execute_code until DumbService reports smart mode.
+     * Writes progress to the console.
+     */
+    fun waitForProjectReady() {
+        console.writeStep(0, "Waiting for project import and indexing...")
+        waitFor(300_000, "Project import and indexing") {
             val result = intellijDriver.mcpExecuteCode(
                 projectName = "demo-project",
                 code = """
-                    import java.awt.Rectangle
-                    import com.intellij.openapi.wm.WindowManager
+                    import com.intellij.openapi.project.DumbService
 
-                    val frame = WindowManager.getInstance().getFrame(project)
-                        ?: error("No frame found for project")
-
-                    frame.bounds = Rectangle($x, $y, $width, $height)
-                    println("Window positioned: ${'$'}{frame.bounds}")
+                    val isDumb = DumbService.getInstance(project).isDumb
+                    println("dumb=${'$'}isDumb")
+                    if (isDumb) error("Still indexing")
                 """.trimIndent(),
-                taskId = "position-window",
-                reason = "Position project window to left 2/3 of screen",
+                taskId = "wait-project-ready",
+                reason = "Wait for project import and indexing to complete",
             )
             result.exitCode == 0
         }
-        println("[IDE] Project window positioned")
+        console.writeSuccess("Project import and indexing complete")
     }
 
     //TODO: we need an option to start MCP Steroid connection to agents or not
@@ -92,12 +83,55 @@ class IdeContainer(
     companion object
 }
 
+/**
+ * Move the IDE project window to the left 2/3 of the screen via MCP Steroid execute_code.
+ * Uses IntelliJ's AWT frame API to reposition and resize the window.
+ * The remaining 1/3 on the right is reserved for agent consoles.
+ *
+ * Queries the actual usable screen area from the window manager (excluding taskbars)
+ * instead of using raw display dimensions.
+ *
+ * Must be called after [AiAgentDriver.waitForMcpReady].
+ */
+private fun positionProjectWindow(xcvb: XcvbDriver, ijDriver: IntelliJDriver) {
+    val workArea = xcvb.getWorkArea()
+    val width = workArea.width * 2 / 3
+    val height = workArea.height
+    val x = workArea.x
+    val y = workArea.y
+
+    println("[IDE] Work area: $workArea")
+    println("[IDE] Positioning project window to left 2/3 (${width}x${height}+${x}+${y})...")
+
+    // Retry: the project may not be registered yet right after MCP server readiness.
+    waitFor(60_000, "Position project window") {
+        val result = ijDriver.mcpExecuteCode(
+            projectName = "demo-project",
+            code = """
+                import java.awt.Rectangle
+                import com.intellij.openapi.wm.WindowManager
+
+                val frame = WindowManager.getInstance().getFrame(project)
+                    ?: error("No frame found for project")
+
+                frame.bounds = Rectangle($x, $y, $width, $height)
+                println("Window positioned: ${'$'}{frame.bounds}")
+            """.trimIndent(),
+            taskId = "position-window",
+            reason = "Position project window to left 2/3 of screen",
+        )
+        result.exitCode == 0
+    }
+    println("[IDE] Project window positioned")
+}
+
 fun IdeContainer.Companion.create(
     lifetime: CloseableStack,
     dockerFileBase: String,
     runId: String,
     projectName: String = "test-project",
     consoleTitle: String = "Test Console",
+    waitForProjectReady: Boolean = false,
 ): IdeContainer {
     val runDir = run {
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
@@ -176,11 +210,18 @@ fun IdeContainer.Companion.create(
     println("=".repeat(60))
     println()
 
+    // Position project window before creating console so the console
+    // is visible during warmup on the right side of the screen
+    positionProjectWindow(xcvb, ijDriver)
+
     // Create console (immutable, starts immediately)
     val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
-    session.positionProjectWindow()
+
+    if (waitForProjectReady) {
+        session.waitForProjectReady()
+    }
 
     return session
 }
@@ -199,6 +240,7 @@ fun IdeContainer.Companion.createWithGitRepo(
     gitRepoUrl: String,
     cloneTimeoutSeconds: Long = 300,
     consoleTitle: String = "Test Console",
+    waitForProjectReady: Boolean = false,
 ): IdeContainer {
     val runDir = run {
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
@@ -276,11 +318,18 @@ fun IdeContainer.Companion.createWithGitRepo(
     println("=".repeat(60))
     println()
 
+    // Position project window before creating console so the console
+    // is visible during warmup on the right side of the screen
+    positionProjectWindow(xcvb, ijDriver)
+
     // Create console (immutable, starts immediately)
     val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
 
     val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
-    session.positionProjectWindow()
+
+    if (waitForProjectReady) {
+        session.waitForProjectReady()
+    }
 
     return session
 }

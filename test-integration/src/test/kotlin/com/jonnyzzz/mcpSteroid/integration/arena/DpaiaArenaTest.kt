@@ -89,6 +89,7 @@ class DpaiaArenaTest {
                 lifetime,
                 "ide-agent",
                 runId = "dpaia-arena",
+                waitForProjectReady = true,
             )
         }
 

@@ -219,6 +219,7 @@ class KeycloakArchitectureTest {
                 runId = "keycloak",
                 gitRepoUrl = KEYCLOAK_REPO_URL,
                 cloneTimeoutSeconds = 600,
+                waitForProjectReady = true,
             )
         }
 

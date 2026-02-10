@@ -49,6 +49,7 @@ class DebuggerDemoTest {
             lifetime, "ide-agent",
             runId = "debugger-$agentName",
             consoleTitle = "Debugger Demo ($agentName)",
+            waitForProjectReady = true,
         )
         val console = session.console
 

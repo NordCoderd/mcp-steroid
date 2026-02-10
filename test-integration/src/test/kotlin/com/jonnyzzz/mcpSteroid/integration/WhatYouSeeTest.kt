@@ -144,6 +144,7 @@ class WhatYouSeeTest {
                 lifetime,
                 "ide-agent",
                 runId = "what-you-see",
+                waitForProjectReady = true,
             )
         }
 
