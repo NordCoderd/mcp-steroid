@@ -143,6 +143,7 @@ class WhatYouSeeTest {
             IdeContainer.create(
                 lifetime,
                 "ide-agent",
+                runId = "what-you-see",
             )
         }
 

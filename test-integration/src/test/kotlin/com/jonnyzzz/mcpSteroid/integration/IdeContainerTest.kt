@@ -29,13 +29,14 @@ class IdeContainerTest {
         IdeContainer.create(
             lifetime,
             "ide-agent",
+            runId = "ide-container",
         )
     }
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
     fun `xdotool input control works`() {
-        val session = IdeContainer.create(lifetime, "ide-agent")
+        val session = IdeContainer.create(lifetime, "ide-agent", runId = "ide-container-input")
 
         // Move the mouse to the center of the screen
         session.input.mouseMove(1920, 1080)

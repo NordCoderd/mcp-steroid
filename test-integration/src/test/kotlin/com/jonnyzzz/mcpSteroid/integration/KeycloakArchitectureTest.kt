@@ -216,6 +216,7 @@ class KeycloakArchitectureTest {
             IdeContainer.createWithGitRepo(
                 lifetime,
                 "ide-agent",
+                runId = "keycloak",
                 gitRepoUrl = KEYCLOAK_REPO_URL,
                 cloneTimeoutSeconds = 600,
             )

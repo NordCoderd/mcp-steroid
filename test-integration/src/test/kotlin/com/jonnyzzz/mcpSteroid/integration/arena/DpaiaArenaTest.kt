@@ -88,6 +88,7 @@ class DpaiaArenaTest {
             IdeContainer.create(
                 lifetime,
                 "ide-agent",
+                runId = "dpaia-arena",
             )
         }
 

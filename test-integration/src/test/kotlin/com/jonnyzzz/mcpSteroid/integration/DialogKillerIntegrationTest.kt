@@ -41,7 +41,7 @@ class DialogKillerIntegrationTest {
      * 5. Verifies the Settings dialog is gone
      */
     private fun doTest(modeName: String, closeAction: (IdeContainer, String) -> Unit) {
-        val session = IdeContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer Test")
+        val session = IdeContainer.create(lifetime, "ide-agent", runId = "dialog-killer", consoleTitle = "Dialog Killer Test")
         val console = session.console
 
         console.writeInfo("Mode: $modeName")

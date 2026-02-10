@@ -10,6 +10,8 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
 import java.nio.file.Files.createLink
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import kotlin.io.path.exists
 
 /**
@@ -93,11 +95,13 @@ class IdeContainer(
 fun IdeContainer.Companion.create(
     lifetime: CloseableStack,
     dockerFileBase: String,
+    runId: String,
     projectName: String = "test-project",
     consoleTitle: String = "Test Console",
 ): IdeContainer {
     val runDir = run {
-        val file = File(IdeTestFolders.testOutputDir, "run-$dockerFileBase")
+        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+        val file = File(IdeTestFolders.testOutputDir, "run-${timestamp}-${runId}")
         file.mkdirs()
         file
     }
@@ -191,12 +195,14 @@ fun IdeContainer.Companion.create(
 fun IdeContainer.Companion.createWithGitRepo(
     lifetime: CloseableStack,
     dockerFileBase: String,
+    runId: String,
     gitRepoUrl: String,
     cloneTimeoutSeconds: Long = 300,
     consoleTitle: String = "Test Console",
 ): IdeContainer {
     val runDir = run {
-        val file = File(IdeTestFolders.testOutputDir, "run-$dockerFileBase")
+        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+        val file = File(IdeTestFolders.testOutputDir, "run-${timestamp}-${runId}")
         file.mkdirs()
         file
     }

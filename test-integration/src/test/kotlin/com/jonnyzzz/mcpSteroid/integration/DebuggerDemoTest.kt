@@ -47,6 +47,7 @@ class DebuggerDemoTest {
     private fun runDebuggerDemo(agentName: String) {
         val session = IdeContainer.create(
             lifetime, "ide-agent",
+            runId = "debugger-$agentName",
             consoleTitle = "Debugger Demo ($agentName)",
         )
         val console = session.console
