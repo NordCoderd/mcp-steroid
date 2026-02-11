@@ -171,7 +171,7 @@ class XcvbConsoleDriver(
             "-title", title,
             "-geometry", "80x30+${layoutRect.x}+${layoutRect.y}",
             "-fa", "JetBrains Mono:style=Regular",
-            "-fs", "14",
+            "-fs", "16",
             "-bg", "black",
             "-fg", "white",
             "-e",
