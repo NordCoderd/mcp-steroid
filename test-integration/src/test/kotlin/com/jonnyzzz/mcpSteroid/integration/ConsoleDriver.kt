@@ -152,10 +152,11 @@ class ConsoleDriver private constructor(
             container.writeFileInContainer(consoleFile, "")
 
             val workArea = xcvbDriver.getWorkArea()
+            // Console takes right half of screen with 4px gap from IDE
             val rect = WindowRect(
-                x = workArea.x + workArea.width * 2 / 3 + 2,
+                x = workArea.x + workArea.width / 2 + 4,
                 y = workArea.y,
-                width = workArea.width / 3 - 4,  // 2px gap on left and right
+                width = workArea.width / 2 - 8,  // 4px gap on left, 4px on right
                 height = workArea.height,
             )
 

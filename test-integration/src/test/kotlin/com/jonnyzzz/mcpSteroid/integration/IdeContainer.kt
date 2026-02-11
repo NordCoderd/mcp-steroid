@@ -97,15 +97,16 @@ private fun positionProjectWindowAsync(
     console: ConsoleDriver? = null,
 ) {
     val workArea = xcvb.getWorkArea()
+    // IDE takes left half of screen (50%) to match console on right half
     val rect = WindowRect(
         x = workArea.x,
         y = workArea.y,
-        width = workArea.width * 2 / 3,
+        width = workArea.width / 2,
         height = workArea.height,
     )
 
     println("[IDE] Work area: $workArea")
-    println("[IDE] Will position project window to left 2/3 (${rect.width}x${rect.height}+${rect.x}+${rect.y})...")
+    println("[IDE] Will position project window to left half (${rect.width}x${rect.height}+${rect.x}+${rect.y})...")
 
     kotlin.concurrent.thread(start = true, isDaemon = true, name = "ide-window-position") {
         runCatching {
