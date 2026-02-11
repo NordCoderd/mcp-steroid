@@ -83,7 +83,7 @@ class XcvbVideoDriver(
             videoInternalPath,
         )
 
-        val hostVideoFile = driver.mapGuestPathToHostPath(videoGuestPath)
+        val hostVideoFile = runCatching { driver.mapGuestPathToHostPath(videoGuestPath) }.getOrNull()
         println("[xcvb] Starting video recording (container-local: $videoInternalPath, host: $hostVideoFile)...")
         val proc = driver.runInContainerDetached(args)
 
@@ -135,7 +135,6 @@ class XcvbVideoDriver(
             Thread.sleep(500)
         }
 
-        val hostVideoFile = driver.mapGuestPathToHostPath(videoGuestPath)
         // Copy the finalized video from the container-local path to the mounted volume.
         // Using cp (open-write-close) instead of letting ffmpeg write directly to the
         // mount avoids the virtiofs stale-data issue.
@@ -146,7 +145,11 @@ class XcvbVideoDriver(
             }),
             timeoutSeconds = 30,
         ).assertExitCode(0, "Failed to copy video")
-        println("Check out screen recording at $hostVideoFile")
+
+        runCatching {
+            val hostVideoFile = driver.mapGuestPathToHostPath(videoGuestPath)
+            println("Check out screen recording at $hostVideoFile")
+        }
     }
 
     /**
