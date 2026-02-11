@@ -100,13 +100,9 @@ fun IntelliJContainer.Companion.create(
     windowsDriver.updateLayout(ijWindowInfo, windowsLayout.layoutIntelliJWindow())
 
     // Wait for MCP server readiness
-    val mcpSteroidDriver = McpSteroidDriver(container)
+    val mcpSteroidDriver = McpSteroidDriver(container, ijDriver)
     console.writeInfo("Waiting for MCP Steroid server...")
     mcpSteroidDriver.waitForMcpReady()
-
-
-    console.writeInfo("Waiting for IDE warm up...")
-    mcpSteroidDriver.waitForIndexesReady()
 
     val aiAgentDriver = AiAgentDriver(
         container = container,

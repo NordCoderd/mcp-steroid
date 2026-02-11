@@ -3,9 +3,8 @@ package com.jonnyzzz.mcpSteroid.integration.tests
 
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
-import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
-import org.junit.jupiter.api.AfterEach
+import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
@@ -24,24 +23,7 @@ import java.util.concurrent.TimeUnit
  * Uses direct MCP HTTP calls (bypassing AI agents) for reliable testing.
  */
 class DialogKillerIntegrationTest {
-    private val lifetime by lazy {
-        CloseableStackHost()
-    }
-
-    @AfterEach
-    fun tearDown() {
-        lifetime.closeAllStacks()
-    }
-
-    /**
-     * Shared test body:
-     * 1. Creates an IDE session
-     * 2. Opens the Settings dialog (with dialog killer disabled)
-     * 3. Verifies the Settings dialog is visible
-     * 4. Calls [closeAction] to close the dialog
-     * 5. Verifies the Settings dialog is gone
-     */
-    private fun doTest(modeName: String, closeAction: (IntelliJContainer, Long) -> Unit) {
+    private fun doTest(modeName: String, closeAction: (IntelliJContainer) -> Unit) = runWithCloseableStack { lifetime ->
         val session = IntelliJContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer")
         val console = session.console
 
@@ -50,7 +32,6 @@ class DialogKillerIntegrationTest {
         // Step 1: Open Settings dialog and leave it open (dialog killer disabled)
         console.writeStep(1, "Opening Settings dialog")
         session.mcpSteroid.mcpExecuteCode(
-            projectName = "demo-project",
             code = """
                 // Disable modal cancellation so the dialog stays open after this execution
                 doNotCancelOnModalityStateChange()
@@ -83,38 +64,34 @@ class DialogKillerIntegrationTest {
 
         // Step 2: Verify Settings dialog appeared via xcvb window list
         console.writeStep(2, "Verifying Settings dialog is visible")
-        val windowsWithDialog = session.windows.listWindows()
-        val idePid = session.pid
-        val settingsWindow = windowsWithDialog.find { it.title == "Settings" && it.pid == idePid }
+        val settingsWindow = {
+            val idePid = session.pid
+            val listWindows = session.windows.listWindows()
+            console.writeInfo("[TEST] Windows after opening Settings:")
+            listWindows.filter { it.pid == idePid }.forEach { println("  $it") }
 
-        console.writeInfo("[TEST] Windows after opening Settings:")
-        windowsWithDialog.filter { it.pid == idePid }.forEach { println("  $it") }
+            listWindows.find { it.title == "Settings" && it.pid == idePid }
+        }
 
-        Assertions.assertNotNull(settingsWindow, "Settings dialog should be visible")
+
+        Assertions.assertNotNull(settingsWindow(), "Settings dialog should be visible")
         console.writeSuccess("Settings dialog visible")
 
         // Step 3: Execute the close action
         console.writeStep(3, "Running dialog killer ($modeName)")
-        closeAction(session, idePid)
+        closeAction(session)
 
         // Step 4: Verify Settings dialog is gone via xcvb window list
         console.writeStep(4, "Verifying Settings dialog is gone")
-        val windowsAfterKiller = session.windows.listWindows()
-        val settingsAfterKiller = windowsAfterKiller.find { it.title == "Settings" && it.pid == idePid }
-
         console.writeInfo("[TEST] Windows after dialog killer:")
-        windowsAfterKiller.filter { it.pid == idePid }.forEach { println("  $it") }
-        Assertions.assertNull(settingsAfterKiller, "Settings dialog should have been closed by dialog killer")
+        Assertions.assertNull(settingsWindow(), "Settings dialog should have been closed by dialog killer")
         console.writeSuccess("Settings dialog closed")
-
-        console.writeHeader("PASSED")
     }
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `explicit dialog killer via script API`() = doTest("explicit") { session, _ ->
+    fun `explicit dialog killer via script API`() = doTest("explicit") { session ->
         session.mcpSteroid.mcpExecuteCode(
-            projectName = "demo-project",
             code = """
                 import com.jonnyzzz.mcpSteroid.execution.dialogKiller
                 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
@@ -134,9 +111,8 @@ class DialogKillerIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `automatic dialog killer closes Settings dialog`() = doTest("automatic") { session, _ ->
+    fun `automatic dialog killer closes Settings dialog`() = doTest("automatic") { session ->
         session.mcpSteroid.mcpExecuteCode(
-            projectName = "demo-project",
             dialogKiller = true,
             code = """
                 println("Dialog killer should have closed the Settings dialog before this runs")

@@ -16,12 +16,14 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonObject
 
-fun McpSteroidDriver.waitForIndexesReady() {
-    TODO("Not yet implemented")
-}
+data class McpProjectInfo(
+    val name: String,
+    val path: String,
+)
 
 class McpSteroidDriver(
     private val driver: ContainerDriver,
+    private val ijDriver: IntelliJDriver,
 ) {
     companion object {
         val MCP_STEROID_PORT = ContainerPort(6754)
@@ -73,6 +75,55 @@ class McpSteroidDriver(
 
 
     /**
+     * List all open projects in the IDE via steroid_list_projects tool.
+     */
+    fun mcpListProjects(): List<McpProjectInfo> {
+        val sessionId = mcpInitialize()
+
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 2)
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_list_projects")
+                putJsonObject("arguments") { }
+            }
+        }.toString()
+
+        val run = executeMcpRequest(sessionId, request)
+        val data = json.parseToJsonElement(run)
+
+        val text = data.jsonObject["result"]
+            ?.jsonObject?.get("content")
+            ?.jsonArray?.firstOrNull()
+            ?.jsonObject?.get("text")
+            ?.jsonPrimitive?.contentOrNull
+            ?: error("steroid_list_projects returned no content: $run")
+
+        val response = json.parseToJsonElement(text)
+        return response.jsonObject["projects"]
+            ?.jsonArray
+            ?.map {
+                McpProjectInfo(
+                    name = it.jsonObject["name"]!!.jsonPrimitive.content,
+                    path = it.jsonObject["path"]!!.jsonPrimitive.content,
+                )
+            }
+            ?: error("steroid_list_projects returned no projects: $text")
+    }
+
+    /**
+     * Find the project name for the guest project directory.
+     * Calls steroid_list_projects and picks the project whose path matches [guestProjectDir].
+     */
+    fun resolveProjectName(): String {
+        val guestProjectDir = ijDriver.getGuestProjectDir()
+        val projects = mcpListProjects()
+        return projects.singleOrNull { it.path == guestProjectDir }?.name
+            ?: error("No project found for path $guestProjectDir. Available: ${projects.map { "${it.name} -> ${it.path}" }}")
+    }
+
+    /**
      * Execute Kotlin code via steroid_execute_code tool.
      *
      * This makes a direct HTTP call to the MCP server, bypassing AI agents.
@@ -82,7 +133,7 @@ class McpSteroidDriver(
      * @param taskId Task identifier (default: "integration-test")
      * @param reason Human-readable reason for execution
      * @param timeout Timeout in seconds (default: 600)
-     * @param projectName Project name (default: "test-project")
+     * @param projectName Project name (defaults to the project at [guestProjectDir])
      * @return MCP tool result as JSON string
      */
     fun mcpExecuteCode(
@@ -90,7 +141,7 @@ class McpSteroidDriver(
         taskId: String = "integration-test",
         reason: String = "Integration test execution",
         timeout: Int = 600,
-        projectName: String = "test-project",
+        projectName: String = resolveProjectName(),
         dialogKiller: Boolean? = false,
     ): ProcessResult {
         // First, initialize MCP session

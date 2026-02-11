@@ -43,7 +43,6 @@ class IntelliJContainer(
         console.writeStep(0, "Waiting for project import and indexing...")
         waitFor(600_000, "Project import and indexing") {
             val result = mcpSteroid.mcpExecuteCode(
-                projectName = "demo-project",
                 code = """
                     import com.intellij.openapi.project.DumbService
 
