@@ -60,25 +60,14 @@ class ConsoleAwareAgentSession(
  * This is used to convert NDJSON (stream-json) to human-readable text.
  */
 class ConsolePumpingContainerDriver(
-    private val delegate: ContainerDriver,
+    delegate: ContainerDriver,
     private val console: ConsoleDriver,
     private val agentName: String,
     private val consoleFilterScript: String? = null,
-) : ContainerDriver {
-    override val containerId: String get() = delegate.containerId
+) : ContainerDriverDelegate<ConsolePumpingContainerDriver>(delegate) {
     private val counter = AtomicInteger(0)
 
-    override fun mapContainerPortToHostPort(port: ContainerPort): Int =
-        delegate.mapContainerPortToHostPort(port)
-
-    override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver =
-        ConsolePumpingContainerDriver(delegate.withGuestWorkDir(guestWorkDir), console, agentName, consoleFilterScript)
-
-    override fun withSecretPattern(secretPattern: String): ContainerDriver =
-        ConsolePumpingContainerDriver(delegate.withSecretPattern(secretPattern), console, agentName, consoleFilterScript)
-
-    override fun withEnv(key: String, value: String): ContainerDriver =
-        ConsolePumpingContainerDriver(delegate.withEnv(key, value), console, agentName, consoleFilterScript)
+    override fun createNewDriver(delegate: ContainerDriver) = ConsolePumpingContainerDriver(delegate, console, agentName)
 
     override fun runInContainer(
         args: List<String>,
@@ -132,18 +121,6 @@ class ConsolePumpingContainerDriver(
 
         return proc
     }
-
-    override fun writeFileInContainer(containerPath: String, content: String, executable: Boolean) =
-        delegate.writeFileInContainer(containerPath, content, executable)
-
-    override fun copyFromContainer(containerPath: String, localPath: File) =
-        delegate.copyFromContainer(containerPath, localPath)
-
-    override fun copyToContainer(localPath: File, containerPath: String) =
-        delegate.copyToContainer(localPath, containerPath)
-
-    override fun mapGuestPathToHostPath(path: String): File =
-        delegate.mapGuestPathToHostPath(path)
 
     override fun toString(): String = "ConsolePumping[$agentName]($delegate)"
 

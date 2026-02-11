@@ -3,9 +3,7 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
-import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -20,29 +18,15 @@ import java.util.concurrent.atomic.AtomicInteger
  * the detached process's stdout log.
  */
 class VisibleConsoleContainerDriver(
-    private val delegate: ContainerDriver,
+    delegate: ContainerDriver,
     private val xcvb: XcvbDriver,
     private val consoleTitle: String = "Agent",
     private val geometry: String = "200x50+0+0",
     private val windowRect: WindowRect? = null,
-) : ContainerDriver {
-    override val containerId: String get() = delegate.containerId
+) : ContainerDriverDelegate<VisibleConsoleContainerDriver>(delegate) {
     private val counter = AtomicInteger(0)
 
-    override fun mapContainerPortToHostPort(port: ContainerPort): Int =
-        delegate.mapContainerPortToHostPort(port)
-
-    override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver =
-        VisibleConsoleContainerDriver(delegate.withGuestWorkDir(guestWorkDir), xcvb, consoleTitle, geometry, windowRect)
-
-    override fun withSecretPattern(secretPattern: String): ContainerDriver =
-        VisibleConsoleContainerDriver(delegate.withSecretPattern(secretPattern), xcvb, consoleTitle, geometry, windowRect)
-
-    override fun withEnv(key: String, value: String): ContainerDriver =
-        VisibleConsoleContainerDriver(delegate.withEnv(key, value), xcvb, consoleTitle, geometry, windowRect)
-
-    fun withConsoleTitle(title: String): VisibleConsoleContainerDriver =
-        VisibleConsoleContainerDriver(delegate, xcvb, title, geometry, windowRect)
+    override fun createNewDriver(delegate: ContainerDriver) = VisibleConsoleContainerDriver(delegate, xcvb, consoleTitle, geometry)
 
     override fun runInContainer(
         args: List<String>,
@@ -104,20 +88,7 @@ class VisibleConsoleContainerDriver(
         return proc
     }
 
-    override fun writeFileInContainer(containerPath: String, content: String, executable: Boolean) =
-        delegate.writeFileInContainer(containerPath, content, executable)
-
-    override fun copyFromContainer(containerPath: String, localPath: File) =
-        delegate.copyFromContainer(containerPath, localPath)
-
-    override fun copyToContainer(localPath: File, containerPath: String) =
-        delegate.copyToContainer(localPath, containerPath)
-
-    override fun mapGuestPathToHostPath(path: String): File =
-        delegate.mapGuestPathToHostPath(path)
-
-    override fun toString(): String =
-        "VisibleConsole($delegate)"
+    override fun toString(): String = "VisibleConsole($delegate)"
 
     companion object {
         const val ENABLE_CONSOLE_ENV = "MCP_STEROID_VISIBLE_CONSOLE"
