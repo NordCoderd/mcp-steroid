@@ -242,6 +242,18 @@ val pluginZipElements by configurations.creating {
 }
 
 tasks.buildPlugin {
+    // Preserve executable permissions in the ZIP for scripts
+    filesMatching("**/kotlinc/bin/*") {
+        if (!name.endsWith(".bat")) {
+            permissions { unix("rwxr-xr-x") }
+        }
+    }
+    filesMatching("**/ocr-tesseract/bin/*") {
+        if (!name.endsWith(".bat")) {
+            permissions { unix("rwxr-xr-x") }
+        }
+    }
+
     doFirst {
         val outputDir = tasks.buildPlugin.get().archiveFile.get().asFile.parentFile
         val zips = outputDir
@@ -304,6 +316,8 @@ val verifyBundledLibraries by tasks.registering {
         check(ocrFiles.contains("ocr-tesseract/bin/ocr-tesseract.bat")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
         check(ocrFiles.contains("ocr-tesseract/tessdata/eng.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
         check(ocrFiles.contains("ocr-tesseract/tessdata/osd.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
+        check(ocrFiles.any { it.startsWith("ocr-tesseract/lib/ocr-common-${project.version}.jar") }) { "ocr-common jar must be included in ocr-tesseract" }
+        check(ocrFiles.any { it.startsWith("ocr-tesseract/lib/ocr-tesseract-${project.version}.jar") }) { "ocr-tesseract jar must be included in ocr-tesseract" }
 
         allFiles = (allFiles - ocrFiles).toCollection(sortedSetOf())
 
@@ -316,8 +330,6 @@ val verifyBundledLibraries by tasks.registering {
             "lib/ai-agents-${project.version}.jar",
             "lib/mcp-steroid-${project.version}.jar",
             "lib/ocr-common-${project.version}.jar",
-            "ocr-tesseract/lib/ocr-common-${project.version}.jar",
-            "ocr-tesseract/lib/ocr-tesseract-${project.version}.jar",
 
             //libraries
             "lib/config-1.4.3.jar",
