@@ -40,6 +40,7 @@ class ConsoleDriver(
         container.runInContainer(
             listOf("bash", "-c", "cat >> $consoleFile << 'CONSOLE_LINE_END'\n$text\nCONSOLE_LINE_END"),
             timeoutSeconds = 5,
+            quietly = true,
         )
     }
 
