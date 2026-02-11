@@ -12,7 +12,7 @@ abstract class ContainerDriverDelegate<D: ContainerDriverDelegate<D>>(
     protected abstract fun createNewDriver(delegate: ContainerDriver) : D
 
     final override val containerId: String by delegate::containerId
-    final override fun mapContainerPortToHostPort(port: ContainerPort): Int = delegate.mapContainerPortToHostPort(port)
+    final override fun mapGuestPortToHostPort(port: ContainerPort): Int = delegate.mapGuestPortToHostPort(port)
     final override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver = createNewDriver(delegate.withGuestWorkDir(guestWorkDir))
     final override fun withSecretPattern(secretPattern: String): ContainerDriver = createNewDriver(delegate.withSecretPattern(secretPattern))
     final override fun withEnv(key: String, value: String): ContainerDriver = createNewDriver(delegate.withEnv(key, value))

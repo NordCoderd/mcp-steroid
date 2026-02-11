@@ -9,17 +9,13 @@ package com.jonnyzzz.mcpSteroid.integration.infra
  * and window zone positioning.
  */
 interface LayoutManager {
-    /** Display width in pixels. Used by XcvbDriver to configure the virtual display. */
-    val displayWidth: Int
-
-    /** Display height in pixels. Used by XcvbDriver to configure the virtual display. */
-    val displayHeight: Int
+    val displaySize : WindowRect
 
     /** Target rect for IDE project window(s) — left-aligned, occupies 2/3 of the screen. */
-    fun layoutIdeWindows(): WindowRect
+    fun layoutIntelliJWindow(workArea: WindowRect): WindowRect
 
     /** Target rect for the status/console window — right-aligned, occupies 1/3 of the screen. */
-    fun layoutStatusConsoleWindow(): WindowRect
+    fun layoutStatusConsoleWindow(workArea: WindowRect): WindowRect
 }
 
 /**
@@ -30,23 +26,19 @@ interface LayoutManager {
  * ┌──────────────────────────────┬──┬───────────────┐
  * │  IDE (2/3 width - 2px)       │4 │ Console       │
  * │  aligned left                │px│ (1/3 w - 2px) │
- * │                              │  │ aligned right  │
+ * │                              │  │ aligned right │
  * └──────────────────────────────┴──┴───────────────┘
  * ```
- *
- * Create the layout manager first with the desired resolution, then set [xcvb]
- * after the display driver is initialized so that [layoutIdeWindows] and
- * [layoutStatusConsoleWindow] can query the actual work area.
  */
-class DefaultLayoutManager(
-    override val displayWidth: Int = 3840,
-    override val displayHeight: Int = 2160,
+class HorizontalLayoutManager(
+    val displayWidth: Int = 3840,
+    val displayHeight: Int = 2160,
 ) : LayoutManager {
-    /** Set after XcvbDriver is created. Required before calling layout methods. */
-    lateinit var xcvb: XcvbDriver
 
-    override fun layoutIdeWindows(): WindowRect {
-        val workArea = xcvb.getWorkArea()
+    override val displaySize: WindowRect
+        get() = WindowRect(0, 0, displayWidth, displayHeight)
+
+    override fun layoutIntelliJWindow(workArea: WindowRect): WindowRect {
         return WindowRect(
             x = workArea.x,
             y = workArea.y,
@@ -55,8 +47,7 @@ class DefaultLayoutManager(
         )
     }
 
-    override fun layoutStatusConsoleWindow(): WindowRect {
-        val workArea = xcvb.getWorkArea()
+    override fun layoutStatusConsoleWindow(workArea: WindowRect): WindowRect {
         val consoleWidth = workArea.width / 3 - 2
         return WindowRect(
             x = workArea.x + workArea.width - consoleWidth,
@@ -65,4 +56,16 @@ class DefaultLayoutManager(
             height = workArea.height,
         )
     }
+}
+
+class WindowLayoutManager(
+    private val driver: XcvbWindowDriver,
+    private val layoutManager: LayoutManager,
+) {
+
+    /** Target rect for IDE project window(s) — left-aligned, occupies 2/3 of the screen. */
+    fun layoutIntelliJWindow(): WindowRect = layoutManager.layoutIntelliJWindow(driver.getWorkArea())
+
+    /** Target rect for the status/console window — right-aligned, occupies 1/3 of the screen. */
+    fun layoutStatusConsoleWindow(): WindowRect = layoutManager.layoutStatusConsoleWindow(driver.getWorkArea())
 }

@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import kotlin.sequences.forEach
 
 /**
@@ -11,8 +12,7 @@ import kotlin.sequences.forEach
  * Use [kill] to terminate the process if it is still running.
  */
 class RunningContainerProcess(
-    private val driver: DockerDriver,
-    private val containerId: String,
+    private val driver: ContainerDriver,
     /** Name/label for this background process */
     val name: String,
     /** Container-side directory holding stdout.log, stderr.log, and pid */
@@ -20,8 +20,8 @@ class RunningContainerProcess(
 ) : ProcessResult {
     val stdoutPath: String get() = "$logDir/stdout.log"
     val stderrPath: String get() = "$logDir/stderr.log"
-    val pidPath: String get() = "$logDir/pid"
-    val exitcodePath: String get() = "$logDir/exitcode"
+    private val pidPath: String get() = "$logDir/pid"
+    private val exitCodePath: String get() = "$logDir/exitcode"
 
     override val exitCode: Int?
         get() = readExitCode()
@@ -53,7 +53,6 @@ class RunningContainerProcess(
     /** Read current stdout content from the container. */
     fun readStdOut(timeoutSeconds: Long = 10): String {
         val result = driver.runInContainer(
-            containerId,
             listOf("cat", stdoutPath),
             timeoutSeconds = timeoutSeconds,
         )
@@ -63,21 +62,18 @@ class RunningContainerProcess(
     /** Read current stderr content from the container. */
     fun readStderr(timeoutSeconds: Long = 10): String {
         val result = driver.runInContainer(
-            containerId,
             listOf("cat", stderrPath),
             timeoutSeconds = timeoutSeconds,
         )
         return result.output
     }
 
-    /** Read the PID of the background process. Returns null if not available. */
-    fun readPid(): String? {
+    val pid: Long by lazy {
         val result = driver.runInContainer(
-            containerId,
             listOf("cat", pidPath),
             timeoutSeconds = 5L,
-        )
-        return result.output.trim().takeIf { it.isNotEmpty() && result.exitCode == 0 }
+        ).assertExitCode(0)
+        result.output.trim().toLong()
     }
 
     /**
@@ -86,8 +82,7 @@ class RunningContainerProcess(
      */
     fun readExitCode(timeoutSeconds: Long = 5): Int? {
         val result = driver.runInContainer(
-            containerId,
-            listOf("cat", exitcodePath),
+            listOf("cat", exitCodePath),
             timeoutSeconds = timeoutSeconds,
         )
         if (result.exitCode != 0) return null
@@ -96,20 +91,16 @@ class RunningContainerProcess(
 
     /** Kill the background process if it is still running. */
     fun kill(signal: String = "TERM", timeoutSeconds: Long = 5) {
-        val pid = readPid() ?: return
         driver.runInContainer(
-            containerId,
-            listOf("kill", "-$signal", pid),
+            listOf("kill", "-$signal", this.pid.toString()),
             timeoutSeconds = timeoutSeconds,
         )
     }
 
     /** Check if the process is still running. */
     fun isRunning(timeoutSeconds: Long = 5): Boolean {
-        val pid = readPid() ?: return false
         val result = driver.runInContainer(
-            containerId,
-            listOf("kill", "-0", pid),
+            listOf("kill", "-0", pid.toString()),
             timeoutSeconds = timeoutSeconds,
         )
         return result.exitCode == 0

@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration.tests
 
 import com.jonnyzzz.mcpSteroid.integration.infra.ConsoleDriver
-import com.jonnyzzz.mcpSteroid.integration.infra.IdeContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
@@ -47,15 +47,13 @@ class DebuggerDemoTest {
     fun `gemini finds sortedByDescending bug via debugger`() = runDebuggerDemo("gemini")
 
     private fun runDebuggerDemo(agentName: String) {
-        val session = IdeContainer.create(
+        val session = IntelliJContainer.create(
             lifetime, "ide-agent",
-            runId = "debugger-$agentName",
-            consoleTitle = "Debugger Demo ($agentName)",
-            waitForProjectReady = true,
-        )
+            consoleTitle = "debugger-$agentName",
+        ).waitForProjectReady()
         val console = session.console
 
-        val agent: AiAgentSession? = session.aiAgentDriver.aiAgents[agentName]
+        val agent: AiAgentSession? = session.aiAgents.aiAgents[agentName]
         Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
         console.writeStep(1, "Building prompt for $agentName")
 

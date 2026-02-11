@@ -14,7 +14,8 @@ import java.io.File
 interface ContainerDriver : ContainerProcessRunner {
     val containerId: String
 
-    fun mapContainerPortToHostPort(port: ContainerPort): Int
+    fun mapGuestPathToHostPath(path: String) : File
+    fun mapGuestPortToHostPort(port: ContainerPort): Int
 
     fun withGuestWorkDir(guestWorkDir: String): ContainerDriver
     fun withSecretPattern(secretPattern: String): ContainerDriver
@@ -44,7 +45,6 @@ interface ContainerDriver : ContainerProcessRunner {
         containerPath: String,
     )
 
-    fun mapGuestPathToHostPath(path: String) : File
 
     companion object
 }
@@ -55,6 +55,7 @@ interface ContainerProcessRunner {
         workingDir: String? = null,
         timeoutSeconds: Long = 30,
         extraEnvVars: Map<String, String> = emptyMap(),
+        quietly: Boolean = false,
     ): ProcessResult
 }
 
@@ -127,7 +128,7 @@ private class ContainerDriverImpl(
     private val volumes: List<ContainerVolume> = emptyList(),
     private val hostPorts: Map<Int, Int> = emptyMap(),
 ) : ContainerDriver {
-    override fun mapContainerPortToHostPort(port: ContainerPort): Int =
+    override fun mapGuestPortToHostPort(port: ContainerPort): Int =
         hostPorts[port.containerPort]
             ?: error("Port ${port.containerPort} is not mapped. Available: ${hostPorts.keys}")
 
@@ -147,9 +148,10 @@ private class ContainerDriverImpl(
         args: List<String>,
         workingDir: String?,
         timeoutSeconds: Long,
-        extraEnvVars: Map<String, String>
+        extraEnvVars: Map<String, String>,
+        quietly: Boolean,
     ): ProcessResult {
-        return scope.runInContainer(containerId, args.toList(), workingDir, timeoutSeconds, extraEnvVars)
+        return scope.runInContainer(containerId, args.toList(), workingDir, timeoutSeconds, extraEnvVars, quietly = quietly)
     }
 
     override fun runInContainerDetached(
@@ -157,7 +159,8 @@ private class ContainerDriverImpl(
         workingDir: String?,
         extraEnvVars: Map<String, String>
     ): RunningContainerProcess {
-        return scope.runInContainerDetached(containerId, args, workingDir, extraEnvVars)
+        val info = scope.runInContainerDetached(containerId, args, workingDir, extraEnvVars)
+        return RunningContainerProcess(this, info.name, info.logDir)
     }
 
     override fun writeFileInContainer(

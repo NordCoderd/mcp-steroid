@@ -40,7 +40,7 @@ object DockerReaper {
      * Idempotent — only the first call performs actual work.
      *
      * Uses [DockerDriver] to build the image and [startContainerDriver] to start the container.
-     * Uses [ContainerDriver.mapContainerPortToHostPort] for port mapping.
+     * Uses [ContainerDriver.mapGuestPortToHostPort] for port mapping.
      * Container IDs registered before the connection is established are buffered
      * in a [Channel] with capacity 128.
      */
@@ -81,7 +81,7 @@ object DockerReaper {
         println("[REAPER] Container started: $reaperContainerId")
 
         // Map the container port to host port using ContainerDriver
-        val hostPort = containerDriver.mapContainerPortToHostPort(port8080)
+        val hostPort = containerDriver.mapGuestPortToHostPort(port8080)
         println("[REAPER] Listening on host port: $hostPort")
 
         // Connect to the reaper socket with retries

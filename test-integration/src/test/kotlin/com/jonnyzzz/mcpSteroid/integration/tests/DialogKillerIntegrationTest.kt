@@ -1,7 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.tests
 
-import com.jonnyzzz.mcpSteroid.integration.infra.IdeContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
@@ -41,21 +41,15 @@ class DialogKillerIntegrationTest {
      * 4. Calls [closeAction] to close the dialog
      * 5. Verifies the Settings dialog is gone
      */
-    private fun doTest(modeName: String, closeAction: (IdeContainer, String) -> Unit) {
-        val session = IdeContainer.create(lifetime, "ide-agent", runId = "dialog-killer", consoleTitle = "Dialog Killer Test")
+    private fun doTest(modeName: String, closeAction: (IntelliJContainer, Long) -> Unit) {
+        val session = IntelliJContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer")
         val console = session.console
 
         console.writeInfo("Mode: $modeName")
 
-        // Find the IDE process PID from the project window
-        val idePid = session.listWindows()
-            .first { it.title == "demo-project" && it.pid.isNotBlank() }
-            .pid
-        console.writeInfo("IDE PID: $idePid")
-
         // Step 1: Open Settings dialog and leave it open (dialog killer disabled)
         console.writeStep(1, "Opening Settings dialog")
-        session.intellijDriver.mcpExecuteCode(
+        session.mcpSteroid.mcpExecuteCode(
             projectName = "demo-project",
             code = """
                 // Disable modal cancellation so the dialog stays open after this execution
@@ -89,10 +83,13 @@ class DialogKillerIntegrationTest {
 
         // Step 2: Verify Settings dialog appeared via xcvb window list
         console.writeStep(2, "Verifying Settings dialog is visible")
-        val windowsWithDialog = session.listWindows()
+        val windowsWithDialog = session.windows.listWindows()
+        val idePid = session.pid
         val settingsWindow = windowsWithDialog.find { it.title == "Settings" && it.pid == idePid }
-        println("[TEST] Windows after opening Settings:")
+
+        console.writeInfo("[TEST] Windows after opening Settings:")
         windowsWithDialog.filter { it.pid == idePid }.forEach { println("  $it") }
+
         Assertions.assertNotNull(settingsWindow, "Settings dialog should be visible")
         console.writeSuccess("Settings dialog visible")
 
@@ -102,9 +99,10 @@ class DialogKillerIntegrationTest {
 
         // Step 4: Verify Settings dialog is gone via xcvb window list
         console.writeStep(4, "Verifying Settings dialog is gone")
-        val windowsAfterKiller = session.listWindows()
+        val windowsAfterKiller = session.windows.listWindows()
         val settingsAfterKiller = windowsAfterKiller.find { it.title == "Settings" && it.pid == idePid }
-        println("[TEST] Windows after dialog killer:")
+
+        console.writeInfo("[TEST] Windows after dialog killer:")
         windowsAfterKiller.filter { it.pid == idePid }.forEach { println("  $it") }
         Assertions.assertNull(settingsAfterKiller, "Settings dialog should have been closed by dialog killer")
         console.writeSuccess("Settings dialog closed")
@@ -115,7 +113,7 @@ class DialogKillerIntegrationTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
     fun `explicit dialog killer via script API`() = doTest("explicit") { session, _ ->
-        session.intellijDriver.mcpExecuteCode(
+        session.mcpSteroid.mcpExecuteCode(
             projectName = "demo-project",
             code = """
                 import com.jonnyzzz.mcpSteroid.execution.dialogKiller
@@ -137,7 +135,7 @@ class DialogKillerIntegrationTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
     fun `automatic dialog killer closes Settings dialog`() = doTest("automatic") { session, _ ->
-        session.intellijDriver.mcpExecuteCode(
+        session.mcpSteroid.mcpExecuteCode(
             projectName = "demo-project",
             dialogKiller = true,
             code = """

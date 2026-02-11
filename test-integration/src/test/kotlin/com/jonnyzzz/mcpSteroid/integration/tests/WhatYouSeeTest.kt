@@ -1,7 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.tests
 
-import com.jonnyzzz.mcpSteroid.integration.infra.IdeContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
@@ -147,17 +147,16 @@ class WhatYouSeeTest {
         }
 
         val session by lazy {
-            IdeContainer.Companion.create(
+            IntelliJContainer.create(
                 lifetime,
                 "ide-agent",
-                runId = "what-you-see",
-                waitForProjectReady = true,
-            )
+                consoleTitle = "what-you-see",
+            ).waitForProjectReady()
         }
 
         @JvmStatic
         fun agents(): Stream<Arguments> = session
-            .aiAgentDriver
+            .aiAgents
             .aiAgents
             .entries.stream()
             .map { (name, driver) ->

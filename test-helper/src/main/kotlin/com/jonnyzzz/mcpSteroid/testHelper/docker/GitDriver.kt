@@ -7,6 +7,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
  * Reusable Git operations for Docker containers.
  * Works with any [ContainerDriver] instance.
  */
+//TODO: We need to cache repositories on the host machine as bare checkout to make deployment faster
 class GitDriver(
     private val driver: ContainerDriver,
 ) {

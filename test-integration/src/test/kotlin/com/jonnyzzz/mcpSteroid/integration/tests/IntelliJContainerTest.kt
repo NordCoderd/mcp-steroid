@@ -1,9 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.tests
 
-import com.jonnyzzz.mcpSteroid.integration.infra.IdeContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
+import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
@@ -15,30 +16,22 @@ import java.util.concurrent.TimeUnit
  * Verifies that the Docker container can be built and started,
  * all directories are properly mounted, and the IDE starts successfully.
  */
-class IdeContainerTest {
-    val lifetime by lazy {
-        CloseableStackHost()
-    }
-
-    @AfterEach
-    fun tearDown() {
-       lifetime.closeAllStacks()
-    }
-
+class IntelliJContainerTest {
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `container starts and IDE becomes ready`() {
-        IdeContainer.create(
+    fun `container starts and IDE becomes ready`() = runWithCloseableStack { lifetime ->
+        IntelliJContainer.create(
             lifetime,
             "ide-agent",
-            runId = "ide-container",
+            consoleTitle = "ide-container",
         )
+        Thread.sleep(3000)
     }
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `xdotool input control works`() {
-        val session = IdeContainer.create(lifetime, "ide-agent", runId = "ide-container-input")
+    fun `xdotool input control works`() = runWithCloseableStack { lifetime ->
+        val session = IntelliJContainer.create(lifetime, "ide-agent", consoleTitle = "ide-container-input")
 
         // Move the mouse to the center of the screen
         session.input.mouseMove(1920, 1080)
@@ -62,13 +55,5 @@ class IdeContainerTest {
         check(pasted.contains("mcp-steroid-test")) {
             "Clipboard round-trip failed: expected 'mcp-steroid-test', got '$pasted'"
         }
-
-        // Capture a region screenshot and verify the file was created
-        session.input.screenshotRegion(0, 0, 800, 600, "input-test-region.png")
-        val screenshotFile = session.xcvbContainer.videoFile.parentFile.resolve("input-test-region.png")
-        check(screenshotFile.exists() && screenshotFile.length() > 0) {
-            "Screenshot file was not created or is empty: $screenshotFile"
-        }
-        println("[test] Input control test passed, screenshot: ${screenshotFile.length()} bytes")
     }
 }

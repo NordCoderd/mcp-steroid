@@ -120,6 +120,7 @@ class ProcessRunner(
         description: String,
         workingDir: File,
         timeoutSeconds: Long = 30,
+        quietly: Boolean = false,
     ): ProcessResult {
         // Filter secrets from command line and description for logging
         val filteredCommand = command.map { filterSecrets(it) }
@@ -142,7 +143,9 @@ class ProcessRunner(
                         Thread.sleep(100)
                         reader.forEachLine { line ->
                             val filterSecrets = filterSecrets(line)
-                            println("[$prefix] $filterSecrets")
+                            if (!quietly) {
+                                println("[$prefix] $filterSecrets")
+                            }
                             target.appendLine(filterSecrets)
                         }
                     }

@@ -209,6 +209,7 @@ class DockerDriver(
         timeoutSeconds: Long,
         extraEnvVars: Map<String, String> = emptyMap(),
         detach: Boolean = false,
+        quietly: Boolean = false,
     ): ProcessResult {
         val shellCommand = escapeShellArgs(args)
 
@@ -235,6 +236,7 @@ class DockerDriver(
             description = "In container: ${args.joinToString(" ")}",
             workingDir = workDir,
             timeoutSeconds = timeoutSeconds,
+            quietly = quietly,
         )
     }
 
@@ -243,7 +245,7 @@ class DockerDriver(
         args: List<String>,
         workingDir: String? = null,
         extraEnvVars: Map<String, String> = emptyMap(),
-    ): RunningContainerProcess {
+    ): DetachedContainerProcess {
         val timestamp = ofPattern("yyyyMMdd-HHmmss-SSS").format(LocalDateTime.now())
         val name = args.first().substringAfterLast("/")
         val logDir = "/tmp/run-$timestamp-$name"
@@ -279,7 +281,7 @@ class DockerDriver(
         }
 
         println("[$logPrefix] Detached process '$name' started, stdout/stderr at $logDir")
-        return RunningContainerProcess(this, containerId, name, logDir)
+        return DetachedContainerProcess(name = name, logDir = logDir)
     }
 
     private fun escapeShellArgs(args: List<String>): String =
@@ -291,3 +293,8 @@ class DockerDriver(
             }
         }
 }
+
+data class DetachedContainerProcess(
+    val name: String,
+    val logDir: String,
+)

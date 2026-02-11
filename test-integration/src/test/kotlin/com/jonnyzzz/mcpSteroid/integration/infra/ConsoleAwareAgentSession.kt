@@ -74,7 +74,10 @@ class ConsolePumpingContainerDriver(
         workingDir: String?,
         timeoutSeconds: Long,
         extraEnvVars: Map<String, String>,
+        quietly: Boolean,
     ): ProcessResult {
+        require(!quietly) { "quietly mode is not supported for console runs" }
+
         val idx = counter.incrementAndGet()
         val slug = agentName.lowercase().replace(" ", "-")
         val combinedLog = "/tmp/agent-$slug-$idx-combined.log"

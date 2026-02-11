@@ -78,7 +78,6 @@ class DockerCodexSession(
 
     companion object : AIAgentCompanion<DockerCodexSession>("codex-cli") {
         const val DISPLAY_NAME = "Codex"
-        private const val VISIBLE_CONSOLE_ENV = "MCP_STEROID_VISIBLE_CONSOLE"
 
         override fun readApiKey(): String {
             System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }

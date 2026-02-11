@@ -2,6 +2,9 @@
 package com.jonnyzzz.mcpSteroid.integration.tests
 
 import com.jonnyzzz.mcpSteroid.integration.infra.IdeTestFolders
+import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.create
+import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import org.junit.jupiter.api.Test
 
 class InfrastructureTest {
