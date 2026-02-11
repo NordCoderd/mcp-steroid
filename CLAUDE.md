@@ -57,7 +57,8 @@ Track all tasks in TODO* files. Review them before starting work. Work items one
 
 IntelliJ MCP Steroid — MCP server plugin exposing IDE APIs to LLM agents via Kotlin code execution.
 
-- **GitHub**: https://github.com/jonnyzzz/intellij-mcp-steroids
+- **GitHub (public)**: https://github.com/jonnyzzz/mcp-steroid — public issue tracker for epics and public bugs
+- **GitHub (internal)**: https://github.com/jonnyzzz/intellij-mcp-steroids — internal repo for internal tasks
 - **Docs**: [README.md](../../README.md), [AGENT-STEROID-GUIDE.md](../guides/AGENT-STEROID-GUIDE.md)
 
 ## Build
