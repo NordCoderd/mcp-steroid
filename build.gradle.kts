@@ -142,12 +142,9 @@ tasks {
     }
 }
 
-val testProjectHomeProperty = "mcp.steroid.test.projectHome"
-val testProjectHomePath = rootProject.layout.projectDirectory.asFile.absolutePath
-
 allprojects {
     tasks.withType<Test>().configureEach {
-        systemProperty(testProjectHomeProperty, testProjectHomePath)
+        systemProperty("mcp.steroid.test.projectHome", rootProject.layout.projectDirectory.asFile.absolutePath)
         maxHeapSize = "4g"
     }
 }
