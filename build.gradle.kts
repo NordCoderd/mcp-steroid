@@ -5,12 +5,13 @@ import com.jonnyzzz.mcpSteroid.gradle.GenerateMetadataTask
 import de.undercouch.gradle.tasks.download.Download
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.HttpURLConnection
 import java.net.URI
 import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.zip.ZipFile
+import java.util.SortedSet
 
 plugins {
     id("de.undercouch.download") version "5.6.0"
@@ -113,7 +114,7 @@ kotlin.sourceSets.test {
     kotlin.srcDir(generatedTestSourcesPath)
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+tasks.withType<KotlinCompile>().configureEach {
     dependsOn(generateMetadata)
     dependsOn(compilePrompts)
 }
@@ -209,9 +210,19 @@ listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
     it.invoke {
         from(ocrToolDist) {
             into(intellijPlatform.projectName.map { "$it/ocr-tesseract" })
+            filesMatching("bin/*") {
+                if (!name.endsWith(".bat")) {
+                    permissions { unix("rwxr-xr-x") }
+                }
+            }
         }
         from(downloadKotlinc) {
             into(intellijPlatform.projectName)
+            filesMatching("kotlinc/bin/*") {
+                if (!name.endsWith(".bat")) {
+                    permissions { unix("rwxr-xr-x") }
+                }
+            }
         }
         // Include LICENSE file in plugin root
         from(layout.projectDirectory.file("website/static/LICENSE")) {
@@ -255,13 +266,23 @@ val verifyBundledLibraries by tasks.registering {
     dependsOn(tasks.buildPlugin)
     doLast {
         val zip = tasks.buildPlugin.get().outputs.files.singleFile
-        var allFiles = ZipFile(zip).use {
-            it.entries()
-                .asSequence()
-                .filter { !it.isDirectory }
-                .map { it.name }
-                .toSortedSet()
-        }
+
+        // Read ZIP entries with executable flag detection (:X suffix)
+        var allFiles: SortedSet<String> = run {
+            val allFiles = mutableListOf<String>()
+            zipTree(zip).visit {
+                if (!isDirectory) {
+                    val isExec = permissions.user.execute
+                    val path = relativePath.pathString
+
+                    allFiles += when {
+                        isExec ->  "$path:X"
+                        else -> path
+                    }
+                }
+            }
+            allFiles
+        }.toSortedSet()
 
         val pluginPrefix = intellijPlatform.projectName.get() + "/"
 
@@ -273,11 +294,19 @@ val verifyBundledLibraries by tasks.registering {
         allFiles = allFiles.map { it.removePrefix(pluginPrefix) }.toSortedSet()
         assert(allFiles.isNotEmpty()) { "no libraries found in ${allFiles.joinToString { "\n  - $it" }}" }
 
-        val kotlincFiles = allFiles.filter { it.startsWith("kotlinc/") }
-        assert(kotlincFiles.contains("kotlinc/bin/kotlinc")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n -$it" } }
+        val kotlincFiles = allFiles.filter { it.startsWith("kotlinc/") }.toSortedSet()
+        assert(kotlincFiles.contains("kotlinc/bin/kotlinc:X")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n -$it" } }
         assert(kotlincFiles.contains("kotlinc/bin/kotlinc.bat")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n -$it" } }
+        allFiles = (allFiles - kotlincFiles).toCollection(sortedSetOf())
 
-        allFiles = (allFiles - kotlincFiles).toSortedSet()
+
+        val ocrFiles = allFiles.filter { !it.startsWith("ocr-tesseract/") }.toSortedSet()
+        assert(ocrFiles.contains("ocr-tesseract/bin/ocr-tesseract:X")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n -$it" } }
+        assert(ocrFiles.contains("ocr-tesseract/bin/ocr-tesseract.bat")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n -$it" } }
+        assert(ocrFiles.contains("ocr-tesseract/tessdata/eng.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n -$it" } }
+        assert(ocrFiles.contains("ocr-tesseract/tessdata/osd.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n -$it" } }
+
+        allFiles = (allFiles - ocrFiles).toCollection(sortedSetOf())
 
         // Assert expected libraries - update this list when dependencies change
         val expectedFiles = sortedSetOf(
@@ -314,64 +343,6 @@ val verifyBundledLibraries by tasks.registering {
             "lib/posthog-6.4.0.jar",
             "lib/posthog-server-2.3.0.jar",
 
-            "ocr-tesseract/bin/ocr-tesseract",
-            "ocr-tesseract/bin/ocr-tesseract.bat",
-            "ocr-tesseract/lib/annotations-13.0.jar",
-            "ocr-tesseract/lib/bcpkix-jdk18on-1.82.jar",
-            "ocr-tesseract/lib/bcprov-jdk18on-1.82.jar",
-            "ocr-tesseract/lib/bcutil-jdk18on-1.82.jar",
-            "ocr-tesseract/lib/commons-io-2.21.0.jar",
-            "ocr-tesseract/lib/commons-logging-1.3.5.jar",
-            "ocr-tesseract/lib/fontbox-3.0.6.jar",
-            "ocr-tesseract/lib/jai-imageio-core-1.4.0.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-android-arm64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-android-x86_64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-ios-arm64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-ios-x86_64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-linux-arm64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-linux-ppc64le.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-linux-riscv64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-linux-x86_64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-macosx-arm64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-macosx-x86_64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12-windows-x86_64.jar",
-            "ocr-tesseract/lib/javacpp-1.5.12.jar",
-            "ocr-tesseract/lib/javacpp-platform-1.5.12.jar",
-            "ocr-tesseract/lib/jbig2-imageio-3.0.4.jar",
-            "ocr-tesseract/lib/jboss-logging-3.1.4.GA.jar",
-            "ocr-tesseract/lib/jboss-vfs-3.2.17.Final.jar",
-            "ocr-tesseract/lib/jna-5.18.1.jar",
-            "ocr-tesseract/lib/kotlin-stdlib-2.2.21.jar",
-            "ocr-tesseract/lib/kotlinx-serialization-core-jvm-1.7.3.jar",
-            "ocr-tesseract/lib/kotlinx-serialization-json-jvm-1.7.3.jar",
-            "ocr-tesseract/lib/lept4j-1.22.0.jar",
-            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-android-arm64.jar",
-            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-android-x86_64.jar",
-            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-linux-arm64.jar",
-            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-linux-x86_64.jar",
-            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-macosx-arm64.jar",
-            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-macosx-x86_64.jar",
-            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12-windows-x86_64.jar",
-            "ocr-tesseract/lib/leptonica-1.85.0-1.5.12.jar",
-            "ocr-tesseract/lib/leptonica-platform-1.85.0-1.5.12.jar",
-            "ocr-tesseract/lib/pdfbox-3.0.6.jar",
-            "ocr-tesseract/lib/pdfbox-debugger-3.0.6.jar",
-            "ocr-tesseract/lib/pdfbox-io-3.0.6.jar",
-            "ocr-tesseract/lib/pdfbox-tools-3.0.6.jar",
-            "ocr-tesseract/lib/picocli-4.7.7.jar",
-            "ocr-tesseract/lib/slf4j-api-2.0.17.jar",
-            "ocr-tesseract/lib/tess4j-5.17.0.jar",
-            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-android-arm64.jar",
-            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-android-x86_64.jar",
-            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-linux-arm64.jar",
-            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-linux-x86_64.jar",
-            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-macosx-arm64.jar",
-            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-macosx-x86_64.jar",
-            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12-windows-x86_64.jar",
-            "ocr-tesseract/lib/tesseract-5.5.1-1.5.12.jar",
-            "ocr-tesseract/lib/tesseract-platform-5.5.1-1.5.12.jar",
-            "ocr-tesseract/tessdata/eng.traineddata",
-            "ocr-tesseract/tessdata/osd.traineddata",
         ).toSortedSet()
 
         if (allFiles != expectedFiles) {
