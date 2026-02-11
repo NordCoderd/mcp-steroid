@@ -16,7 +16,7 @@ data class WindowInfo(
     val id: String,
     val title: String,
     val rect: WindowRect,
-    val pid: Long,
+    val pid: Long?,
 )
 
 class XcvbWindowDriver(
@@ -75,7 +75,7 @@ class XcvbWindowDriver(
                 val y = parts[2].toIntOrNull() ?: return@mapNotNull null
                 val width = parts[3].toIntOrNull() ?: return@mapNotNull null
                 val height = parts[4].toIntOrNull() ?: return@mapNotNull null
-                val pid = parts[5].toLongOrNull() ?: -1L
+                val pid = parts[5].toLongOrNull()
                 val title = parts[6]
 
                 WindowInfo(id, title, WindowRect(x, y, width, height), pid)

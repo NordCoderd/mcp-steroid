@@ -52,7 +52,7 @@ class HorizontalLayoutManager(
         return WindowRect(
             x = workArea.x + workArea.width - consoleWidth,
             y = workArea.y,
-            width = consoleWidth,
+            width = consoleWidth - 2,
             height = workArea.height,
         )
     }
