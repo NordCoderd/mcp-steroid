@@ -147,20 +147,14 @@ class ConsoleDriver private constructor(
             xcvbDriver: XcvbDriver,
             container: ContainerDriver,
             title: String = "Test Console",
+            layoutManager: LayoutManager,
         ): ConsoleDriver {
             val consoleFile = "/tmp/test-console-${consoleCounter.incrementAndGet()}"
             container.writeFileInContainer(consoleFile, "")
 
-            val workArea = xcvbDriver.getWorkArea()
-            // Console takes right half of screen with 4px gap from IDE
-            val rect = WindowRect(
-                x = workArea.x + workArea.width / 2 + 4,
-                y = workArea.y,
-                width = workArea.width / 2 - 8,  // 4px gap on left, 4px on right
-                height = workArea.height,
-            )
+            val rect = layoutManager.layoutStatusConsoleWindow()
 
-            // Start xterm at the target position immediately (right 1/3);
+            // Start xterm at the target position (right 1/3);
             // xdotool will then resize to exact pixel dimensions.
             xcvbDriver.runInVisibleConsole(
                 args = listOf("tail", "-f", "-s", "0.1", consoleFile),

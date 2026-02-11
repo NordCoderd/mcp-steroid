@@ -12,7 +12,10 @@ class XcvbDriver(
     driver: ContainerDriver,
     private val videoDirInContainer: String,
     private val runId: String = "unknown",
+    private val layoutManager: LayoutManager,
 ) {
+    val displayWidth get() = layoutManager.displayWidth
+    val displayHeight get() = layoutManager.displayHeight
     private val DISPLAY = ":99"
     private val driver = driver.withEnv("DISPLAY", DISPLAY)
 
@@ -47,7 +50,7 @@ class XcvbDriver(
     fun startDisplayServer(): RunningContainerProcess {
         println("[xcvb] Starting Xvfb...")
         val proc = driver.runInContainerDetached(
-            listOf("Xvfb", DISPLAY, "-screen", "0", "3840x2160x24", "-ac"),
+            listOf("Xvfb", DISPLAY, "-screen", "0", "${displayWidth}x${displayHeight}x24", "-ac"),
         )
 
         println("[xcvb] Waiting for display $DISPLAY to be ready...")
@@ -76,6 +79,8 @@ class XcvbDriver(
             buildFfmpegLiveRecordingCommand(
                 display = DISPLAY,
                 outputPath = videoInternalPath,
+                videoWidth = displayWidth,
+                videoHeight = displayHeight,
             ),
         )
 
@@ -287,7 +292,7 @@ class XcvbDriver(
             }
         }
         // Fallback to full display
-        return WindowRect(0, 0, DISPLAY_WIDTH, DISPLAY_HEIGHT)
+        return WindowRect(0, 0, displayWidth, displayHeight)
     }
 
     // ── Visible console ────────────────────────────────────────────────
@@ -376,11 +381,18 @@ class XcvbDriver(
         delegate: ContainerDriver,
         title: String,
     ): ContainerDriver {
+        val agentRect = WindowRect(
+            x = displayWidth / 2,
+            y = displayHeight / 4,
+            width = displayWidth / 2,
+            height = displayHeight / 2,
+        )
+        val agentGeometry = "220x58+${displayWidth / 2}+${displayHeight / 4}"
         return withVisibleConsole(
             delegate = delegate,
             title = title,
-            geometry = AGENT_CONSOLE_GEOMETRY,
-            windowRect = AGENT_CONSOLE_RECT,
+            geometry = agentGeometry,
+            windowRect = agentRect,
         )
     }
 
@@ -581,17 +593,7 @@ class XcvbDriver(
     }
 
     companion object {
-        const val DISPLAY_WIDTH = 3840
-        const val DISPLAY_HEIGHT = 2160
         val VIDEO_STREAMING_PORT = ContainerPort(8765)
-
-        val AGENT_CONSOLE_RECT = WindowRect(
-            x = DISPLAY_WIDTH / 2,
-            y = DISPLAY_HEIGHT / 4,
-            width = DISPLAY_WIDTH / 2,
-            height = DISPLAY_HEIGHT / 2,
-        )
-        const val AGENT_CONSOLE_GEOMETRY = "220x58+1920+540"
 
         /** Default path where the xcvb skill file is deployed inside containers. */
         const val SKILL_GUEST_PATH = "/home/agent/.skills/xcvb-display-control.md"
@@ -624,6 +626,8 @@ data class WindowInfo(
 internal fun buildFfmpegLiveRecordingCommand(
     display: String,
     outputPath: String,
+    videoWidth: Int = 3840,
+    videoHeight: Int = 2160,
     frameRate: Int = 10,
     keyframeIntervalSeconds: Int = 1,
 ): List<String> {
@@ -635,7 +639,7 @@ internal fun buildFfmpegLiveRecordingCommand(
 
     return listOf(
         "ffmpeg", "-nostdin", "-y",
-        "-f", "x11grab", "-video_size", "3840x2160",
+        "-f", "x11grab", "-video_size", "${videoWidth}x${videoHeight}",
         "-framerate", frameRate.toString(), "-i", display,
         "-c:v", "libx264",
         "-preset", "ultrafast",

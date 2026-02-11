@@ -30,6 +30,7 @@ class IdeContainer(
     val xcvbContainer: XcvbDriver,
     val intellij: RunningContainerProcess,
     val console: ConsoleDriver,
+    val layoutManager: LayoutManager,
 ) {
     fun listWindows(): List<WindowInfo> {
         return xcvbContainer.listWindows()
@@ -40,7 +41,7 @@ class IdeContainer(
      * Runs asynchronously in a background thread.
      */
     fun positionProjectWindow() {
-        positionProjectWindowAsync(xcvbContainer, console = console)
+        positionProjectWindowAsync(xcvbContainer, layoutManager, console = console)
     }
 
     /**
@@ -83,7 +84,7 @@ class IdeContainer(
 }
 
 /**
- * Position the IDE project window to the left 2/3 of the screen using xdotool.
+ * Position the IDE project window using the [LayoutManager] via xdotool.
  *
  * Runs in a **background thread** and polls for the window by title pattern.
  * This avoids the dependency on MCP server readiness that the old AWT-based
@@ -93,20 +94,13 @@ class IdeContainer(
  */
 private fun positionProjectWindowAsync(
     xcvb: XcvbDriver,
+    layoutManager: LayoutManager,
     windowTitlePattern: String = "demo-project",
     console: ConsoleDriver? = null,
 ) {
-    val workArea = xcvb.getWorkArea()
-    // IDE takes left half of screen (50%) to match console on right half
-    val rect = WindowRect(
-        x = workArea.x,
-        y = workArea.y,
-        width = workArea.width / 2,
-        height = workArea.height,
-    )
+    val rect = layoutManager.layoutIdeWindows()
 
-    println("[IDE] Work area: $workArea")
-    println("[IDE] Will position project window to left half (${rect.width}x${rect.height}+${rect.x}+${rect.y})...")
+    println("[IDE] Will position project window to left 2/3 (${rect.width}x${rect.height}+${rect.x}+${rect.y})...")
 
     kotlin.concurrent.thread(start = true, isDaemon = true, name = "ide-window-position") {
         runCatching {
@@ -159,12 +153,16 @@ fun IdeContainer.Companion.create(
         ),
     )
 
+    val layoutManager = DefaultLayoutManager()
+
     val xcvb = XcvbDriver(
         lifetime,
         container,
         "$containerMountedPath/video",
         runId = runDir.name,
+        layoutManager = layoutManager,
     )
+    layoutManager.xcvb = xcvb
 
     xcvb.startAllServices()
     xcvb.startLiveVideoPreview()
@@ -173,7 +171,7 @@ fun IdeContainer.Companion.create(
     container = xcvb.withDisplay(container)
 
     // Create console early — visible during IDE startup and warmup
-    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
+    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle, layoutManager)
     console.writeInfo("Preparing IntelliJ IDEA...")
 
     val ijDriver = IntelliJDriver(
@@ -190,7 +188,7 @@ fun IdeContainer.Companion.create(
     console.writeSuccess("IntelliJ IDEA process started")
 
     // Position IDE window as soon as it appears (async, via xdotool)
-    positionProjectWindowAsync(xcvb, console = console)
+    positionProjectWindowAsync(xcvb, layoutManager, console = console)
 
     // Wait for MCP server readiness
     console.writeInfo("Waiting for MCP Steroid server...")
@@ -222,7 +220,7 @@ fun IdeContainer.Companion.create(
     println("=".repeat(60))
     println()
 
-    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
+    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console, layoutManager)
 
     // Wait for indexing (shown in console)
     if (waitForProjectReady) {
@@ -274,12 +272,16 @@ fun IdeContainer.Companion.createWithGitRepo(
         ),
     )
 
+    val layoutManager = DefaultLayoutManager()
+
     val xcvb = XcvbDriver(
         lifetime,
         container,
         "$containerMountedPath/video",
         runId = runDir.name,
+        layoutManager = layoutManager,
     )
+    layoutManager.xcvb = xcvb
 
     xcvb.startAllServices()
     xcvb.startLiveVideoPreview()
@@ -288,7 +290,7 @@ fun IdeContainer.Companion.createWithGitRepo(
     container = xcvb.withDisplay(container)
 
     // Create console early — visible during git clone, IDE startup, and warmup
-    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle)
+    val console = ConsoleDriver.create(lifetime, xcvb, container, consoleTitle, layoutManager)
     console.writeInfo("Cloning git repository...")
 
     val ijDriver = IntelliJDriver(
@@ -307,7 +309,7 @@ fun IdeContainer.Companion.createWithGitRepo(
     console.writeSuccess("IntelliJ IDEA process started")
 
     // Position IDE window as soon as it appears (async, via xdotool)
-    positionProjectWindowAsync(xcvb, console = console)
+    positionProjectWindowAsync(xcvb, layoutManager, console = console)
 
     // Wait for MCP server readiness
     console.writeInfo("Waiting for MCP Steroid server...")
@@ -340,7 +342,7 @@ fun IdeContainer.Companion.createWithGitRepo(
     println("=".repeat(60))
     println()
 
-    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console)
+    val session = IdeContainer(lifetime, container, ijDriver, xcvb, ijContainer, console, layoutManager)
 
     // Wait for indexing (shown in console)
     if (waitForProjectReady) {
