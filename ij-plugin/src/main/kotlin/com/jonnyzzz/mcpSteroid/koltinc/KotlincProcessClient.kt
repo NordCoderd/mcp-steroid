@@ -41,7 +41,7 @@ class KotlincProcessClient {
 
     private fun runProcess(commandLine: GeneralCommandLine): ProcessOutput {
         val output = try {
-            ExecUtil.execAndGetOutput(commandLine, KOTLINC_TIMEOUT_MS)
+            ExecUtil.execAndGetOutput(commandLine, 120_000)
         } catch (e: ExecutionException) {
             throw IllegalStateException("Failed to start kotlinc process: ${e.message}", e)
         }
@@ -79,8 +79,4 @@ class KotlincProcessClient {
     }
 
     private data class KotlincExecutable(val path: Path, val root: Path)
-
-    companion object {
-        private const val KOTLINC_TIMEOUT_MS = 120_000
-    }
 }
