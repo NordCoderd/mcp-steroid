@@ -42,18 +42,18 @@ class XcvbWindowDriver(
         }
     }
 
-    fun listWindows(): List<WindowInfo> {
+    fun listWindows(quietly : Boolean = true): List<WindowInfo> {
         // Run a shell script to list all windows with their geometry and title efficiently
         // Output format: ID|X|Y|WIDTH|HEIGHT|PID|TITLE
         val d = '$'
         val script = """
             for id in ${d}(xdotool search --name "" 2>/dev/null); do
-              unset X Y WIDTH HEIGHT PID
+              unset X Y WIDTH HEIGHT pid
               name=${d}(xdotool getwindowname "${d}id" 2>/dev/null)
               eval ${d}(xdotool getwindowgeometry --shell "${d}id" 2>/dev/null)
               pid=${d}(xdotool getwindowpid "${d}id" 2>/dev/null)
               if [ -n "${d}X" ] && [ -n "${d}Y" ] && [ -n "${d}WIDTH" ] && [ -n "${d}HEIGHT" ]; then
-                echo "${d}id|${d}X|${d}Y|${d}WIDTH|${d}HEIGHT|${d}pid|${d}name"
+                echo "${d}id|${d}X|${d}Y|${d}WIDTH|${d}HEIGHT|${d}{pid:--1}|${d}name"
               fi
             done
         """.trimIndent()
@@ -61,6 +61,7 @@ class XcvbWindowDriver(
         val result = driver.runInContainer(
             listOf("bash", "-c", script),
             timeoutSeconds = 5,
+            quietly = quietly,
         )
         if (result.exitCode != 0) return emptyList()
 
@@ -74,10 +75,10 @@ class XcvbWindowDriver(
                 val y = parts[2].toIntOrNull() ?: return@mapNotNull null
                 val width = parts[3].toIntOrNull() ?: return@mapNotNull null
                 val height = parts[4].toIntOrNull() ?: return@mapNotNull null
-                val pid = parts[5]
+                val pid = parts[5].toLongOrNull() ?: -1L
                 val title = parts[6]
 
-                WindowInfo(id, title, WindowRect(x, y, width, height), pid.toLong())
+                WindowInfo(id, title, WindowRect(x, y, width, height), pid)
             }
             .toList()
     }
