@@ -8,6 +8,7 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.HttpURLConnection
 import java.net.URI
+import java.nio.file.FileSystem
 import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -173,7 +174,7 @@ val downloadKotlinc by tasks.registering {
             digest().toHexString()
         }
 
-        assert(actualSha256 == sha256) {
+        check(actualSha256 == sha256) {
             "Actual:\n${actualSha256}\nExpected\n${sha256}"
         }
 
@@ -285,26 +286,24 @@ val verifyBundledLibraries by tasks.registering {
         }.toSortedSet()
 
         val pluginPrefix = intellijPlatform.projectName.get() + "/"
-
-        assert(
-            allFiles.all {
-                it.startsWith(pluginPrefix)
-            }){"files must be under plugin roots: " + allFiles.map { it.substringBefore('/') }.toSortedSet() }
-
+        check(allFiles.all { it.startsWith(pluginPrefix) }) {
+            "files must be under plugin roots: " + allFiles.map { it.substringBefore('/') }.toSortedSet()
+        }
         allFiles = allFiles.map { it.removePrefix(pluginPrefix) }.toSortedSet()
-        assert(allFiles.isNotEmpty()) { "no libraries found in ${allFiles.joinToString { "\n  - $it" }}" }
+
+        check(allFiles.isNotEmpty()) { "no libraries found in ${allFiles.joinToString { "\n  - $it" }}" }
 
         val kotlincFiles = allFiles.filter { it.startsWith("kotlinc/") }.toSortedSet()
-        assert(kotlincFiles.contains("kotlinc/bin/kotlinc:X")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n -$it" } }
-        assert(kotlincFiles.contains("kotlinc/bin/kotlinc.bat")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n -$it" } }
+        check(kotlincFiles.contains("kotlinc/bin/kotlinc:X")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n $it" } }
+        check(kotlincFiles.contains("kotlinc/bin/kotlinc.bat")) { "Kotlinc must be included in " + kotlincFiles.joinToString { "\n $it" } }
         allFiles = (allFiles - kotlincFiles).toCollection(sortedSetOf())
 
 
-        val ocrFiles = allFiles.filter { !it.startsWith("ocr-tesseract/") }.toSortedSet()
-        assert(ocrFiles.contains("ocr-tesseract/bin/ocr-tesseract:X")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n -$it" } }
-        assert(ocrFiles.contains("ocr-tesseract/bin/ocr-tesseract.bat")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n -$it" } }
-        assert(ocrFiles.contains("ocr-tesseract/tessdata/eng.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n -$it" } }
-        assert(ocrFiles.contains("ocr-tesseract/tessdata/osd.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n -$it" } }
+        val ocrFiles = allFiles.filter { it.startsWith("ocr-tesseract/") }.toSortedSet()
+        check(ocrFiles.contains("ocr-tesseract/bin/ocr-tesseract:X")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
+        check(ocrFiles.contains("ocr-tesseract/bin/ocr-tesseract.bat")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
+        check(ocrFiles.contains("ocr-tesseract/tessdata/eng.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
+        check(ocrFiles.contains("ocr-tesseract/tessdata/osd.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
 
         allFiles = (allFiles - ocrFiles).toCollection(sortedSetOf())
 
