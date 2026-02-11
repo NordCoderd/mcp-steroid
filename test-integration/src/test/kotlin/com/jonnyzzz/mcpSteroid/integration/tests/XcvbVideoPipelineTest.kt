@@ -1,11 +1,11 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.integration
+package com.jonnyzzz.mcpSteroid.integration.tests
 
+import com.jonnyzzz.mcpSteroid.integration.infra.buildFfmpegLiveRecordingCommand
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import java.io.File
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 
 class XcvbVideoPipelineTest {
     @Test
@@ -17,16 +17,16 @@ class XcvbVideoPipelineTest {
             keyframeIntervalSeconds = 1,
         )
 
-        assertEquals("10", argValue(args, "-g"), "GOP should be 1 second at 10fps")
-        assertEquals("10", argValue(args, "-keyint_min"), "Minimum keyframe interval should match GOP")
-        assertEquals("zerolatency", argValue(args, "-tune"), "Encoder should favor low-latency delivery")
-        assertEquals("1000000", argValue(args, "-frag_duration"), "Fragment duration should be 1 second")
-        assertEquals(
+        Assertions.assertEquals("10", argValue(args, "-g"), "GOP should be 1 second at 10fps")
+        Assertions.assertEquals("10", argValue(args, "-keyint_min"), "Minimum keyframe interval should match GOP")
+        Assertions.assertEquals("zerolatency", argValue(args, "-tune"), "Encoder should favor low-latency delivery")
+        Assertions.assertEquals("1000000", argValue(args, "-frag_duration"), "Fragment duration should be 1 second")
+        Assertions.assertEquals(
             "keyint=10:min-keyint=10:scenecut=0:rc-lookahead=0",
             argValue(args, "-x264-params"),
             "x264 GOP settings should force 1-second keyframe cadence"
         )
-        assertEquals(
+        Assertions.assertEquals(
             "frag_keyframe+empty_moov+default_base_moof",
             argValue(args, "-movflags"),
             "Fragmented MP4 flags should support early browser playback"
@@ -57,31 +57,31 @@ class XcvbVideoPipelineTest {
     fun `video viewer script exposes waiting state branding and playback controls`() {
         val script = readVideoServerScript()
 
-        assertTrue(
+        Assertions.assertTrue(
             script.contains("Waiting for video to start..."),
             "Viewer should render waiting text before stream playback"
         )
-        assertTrue(
+        Assertions.assertTrue(
             !script.contains("class=\"moving-brand\""),
             "Viewer should not include moving MCP Steroid text overlay"
         )
-        assertTrue(
+        Assertions.assertTrue(
             script.contains("<video id=\"video\" autoplay muted controls"),
             "Viewer should expose native video controls"
         )
-        assertTrue(
+        Assertions.assertTrue(
             script.contains("id=\"speedSelect\""),
             "Viewer should expose playback speed selector"
         )
-        assertTrue(
+        Assertions.assertTrue(
             script.contains("enterServerDownState"),
             "Viewer should enter a stable shutdown state when server becomes unavailable"
         )
-        assertTrue(
+        Assertions.assertTrue(
             script.contains("window.close()"),
             "Viewer should attempt to auto-close the browser window when server is down"
         )
-        assertTrue(
+        Assertions.assertTrue(
             !script.contains("Watingin for video to start..."),
             "Viewer should not contain the old typo"
         )

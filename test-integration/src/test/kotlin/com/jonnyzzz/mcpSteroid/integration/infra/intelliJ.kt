@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.integration
+package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
@@ -215,12 +215,6 @@ class IntelliJDriver(
             workingDir = pluginsGuestDir,
             timeoutSeconds = 30,
         ).assertExitCode(0)
-
-        // Ensure kotlinc and other bundled binaries are executable (best-effort, may find nothing)
-        driver.runInContainer(
-            listOf("bash", "-c", "find $pluginsGuestDir -name 'kotlinc' -type f -exec chmod +x {} + 2>/dev/null || true"),
-            timeoutSeconds = 10,
-        )
     }
 
     /**

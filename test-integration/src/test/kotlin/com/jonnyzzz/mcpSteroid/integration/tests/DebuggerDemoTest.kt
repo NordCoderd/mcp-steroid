@@ -1,12 +1,15 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.integration
+package com.jonnyzzz.mcpSteroid.integration.tests
 
+import com.jonnyzzz.mcpSteroid.integration.infra.ConsoleDriver
+import com.jonnyzzz.mcpSteroid.integration.infra.IdeContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assumptions.assumeTrue
+import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import java.util.concurrent.TimeUnit
@@ -53,7 +56,7 @@ class DebuggerDemoTest {
         val console = session.console
 
         val agent: AiAgentSession? = session.aiAgentDriver.aiAgents[agentName]
-        assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
         console.writeStep(1, "Building prompt for $agentName")
 
         val prompt = buildString {

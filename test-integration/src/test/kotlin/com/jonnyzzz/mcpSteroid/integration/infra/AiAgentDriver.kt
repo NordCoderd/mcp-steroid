@@ -1,11 +1,12 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.integration
+package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerClaudeSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerCodexSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import kotlin.collections.iterator
 
 class AiAgentDriver(
     container: ContainerDriver,
@@ -82,6 +83,8 @@ class AiAgentDriver(
     fun waitForMcpReady() {
         val mcpUrl = "http://localhost:${IntelliJDriver.MCP_STEROID_PORT.containerPort}/mcp"
 
+
+        //TODO: Replace to the
         // First wait for the server to be reachable via a simple GET health check.
         // This avoids creating orphan sessions from repeated initialize requests.
         waitFor(300_000, "Wait for MCP Steroid ready") {

@@ -1,8 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.integration
+package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Provides a visible console window (xterm) on the right 1/3 of the screen
@@ -115,7 +117,7 @@ class ConsoleDriver private constructor(
 
     class PumpHandle(
         private val container: ContainerDriver,
-        private val process: com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess,
+        private val process: RunningContainerProcess,
     ) {
         fun stop() {
             try {
@@ -140,7 +142,7 @@ class ConsoleDriver private constructor(
         const val CYAN = "\u001b[36m"
         const val BRIGHT_WHITE = "\u001b[97m"
 
-        private val consoleCounter = java.util.concurrent.atomic.AtomicInteger(0)
+        private val consoleCounter = AtomicInteger(0)
 
         fun create(
             lifetime: CloseableStack,

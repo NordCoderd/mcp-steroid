@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.integration
+package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
@@ -11,6 +11,7 @@ import java.io.File
 import java.nio.file.Files.createLink
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import kotlin.concurrent.thread
 import kotlin.io.path.exists
 
 /**
@@ -102,7 +103,7 @@ private fun positionProjectWindowAsync(
 
     println("[IDE] Will position project window to left 2/3 (${rect.width}x${rect.height}+${rect.x}+${rect.y})...")
 
-    kotlin.concurrent.thread(start = true, isDaemon = true, name = "ide-window-position") {
+    thread(start = true, isDaemon = true, name = "ide-window-position") {
         runCatching {
             val positioned = xcvb.waitForWindowAndPlace(
                 titlePattern = windowTitlePattern,

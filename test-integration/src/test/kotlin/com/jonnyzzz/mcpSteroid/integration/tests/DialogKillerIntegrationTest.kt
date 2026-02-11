@@ -1,11 +1,12 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.integration
+package com.jonnyzzz.mcpSteroid.integration.tests
 
+import com.jonnyzzz.mcpSteroid.integration.infra.IdeContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertNotNull
-import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import java.util.concurrent.TimeUnit
@@ -92,7 +93,7 @@ class DialogKillerIntegrationTest {
         val settingsWindow = windowsWithDialog.find { it.title == "Settings" && it.pid == idePid }
         println("[TEST] Windows after opening Settings:")
         windowsWithDialog.filter { it.pid == idePid }.forEach { println("  $it") }
-        assertNotNull(settingsWindow, "Settings dialog should be visible")
+        Assertions.assertNotNull(settingsWindow, "Settings dialog should be visible")
         console.writeSuccess("Settings dialog visible")
 
         // Step 3: Execute the close action
@@ -105,7 +106,7 @@ class DialogKillerIntegrationTest {
         val settingsAfterKiller = windowsAfterKiller.find { it.title == "Settings" && it.pid == idePid }
         println("[TEST] Windows after dialog killer:")
         windowsAfterKiller.filter { it.pid == idePid }.forEach { println("  $it") }
-        assertNull(settingsAfterKiller, "Settings dialog should have been closed by dialog killer")
+        Assertions.assertNull(settingsAfterKiller, "Settings dialog should have been closed by dialog killer")
         console.writeSuccess("Settings dialog closed")
 
         console.writeHeader("PASSED")

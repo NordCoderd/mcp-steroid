@@ -1,8 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.integration
+package com.jonnyzzz.mcpSteroid.integration.infra
 
 import java.io.File
 import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 private fun readFilePathFromSystemProperties(
     key: String,
@@ -39,7 +40,6 @@ object IdeTestFolders {
     }
     val intelliJTarGz = readFilePathFromSystemProperties("test.integration.idea.archive")
     val dockerDir = readFilePathFromSystemProperties("test.integration.docker")
-    val projectDir = dockerDir
     val testOutputDir = readFilePathFromSystemProperties("test.integration.testOutput")
 
     fun copyDockerFiles(containerName: String, destinationDir: File) {
@@ -58,7 +58,7 @@ object IdeTestFolders {
 fun copyRecursively(source: File, destination: File) {
     if (source.isFile) {
         destination.parentFile.mkdirs()
-        Files.copy(source.toPath(), destination.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+        Files.copy(source.toPath(), destination.toPath(), StandardCopyOption.REPLACE_EXISTING)
         destination.setLastModified(source.lastModified())
         return
     }
