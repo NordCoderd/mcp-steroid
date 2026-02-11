@@ -8,6 +8,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
+import com.jonnyzzz.mcpSteroid.testHelper.titleCase
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
@@ -49,7 +50,7 @@ class DebuggerDemoTest {
     private fun runDebuggerDemo(agentName: String) {
         val session = IntelliJContainer.create(
             lifetime, "ide-agent",
-            consoleTitle = "debugger-$agentName",
+            consoleTitle = "Debugger with ${agentName.titleCase()}",
         ).waitForProjectReady()
         val console = session.console
 

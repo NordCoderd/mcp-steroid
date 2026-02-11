@@ -8,3 +8,6 @@ internal fun createTempDirectory(prefix: String): File {
     tempDir.mkdirs()
     return tempDir
 }
+
+
+fun String.titleCase() = replaceFirstChar { it.titlecase() }
