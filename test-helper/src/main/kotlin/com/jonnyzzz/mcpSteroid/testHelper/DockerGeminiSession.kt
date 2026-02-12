@@ -39,6 +39,7 @@ class DockerGeminiSession(
         }
         val env = buildMap {
             put("GEMINI_API_KEY", apiKey)
+            put("GOOGLE_API_KEY", apiKey)
             if (debug) {
                 put("GEMINI_DEBUG", "1")
                 put("MCP_DEBUG", "1")
@@ -55,7 +56,9 @@ class DockerGeminiSession(
 
     override fun runPrompt(prompt: String, timeoutSeconds: Long): ProcessResult {
         return runInContainer(
-            "--yolo", // Auto-approve all tool calls
+            "--screen-reader", "true",
+            "--sandbox-mode", "none",
+            "--approval-mode", "yolo",
             prompt,
             timeoutSeconds = timeoutSeconds
         )
@@ -66,12 +69,16 @@ class DockerGeminiSession(
 
         override fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
-            val keyFile = File(System.getProperty("user.home"), ".vertex")
-            if (keyFile.exists()) {
-                val content = keyFile.readText().trim()
-                if (content.isNotBlank()) return content
+            System.getenv("GOOGLE_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
+            val home = System.getProperty("user.home")
+            for (filename in listOf(".vertes", ".vertex")) {
+                val keyFile = File(home, filename)
+                if (keyFile.exists()) {
+                    val content = keyFile.readText().trim()
+                    if (content.isNotBlank()) return content
+                }
             }
-            error("GEMINI_API_KEY required (set env or ~/.vertex)")
+            error("GEMINI_API_KEY required (set env GEMINI_API_KEY, GOOGLE_API_KEY, or ~/.vertes / ~/.vertex)")
         }
 
         override fun createImpl(
