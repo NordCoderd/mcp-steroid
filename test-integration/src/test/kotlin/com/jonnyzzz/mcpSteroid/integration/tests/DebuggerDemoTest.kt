@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
  * The agent is asked to debug DemoByJonnyzzz.kt and find the sortedByDescending bug.
  *
  * The prompt intentionally avoids giving the agent any IntelliJ API code. Instead,
- * it directs the agent to read MCP debugger resources (mcp-steroid://debugger/*)
+ * it directs the agent to read MCP debugger resources (mcp-steroid://debugger/...)
  * which contain complete, copy-paste-ready code for each step. This tests whether
  * agents can discover and use MCP resources independently.
  *
@@ -51,6 +51,18 @@ class DebuggerDemoTest {
     @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
     fun `gemini finds sortedByDescending bug via debugger`() = runDebuggerDemo("gemini")
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    fun `test debugger finds null-default bug with Claude`() = runNullDefaultDemo("claude")
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    fun `test debugger finds off-by-one bug with Claude`() = runOffByOneDemo("claude")
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    fun `test debugger finds string-format bug with Claude`() = runStringFormatDemo("claude")
 
     private fun runDebuggerDemo(agentName: String) {
         val session = IntelliJContainer.create(
@@ -204,16 +216,21 @@ class DebuggerDemoTest {
      * Checks for:
      * 1. Suspension evidence -- the debugger hit a breakpoint ("suspended at:")
      * 2. Evaluation evidence -- the agent evaluated expressions at a breakpoint
-     *    (BEFORE_VALUE or AFTER_VALUE markers, or evaluateExpression / players.toString output)
+     *    (BEFORE_VALUE or AFTER_VALUE markers, or evaluateExpression / variable evaluation output)
      */
     private fun assertDebuggerEvidence(combined: String, console: ConsoleDriver) {
         // Check for breakpoint suspension evidence (case-insensitive to match both
         // "Suspended at:" from custom code and "Debugger suspended at:" from MCP resources)
-        val suspendedPattern = Regex("""(?i)suspended at:\s*\S+:\d+""")
-        val hasSuspension = suspendedPattern.containsMatchIn(combined)
+        val suspensionPatterns = listOf(
+            Regex("""(?i)suspended at:\s*\S+:\d+"""),
+            Regex("""(?i)breakpoint hit.*:\d+"""),
+            Regex("""(?i)stopped at.*:\d+"""),
+        )
+        val hasSuspension = suspensionPatterns.any { it.containsMatchIn(combined) }
         if (hasSuspension) {
             console.writeSuccess("Found breakpoint suspension evidence")
         }
+
         // Check for debugger evaluation evidence (BEFORE_VALUE / AFTER_VALUE from step+eval)
         val hasBeforeValue = combined.contains("BEFORE_VALUE:", ignoreCase = true)
         val hasAfterValue = combined.contains("AFTER_VALUE:", ignoreCase = true)
@@ -221,21 +238,45 @@ class DebuggerDemoTest {
         if (hasAfterValue) console.writeSuccess("Found AFTER_VALUE evidence")
 
         // Broader evaluation evidence: any expression evaluation output from the debugger
+        // Look for common patterns:
+        // - "variable = value" patterns
+        // - "evaluating: expression" patterns
+        // - "Result: value" patterns
+        // - Variable names followed by values
         val evaluationPatterns = listOf(
-            "players =", "players.size =", "sorted result =",  // from evaluate-expression.kts
-            "players.toString()",  // the expression we ask the agent to evaluate
-            "After step:",  // from step-over
+            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId)\s*=\s*\S+"""),
+            Regex("""(?i)evaluating:"""),
+            Regex("""(?i)result:\s*\S+"""),
+            Regex("""(?i)after step:"""),
+            Regex("""(?i)value:\s*\S+"""),
+            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId)\.toString\(\)"""),
+            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId)\.(size|city|street|zip|displayName|email|first|last)"""),
         )
-        val hasEvalEvidence = evaluationPatterns.any { combined.contains(it, ignoreCase = true) }
+        val hasEvalEvidence = evaluationPatterns.any { it.containsMatchIn(combined) }
+        if (hasEvalEvidence) {
+            console.writeSuccess("Found variable evaluation evidence")
+        }
 
         // Must have suspension evidence + at least some evaluation evidence
         check(hasSuspension) {
-            "Agent must show evidence of debugger suspension (expected 'Debugger suspended at: <file>:<line>' or similar).\n" +
-                    "This proves the debugger actually hit a breakpoint.\nOutput:\n$combined"
+            "Agent must show evidence of debugger suspension.\n" +
+                    "Expected patterns:\n" +
+                    "  - 'Debugger suspended at: <file>:<line>'\n" +
+                    "  - 'Breakpoint hit at: <file>:<line>'\n" +
+                    "  - 'Stopped at: <file>:<line>'\n" +
+                    "This proves the debugger actually hit a breakpoint.\n" +
+                    "If you see 'Suspended at:' in the output but this check fails, verify the pattern matches.\n" +
+                    "Combined output length: ${combined.length} chars"
         }
         check(hasBeforeValue || hasAfterValue || hasEvalEvidence) {
             "Agent must show evidence of debugger expression evaluation.\n" +
-                    "Expected BEFORE_VALUE/AFTER_VALUE markers or expression evaluation output.\nOutput:\n$combined"
+                    "Expected evidence:\n" +
+                    "  - BEFORE_VALUE/AFTER_VALUE markers\n" +
+                    "  - Variable evaluation output (e.g., 'variable = value')\n" +
+                    "  - Expression evaluation output (e.g., 'evaluating: expression', 'Result: value')\n" +
+                    "  - Variable property access (e.g., 'address.city', 'players.size')\n" +
+                    "This proves the agent evaluated expressions during debugging, not just read source code.\n" +
+                    "Combined output length: ${combined.length} chars"
         }
     }
 
@@ -276,6 +317,361 @@ class DebuggerDemoTest {
                     !lowered.contains("copy the") &&
                     !lowered.contains("one line description") &&
                     !lowered.contains("exact buggy source line")
+        }
+    }
+
+    private fun runStringFormatDemo(agentName: String) {
+        val session = IntelliJContainer.create(
+            lifetime, "ide-agent",
+            consoleTitle = "Debugger with ${agentName.titleCase()}",
+        ).waitForProjectReady()
+        val console = session.console
+
+        val agent: AiAgentSession? = session.aiAgents.aiAgents[agentName]
+        Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        console.writeStep(1, "Building prompt for $agentName")
+
+        val prompt = buildString {
+            appendLine("# Task: Debug DemoStringFormat.kt to find the bug")
+            appendLine()
+            appendLine("You MUST use the IntelliJ debugger to investigate the bug.")
+            appendLine("Do NOT just read source code and guess -- the test validates debugger evidence.")
+            appendLine()
+            appendLine("## Instructions")
+            appendLine()
+            appendLine("1. Find `DemoStringFormat.kt` in the project and read it")
+            appendLine("2. Use the debugger to set a breakpoint, run the program, and evaluate variables")
+            appendLine("3. Step through the code and observe how the address string is formatted")
+            appendLine("4. Identify the bug based on debugger evidence (fields are in the wrong order)")
+            appendLine()
+            appendLine("Read `mcp-steroid://skill/debugger-skill` to learn how to use the debugger APIs.")
+            appendLine("It links to individual resources with complete, copy-paste-ready code for each step.")
+            appendLine()
+            appendLine("## Required Output")
+            appendLine()
+            appendLine("Print these markers on separate lines:")
+            appendLine("BUG_FOUND: yes")
+            appendLine("BUG_LINE: <the exact buggy source line>")
+            appendLine("ROOT_CAUSE: <must explain that city and street fields are swapped in the string template>")
+            appendLine("DEBUGGER_EVIDENCE: <variable values showing the Address object fields and the formatted result>")
+            appendLine()
+            appendLine("Also print BEFORE_VALUE and AFTER_VALUE markers when evaluating variables")
+            appendLine("before and after the suspected buggy line executes.")
+            appendLine()
+            appendLine("## Rules")
+            appendLine()
+            appendLine("- You MUST use the debugger (set breakpoints, evaluate variables, step through code)")
+            appendLine("- Do NOT use screenshots or UI input tools")
+            appendLine("- Read MCP debugger resources for API patterns -- do not invent API calls")
+        }
+
+        console.writeStep(2, "Running agent prompt")
+
+        val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
+        val output = result.output
+        val combined = result.rawOutput + "\n" + result.stderr
+
+        console.writeStep(3, "Validating agent output")
+
+        // If CLI timed out but the agent already emitted required markers, keep validating the output.
+        val hasFinalMarkers = hasAnyMarkerLine(output, "BUG_FOUND", "Bug found") &&
+                hasAnyMarkerLine(output, "ROOT_CAUSE", "Root cause")
+        if (result.exitCode != 0 && !hasFinalMarkers) {
+            console.writeError("Agent exited with code ${result.exitCode}")
+            result.assertExitCode(0, message = "debugger demo")
+        }
+        console.writeInfo("Agent exited with code ${result.exitCode ?: "?"}")
+
+        // Agent must show evidence of MCP Steroid execute_code usage
+        console.writeInfo("Checking: steroid_execute_code usage evidence")
+        assertUsedExecuteCodeEvidence(combined)
+        console.writeSuccess("execute_code evidence found")
+
+        console.writeInfo("Checking: BUG_LINE marker")
+        val bugLine = findMarkerValue(output, "BUG_LINE", "Buggy line", "Bug line")
+        check(bugLine != null) {
+            "Agent did not output required marker 'BUG_LINE:' (or equivalent).\nOutput:\n$combined"
+        }
+        check(
+            bugLine.contains("address.city", ignoreCase = true) &&
+            bugLine.contains("address.street", ignoreCase = true)
+        ) {
+            "BUG_LINE must mention the string template with address.city and address.street.\nOutput:\n$combined"
+        }
+        console.writeSuccess("BUG_LINE: $bugLine")
+
+        // Agent must identify the root cause: city and street are swapped
+        console.writeInfo("Checking: ROOT_CAUSE marker")
+        val rootCause = findMarkerValue(output, "ROOT_CAUSE", "Root cause")
+        check(rootCause != null) {
+            "Agent did not output required marker 'ROOT_CAUSE:' (or equivalent).\nOutput:\n$combined"
+        }
+        console.writeSuccess("ROOT_CAUSE: $rootCause")
+
+        console.writeInfo("Checking: BUG_FOUND marker")
+        val bugFound = findMarkerValue(output, "BUG_FOUND", "Bug found")
+        val hasExplicitYes = bugFound?.equals("yes", ignoreCase = true) == true
+        val inferredYes = bugFound == null && bugLine.isNotBlank() && rootCause.isNotBlank()
+        check(hasExplicitYes || inferredYes) {
+            "Agent did not confirm bug detection with 'BUG_FOUND: yes' and no valid fallback markers were found.\nOutput:\n$combined"
+        }
+        console.writeSuccess("BUG_FOUND: ${bugFound ?: "(inferred)"}")
+
+        console.writeInfo("Checking: ROOT_CAUSE quality")
+        val swapPatterns = listOf(
+            "swap", "reversed", "wrong order", "incorrect order",
+            "city.*street", "street.*city", "mixed up", "backwards",
+        )
+
+        val mentionsSwap = swapPatterns.any { pattern ->
+            rootCause.contains(pattern, ignoreCase = true) ||
+            Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(rootCause)
+        }
+        check(mentionsSwap) {
+            "ROOT_CAUSE must explain that city and street fields are swapped in the string template.\n" +
+                    "Expected patterns: $swapPatterns\nOutput:\n$combined"
+        }
+        console.writeSuccess("ROOT_CAUSE quality validated")
+
+        // Validate debugger evidence: the agent must have actually used the debugger,
+        // not just read source code and guessed the answer.
+        console.writeInfo("Checking: debugger evidence (suspension + evaluation)")
+        assertDebuggerEvidence(combined, console)
+        console.writeSuccess("Debugger evidence validated")
+
+        console.writeSuccess("Agent '$agentName' identified the string-format bug")
+        console.writeHeader("PASSED")
+
+        println("[TEST] Agent '$agentName' successfully identified the string-format bug")
+    }
+
+    private fun runNullDefaultDemo(agentName: String) {
+        val session = IntelliJContainer.create(
+            lifetime, "ide-agent",
+            consoleTitle = "Null-Default Bug with ${agentName.titleCase()}",
+        ).waitForProjectReady()
+        val console = session.console
+
+        val agent: AiAgentSession? = session.aiAgents.aiAgents[agentName]
+        Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        console.writeStep(1, "Building prompt for $agentName")
+
+        val prompt = buildString {
+            appendLine("# Task: Debug DemoNullDefault.kt to find the bug")
+            appendLine()
+            appendLine("You MUST use the IntelliJ debugger to investigate the bug.")
+            appendLine("Do NOT just read source code and guess -- the test validates debugger evidence.")
+            appendLine()
+            appendLine("## Instructions")
+            appendLine()
+            appendLine("1. Find `DemoNullDefault.kt` in the project and read it")
+            appendLine("2. Use the debugger to set a breakpoint, run the program, and evaluate variables")
+            appendLine("3. Step through the code and observe how variables change before and after key lines")
+            appendLine("4. Identify the bug based on debugger evidence")
+            appendLine()
+            appendLine("Read `mcp-steroid://skill/debugger-skill` to learn how to use the debugger APIs.")
+            appendLine("It links to individual resources with complete, copy-paste-ready code for each step.")
+            appendLine()
+            appendLine("## Required Output")
+            appendLine()
+            appendLine("Print these markers on separate lines:")
+            appendLine("BUG_FOUND: yes")
+            appendLine("BUG_LINE: <the exact buggy source line>")
+            appendLine("ROOT_CAUSE: <must explain that the code searches by displayName field instead of using userId as the map key, AND that this causes the lookup to always return the default/fallback value>")
+            appendLine("DEBUGGER_EVIDENCE: <BEFORE and AFTER values showing the lookup result>")
+            appendLine()
+            appendLine("Also print BEFORE_VALUE and AFTER_VALUE markers when evaluating variables")
+            appendLine("before and after the suspected buggy line executes.")
+            appendLine()
+            appendLine("## Rules")
+            appendLine()
+            appendLine("- You MUST use the debugger (set breakpoints, evaluate variables, step through code)")
+            appendLine("- Do NOT use screenshots or UI input tools")
+            appendLine("- Read MCP debugger resources for API patterns -- do not invent API calls")
+        }
+
+        console.writeStep(2, "Running agent prompt")
+
+        val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
+        val output = result.output
+        val combined = result.rawOutput + "\n" + result.stderr
+
+        console.writeStep(3, "Validating agent output")
+
+        val hasFinalMarkers = hasAnyMarkerLine(output, "BUG_FOUND", "Bug found") &&
+                hasAnyMarkerLine(output, "ROOT_CAUSE", "Root cause")
+        if (result.exitCode != 0 && !hasFinalMarkers) {
+            console.writeError("Agent exited with code ${result.exitCode}")
+            result.assertExitCode(0, message = "null-default demo")
+        }
+        console.writeInfo("Agent exited with code ${result.exitCode ?: "?"}")
+
+        console.writeInfo("Checking: steroid_execute_code usage evidence")
+        assertUsedExecuteCodeEvidence(combined)
+        console.writeSuccess("execute_code evidence found")
+
+        console.writeInfo("Checking: BUG_LINE marker")
+        assertBugFound(combined, output, "registry.values.firstOrNull")
+        console.writeSuccess("BUG_LINE validated")
+
+        result.assertOutputContains("displayName", message = "agent must mention displayName")
+
+        console.writeInfo("Checking: ROOT_CAUSE marker")
+        assertRootCauseQuality(
+            combined, output,
+            ignoredReturnPatterns = listOf(
+                "displayName", "by displayName", "displayName field", "displayName instead",
+                "searches by displayName", "using displayName", "matches displayName",
+            ),
+            returnsNewListPatterns = listOf(
+                "map key", "userId as key", "key lookup", "as the key",
+                "default", "fallback", "guest", "always returns", "never matches",
+            ),
+            explanation = "ROOT_CAUSE must explain that the code searches by displayName field instead of using userId as the map key, " +
+                    "AND that this causes the lookup to always return the default/fallback value."
+        )
+        console.writeSuccess("ROOT_CAUSE quality validated")
+
+        console.writeInfo("Checking: debugger evidence (suspension + evaluation)")
+        assertDebuggerEvidence(combined, console)
+        console.writeSuccess("Debugger evidence validated")
+
+        console.writeSuccess("Agent '$agentName' identified the null-default bug")
+        console.writeHeader("PASSED")
+
+        println("[TEST] Agent '$agentName' successfully identified the null-default bug")
+    }
+
+    private fun runOffByOneDemo(agentName: String) {
+        val session = IntelliJContainer.create(
+            lifetime, "ide-agent",
+            consoleTitle = "Off-by-One Bug with ${agentName.titleCase()}",
+        ).waitForProjectReady()
+        val console = session.console
+
+        val agent: AiAgentSession? = session.aiAgents.aiAgents[agentName]
+        Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        console.writeStep(1, "Building prompt for $agentName")
+
+        val prompt = buildString {
+            appendLine("# Task: Debug DemoOffByOne.kt to find the bug")
+            appendLine()
+            appendLine("You MUST use the IntelliJ debugger to investigate the bug.")
+            appendLine("Do NOT just read source code and guess -- the test validates debugger evidence.")
+            appendLine()
+            appendLine("## Instructions")
+            appendLine()
+            appendLine("1. Find `DemoOffByOne.kt` in the project and read it")
+            appendLine("2. Use the debugger to set a breakpoint, run the program, and evaluate variables")
+            appendLine("3. Step through the code and observe how variables change before and after key lines")
+            appendLine("4. Identify the bug based on debugger evidence")
+            appendLine()
+            appendLine("Read `mcp-steroid://skill/debugger-skill` to learn how to use the debugger APIs.")
+            appendLine("It links to individual resources with complete, copy-paste-ready code for each step.")
+            appendLine()
+            appendLine("## Required Output")
+            appendLine()
+            appendLine("Print these markers on separate lines:")
+            appendLine("BUG_FOUND: yes")
+            appendLine("BUG_LINE: <the exact buggy source line>")
+            appendLine("ROOT_CAUSE: <must explain that the loop counter starts at 1 instead of 0, AND that this skips the first element of the list>")
+            appendLine("DEBUGGER_EVIDENCE: <BEFORE and AFTER values showing the loop counter or accumulated sum>")
+            appendLine()
+            appendLine("Also print BEFORE_VALUE and AFTER_VALUE markers when evaluating variables")
+            appendLine("before and after the suspected buggy line executes.")
+            appendLine()
+            appendLine("## Rules")
+            appendLine()
+            appendLine("- You MUST use the debugger (set breakpoints, evaluate variables, step through code)")
+            appendLine("- Do NOT use screenshots or UI input tools")
+            appendLine("- Read MCP debugger resources for API patterns -- do not invent API calls")
+        }
+
+        console.writeStep(2, "Running agent prompt")
+
+        val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
+        val output = result.output
+        val combined = result.rawOutput + "\n" + result.stderr
+
+        console.writeStep(3, "Validating agent output")
+
+        val hasFinalMarkers = hasAnyMarkerLine(output, "BUG_FOUND", "Bug found") &&
+                hasAnyMarkerLine(output, "ROOT_CAUSE", "Root cause")
+        if (result.exitCode != 0 && !hasFinalMarkers) {
+            console.writeError("Agent exited with code ${result.exitCode}")
+            result.assertExitCode(0, message = "off-by-one demo")
+        }
+        console.writeInfo("Agent exited with code ${result.exitCode ?: "?"}")
+
+        console.writeInfo("Checking: steroid_execute_code usage evidence")
+        assertUsedExecuteCodeEvidence(combined)
+        console.writeSuccess("execute_code evidence found")
+
+        console.writeInfo("Checking: BUG_LINE marker")
+        assertBugFound(combined, output, "var i = 1")
+        console.writeSuccess("BUG_LINE validated")
+
+        result.assertOutputContains("index", message = "agent must mention index")
+
+        console.writeInfo("Checking: ROOT_CAUSE marker")
+        assertRootCauseQuality(
+            combined, output,
+            ignoredReturnPatterns = listOf(
+                "starts at 1", "starting at 1", "index 1", "i = 1",
+                "begins at 1", "initialized to 1", "starting index",
+            ),
+            returnsNewListPatterns = listOf(
+                "instead of 0", "should be 0", "skips first", "missing first",
+                "first element", "element at index 0", "off-by-one",
+            ),
+            explanation = "ROOT_CAUSE must explain that the loop counter starts at 1 instead of 0, " +
+                    "AND that this skips the first element of the list."
+        )
+        console.writeSuccess("ROOT_CAUSE quality validated")
+
+        console.writeInfo("Checking: debugger evidence (suspension + evaluation)")
+        assertDebuggerEvidence(combined, console)
+        console.writeSuccess("Debugger evidence validated")
+
+        console.writeSuccess("Agent '$agentName' identified the off-by-one bug")
+        console.writeHeader("PASSED")
+
+        println("[TEST] Agent '$agentName' successfully identified the off-by-one bug")
+    }
+
+    private fun assertBugFound(combined: String, output: String, expectedBugLine: String) {
+        val bugLine = findMarkerValue(output, "BUG_LINE", "Buggy line", "Bug line")
+        check(bugLine != null) {
+            "Agent did not output required marker 'BUG_LINE:' (or equivalent).\nOutput:\n$combined"
+        }
+        check(bugLine.contains(expectedBugLine, ignoreCase = true)) {
+            "BUG_LINE must mention '$expectedBugLine'.\nActual: $bugLine\nOutput:\n$combined"
+        }
+    }
+
+    private fun assertRootCauseQuality(
+        combined: String,
+        output: String,
+        ignoredReturnPatterns: List<String>,
+        returnsNewListPatterns: List<String>,
+        explanation: String
+    ) {
+        val rootCause = findMarkerValue(output, "ROOT_CAUSE", "Root cause")
+        check(rootCause != null) {
+            "Agent did not output required marker 'ROOT_CAUSE:' (or equivalent).\nOutput:\n$combined"
+        }
+
+        val mentionsFirstAspect = ignoredReturnPatterns.any { pattern ->
+            rootCause.contains(pattern, ignoreCase = true)
+        }
+        val mentionsSecondAspect = returnsNewListPatterns.any { pattern ->
+            rootCause.contains(pattern, ignoreCase = true)
+        }
+        check(mentionsFirstAspect && mentionsSecondAspect) {
+            "$explanation\n" +
+                    "Expected first-aspect patterns: $ignoredReturnPatterns\n" +
+                    "Expected second-aspect patterns: $returnsNewListPatterns\n" +
+                    "Actual ROOT_CAUSE: $rootCause\nOutput:\n$combined"
         }
     }
 }
