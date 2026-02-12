@@ -9,7 +9,6 @@ import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import com.jonnyzzz.mcpSteroid.testHelper.*
 import kotlinx.serialization.json.*
 import java.util.*
-import org.junit.Assume.assumeTrue
 import kotlin.time.Duration.Companion.seconds
 
 abstract class CliIntegrationTestBase : BasePlatformTestCase() {
@@ -19,35 +18,12 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
         }
     }
 
-    protected open fun verifyPrerequisites() {}
-
     override fun setUp() {
-        assumeTrue(
-            "Skipping CLI integration tests: Docker daemon is unavailable",
-            dockerAvailable
-        )
-        verifyPrerequisites()
         setServerPortProperties()
-        return super.setUp()
+        super.setUp()
     }
 
     protected abstract fun newAiSession(): AiAgentSession
-
-    companion object {
-        private val dockerAvailable: Boolean by lazy { detectDockerAvailability() }
-
-        private fun detectDockerAvailability(): Boolean {
-            return try {
-                val process = ProcessBuilder("docker", "info")
-                    .redirectErrorStream(true)
-                    .start()
-                process.inputStream.bufferedReader().use { it.readText() }
-                process.waitFor() == 0
-            } catch (_: Exception) {
-                false
-            }
-        }
-    }
 
     /**
      * This test validates the discovery of tools and the use of the CLI.

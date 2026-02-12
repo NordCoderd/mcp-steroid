@@ -6,7 +6,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
-import org.junit.Assume.assumeTrue
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -25,13 +24,6 @@ import kotlin.time.Duration.Companion.seconds
  */
 class CliGeminiIntegrationTest : CliIntegrationTestBase() {
     private fun geminiSession() = DockerGeminiSession.create(lifetime)
-
-    override fun verifyPrerequisites() {
-        assumeTrue(
-            "Skipping Gemini CLI integration tests: GEMINI_API_KEY/GOOGLE_API_KEY is not configured",
-            DockerGeminiSession.isConfigured()
-        )
-    }
 
     override fun newAiSession(): AiAgentSession = geminiSession().registerMcp(resolveDockerUrl(), "intellij")
 
