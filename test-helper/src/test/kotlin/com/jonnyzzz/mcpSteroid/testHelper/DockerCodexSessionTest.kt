@@ -9,6 +9,8 @@ class DockerCodexSessionTest {
     fun extractsRepresentativeEvents() {
         val raw = """
             {"type":"thread.started","thread_id":"th_1"}
+            {"type":"item.started","item":{"type":"command_execution","command":"ls -la"}}
+            {"type":"item.started","item":{"type":"tool_call","name":"read_mcp_resource","input":{"uri":"mcp://demo/resource"}}}
             {"type":"item.completed","item":{"type":"agent_message","text":"final answer"}}
             {"type":"item.completed","item":{"type":"command_execution","output":"line1\nline2\n"}}
             {"type":"item.completed","item":{"type":"tool_call","output":"tool ok"}}
@@ -20,6 +22,8 @@ class DockerCodexSessionTest {
 
         assertEquals(
             """
+                >> ls -la
+                >> read_mcp_resource (mcp://demo/resource)
                 final answer
                 line1
                 line2
@@ -27,6 +31,20 @@ class DockerCodexSessionTest {
                 [tokens] in=12 out=34
                 [ERROR api_error] boom
             """.trimIndent(),
+            result
+        )
+    }
+
+    @Test
+    fun extractsProgressFromFunctionCallArgumentsJsonString() {
+        val raw = """
+            {"type":"item.started","item":{"type":"function_call","function":{"name":"Bash"},"arguments":"{\"command\":\"echo hello\"}"}}
+        """.trimIndent()
+
+        val result = DockerCodexSession.extractCodexJsonResult(raw)
+
+        assertEquals(
+            ">> Bash (echo hello)",
             result
         )
     }

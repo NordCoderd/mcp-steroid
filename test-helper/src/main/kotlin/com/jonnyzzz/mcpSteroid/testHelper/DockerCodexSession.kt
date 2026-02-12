@@ -65,10 +65,9 @@ class DockerCodexSession(
     /**
      * Run codex exec for non-interactive mode.
      *
-     * Uses `--dangerously-bypass-approvals-and-sandbox` to auto-approve all
-     * tool calls and sandbox operations (matching run-agent.sh behavior).
-     * Uses `--json` to stream NDJSON events to stdout for real-time console
-     * visibility via the console pump filter.
+     * Codex CLI flags for auto-approval and progress visibility:
+     * `codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check --json <prompt>`.
+     * `--json` streams NDJSON events to stdout for real-time console visibility.
      */
     override fun runPrompt(
         prompt: String,
@@ -125,6 +124,8 @@ class DockerCodexSession(
          * Extract the final result text from Codex's NDJSON output.
          *
          * Codex `--json` emits newline-delimited JSON events:
+         * - `item.started` with `item.type=command_execution`: command progress
+         * - `item.started` with `item.type=tool_call/function_call/mcp_tool_call`: tool progress
          * - `item.completed` with `item.type=agent_message`: contains `item.text`
          * - `item.completed` with `item.type=command_execution`: contains `item.output`
          * - `item.completed` with `item.type=tool_call/mcp_tool_call`: contains `item.output`
@@ -151,6 +152,7 @@ class DockerCodexSession(
 
                 val event = parseJsonObject(trimmed) ?: continue
                 when (event.stringField("type")) {
+                    "item.started" -> appendStartedItem(extracted, event["item"] as? JsonObject)
                     "item.completed" -> appendCompletedItem(extracted, event["item"] as? JsonObject)
                     "turn.completed" -> appendTokenUsage(extracted, event["usage"] as? JsonObject)
                     "error" -> appendError(extracted, event)
@@ -159,6 +161,28 @@ class DockerCodexSession(
 
             val result = extracted.toString().trim()
             return result.ifEmpty { rawOutput }
+        }
+
+        private fun appendStartedItem(extracted: StringBuilder, item: JsonObject?) {
+            if (item == null) return
+
+            when (item.stringField("type")) {
+                "command_execution" -> {
+                    item.stringField("command")
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { extracted.appendLine(">> $it") }
+                }
+
+                "tool_call", "function_call", "mcp_tool_call" -> {
+                    val name = item.stringField("name")
+                        ?: (item["function"] as? JsonObject)?.stringField("name")
+                        ?: "?"
+                    val input = item["input"] ?: item["arguments"]
+                    val detail = toolDetail(name, input)
+                    extracted.appendLine(">> $name$detail")
+                }
+            }
         }
 
         private fun parseJsonObject(line: String): JsonObject? {
@@ -231,6 +255,45 @@ class DockerCodexSession(
             } else {
                 extracted.appendLine("[ERROR] $message")
             }
+        }
+
+        private fun toolDetail(toolName: String, inputElement: JsonElement?): String {
+            val input = toJsonObject(inputElement) ?: return ""
+            val detailValue = when (toolName) {
+                "steroid_execute_code" -> truncate(input.stringField("reason"), maxLength = 80)
+                "read_mcp_resource" -> input.stringField("uri")
+                "Bash", "bash" -> truncate(input.stringField("command"), maxLength = 60)
+                "Read", "read", "Edit", "edit", "Write", "write" -> input.stringField("file_path")
+                "Grep", "grep", "Glob", "glob" -> input.stringField("pattern")
+                else -> null
+            }?.trim()
+
+            if (detailValue.isNullOrEmpty()) return ""
+            return " ($detailValue)"
+        }
+
+        private fun toJsonObject(inputElement: JsonElement?): JsonObject? {
+            return when (inputElement) {
+                is JsonObject -> inputElement
+                is JsonPrimitive -> {
+                    val text = inputElement.contentOrNull ?: return null
+                    val parsed = try {
+                        codexJsonParser.parseToJsonElement(text)
+                    } catch (_: Exception) {
+                        return null
+                    }
+                    parsed as? JsonObject
+                }
+
+                else -> null
+            }
+        }
+
+        private fun truncate(value: String?, maxLength: Int): String? {
+            if (value == null) return null
+            if (value.length <= maxLength) return value
+            if (maxLength <= 3) return value.take(maxLength)
+            return value.take(maxLength - 3) + "..."
         }
 
         private fun JsonObject.extractOutputText(): String? {
