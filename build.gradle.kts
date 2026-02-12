@@ -2,7 +2,13 @@
 
 import com.jonnyzzz.mcpSteroid.gradle.CompilePromptsTask
 import com.jonnyzzz.mcpSteroid.gradle.GenerateMetadataTask
+import com.jonnyzzz.mcpSteroid.gradle.HostArchitecture
+import com.jonnyzzz.mcpSteroid.gradle.IdeaReleaseChannel
+import com.jonnyzzz.mcpSteroid.gradle.IdeaReleaseService
+import com.jonnyzzz.mcpSteroid.gradle.VerifyBundledKotlinCompatibilityTask
+import com.jonnyzzz.mcpSteroid.gradle.resolveHostArchitecture
 import de.undercouch.gradle.tasks.download.Download
+import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -27,6 +33,8 @@ val gitHash = providers.exec {
     commandLine("git", "rev-parse", "--short", "HEAD")
 }.standardOutput.asText.get().trim()
 version = "$baseVersion-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}-$gitHash"
+val intellijIdeaTargetMajorVersion = "2025.3"
+val hostArchitecture = resolveHostArchitecture()
 
 
 repositories {
@@ -47,7 +55,7 @@ configurations.named("implementation") {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaUltimate("2025.3")
+        intellijIdeaUltimate(intellijIdeaTargetMajorVersion)
         bundledPlugin("org.jetbrains.kotlin")
         testFramework(TestFrameworkType.Platform)
     }
@@ -144,6 +152,50 @@ tasks {
     }
 }
 
+val verifyIntellijMajorReleaseAlignment by tasks.registering {
+    group = "verification"
+    description = "Assert configured IntelliJ major matches latest stable IntelliJ major from products service"
+    inputs.property("intellijIdeaTargetMajorVersion", intellijIdeaTargetMajorVersion)
+
+    doLast {
+        val latestStable = IdeaReleaseService.latestIdeaRelease(IdeaReleaseChannel.STABLE)
+        check(latestStable.majorVersion == intellijIdeaTargetMajorVersion) {
+            "Configured IntelliJ major '$intellijIdeaTargetMajorVersion' is stale. " +
+                    "Latest stable major is '${latestStable.majorVersion}' " +
+                    "(version ${latestStable.version}, build ${latestStable.build}). " +
+                    "Update intellijIdeaUltimate(...) in build.gradle.kts."
+        }
+        logger.lifecycle(
+            "IntelliJ major alignment verified: configured {}, latest stable {} ({} / {}).",
+            intellijIdeaTargetMajorVersion,
+            latestStable.majorVersion,
+            latestStable.version,
+            latestStable.build,
+        )
+    }
+}
+
+val verifySupportedHostArchitecture by tasks.registering {
+    group = "verification"
+    description = "Assert current host machine architecture is supported by build scripts"
+    inputs.property("hostArchitecture", hostArchitecture.name)
+    doLast {
+        check(hostArchitecture == HostArchitecture.ARM64 || hostArchitecture == HostArchitecture.X86_64) {
+            "Unsupported host architecture '$hostArchitecture'"
+        }
+        logger.lifecycle(
+            "Host architecture support verified: {} (aliases {}).",
+            hostArchitecture.name,
+            hostArchitecture.aliases.joinToString(", "),
+        )
+    }
+}
+
+tasks.named("check") {
+    dependsOn(verifyIntellijMajorReleaseAlignment)
+    dependsOn(verifySupportedHostArchitecture)
+}
+
 allprojects {
     tasks.withType<Test>().configureEach {
         systemProperty("mcp.steroid.test.projectHome", rootProject.layout.projectDirectory.asFile.absolutePath)
@@ -151,7 +203,7 @@ allprojects {
     }
 }
 
-val kotlincVersion = "2.2.21"
+val kotlincVersion = "2.3.10"
 val kotlincUrl = "https://github.com/JetBrains/kotlin/releases/download/v${kotlincVersion}/kotlin-compiler-${kotlincVersion}.zip"
 val kotlincSha256Url = "$kotlincUrl.sha256"
 val kotlincDownloadDir = layout.buildDirectory.dir("kotlinc-zip")
@@ -162,12 +214,19 @@ val downloadKotlinc by tasks.registering {
     outputs.dir(kotlincDir)
 
     doLast {
-        val files = fileTree(kotlincDownloadDir).files
-        val sha256 = files
-            .single { it.name.endsWith(".sha256") }
-            .readText()
+        val zipFileName = "kotlin-compiler-${kotlincVersion}.zip"
+        val shaFileName = "$zipFileName.sha256"
 
-        val zip = files.single { it.name.endsWith(".zip") }
+        val zip = kotlincDownloadDir.get().file(zipFileName).asFile
+        val shaFile = kotlincDownloadDir.get().file(shaFileName).asFile
+
+        check(zip.isFile) { "Missing downloaded kotlinc archive: $zip" }
+        check(shaFile.isFile) { "Missing downloaded kotlinc checksum: $shaFile" }
+
+        val sha256 = shaFile
+            .readText()
+            .trim()
+            .substringBefore(' ')
 
         val actualSha256 = MessageDigest.getInstance("SHA-256").run {
             update(zip.readBytes())
@@ -193,6 +252,19 @@ listOf(kotlincUrl, kotlincSha256Url).forEach { url ->
         onlyIfModified(true)
     }
     downloadKotlinc.configure { dependsOn(task) }
+}
+
+val verifyBundledKotlinCompatibility by tasks.registering(VerifyBundledKotlinCompatibilityTask::class) {
+    group = "verification"
+    description = "Verify bundled kotlinc is close enough to IntelliJ-bundled kotlin-stdlib"
+    dependsOn(downloadKotlinc)
+    dependsOn(tasks.prepareSandbox)
+
+    val sourceSets = project.extensions.getByType<SourceSetContainer>()
+    mainRuntimeClasspath.from(sourceSets.getByName("main").runtimeClasspath)
+    mainRuntimeClasspath.from(configurations.getByName("intellijPlatformDependency"))
+    kotlincHome.set(kotlincDir.map { it.dir("kotlinc") })
+    reportFile.set(layout.buildDirectory.file("reports/kotlin-version-compatibility.txt"))
 }
 
 val ocrToolDist by configurations.creating {
@@ -380,6 +452,7 @@ val verifyBundledLibraries by tasks.registering {
 }
 
 tasks.verifyPlugin {
+    dependsOn(verifyBundledKotlinCompatibility)
     dependsOn(verifyBundledLibraries)
 }
 

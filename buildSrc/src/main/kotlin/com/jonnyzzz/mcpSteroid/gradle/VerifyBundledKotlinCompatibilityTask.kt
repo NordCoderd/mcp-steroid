@@ -1,0 +1,177 @@
+/* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+package com.jonnyzzz.mcpSteroid.gradle
+
+import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
+import java.nio.file.Files
+import java.nio.file.Path
+import java.net.URL
+import java.net.URLClassLoader
+import java.util.LinkedHashSet
+
+abstract class VerifyBundledKotlinCompatibilityTask : DefaultTask() {
+    @get:Classpath
+    abstract val mainRuntimeClasspath: ConfigurableFileCollection
+
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val kotlincHome: DirectoryProperty
+
+    @get:OutputFile
+    abstract val reportFile: RegularFileProperty
+
+    @TaskAction
+    fun verify() {
+        val ideKotlinVersion = probeKotlinVersionFromMainRuntimeClasspath(mainRuntimeClasspath.files.map { it.toPath() })
+        val bundledKotlincVersion = detectBundledKotlincVersion(kotlincHome.get().asFile.toPath())
+        val compatible = KotlinVersionCompatibility.isCompatible(ideKotlinVersion, bundledKotlincVersion)
+        val latestStableKotlinVersion = fetchLatestStableKotlinVersionOrNull()
+        val latestStableStatus = when {
+            latestStableKotlinVersion == null -> "Latest stable Kotlin release: unavailable"
+            latestStableKotlinVersion == bundledKotlincVersion ->
+                "Latest stable Kotlin release: $latestStableKotlinVersion (bundled kotlinc is up to date)"
+            else -> "Latest stable Kotlin release: $latestStableKotlinVersion (WARNING: bundled kotlinc is $bundledKotlincVersion)"
+        }
+
+        val report = buildString {
+            appendLine("IDE Kotlin version: $ideKotlinVersion")
+            appendLine("Bundled kotlinc version: $bundledKotlincVersion")
+            appendLine("Compatible (major match, minor diff <= 1): $compatible")
+            appendLine(latestStableStatus)
+        }
+
+        val reportPath = reportFile.get().asFile.toPath()
+        reportPath.parent?.let { Files.createDirectories(it) }
+        Files.writeString(reportPath, report)
+
+        if (!compatible) {
+            throw GradleException(
+                "Bundled kotlinc $bundledKotlincVersion is too far from IDE kotlin-stdlib $ideKotlinVersion. " +
+                        "Expected same major and minor distance <= 1.\n$report"
+            )
+        }
+
+        when {
+            latestStableKotlinVersion == null -> logger.warn(
+                "Unable to verify latest stable Kotlin release; continuing without failing the build."
+            )
+
+            latestStableKotlinVersion != bundledKotlincVersion -> logger.warn(
+                "Bundled kotlinc {} is not the latest stable Kotlin release {}.",
+                bundledKotlincVersion,
+                latestStableKotlinVersion,
+            )
+        }
+
+        logger.lifecycle(report.trim())
+    }
+
+    private fun fetchLatestStableKotlinVersionOrNull(): KotlinVersion? {
+        return runCatching { KotlinReleaseService.latestStableKotlinVersion() }
+            .onFailure { error ->
+                logger.warn(
+                    "Failed to fetch latest stable Kotlin release metadata: {}",
+                    error.message ?: error::class.java.name,
+                )
+            }
+            .getOrNull()
+    }
+
+    private fun probeKotlinVersionFromMainRuntimeClasspath(classpathEntries: List<Path>): KotlinVersion {
+        require(classpathEntries.isNotEmpty()) { "main.runtimeClasspath must not be empty" }
+
+        val classpathUrls = LinkedHashSet<URL>()
+        classpathEntries.forEach { classpathUrls += expandClasspathEntry(it) }
+        check(classpathUrls.isNotEmpty()) { "Resolved runtime classpath URLs are empty" }
+
+        URLClassLoader(classpathUrls.toTypedArray(), null).use { classLoader ->
+            val kotlinVersionClass = Class.forName("kotlin.KotlinVersion", true, classLoader)
+            val current = kotlinVersionClass.getField("CURRENT").get(null)
+                ?: throw GradleException("kotlin.KotlinVersion.CURRENT is null")
+
+            fun readInt(methodName: String): Int {
+                val value = kotlinVersionClass.getMethod(methodName).invoke(current)
+                return (value as? Number)?.toInt()
+                    ?: throw GradleException("Expected Number from KotlinVersion.$methodName, got ${value?.javaClass}")
+            }
+
+            return KotlinVersion(
+                readInt("getMajor"),
+                readInt("getMinor"),
+                readInt("getPatch"),
+            )
+        }
+    }
+
+    private fun expandClasspathEntry(entry: Path): List<URL> {
+        if (!Files.exists(entry)) return emptyList()
+
+        if (Files.isRegularFile(entry)) {
+            return listOf(entry.toUri().toURL())
+        }
+
+        require(Files.isDirectory(entry)) { "Unsupported classpath entry type: $entry" }
+        val urls = LinkedHashSet<URL>()
+        urls += entry.toUri().toURL()
+        Files.walk(entry).use { stream ->
+            stream
+                .filter { Files.isRegularFile(it) }
+                .filter { it.fileName.toString().endsWith(".jar") }
+                .forEach { urls += it.toUri().toURL() }
+        }
+        require(urls.isNotEmpty()) { "Classpath directory has no classpath URLs: $entry" }
+        return urls.toList()
+    }
+
+    private fun detectBundledKotlincVersion(kotlincRoot: Path): KotlinVersion {
+        val executable = kotlincRoot.resolve(if (isWindows()) "bin/kotlinc.bat" else "bin/kotlinc")
+        if (!Files.exists(executable)) {
+            throw GradleException("Bundled kotlinc executable not found: $executable")
+        }
+
+        val command = if (isWindows()) {
+            listOf("cmd", "/c", executable.toString(), "-version")
+        } else {
+            listOf(executable.toString(), "-version")
+        }
+
+        val output = runCommand(command, project.projectDir.toPath())
+        if (output.exitCode != 0) {
+            throw GradleException("Failed to execute bundled kotlinc.\n${output.output}")
+        }
+
+        return KotlinVersionCompatibility.parseKotlincVersionOutput(output.output)
+            ?: throw GradleException(
+                "Cannot parse bundled kotlinc version from output:\n${output.output}"
+            )
+    }
+
+    private fun runCommand(command: List<String>, workDir: Path): CommandOutput {
+        val process = ProcessBuilder(command)
+            .directory(workDir.toFile())
+            .redirectErrorStream(true)
+            .start()
+
+        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+        val exitCode = process.waitFor()
+        return CommandOutput(exitCode, output)
+    }
+
+    private fun isWindows(): Boolean {
+        return System.getProperty("os.name").startsWith("Windows", ignoreCase = true)
+    }
+
+    private data class CommandOutput(
+        val exitCode: Int,
+        val output: String,
+    )
+}
