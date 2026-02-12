@@ -6,12 +6,15 @@
 - [x] Add release worker instructions in `release/release-instructions.md`.
 - [x] Define Docker build container in `release/docker/Dockerfile`.
 - [x] Add Dockerized matrix runner script for build + selected integration tests.
-- [x] Preserve stable (`2025.3`) plugin ZIP artifact under `release/out/`.
+- [x] Preserve stable (`2025.3`) plugin ZIP artifact under deterministic path `release/out/plugin-idea-2025.3.zip`.
 - [x] Add one-time version bump script with rerun guard.
-- [x] Add dry-run mode that skips version bump and GitHub publish.
+- [x] Add dry-run mode that skips version bump and GitHub publish (keeps `VERSION` unchanged).
 - [x] Add release orchestration entrypoint script (`release/scripts/run-release.sh`).
 - [x] Isolate `.intellijPlatform` cache in container volume and add `.dockerignore` for lean Docker context.
 - [x] Add agent prompt templates for release notes collection/review and website release-page update.
+- [x] Add `--publish` flag for explicit publish stage enablement in non-dry-run mode.
+- [x] Document preflight clean-worktree enforcement with `--allow-dirty` override.
+- [x] Document publish stage inputs: tag (default `v<version>`), notes file (default `release/out/release-notes-final.md`), ZIP (default `release/out/plugin-idea-2025.3.zip`).
 
 ## Verification Tasks
 
@@ -25,8 +28,6 @@
 - [ ] PyCharm EAP lane
 - [ ] Confirm stable ZIP copied to `release/out/plugin-idea-2025.3.zip`.
 
-## Later (Enabled After Approval)
+## Later (Enhancements)
 
-- [ ] Wire finalized release notes file into `gh release create`.
-- [ ] Enable publish stage by explicit operator flag.
 - [ ] Add post-publish validation (GitHub release asset checksum + website link checks).

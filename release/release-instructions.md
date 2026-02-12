@@ -30,12 +30,12 @@ Use the same workflow style as `~/Work/jonnyzzz-ai-coder/THE_PROMPT_v5.md`:
 
 ## Dry-Run Mode
 
-Use `RELEASE_DRY_RUN=1` (default in `release/scripts/run-release.sh`).
+Dry-run mode is the default in `release/scripts/run-release.sh`.
 
 Dry-run guarantees:
 
-- Version bump stage is skipped.
-- GitHub publish stage is skipped.
+- **Version bump stage is skipped**: `VERSION` file remains unchanged.
+- **GitHub publish stage is disabled**: no release created even with `--publish` flag.
 - Build/test matrix still runs to validate product readiness.
 - Release notes/website prep can still run.
 
@@ -51,12 +51,20 @@ Optional portability override for agent runner:
 RUN_AGENT_SCRIPT=/path/to/run-agent.sh release/scripts/run-release.sh --dry-run
 ```
 
+To run a non-dry-run release (version bump enabled, publish available):
+
+```bash
+release/scripts/run-release.sh --no-dry-run --publish
+```
+
 ### Stage 0: Preflight
 
-1. Ensure working tree is clean enough for release actions.
+1. Ensure working tree is clean (enforced by default; override with `--allow-dirty` if needed).
 2. Verify Docker daemon is reachable.
 3. Verify `gh auth status` is valid (only required when publish is enabled).
 4. Ensure `VERSION` is in semantic format `major.minor.patch`.
+
+The preflight stage enforces a clean working tree to prevent accidental inclusion of uncommitted changes in the release. Use `--allow-dirty` to bypass this check if intentionally building from a modified tree (e.g., for local testing).
 
 ### Stage 1: Version Bump (exactly once per release attempt)
 
@@ -109,7 +117,8 @@ Selected category currently includes:
 
 Stable plugin artifact handling:
 
-- Preserve plugin ZIP built from stable build under `release/out/`.
+- Plugin ZIP built from stable build is preserved under a deterministic path: `release/out/plugin-${STABLE_PRODUCT}-${STABLE_VERSION}.zip`
+- Default artifact path: `release/out/plugin-idea-2025.3.zip`
 - This ZIP is the candidate for publishing.
 
 ### Stage 3: Release Notes via Agents
@@ -132,13 +141,27 @@ Review/edit notes with another independent run:
 
 ### Stage 4: GitHub Release Publish
 
+The publish stage is available in non-dry-run mode with the explicit `--publish` flag:
+
+```bash
+release/scripts/run-release.sh --no-dry-run --publish
+```
+
 Target command when enabled:
 
 ```bash
 gh release create <tag> <stable-plugin-zip> --repo jonnyzzz/mcp-steroid --notes-file <notes-file>
 ```
 
-This stage must stay disabled in dry-run mode and only run in non-dry runs with explicit approval.
+Required inputs for publish stage:
+
+- **Tag**: defaults to `v<version>` derived from `VERSION` file (e.g., `v0.15.0`)
+- **Notes file**: defaults to `release/out/release-notes-final.md`
+- **Plugin ZIP**: defaults to `release/out/plugin-idea-2025.3.zip`
+- `gh` CLI must be installed and authenticated (`gh auth status`)
+- Notes file and ZIP file must exist before publish stage starts
+
+This stage remains disabled in dry-run mode regardless of the `--publish` flag. In dry-run mode, version remains unchanged and no GitHub release is created.
 
 ### Stage 5: Website Release Page Update via Agent
 
