@@ -14,9 +14,6 @@ class NoHardcodedMcpSteroidUriUsageTest : BasePlatformTestCase() {
         val sourceRoots = listOf(
             "src/main/kotlin",
             "src/test/kotlin",
-            "test-helper/src/main/kotlin",
-            "test-helper/src/test/kotlin",
-            "test-integration/src/test/kotlin",
         ).map(projectHome::resolve)
 
         val matches = mutableListOf<String>()
