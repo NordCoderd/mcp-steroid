@@ -16,6 +16,7 @@
 - [x] Document preflight clean-worktree enforcement with `--allow-dirty` override.
 - [x] Document publish stage inputs: tag (default `v<version>`), notes file (default `release/notes/<version>.md`), ZIP (default `release/out/plugin-idea-2025.3.zip`).
 - [x] Forward stable/EAP matrix override env vars into Docker builder container.
+- [x] Forward AI API keys into Docker builder container with env-first and local-file fallback (`~/.openai`, `~/.anthropic`, `~/.vertes`, `~/.vertex`).
 - [x] Harden publish stage with target commit, existing-release stop check, and stale-artifact guard.
 - [x] Validate version-bump state file against current `VERSION` and recorded commit.
 - [x] Use committed release notes file at `release/notes/<version>.md` and include it into plugin `change-notes`.

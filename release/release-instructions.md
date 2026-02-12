@@ -122,6 +122,9 @@ Builder container requirements:
 - Uses `release/docker/Dockerfile`.
 - Mounts host Docker socket (`/var/run/docker.sock`) for Docker-in-Docker style test usage.
 - Uses a dedicated container volume for `/workspace/.intellijPlatform` to avoid host OS cache contamination.
+- Forwards API keys into the builder container:
+  - Uses existing env vars when already set (`OPENAI_API_KEY`, `CODEX_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`).
+  - If missing on host, auto-loads from local files (`~/.openai`, `~/.anthropic`, `~/.vertes`, `~/.vertex`) and forwards as env vars.
 - Builds plugin and runs tests in containerized environment.
 - Uses release build version format `X.Y.Z-<gitHash>` (no `SNAPSHOT`, no timestamp) by passing `-Pmcp.release.build=true`.
 

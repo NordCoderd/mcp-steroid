@@ -44,3 +44,11 @@ Publish safety defaults:
 - Refuses to publish if the GitHub release tag already exists
 
 Container builds use an isolated `.intellijPlatform` Docker volume to prevent host-OS IDE cache conflicts.
+
+Builder container API key forwarding:
+
+- Reuses host env vars when present: `OPENAI_API_KEY`, `CODEX_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`
+- If missing, auto-loads from known local files and forwards as env:
+  - `~/.openai` -> `OPENAI_API_KEY` (and `CODEX_API_KEY` fallback)
+  - `~/.anthropic` -> `ANTHROPIC_API_KEY`
+  - `~/.vertes` / `~/.vertex` -> `GEMINI_API_KEY` (and `GOOGLE_API_KEY` fallback)
