@@ -8,6 +8,20 @@ import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import kotlin.collections.iterator
 
+/**
+ * Specifies which console output filter to use for an agent's NDJSON output.
+ */
+enum class ConsoleFilterKind {
+    /** No filtering -- raw output is pumped to console. */
+    NONE,
+    /** Claude stream-json filter (content_block_delta, tool_use, etc). */
+    CLAUDE_STREAM_JSON,
+    /** Codex --json filter (item.completed/agent_message, item.started/command_execution, etc). */
+    CODEX_JSON,
+    /** Gemini text filter (strip ANSI, highlight tool calls, remove noise). */
+    GEMINI,
+}
+
 class AiAgentDriver(
     container: ContainerDriver,
     private val intellijDriver: IntelliJDriver,
@@ -19,13 +33,24 @@ class AiAgentDriver(
         container.withGuestWorkDir(intellijDriver.getGuestProjectDir())
     }
 
-    private fun scopeForAgent(windowTitle: String, useStreamJsonFilter: Boolean = false): ContainerDriver {
+    private fun scopeForAgent(windowTitle: String, consoleFilter: ConsoleFilterKind = ConsoleFilterKind.NONE): ContainerDriver {
         val base = scope
         return run {
-            val filterScript = if (useStreamJsonFilter) {
-                ConsolePumpingContainerDriver.deployStreamJsonFilter(base)
-                ConsolePumpingContainerDriver.STREAM_JSON_FILTER_PATH
-            } else null
+            val filterScript = when (consoleFilter) {
+                ConsoleFilterKind.CLAUDE_STREAM_JSON -> {
+                    ConsolePumpingContainerDriver.deployStreamJsonFilter(base)
+                    ConsolePumpingContainerDriver.STREAM_JSON_FILTER_PATH
+                }
+                ConsoleFilterKind.CODEX_JSON -> {
+                    ConsolePumpingContainerDriver.deployCodexJsonFilter(base)
+                    ConsolePumpingContainerDriver.CODEX_JSON_FILTER_PATH
+                }
+                ConsoleFilterKind.GEMINI -> {
+                    ConsolePumpingContainerDriver.deployGeminiFilter(base)
+                    ConsolePumpingContainerDriver.GEMINI_FILTER_PATH
+                }
+                ConsoleFilterKind.NONE -> null
+            }
             ConsolePumpingContainerDriver(base, console, windowTitle, consoleFilterScript = filterScript)
         }
     }
@@ -53,8 +78,8 @@ class AiAgentDriver(
     }
 
     private val agentFactories: Map<String, () -> AiAgentSession> = mapOf(
-        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME, useStreamJsonFilter = true)), DockerClaudeSession.DISPLAY_NAME) },
-        "codex" to { prepareAIAgent(DockerCodexSession.create(scopeForAgent(DockerCodexSession.DISPLAY_NAME)), DockerCodexSession.DISPLAY_NAME) },
-        "gemini" to { prepareAIAgent(DockerGeminiSession.create(scopeForAgent(DockerGeminiSession.DISPLAY_NAME)), DockerGeminiSession.DISPLAY_NAME) },
+        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME, consoleFilter = ConsoleFilterKind.CLAUDE_STREAM_JSON)), DockerClaudeSession.DISPLAY_NAME) },
+        "codex" to { prepareAIAgent(DockerCodexSession.create(scopeForAgent(DockerCodexSession.DISPLAY_NAME, consoleFilter = ConsoleFilterKind.CODEX_JSON)), DockerCodexSession.DISPLAY_NAME) },
+        "gemini" to { prepareAIAgent(DockerGeminiSession.create(scopeForAgent(DockerGeminiSession.DISPLAY_NAME, consoleFilter = ConsoleFilterKind.GEMINI)), DockerGeminiSession.DISPLAY_NAME) },
     )
 }
