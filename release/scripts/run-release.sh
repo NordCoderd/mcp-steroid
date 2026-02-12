@@ -72,20 +72,26 @@ check_publish_prerequisites() {
   if [[ "$RUN_PUBLISH" != "1" ]]; then
     return 0
   fi
-  if [[ ! -f "$RELEASE_NOTES_FILE" ]]; then
-    echo "Missing release notes file for publish stage: $RELEASE_NOTES_FILE" >&2
-    exit 1
-  fi
-  if [[ ! -f "$RELEASE_ZIP_FILE" ]]; then
-    echo "Missing plugin ZIP for publish stage: $RELEASE_ZIP_FILE" >&2
-    exit 1
-  fi
   if ! command -v gh >/dev/null 2>&1; then
     echo "gh CLI is required for publish stage" >&2
     exit 1
   fi
   if ! gh auth status >/dev/null 2>&1; then
     echo "gh is not authenticated; run 'gh auth login' before publish stage" >&2
+    exit 1
+  fi
+}
+
+validate_publish_inputs() {
+  if [[ "$RUN_PUBLISH" != "1" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$RELEASE_NOTES_FILE" ]]; then
+    echo "Missing release notes file for publish stage: $RELEASE_NOTES_FILE" >&2
+    exit 1
+  fi
+  if [[ ! -f "$RELEASE_ZIP_FILE" ]]; then
+    echo "Missing plugin ZIP for publish stage: $RELEASE_ZIP_FILE" >&2
     exit 1
   fi
 }
@@ -138,9 +144,6 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 validate_version_file
-if [[ -z "$RELEASE_TAG" ]]; then
-  RELEASE_TAG="v$VERSION"
-fi
 
 echo "Release run configuration:"
 echo "  dry_run=$DRY_RUN"
@@ -160,6 +163,11 @@ if [[ "$DRY_RUN" == "1" ]]; then
   RELEASE_DRY_RUN=1 release/scripts/bump-version.sh
 else
   RELEASE_DRY_RUN=0 release/scripts/bump-version.sh
+fi
+
+validate_version_file
+if [[ -z "$RELEASE_TAG" ]]; then
+  RELEASE_TAG="v$VERSION"
 fi
 
 if [[ "$RUN_BUILD" == "1" ]]; then
@@ -183,6 +191,7 @@ if [[ "$RUN_WEBSITE" == "1" ]]; then
 fi
 
 if [[ "$RUN_PUBLISH" == "1" ]]; then
+  validate_publish_inputs
   gh release create "$RELEASE_TAG" "$RELEASE_ZIP_FILE" \
     --repo jonnyzzz/mcp-steroid \
     --notes-file "$RELEASE_NOTES_FILE"
