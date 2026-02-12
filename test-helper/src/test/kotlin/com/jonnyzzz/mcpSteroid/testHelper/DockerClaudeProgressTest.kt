@@ -1,0 +1,119 @@
+/* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+package com.jonnyzzz.mcpSteroid.testHelper
+
+import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
+
+/**
+ * Integration test for Claude progress visibility using lightweight Docker container.
+ *
+ * This test validates that Claude's stream-json output format properly shows
+ * tool calls and progress events in real time, not just the final answer.
+ *
+ * The lightweight container (claude-cli) contains only Node.js and @anthropic-ai/claude-code,
+ * without a full IDE setup.
+ *
+ * **Prerequisites**:
+ * - Docker must be running
+ * - ANTHROPIC_API_KEY environment variable must be set (or ~/.anthropic file must exist)
+ * - Dockerfile must exist at test-helper/src/test/docker/claude-cli/Dockerfile
+ *
+ * **Note**: Integration tests that require Docker and API keys are disabled by default.
+ * They run only when ANTHROPIC_API_KEY is present.
+ */
+class DockerClaudeProgressTest {
+
+    /**
+     * Integration test requiring Docker and ANTHROPIC_API_KEY.
+     * This test is disabled by default and only runs when the API key is available.
+     *
+     * To run: Set ANTHROPIC_API_KEY environment variable and ensure Docker is running.
+     */
+    @Test
+    @EnabledIfEnvironmentVariable(named = "ANTHROPIC_API_KEY", matches = ".+")
+    fun `test Claude shows progress events for tool calls`() = runWithCloseableStack { stack ->
+        // Create Claude session with lightweight container
+        val claudeSession = DockerClaudeSession.create(stack)
+
+        // Run a simple prompt that will trigger tool usage
+        // Using bash commands to list files - this should show tool_use events
+        val result = claudeSession.runPrompt(
+            prompt = "List all files in the current directory using bash commands. Show me the full output.",
+            timeoutSeconds = 60
+        )
+
+        // Verify command succeeded
+        assertTrue(result.exitCode == 0, "Claude command should succeed, exitCode=${result.exitCode}")
+
+        // Verify raw output contains NDJSON progress events
+        assertTrue(
+            result.rawOutput.contains("\"type\""),
+            "Raw output should contain NDJSON events with 'type' field"
+        )
+
+        // Verify tool_use events are present in raw output
+        // Claude stream-json emits events like {"type":"content_block_start","content_block":{"type":"tool_use",...}}
+        val hasToolUse = result.rawOutput.contains("tool_use")
+        assertTrue(
+            hasToolUse,
+            "Raw output should contain tool_use events showing tool calls in progress"
+        )
+
+        // Verify we get actual progress events, not just the final result
+        // The raw output should have multiple JSON lines (NDJSON)
+        val jsonLineCount = result.rawOutput.lines().count { line ->
+            line.trim().startsWith("{") && line.trim().endsWith("}")
+        }
+        assertTrue(
+            jsonLineCount > 1,
+            "Raw output should contain multiple NDJSON events (found $jsonLineCount), not just final result"
+        )
+
+        // Verify the processed output is meaningful (not just raw NDJSON)
+        assertNotEquals(
+            result.rawOutput,
+            result.output,
+            "Processed output should be extracted from NDJSON, not identical to raw output"
+        )
+
+        // Verify we get some text output (the actual answer)
+        assertTrue(
+            result.output.isNotBlank(),
+            "Processed output should contain the final answer text"
+        )
+
+        println("✓ Claude progress test passed")
+        println("  - Raw output had $jsonLineCount NDJSON events")
+        println("  - Tool use events detected: $hasToolUse")
+        println("  - Processed output length: ${result.output.length} chars")
+    }
+
+    @Test
+    fun `test Claude extractStreamJsonResult handles tool_use in content blocks`() {
+        // Test the stream-json parser with real tool_use event structure
+        val raw = """
+            {"type":"message_start","message":{"id":"msg_123","type":"message"}}
+            {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_456","name":"bash","input":{}}}
+            {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"command\":\""}}
+            {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"ls -la\"}"}}
+            {"type":"content_block_stop","index":0}
+            {"type":"content_block_start","index":1,"content_block":{"type":"text","text":""}}
+            {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"The files "}}
+            {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"are listed above."}}
+            {"type":"content_block_stop","index":1}
+            {"type":"message_delta","delta":{"stop_reason":"end_turn"}}
+            {"type":"message_stop"}
+            {"type":"result","result":"The files are listed above."}
+        """.trimIndent()
+
+        val result = DockerClaudeSession.extractStreamJsonResult(raw)
+
+        // Should extract the final result event
+        assertTrue(
+            result.contains("files are listed"),
+            "Should extract final result text"
+        )
+    }
+}
