@@ -13,6 +13,7 @@ Never include AI as co-author or mention AI in commit messages.
 - No `@Suppress("DEPRECATION")` — find the non-deprecated replacement
 - Prefer JSON libraries for JSON parsing/manipulation; only static final JSON constants may be hand-written as raw JSON strings
 - **BANNED:** `runCatching{}.onFailure{}` — use `try { } catch (e: Exception) { }` instead. Other `runCatching` uses (`.getOrNull()`, `.getOrDefault()`) are fine
+- **BANNED:** Code must never reference or depend on `run-agent.sh` or `docs/run-agent.sh`. These scripts are tools for humans and AI agents to use manually, not for programmatic execution. Code should implement agent integrations directly using CLI flags and arguments
 - Log new ideas/tasks in TODO* files (TODO.md, TODO-*.md)
 
 ## Workflow
