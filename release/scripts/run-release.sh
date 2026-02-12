@@ -11,10 +11,16 @@ RUN_NOTES="1"
 RUN_WEBSITE="0"
 RUN_PUBLISH="0"
 ALLOW_DIRTY="0"
+ALLOW_EXISTING_ARTIFACTS="0"
 RUN_AGENT_SCRIPT="${RUN_AGENT_SCRIPT:-/Users/jonnyzzz/Work/jonnyzzz-ai-coder/run-agent.sh}"
+RELEASE_STABLE_PRODUCT="${RELEASE_STABLE_PRODUCT:-idea}"
+RELEASE_STABLE_VERSION="${RELEASE_STABLE_VERSION:-2025.3}"
+RELEASE_EAP_PRODUCT="${RELEASE_EAP_PRODUCT:-idea}"
+RELEASE_EAP_VERSION="${RELEASE_EAP_VERSION:-2026.1}"
 RELEASE_NOTES_FILE="${RELEASE_NOTES_FILE:-$ROOT_DIR/release/out/release-notes-final.md}"
-RELEASE_ZIP_FILE="${RELEASE_ZIP_FILE:-$ROOT_DIR/release/out/plugin-idea-2025.3.zip}"
+RELEASE_ZIP_FILE="${RELEASE_ZIP_FILE:-$ROOT_DIR/release/out/plugin-${RELEASE_STABLE_PRODUCT}-${RELEASE_STABLE_VERSION}.zip}"
 RELEASE_TAG="${RELEASE_TAG:-}"
+RELEASE_TARGET=""
 VERSION=""
 
 normalize_bool() {
@@ -72,12 +78,51 @@ check_publish_prerequisites() {
   if [[ "$RUN_PUBLISH" != "1" ]]; then
     return 0
   fi
+  if [[ "$ALLOW_EXISTING_ARTIFACTS" != "1" && ( "$RUN_BUILD" != "1" || "$RUN_NOTES" != "1" ) ]]; then
+    echo "Refusing publish with --skip-build/--skip-notes by default (risk of stale artifacts)." >&2
+    echo "Run with --allow-existing-artifacts only if you intentionally publish prebuilt outputs." >&2
+    exit 1
+  fi
   if ! command -v gh >/dev/null 2>&1; then
     echo "gh CLI is required for publish stage" >&2
     exit 1
   fi
   if ! gh auth status >/dev/null 2>&1; then
     echo "gh is not authenticated; run 'gh auth login' before publish stage" >&2
+    exit 1
+  fi
+}
+
+check_agent_runner_prerequisites() {
+  if [[ "$RUN_NOTES" != "1" && "$RUN_WEBSITE" != "1" ]]; then
+    return 0
+  fi
+  if [[ ! -x "$RUN_AGENT_SCRIPT" ]]; then
+    echo "Agent runner script is not executable: $RUN_AGENT_SCRIPT" >&2
+    exit 1
+  fi
+}
+
+load_release_target() {
+  local state_file="$ROOT_DIR/release/state/version-bump.env"
+  if [[ -f "$state_file" ]]; then
+    # shellcheck disable=SC1090
+    source "$state_file"
+    if [[ -n "${COMMIT_SHA:-}" ]]; then
+      RELEASE_TARGET="$COMMIT_SHA"
+      return 0
+    fi
+  fi
+  RELEASE_TARGET="$(git rev-parse HEAD)"
+}
+
+check_release_not_exists() {
+  if [[ "$RUN_PUBLISH" != "1" ]]; then
+    return 0
+  fi
+  if gh release view "$RELEASE_TAG" --repo jonnyzzz/mcp-steroid >/dev/null 2>&1; then
+    echo "Release '$RELEASE_TAG' already exists in jonnyzzz/mcp-steroid." >&2
+    echo "Refusing to overwrite. Use gh release edit/upload manually for recovery." >&2
     exit 1
   fi
 }
@@ -126,9 +171,13 @@ while [[ $# -gt 0 ]]; do
       ALLOW_DIRTY="1"
       shift
       ;;
+    --allow-existing-artifacts)
+      ALLOW_EXISTING_ARTIFACTS="1"
+      shift
+      ;;
     *)
       echo "Unknown option: $1" >&2
-      echo "Usage: $0 [--dry-run|--no-dry-run] [--skip-build] [--skip-notes] [--website] [--publish] [--allow-dirty]" >&2
+      echo "Usage: $0 [--dry-run|--no-dry-run] [--skip-build] [--skip-notes] [--website] [--publish] [--allow-dirty] [--allow-existing-artifacts]" >&2
       exit 2
       ;;
   esac
@@ -144,19 +193,8 @@ if [[ "$DRY_RUN" == "1" ]]; then
 fi
 
 validate_version_file
-
-echo "Release run configuration:"
-echo "  dry_run=$DRY_RUN"
-echo "  run_build=$RUN_BUILD"
-echo "  run_notes=$RUN_NOTES"
-echo "  run_website=$RUN_WEBSITE"
-echo "  run_publish=$RUN_PUBLISH"
-echo "  allow_dirty=$ALLOW_DIRTY"
-echo "  release_tag=$RELEASE_TAG"
-echo "  release_notes_file=$RELEASE_NOTES_FILE"
-echo "  release_zip_file=$RELEASE_ZIP_FILE"
-
 check_tracked_clean_worktree
+check_agent_runner_prerequisites
 check_publish_prerequisites
 
 if [[ "$DRY_RUN" == "1" ]]; then
@@ -170,8 +208,32 @@ if [[ -z "$RELEASE_TAG" ]]; then
   RELEASE_TAG="v$VERSION"
 fi
 
+load_release_target
+check_release_not_exists
+
+echo "Release run configuration:"
+echo "  dry_run=$DRY_RUN"
+echo "  run_build=$RUN_BUILD"
+echo "  run_notes=$RUN_NOTES"
+echo "  run_website=$RUN_WEBSITE"
+echo "  run_publish=$RUN_PUBLISH"
+echo "  allow_dirty=$ALLOW_DIRTY"
+echo "  allow_existing_artifacts=$ALLOW_EXISTING_ARTIFACTS"
+echo "  stable_product=$RELEASE_STABLE_PRODUCT"
+echo "  stable_version=$RELEASE_STABLE_VERSION"
+echo "  eap_product=$RELEASE_EAP_PRODUCT"
+echo "  eap_version=$RELEASE_EAP_VERSION"
+echo "  release_tag=$RELEASE_TAG"
+echo "  release_target=$RELEASE_TARGET"
+echo "  release_notes_file=$RELEASE_NOTES_FILE"
+echo "  release_zip_file=$RELEASE_ZIP_FILE"
+
 if [[ "$RUN_BUILD" == "1" ]]; then
-  release/scripts/run-builder.sh bash release/scripts/run-release-build-matrix.sh
+  RELEASE_STABLE_PRODUCT="$RELEASE_STABLE_PRODUCT" \
+    RELEASE_STABLE_VERSION="$RELEASE_STABLE_VERSION" \
+    RELEASE_EAP_PRODUCT="$RELEASE_EAP_PRODUCT" \
+    RELEASE_EAP_VERSION="$RELEASE_EAP_VERSION" \
+    release/scripts/run-builder.sh bash release/scripts/run-release-build-matrix.sh
 fi
 
 if [[ "$RUN_NOTES" == "1" ]]; then
@@ -184,18 +246,19 @@ if [[ "$RUN_NOTES" == "1" ]]; then
     /Users/jonnyzzz/Work/mcp-steroid/release/prompts/release-notes-review.md
 fi
 
-if [[ "$RUN_WEBSITE" == "1" ]]; then
-  "$RUN_AGENT_SCRIPT" codex \
-    /Users/jonnyzzz/Work/mcp-steroid \
-    /Users/jonnyzzz/Work/mcp-steroid/release/prompts/website-release-page.md
-fi
-
 if [[ "$RUN_PUBLISH" == "1" ]]; then
   validate_publish_inputs
   gh release create "$RELEASE_TAG" "$RELEASE_ZIP_FILE" \
     --repo jonnyzzz/mcp-steroid \
+    --target "$RELEASE_TARGET" \
     --notes-file "$RELEASE_NOTES_FILE"
   echo "Publish stage completed."
 else
   echo "Publish stage skipped."
+fi
+
+if [[ "$RUN_WEBSITE" == "1" ]]; then
+  "$RUN_AGENT_SCRIPT" codex \
+    /Users/jonnyzzz/Work/mcp-steroid \
+    /Users/jonnyzzz/Work/mcp-steroid/release/prompts/website-release-page.md
 fi

@@ -26,6 +26,10 @@ docker_args=(
   run
   --rm
   -t
+  -e RELEASE_STABLE_PRODUCT
+  -e RELEASE_STABLE_VERSION
+  -e RELEASE_EAP_PRODUCT
+  -e RELEASE_EAP_VERSION
   -v "$ROOT_DIR:/workspace"
   -v mcp-steroid-intellij-platform-cache:/workspace/.intellijPlatform
   -w /workspace

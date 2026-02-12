@@ -14,19 +14,30 @@ IS_DRY_RUN="0"
 
 mkdir -p "$STATE_DIR"
 
+if ! [[ -f "$VERSION_FILE" ]]; then
+  echo "Missing VERSION file: $VERSION_FILE" >&2
+  exit 1
+fi
+
 if [[ -f "$STATE_FILE" ]]; then
   # shellcheck disable=SC1090
   source "$STATE_FILE"
+  current_on_disk="$(tr -d '[:space:]' < "$VERSION_FILE")"
+  if [[ -n "${NEW_VERSION:-}" && "$current_on_disk" != "$NEW_VERSION" ]]; then
+    echo "State mismatch: VERSION=$current_on_disk but state NEW_VERSION=$NEW_VERSION" >&2
+    echo "If this is an intentional reset, remove $STATE_FILE and rerun." >&2
+    exit 1
+  fi
+  if [[ -n "${COMMIT_SHA:-}" ]] && ! git cat-file -e "${COMMIT_SHA}^{commit}" 2>/dev/null; then
+    echo "State mismatch: commit from state not found: $COMMIT_SHA" >&2
+    echo "If this is an intentional reset, remove $STATE_FILE and rerun." >&2
+    exit 1
+  fi
   echo "Version bump already recorded:"
   echo "  old_version=${OLD_VERSION:-unknown}"
   echo "  new_version=${NEW_VERSION:-unknown}"
   echo "  commit=${COMMIT_SHA:-unknown}"
   exit 0
-fi
-
-if ! [[ -f "$VERSION_FILE" ]]; then
-  echo "Missing VERSION file: $VERSION_FILE" >&2
-  exit 1
 fi
 
 current_version="$(tr -d '[:space:]' < "$VERSION_FILE")"
@@ -65,13 +76,15 @@ echo "$next_version" > "$VERSION_FILE"
 git add VERSION
 git commit -m "release: bump version to $next_version"
 
-commit_sha="$(git rev-parse --short HEAD)"
+commit_sha="$(git rev-parse --verify HEAD)"
+state_tmp="$(mktemp "$STATE_DIR/version-bump.env.tmp.XXXXXX")"
 {
   echo "OLD_VERSION=$current_version"
   echo "NEW_VERSION=$next_version"
   echo "COMMIT_SHA=$commit_sha"
   echo "TIMESTAMP_UTC=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-} > "$STATE_FILE"
+} > "$state_tmp"
+mv "$state_tmp" "$STATE_FILE"
 
 echo "Version bumped: $current_version -> $next_version"
 echo "Commit: $commit_sha"
