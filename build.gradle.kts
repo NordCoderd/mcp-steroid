@@ -17,6 +17,8 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.file.FileSystem
 import java.security.MessageDigest
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.SortedSet
 
 plugins {
@@ -43,7 +45,12 @@ val isReleaseBuild = parseBooleanProperty(
     propertyName = "mcp.release.build",
     raw = providers.gradleProperty("mcp.release.build").orElse("false").get()
 )
-version = if (isReleaseBuild) "$baseVersion-$gitHash" else "$baseVersion-SNAPSHOT-$gitHash"
+val snapshotTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+version = if (isReleaseBuild) {
+    "$baseVersion-$gitHash"
+} else {
+    "$baseVersion-SNAPSHOT-$snapshotTimestamp-$gitHash"
+}
 val releaseNotesVersion = providers.gradleProperty("mcp.release.notes.version").orElse(baseVersion).get()
 val releaseNotesFile = layout.projectDirectory.file("release/notes/$releaseNotesVersion.md")
 val releaseNotesText = providers.provider {

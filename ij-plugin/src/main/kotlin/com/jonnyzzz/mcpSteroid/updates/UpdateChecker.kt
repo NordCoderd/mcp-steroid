@@ -93,7 +93,7 @@ class UpdateChecker(
 
     /**
      * Extracts the base version from a full version string.
-     * E.g., "0.86.0-SNAPSHOT-a1b2c3d" -> "0.86.0"
+     * E.g., "0.86.0-SNAPSHOT-20260212-193000-a1b2c3d" -> "0.86.0"
      */
     private fun extractBaseVersion(fullVersion: String): String {
         // Handle SNAPSHOT versions: take everything before "-SNAPSHOT"
