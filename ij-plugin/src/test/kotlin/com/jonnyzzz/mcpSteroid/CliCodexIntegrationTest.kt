@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jonnyzzz.mcpSteroid.testHelper.*
 import java.util.*
+import org.junit.Assume.assumeTrue
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -44,6 +45,13 @@ import kotlin.time.Duration.Companion.seconds
  */
 class CliCodexIntegrationTest : CliIntegrationTestBase() {
     private fun codexSession() = DockerCodexSession.create(lifetime)
+
+    override fun verifyPrerequisites() {
+        assumeTrue(
+            "Skipping Codex CLI integration tests: OPENAI_API_KEY is not configured",
+            DockerCodexSession.isConfigured()
+        )
+    }
 
     override fun newAiSession(): AiAgentSession = codexSession().registerMcp(resolveDockerUrl(), "intellij")
 

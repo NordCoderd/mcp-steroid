@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.ocr
 
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import org.junit.Assume.assumeTrue
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.Locale
@@ -11,6 +12,14 @@ import kotlin.time.Duration.Companion.seconds
 class OcrProcessClientTest : BasePlatformTestCase() {
 
     override fun runInDispatchThread(): Boolean = false
+
+    override fun setUp() {
+        super.setUp()
+        assumeTrue(
+            "Skipping OCR integration tests: OCR executable is unavailable in this environment",
+            OcrProcessClient.getInstance().isAvailable()
+        )
+    }
 
     fun testExtractsHelloOcrText(): Unit = timeoutRunBlocking(90.seconds) {
         val image = loadImage("hello-ocr.png")

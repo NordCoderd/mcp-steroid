@@ -10,6 +10,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.assertNoErrorsInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerSession
+import org.junit.Assume.assumeTrue
 import kotlin.time.Duration.Companion.seconds
 
 class CliIntegrationCommonTest : BasePlatformTestCase() {
@@ -20,6 +21,10 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
     }
 
     override fun setUp() {
+        assumeTrue(
+            "Skipping CLI integration common tests: Docker daemon is unavailable",
+            dockerAvailable
+        )
         setServerPortProperties()
         return super.setUp()
     }
@@ -46,5 +51,21 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
                 "jsonrpc",
                 "\"protocolVersion\":\"2025-11-25\"",
                 message = "curl to MCP")
+    }
+
+    companion object {
+        private val dockerAvailable: Boolean by lazy { detectDockerAvailability() }
+
+        private fun detectDockerAvailability(): Boolean {
+            return try {
+                val process = ProcessBuilder("docker", "info")
+                    .redirectErrorStream(true)
+                    .start()
+                process.inputStream.bufferedReader().use { it.readText() }
+                process.waitFor() == 0
+            } catch (_: Exception) {
+                false
+            }
+        }
     }
 }

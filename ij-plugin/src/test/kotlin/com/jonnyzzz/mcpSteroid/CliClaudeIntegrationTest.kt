@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jonnyzzz.mcpSteroid.testHelper.*
 import java.util.*
+import org.junit.Assume.assumeTrue
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -44,6 +45,13 @@ import kotlin.time.Duration.Companion.seconds
  */
 class CliClaudeIntegrationTest : CliIntegrationTestBase() {
     private fun claudeSession() = DockerClaudeSession.create(lifetime)
+
+    override fun verifyPrerequisites() {
+        assumeTrue(
+            "Skipping Claude CLI integration tests: ANTHROPIC_API_KEY is not configured",
+            DockerClaudeSession.isConfigured()
+        )
+    }
 
     override fun newAiSession(): AiAgentSession = claudeSession().registerMcp(resolveDockerUrl(), "intellij")
 
