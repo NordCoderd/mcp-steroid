@@ -15,17 +15,38 @@ EAP_VERSION="${RELEASE_EAP_VERSION:-2026.1}"
 
 GRADLE_COMMON=(./gradlew --no-daemon --stacktrace)
 
+select_single_distribution_zip() {
+  local dist_dir="$ROOT_DIR/build/distributions"
+  if [[ ! -d "$dist_dir" ]]; then
+    echo "Distribution directory missing after build: $dist_dir" >&2
+    exit 1
+  fi
+
+  shopt -s nullglob
+  local matches=("$dist_dir"/mcp-steroid-*.zip)
+  shopt -u nullglob
+
+  if [[ "${#matches[@]}" -ne 1 ]]; then
+    echo "Expected exactly one plugin ZIP matching mcp-steroid-*.zip in $dist_dir, found ${#matches[@]}." >&2
+    if [[ "${#matches[@]}" -gt 0 ]]; then
+      echo "Matching ZIP files:" >&2
+      printf '  %s\n' "${matches[@]}" >&2
+    fi
+    echo "Current contents of $dist_dir:" >&2
+    ls -lah "$dist_dir" >&2 || true
+    exit 1
+  fi
+
+  printf '%s\n' "${matches[0]}"
+}
+
 echo "== Stage 1: stable build (product=$STABLE_PRODUCT version=$STABLE_VERSION) =="
 "${GRADLE_COMMON[@]}" \
   clean build buildPlugin \
   -Pmcp.platform.product="$STABLE_PRODUCT" \
   -Pmcp.platform.version="$STABLE_VERSION"
 
-stable_zip="$(ls -1t build/distributions/mcp-steroid-*.zip | head -n1)"
-if [[ -z "${stable_zip:-}" ]]; then
-  echo "Failed to locate stable plugin ZIP in build/distributions" >&2
-  exit 1
-fi
+stable_zip="$(select_single_distribution_zip)"
 
 stable_copy="$OUT_DIR/plugin-${STABLE_PRODUCT}-${STABLE_VERSION}.zip"
 cp "$stable_zip" "$stable_copy"

@@ -9,6 +9,8 @@ STATE_DIR="$ROOT_DIR/release/state"
 STATE_FILE="$STATE_DIR/version-bump.env"
 VERSION_FILE="$ROOT_DIR/VERSION"
 DRY_RUN="${RELEASE_DRY_RUN:-0}"
+DRY_RUN_NORMALIZED="$(printf '%s' "$DRY_RUN" | tr '[:upper:]' '[:lower:]')"
+IS_DRY_RUN="0"
 
 mkdir -p "$STATE_DIR"
 
@@ -38,7 +40,20 @@ minor="${BASH_REMATCH[2]}"
 next_minor=$((minor + 1))
 next_version="${major}.${next_minor}.0"
 
-if [[ "$DRY_RUN" == "1" || "$DRY_RUN" == "true" ]]; then
+case "$DRY_RUN_NORMALIZED" in
+  1|true)
+    IS_DRY_RUN="1"
+    ;;
+  0|false)
+    IS_DRY_RUN="0"
+    ;;
+  *)
+    echo "Unsupported RELEASE_DRY_RUN value: '$DRY_RUN' (expected true/false or 1/0)" >&2
+    exit 2
+    ;;
+esac
+
+if [[ "$IS_DRY_RUN" == "1" ]]; then
   echo "[DRY-RUN] Version bump skipped"
   echo "  current_version=$current_version"
   echo "  would_bump_to=$next_version"
