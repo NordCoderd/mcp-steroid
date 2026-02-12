@@ -9,14 +9,19 @@ Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions
 
 ## Quickstart
 
-1) Load `mcp-steroid://debugger/overview` for the recommended workflow.
-2) Set breakpoints: `mcp-steroid://debugger/set-line-breakpoint`
-3) Create run config if needed: `mcp-steroid://debugger/create-application-config`
-4) Start debug session: `mcp-steroid://debugger/debug-run-configuration`
-5) Wait for breakpoint hit: `mcp-steroid://debugger/wait-for-suspend`
-6) **Evaluate variables**: `mcp-steroid://debugger/evaluate-expression`
-7) **Step over**: `mcp-steroid://debugger/step-over`
-8) Evaluate again to see changes.
+1) Read `mcp-steroid://debugger/overview` for the complete workflow and resource list.
+2) **Read each individual resource** before using it -- each one contains complete, copy-paste-ready code.
+3) Set breakpoints: read `mcp-steroid://debugger/set-line-breakpoint`, adapt the file path and line number
+4) Create run config if needed: read `mcp-steroid://debugger/create-application-config`, set the main class
+5) Start debug session: read `mcp-steroid://debugger/debug-run-configuration`
+6) Wait for breakpoint hit: read `mcp-steroid://debugger/wait-for-suspend`
+7) **Evaluate variables**: read `mcp-steroid://debugger/evaluate-expression` -- copy the helper exactly
+8) **Step over**: read `mcp-steroid://debugger/step-over`
+9) Evaluate again to see how values change after each line executes.
+
+**IMPORTANT**: Read the actual MCP resource content for each step. The resources contain working
+IntelliJ API code with correct imports that you can directly adapt and pass to `steroid_execute_code`.
+Do NOT invent your own API calls -- the IntelliJ debugger API has tricky callback patterns.
 
 ## Stateful exec_code workflow
 

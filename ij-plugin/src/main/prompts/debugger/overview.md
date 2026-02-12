@@ -4,9 +4,18 @@ These resources show how to drive IntelliJ's debugger APIs from `steroid_execute
 Use them as building blocks to set breakpoints, start a debug session, evaluate variables,
 step through code, and inspect threads/stack frames.
 
-Stateful exec_code note: the execute_code tool is stateful, so run these in multiple
-short calls (set breakpoints -> start debug -> wait for suspend -> evaluate -> step) rather than one
-long script with waits.
+## Getting Started
+
+If you need to debug a program, follow this approach:
+
+1. **Read this overview** to understand the overall workflow
+2. **Read each resource below** before executing its step -- each contains a complete, copy-paste-ready script
+3. **Execute each step as a separate `steroid_execute_code` call** -- do NOT combine steps into one large script
+4. **Adapt the placeholder values** (file paths, line numbers, class names) in each script to your specific task
+
+The resources are self-contained: each one includes all necessary imports, API calls, and
+error handling. You do not need to know IntelliJ APIs in advance -- just read the resource,
+adapt the parameters, and pass the code to `steroid_execute_code`.
 
 ## Recommended Workflow
 
