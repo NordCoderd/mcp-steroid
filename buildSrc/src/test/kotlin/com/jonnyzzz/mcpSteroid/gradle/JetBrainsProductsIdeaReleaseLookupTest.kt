@@ -17,7 +17,10 @@ class JetBrainsProductsIdeaReleaseLookupTest {
             }
         )
 
-        val stable = lookup.latestIdeaRelease(IdeaReleaseChannel.STABLE)
+        val stable = lookup.latestRelease(
+            product = JetBrainsIdeProduct.IntelliJIdeaUltimate,
+            channel = IdeaReleaseChannel.STABLE,
+        )
 
         assertEquals("https://example.test/products?code=IIU&release.type=release", requestedUrls.single())
         assertEquals("2025.3.2", stable.version)
@@ -38,7 +41,10 @@ class JetBrainsProductsIdeaReleaseLookupTest {
             }
         )
 
-        val eap = lookup.latestIdeaRelease(IdeaReleaseChannel.EAP)
+        val eap = lookup.latestRelease(
+            product = JetBrainsIdeProduct.IntelliJIdeaUltimate,
+            channel = IdeaReleaseChannel.EAP,
+        )
 
         assertEquals("https://example.test/products?code=IIU&release.type=eap", requestedUrls.single())
         assertEquals("2026.1", eap.version)
@@ -49,24 +55,55 @@ class JetBrainsProductsIdeaReleaseLookupTest {
     }
 
     @Test
+    fun resolvesLatestPyCharmReleaseFromProductsServicePayload() {
+        val requestedUrls = mutableListOf<String>()
+        val lookup = JetBrainsProductsIdeaReleaseLookup(
+            serviceUrl = "https://example.test/products",
+            readUrl = { url ->
+                requestedUrls += url
+                pyCharmStablePayload
+            }
+        )
+
+        val stable = lookup.latestRelease(
+            product = JetBrainsIdeProduct.PyCharm,
+            channel = IdeaReleaseChannel.STABLE,
+        )
+
+        assertEquals("https://example.test/products?code=PCP&release.type=release", requestedUrls.single())
+        assertEquals("2025.3.2.1", stable.version)
+        assertEquals("2025.3", stable.majorVersion)
+        assertEquals("253.30387.173", stable.build)
+        assertEquals("https://download.jetbrains.com/python/pycharm-2025.3.2.1.tar.gz", stable.linuxArchiveUrl)
+        assertEquals("https://download.jetbrains.com/python/pycharm-2025.3.2.1-aarch64.tar.gz", stable.linuxArmArchiveUrl)
+    }
+
+    @Test
     fun cachesResultsPerReleaseChannel() {
         var requestCount = 0
         val lookup = JetBrainsProductsIdeaReleaseLookup(
             serviceUrl = "https://example.test/products",
             readUrl = { url ->
                 requestCount += 1
-                if (url.contains("release.type=eap")) eapPayload else stablePayload
+                when {
+                    url.contains("code=PCP") -> pyCharmStablePayload
+                    url.contains("release.type=eap") -> eapPayload
+                    else -> stablePayload
+                }
             }
         )
 
-        val firstStable = lookup.latestIdeaRelease(IdeaReleaseChannel.STABLE)
-        val secondStable = lookup.latestIdeaRelease(IdeaReleaseChannel.STABLE)
-        val firstEap = lookup.latestIdeaRelease(IdeaReleaseChannel.EAP)
-        val secondEap = lookup.latestIdeaRelease(IdeaReleaseChannel.EAP)
+        val firstStable = lookup.latestRelease(JetBrainsIdeProduct.IntelliJIdeaUltimate, IdeaReleaseChannel.STABLE)
+        val secondStable = lookup.latestRelease(JetBrainsIdeProduct.IntelliJIdeaUltimate, IdeaReleaseChannel.STABLE)
+        val firstEap = lookup.latestRelease(JetBrainsIdeProduct.IntelliJIdeaUltimate, IdeaReleaseChannel.EAP)
+        val secondEap = lookup.latestRelease(JetBrainsIdeProduct.IntelliJIdeaUltimate, IdeaReleaseChannel.EAP)
+        val firstPyCharm = lookup.latestRelease(JetBrainsIdeProduct.PyCharm, IdeaReleaseChannel.STABLE)
+        val secondPyCharm = lookup.latestRelease(JetBrainsIdeProduct.PyCharm, IdeaReleaseChannel.STABLE)
 
         assertEquals(firstStable, secondStable)
         assertEquals(firstEap, secondEap)
-        assertEquals(2, requestCount)
+        assertEquals(firstPyCharm, secondPyCharm)
+        assertEquals(3, requestCount)
     }
 
     @Test
@@ -77,7 +114,7 @@ class JetBrainsProductsIdeaReleaseLookupTest {
         )
 
         assertFailsWith<IllegalStateException> {
-            lookup.latestIdeaRelease(IdeaReleaseChannel.STABLE)
+            lookup.latestRelease(JetBrainsIdeProduct.IntelliJIdeaUltimate, IdeaReleaseChannel.STABLE)
         }
     }
 
@@ -115,6 +152,26 @@ class JetBrainsProductsIdeaReleaseLookupTest {
                     "downloads": {
                       "linux": {"link": "https://download.jetbrains.com/idea/idea-261.20362.25.tar.gz"},
                       "linuxARM64": {"link": "https://download.jetbrains.com/idea/idea-261.20362.25-aarch64.tar.gz"}
+                    }
+                  }
+                ]
+              }
+            ]
+        """
+
+        private const val pyCharmStablePayload = """
+            [
+              {
+                "code": "PCP",
+                "releases": [
+                  {
+                    "type": "release",
+                    "version": "2025.3.2.1",
+                    "majorVersion": "2025.3",
+                    "build": "253.30387.173",
+                    "downloads": {
+                      "linux": {"link": "https://download.jetbrains.com/python/pycharm-2025.3.2.1.tar.gz"},
+                      "linuxARM64": {"link": "https://download.jetbrains.com/python/pycharm-2025.3.2.1-aarch64.tar.gz"}
                     }
                   }
                 ]

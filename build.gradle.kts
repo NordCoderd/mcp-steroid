@@ -5,6 +5,7 @@ import com.jonnyzzz.mcpSteroid.gradle.GenerateMetadataTask
 import com.jonnyzzz.mcpSteroid.gradle.HostArchitecture
 import com.jonnyzzz.mcpSteroid.gradle.IdeaReleaseChannel
 import com.jonnyzzz.mcpSteroid.gradle.IdeaReleaseService
+import com.jonnyzzz.mcpSteroid.gradle.JetBrainsIdeProduct
 import com.jonnyzzz.mcpSteroid.gradle.VerifyBundledKotlinCompatibilityTask
 import com.jonnyzzz.mcpSteroid.gradle.resolveHostArchitecture
 import de.undercouch.gradle.tasks.download.Download
@@ -33,7 +34,20 @@ val gitHash = providers.exec {
     commandLine("git", "rev-parse", "--short", "HEAD")
 }.standardOutput.asText.get().trim()
 version = "$baseVersion-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}-$gitHash"
-val intellijIdeaTargetMajorVersion = "2025.3"
+val defaultTargetIdeProduct = "idea"
+val defaultTargetIdeVersion = "2025.3"
+val targetIdeProductRaw = providers.gradleProperty("mcp.platform.product").orElse(defaultTargetIdeProduct).get()
+val targetIdeVersion = providers.gradleProperty("mcp.platform.version").orElse(defaultTargetIdeVersion).get()
+val targetIdeProduct = when (targetIdeProductRaw.trim().lowercase()) {
+    "idea", "iiu", "intellij", "intellijidea", "intellijideaultimate" -> JetBrainsIdeProduct.IntelliJIdeaUltimate
+    "pycharm", "pcp", "python" -> JetBrainsIdeProduct.PyCharm
+    else -> error(
+        "Unsupported mcp.platform.product='$targetIdeProductRaw'. " +
+                "Use one of: idea, pycharm."
+    )
+}
+val isTargetIdeOverridden = providers.gradleProperty("mcp.platform.product").isPresent ||
+        providers.gradleProperty("mcp.platform.version").isPresent
 val hostArchitecture = resolveHostArchitecture()
 
 
@@ -55,7 +69,10 @@ configurations.named("implementation") {
 
 dependencies {
     intellijPlatform {
-        intellijIdeaUltimate(intellijIdeaTargetMajorVersion)
+        when (targetIdeProduct) {
+            JetBrainsIdeProduct.IntelliJIdeaUltimate -> intellijIdeaUltimate(targetIdeVersion)
+            JetBrainsIdeProduct.PyCharm -> pycharm(targetIdeVersion)
+        }
         bundledPlugin("org.jetbrains.kotlin")
         testFramework(TestFrameworkType.Platform)
     }
@@ -155,19 +172,35 @@ tasks {
 val verifyIntellijMajorReleaseAlignment by tasks.registering {
     group = "verification"
     description = "Assert configured IntelliJ major matches latest stable IntelliJ major from products service"
-    inputs.property("intellijIdeaTargetMajorVersion", intellijIdeaTargetMajorVersion)
+    inputs.property("targetIdeProduct", targetIdeProduct.name)
+    inputs.property("targetIdeVersion", targetIdeVersion)
+    inputs.property("isTargetIdeOverridden", isTargetIdeOverridden)
 
     doLast {
-        val latestStable = IdeaReleaseService.latestIdeaRelease(IdeaReleaseChannel.STABLE)
-        check(latestStable.majorVersion == intellijIdeaTargetMajorVersion) {
-            "Configured IntelliJ major '$intellijIdeaTargetMajorVersion' is stale. " +
+        if (isTargetIdeOverridden) {
+            logger.lifecycle(
+                "Skipping stable-major alignment check because mcp.platform.product/version overrides are set: {} {}.",
+                targetIdeProduct.name,
+                targetIdeVersion,
+            )
+            return@doLast
+        }
+
+        val latestStable = IdeaReleaseService.latestRelease(targetIdeProduct, IdeaReleaseChannel.STABLE)
+        val configuredMajor = targetIdeVersion
+            .split(".")
+            .take(2)
+            .joinToString(".")
+        check(latestStable.majorVersion == configuredMajor) {
+            "Configured ${targetIdeProduct.name} major '$configuredMajor' is stale. " +
                     "Latest stable major is '${latestStable.majorVersion}' " +
                     "(version ${latestStable.version}, build ${latestStable.build}). " +
-                    "Update intellijIdeaUltimate(...) in build.gradle.kts."
+                    "Update mcp.platform.version in build.gradle.kts."
         }
         logger.lifecycle(
-            "IntelliJ major alignment verified: configured {}, latest stable {} ({} / {}).",
-            intellijIdeaTargetMajorVersion,
+            "{} major alignment verified: configured {}, latest stable {} ({} / {}).",
+            targetIdeProduct.name,
+            configuredMajor,
             latestStable.majorVersion,
             latestStable.version,
             latestStable.build,

@@ -14,6 +14,11 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 
+enum class JetBrainsIdeProduct(val code: String) {
+    IntelliJIdeaUltimate("IIU"),
+    PyCharm("PCP"),
+}
+
 enum class IdeaReleaseChannel(val apiValue: String) {
     STABLE("release"),
     EAP("eap"),
@@ -29,29 +34,37 @@ data class IdeaReleaseDescriptor(
     fun archiveUrl(isArmArch: Boolean): String = if (isArmArch) linuxArmArchiveUrl else linuxArchiveUrl
 }
 
-fun interface IdeaReleaseLookup {
-    fun latestIdeaRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor
+interface IdeaReleaseLookup {
+    fun latestRelease(product: JetBrainsIdeProduct, channel: IdeaReleaseChannel): IdeaReleaseDescriptor
+
+    fun latestIdeaRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
+        latestRelease(JetBrainsIdeProduct.IntelliJIdeaUltimate, channel)
+
+    fun latestPyCharmRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
+        latestRelease(JetBrainsIdeProduct.PyCharm, channel)
 }
 
 class JetBrainsProductsIdeaReleaseLookup(
     private val serviceUrl: String = DEFAULT_SERVICE_URL,
     private val readUrl: (String) -> String = ::readUrlText,
 ) : IdeaReleaseLookup {
-    private val cache = ConcurrentHashMap<IdeaReleaseChannel, IdeaReleaseDescriptor>()
+    private val cache = ConcurrentHashMap<Pair<JetBrainsIdeProduct, IdeaReleaseChannel>, IdeaReleaseDescriptor>()
 
-    override fun latestIdeaRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
-        cache.computeIfAbsent(channel) { loadLatestIdeaRelease(it) }
+    override fun latestRelease(product: JetBrainsIdeProduct, channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
+        cache.computeIfAbsent(product to channel) { (resolvedProduct, resolvedChannel) ->
+            loadLatestRelease(resolvedProduct, resolvedChannel)
+        }
 
-    internal fun loadLatestIdeaRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor {
-        val endpointUrl = productsUrl(channel)
+    internal fun loadLatestRelease(product: JetBrainsIdeProduct, channel: IdeaReleaseChannel): IdeaReleaseDescriptor {
+        val endpointUrl = productsUrl(product = product, channel = channel)
         val payload = readUrl(endpointUrl)
         val products = jsonParser.parseToJsonElement(payload).jsonArray
-        val ideaProduct = products
+        val matchingProduct = products
             .mapNotNull { it.asObjectOrNull() }
-            .firstOrNull { it["code"].asStringOrNull() == PRODUCT_CODE }
-            ?: throw IllegalStateException("Products response does not contain '$PRODUCT_CODE' entry")
+            .firstOrNull { it["code"].asStringOrNull() == product.code }
+            ?: throw IllegalStateException("Products response does not contain '${product.code}' entry")
 
-        val releases = ideaProduct["releases"].asArrayOrEmpty()
+        val releases = matchingProduct["releases"].asArrayOrEmpty()
 
         val release = releases
             .mapNotNull { it.asObjectOrNull() }
@@ -67,7 +80,7 @@ class JetBrainsProductsIdeaReleaseLookup(
                             .isNullOrBlank()
             }
             ?: throw IllegalStateException(
-                "Unable to resolve latest '${channel.apiValue}' IDEA release from $endpointUrl"
+                "Unable to resolve latest '${channel.apiValue}' release for product '${product.code}' from $endpointUrl"
             )
 
         return IdeaReleaseDescriptor(
@@ -94,14 +107,13 @@ class JetBrainsProductsIdeaReleaseLookup(
         else -> null
     }
 
-    private fun productsUrl(channel: IdeaReleaseChannel): String {
+    private fun productsUrl(product: JetBrainsIdeProduct, channel: IdeaReleaseChannel): String {
         val releaseType = URLEncoder.encode(channel.apiValue, StandardCharsets.UTF_8)
-        return "$serviceUrl?code=$PRODUCT_CODE&release.type=$releaseType"
+        return "$serviceUrl?code=${product.code}&release.type=$releaseType"
     }
 
     companion object {
         const val DEFAULT_SERVICE_URL = "https://data.services.jetbrains.com/products"
-        private const val PRODUCT_CODE = "IIU"
 
         private val jsonParser = Json {
             ignoreUnknownKeys = true
@@ -139,6 +151,6 @@ class JetBrainsProductsIdeaReleaseLookup(
 object IdeaReleaseService : IdeaReleaseLookup {
     private val delegate = JetBrainsProductsIdeaReleaseLookup()
 
-    override fun latestIdeaRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
-        delegate.latestIdeaRelease(channel)
+    override fun latestRelease(product: JetBrainsIdeProduct, channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
+        delegate.latestRelease(product, channel)
 }
