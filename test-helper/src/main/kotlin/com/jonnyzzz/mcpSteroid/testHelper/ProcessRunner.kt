@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
@@ -85,6 +86,50 @@ fun ProcessResult.assertNoMessageInOutput(messageRegex: String) = apply {
 }
 
 /**
+ * Request configuration for running a process.
+ * Use the builder pattern to construct instances.
+ */
+data class ProcessRunRequest(
+    val command: List<String>,
+    val description: String,
+    val workingDir: File,
+    val timeoutSeconds: Long = 30,
+    val quietly: Boolean = false,
+    val stdin: InputStream = ByteArrayInputStream(ByteArray(0)),
+) {
+    open class Builder {
+        protected var command: List<String>? = null
+        protected var description: String? = null
+        protected var workingDir: File? = null
+        protected var timeoutSeconds: Long = 30
+        protected var quietly: Boolean = false
+        protected var stdin: InputStream = ByteArrayInputStream(ByteArray(0))
+
+        open fun command(command: List<String>) = apply { this.command = command }
+        open fun description(description: String) = apply { this.description = description }
+        open fun workingDir(workingDir: File) = apply { this.workingDir = workingDir }
+        open fun timeoutSeconds(timeoutSeconds: Long) = apply { this.timeoutSeconds = timeoutSeconds }
+        open fun quietly(quietly: Boolean) = apply { this.quietly = quietly }
+        open fun stdin(stdin: InputStream) = apply { this.stdin = stdin }
+
+        open fun build(): ProcessRunRequest {
+            return ProcessRunRequest(
+                command = command ?: error("command is required"),
+                description = description ?: error("description is required"),
+                workingDir = workingDir ?: error("workingDir is required"),
+                timeoutSeconds = timeoutSeconds,
+                quietly = quietly,
+                stdin = stdin,
+            )
+        }
+    }
+
+    companion object {
+        fun builder() = Builder()
+    }
+}
+
+/**
  * Utility for running processes with consistent logging.
  * All output is logged to stdout with prefixes for easy debugging.
  * Supports filtering secrets from log output.
@@ -107,55 +152,62 @@ class ProcessRunner(
     }
 
     /**
-     * Run a process and log all output with prefixes.
+     * Run a process using the request configuration.
+     * This is the primary method for running processes.
      * Secrets are filtered from log output but preserved in returned ProcessResult.
      *
-     * @param command The command to run as a list of arguments
-     * @param description A short description of what this command does (for logging)
-     * @param workingDir Working directory for the process
-     * @param timeoutSeconds Maximum time to wait for the process to complete
+     * @param request The process run request with all configuration
      */
-    fun run(
-        command: List<String>,
-        description: String,
-        workingDir: File,
-        timeoutSeconds: Long = 30,
-        quietly: Boolean = false,
-    ): ProcessResult {
+    fun runProcess(request: ProcessRunRequest): ProcessResult {
         // Filter secrets from command line and description for logging
-        val filteredCommand = command.map { filterSecrets(it) }
-        val filteredDescription = filterSecrets(description)
+        val filteredCommand = request.command.map { filterSecrets(it) }
+        val filteredDescription = filterSecrets(request.description)
         println("[$logPrefix] $filteredDescription")
 
-        val processBuilder = ProcessBuilder(command)
-        processBuilder.directory(workingDir)
+        val processBuilder = ProcessBuilder(request.command)
+        processBuilder.directory(request.workingDir)
         processBuilder.redirectInput(ProcessBuilder.Redirect.PIPE)
         processBuilder.redirectOutput(ProcessBuilder.Redirect.PIPE)
         processBuilder.redirectError(ProcessBuilder.Redirect.PIPE)
 
         val process = processBuilder.start()
-        process.outputStream.close()
 
         fun readOutput(stream: InputStream, prefix: String, target: StringBuilder) {
-            runCatching {
+            try {
                 stream.reader().use { reader ->
                     while (process.isAlive) {
                         Thread.sleep(100)
                         reader.forEachLine { line ->
                             val filterSecrets = filterSecrets(line)
-                            if (!quietly) {
+                            if (!request.quietly) {
                                 println("[$prefix] $filterSecrets")
                             }
                             target.appendLine(filterSecrets)
                         }
                     }
                 }
+            } catch (_: Exception) {
+                // Ignore stream read errors
             }
         }
 
-
         val outputBuilder = StringBuilder()
         val errorBuilder = StringBuilder()
+
+        // Thread for copying stdin to the process
+        val stdinThread = Thread {
+            try {
+                request.stdin.use { input ->
+                    process.outputStream.use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            } catch (e: Exception) {
+                if (!request.quietly) {
+                    println("[$logPrefix] stdin copy error: ${e.message}")
+                }
+            }
+        }
 
         val outputThread = Thread {
             readOutput(process.inputStream, "$logPrefix OUT", outputBuilder)
@@ -165,22 +217,53 @@ class ProcessRunner(
             readOutput(process.errorStream, "$logPrefix ERR", errorBuilder)
         }
 
+        stdinThread.start()
         outputThread.start()
         errorThread.start()
 
-        val completed = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+        val completed = process.waitFor(request.timeoutSeconds, TimeUnit.SECONDS)
 
         if (!completed) {
             process.destroyForcibly()
-            println("[$logPrefix] Timed out after ${timeoutSeconds}s")
+            println("[$logPrefix] Timed out after ${request.timeoutSeconds}s")
             return ProcessResultValue(-1, outputBuilder.toString(), "Timeout\n$errorBuilder")
         }
 
+        stdinThread.join(1000)
         outputThread.join(1000)
         errorThread.join(1000)
 
         val exitCode = process.exitValue()
         println("[$logPrefix] Exit code: $exitCode")
         return ProcessResultValue(exitCode, outputBuilder.toString(), errorBuilder.toString())
+    }
+
+    /**
+     * Run a process and log all output with prefixes.
+     * This is a convenience adapter for the primary runProcess method.
+     * Secrets are filtered from log output but preserved in returned ProcessResult.
+     *
+     * @param command The command to run as a list of arguments
+     * @param description A short description of what this command does (for logging)
+     * @param workingDir Working directory for the process
+     * @param timeoutSeconds Maximum time to wait for the process to complete
+     */
+    fun runProcess(
+        command: List<String>,
+        description: String,
+        workingDir: File,
+        timeoutSeconds: Long = 30,
+        quietly: Boolean = false,
+    ): ProcessResult {
+        return runProcess(
+            ProcessRunRequest(
+                command = command,
+                description = description,
+                workingDir = workingDir,
+                timeoutSeconds = timeoutSeconds,
+                quietly = quietly,
+                stdin = ByteArrayInputStream(ByteArray(0)),
+            )
+        )
     }
 }

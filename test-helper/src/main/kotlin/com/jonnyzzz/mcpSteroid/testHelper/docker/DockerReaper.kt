@@ -110,10 +110,18 @@ object DockerReaper {
                 }
             } finally {
                 withContext(NonCancellable) {
-                    runCatching { socket.close() }
+                    try {
+                        socket.close()
+                    } catch (_: Exception) {
+                        // Ignore socket close errors
+                    }
                     // Give reaper time to detect connection loss and clean up
                     delay(1000)
-                    runCatching { lifetime.closeAllStacks() }
+                    try {
+                        lifetime.closeAllStacks()
+                    } catch (_: Exception) {
+                        // Ignore cleanup errors
+                    }
                 }
             }
         }

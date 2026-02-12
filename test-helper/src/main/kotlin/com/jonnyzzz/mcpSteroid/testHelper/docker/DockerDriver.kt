@@ -41,7 +41,7 @@ class DockerDriver(
         require(dockerfilePath.exists() && dockerfilePath.isFile) { "File does not exist: $dockerfilePath" }
 
         val nowDate = DateTimeFormatter.ISO_DATE.format(LocalDateTime.now())
-        val result = processRunner.run(
+        val result = processRunner.runProcess(
             listOf("docker", "build", "-t", imageName, "--build-arg", "CACHE_BUST=$nowDate", "."),
             description = "Build Docker image $imageName",
             workingDir = dockerfilePath.parentFile,
@@ -91,7 +91,7 @@ class DockerDriver(
             addAll(cmd)
         }
 
-        val result = processRunner.run(
+        val result = processRunner.runProcess(
             command,
             description = "Start container from $imageName",
             workingDir = workDir,
@@ -119,7 +119,7 @@ class DockerDriver(
      * Docker output format: "0.0.0.0:52134" or "[::]:52134"
      */
     fun queryMappedPort(containerId: String, containerPort: Int): Int {
-        val result = processRunner.run(
+        val result = processRunner.runProcess(
             listOf("docker", "port", containerId, "$containerPort/tcp"),
             description = "Query host port for $containerPort",
             workingDir = workDir,
@@ -134,14 +134,14 @@ class DockerDriver(
     }
 
     fun killContainer(containerId: String) {
-        processRunner.run(
+        processRunner.runProcess(
             listOf("docker", "kill", containerId),
             description = "kill container",
             workingDir = workDir,
             timeoutSeconds = 10,
         )
 
-        processRunner.run(
+        processRunner.runProcess(
             listOf("docker", "rm", "-f", containerId),
             description = "Remove container",
             workingDir = workDir,
@@ -157,7 +157,7 @@ class DockerDriver(
         containerPath: String,
     ) {
         require(localPath.exists()) { "Local path does not exist: $localPath" }
-        processRunner.run(
+        processRunner.runProcess(
             listOf("docker", "cp", localPath.absolutePath, "$containerId:$containerPath"),
             description = "Copy ${localPath.name} to container:$containerPath",
             workingDir = workDir,
@@ -171,7 +171,7 @@ class DockerDriver(
         localPath: File,
     ) {
         localPath.parentFile?.mkdirs()
-        processRunner.run(
+        processRunner.runProcess(
             listOf("docker", "cp", "$containerId:$containerPath", localPath.absolutePath),
             description = "Copy container:$containerPath to ${localPath.name}",
             workingDir = workDir,
@@ -231,7 +231,7 @@ class DockerDriver(
             add(shellCommand)
         }
 
-        return processRunner.run(
+        return processRunner.runProcess(
             command,
             description = "In container: ${args.joinToString(" ")}",
             workingDir = workDir,

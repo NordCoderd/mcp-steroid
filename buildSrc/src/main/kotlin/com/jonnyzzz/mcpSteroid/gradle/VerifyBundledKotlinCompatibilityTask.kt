@@ -76,14 +76,15 @@ abstract class VerifyBundledKotlinCompatibilityTask : DefaultTask() {
     }
 
     private fun fetchLatestStableKotlinVersionOrNull(): KotlinVersion? {
-        return runCatching { KotlinReleaseService.latestStableKotlinVersion() }
-            .onFailure { error ->
-                logger.warn(
-                    "Failed to fetch latest stable Kotlin release metadata: {}",
-                    error.message ?: error::class.java.name,
-                )
-            }
-            .getOrNull()
+        return try {
+            KotlinReleaseService.latestStableKotlinVersion()
+        } catch (error: Exception) {
+            logger.warn(
+                "Failed to fetch latest stable Kotlin release metadata: {}",
+                error.message ?: error::class.java.name,
+            )
+            null
+        }
     }
 
     private fun probeKotlinVersionFromMainRuntimeClasspath(classpathEntries: List<Path>): KotlinVersion {

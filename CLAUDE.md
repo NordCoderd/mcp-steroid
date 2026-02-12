@@ -12,6 +12,7 @@ Never include AI as co-author or mention AI in commit messages.
 - Tests must show reality — a failing test is better than a fake passing test
 - No `@Suppress("DEPRECATION")` — find the non-deprecated replacement
 - Prefer JSON libraries for JSON parsing/manipulation; only static final JSON constants may be hand-written as raw JSON strings
+- **BANNED:** `runCatching{}.onFailure{}` — use `try { } catch (e: Exception) { }` instead. Other `runCatching` uses (`.getOrNull()`, `.getOrDefault()`) are fine
 - Log new ideas/tasks in TODO* files (TODO.md, TODO-*.md)
 
 ## Workflow
