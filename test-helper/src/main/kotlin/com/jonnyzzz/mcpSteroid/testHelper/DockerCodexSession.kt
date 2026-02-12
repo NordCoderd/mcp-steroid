@@ -4,6 +4,11 @@ package com.jonnyzzz.mcpSteroid.testHelper
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddCommand
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.io.File
 
 /**
@@ -94,6 +99,10 @@ class DockerCodexSession(
 
     companion object : AIAgentCompanion<DockerCodexSession>("codex-cli") {
         const val DISPLAY_NAME = "Codex"
+        private val codexJsonParser = Json {
+            ignoreUnknownKeys = true
+            isLenient = true
+        }
 
         override fun readApiKey(): String {
             System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
@@ -130,12 +139,7 @@ class DockerCodexSession(
         internal fun extractCodexJsonResult(rawOutput: String): String {
             val extracted = StringBuilder()
 
-            // Regex for extracting "text" field value from agent_message events
-            val textRegex = Regex(""""text"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-            // Regex for extracting "output" field value from command_execution/tool_call events
-            val outputRegex = Regex(""""output"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-
-            for (line in rawOutput.lines()) {
+            for (line in rawOutput.lineSequence()) {
                 val trimmed = line.trim()
                 if (trimmed.isEmpty()) continue
 
@@ -145,103 +149,109 @@ class DockerCodexSession(
                     continue
                 }
 
-                // Try to extract meaningful content from Codex NDJSON events.
-                try {
-                    // item.completed with agent_message: primary agent response text
-                    if (trimmed.contains("\"item.completed\"") && trimmed.contains("\"agent_message\"")) {
-                        val textMatch = textRegex.find(trimmed)
-                        if (textMatch != null) {
-                            extracted.appendLine(unescapeJson(textMatch.groupValues[1]))
-                        }
-                    }
-                    // item.completed with command_execution: capture command output
-                    else if (trimmed.contains("\"item.completed\"") && trimmed.contains("\"command_execution\"")) {
-                        val outputMatch = outputRegex.find(trimmed)
-                        if (outputMatch != null) {
-                            val output = unescapeJson(outputMatch.groupValues[1]).trim()
-                            if (output.isNotEmpty()) {
-                                extracted.appendLine(output)
-                            }
-                        }
-                    }
-                    // item.completed with tool_call/function_call/mcp_tool_call: capture tool output
-                    else if (trimmed.contains("\"item.completed\"") &&
-                        (trimmed.contains("\"tool_call\"") || trimmed.contains("\"function_call\"") || trimmed.contains("\"mcp_tool_call\""))) {
-                        val outputMatch = outputRegex.find(trimmed)
-                        if (outputMatch != null) {
-                            val output = unescapeJson(outputMatch.groupValues[1]).trim()
-                            if (output.isNotEmpty()) {
-                                // For tool calls, only extract short outputs (likely error messages)
-                                // Long outputs are usually data that clutters assertion checks
-                                if (output.length < 500 || output.startsWith("[ERROR")) {
-                                    extracted.appendLine(output)
-                                }
-                            }
-                        }
-                    }
-                    // turn.completed: extract token usage summary for debugging/assertions
-                    else if (trimmed.contains("\"type\"") && trimmed.contains("\"turn.completed\"")) {
-                        val inTokensRegex = Regex(""""input_tokens"\s*:\s*(\d+)""")
-                        val outTokensRegex = Regex(""""output_tokens"\s*:\s*(\d+)""")
-                        val inMatch = inTokensRegex.find(trimmed)
-                        val outMatch = outTokensRegex.find(trimmed)
-                        if (inMatch != null || outMatch != null) {
-                            val inTok = inMatch?.groupValues?.get(1) ?: "0"
-                            val outTok = outMatch?.groupValues?.get(1) ?: "0"
-                            extracted.appendLine("[tokens] in=$inTok out=$outTok")
-                        }
-                    }
-                    // error events: capture error messages with type/code if available
-                    else if (trimmed.contains("\"type\"") && trimmed.contains("\"error\"")
-                        && !trimmed.contains("\"item.")) {
-                        val msgRegex = Regex(""""message"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-                        val typeRegex = Regex(""""type"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-                        val codeRegex = Regex(""""code"\s*:\s*"((?:[^"\\]|\\.)*)"""")
-
-                        val msgMatch = msgRegex.find(trimmed)
-                        val typeMatch = typeRegex.find(trimmed)
-                        val codeMatch = codeRegex.find(trimmed)
-
-                        if (msgMatch != null) {
-                            val msg = unescapeJson(msgMatch.groupValues[1])
-                            val errorType = typeMatch?.groupValues?.get(1) ?: codeMatch?.groupValues?.get(1)
-                            if (errorType != null && errorType != "error") {
-                                extracted.appendLine("[ERROR $errorType] $msg")
-                            } else {
-                                extracted.appendLine("[ERROR] $msg")
-                            }
-                        }
-                    }
-                } catch (_: Exception) {
-                    // Skip unparseable JSON lines
+                val event = parseJsonObject(trimmed) ?: continue
+                when (event.stringField("type")) {
+                    "item.completed" -> appendCompletedItem(extracted, event["item"] as? JsonObject)
+                    "turn.completed" -> appendTokenUsage(extracted, event["usage"] as? JsonObject)
+                    "error" -> appendError(extracted, event)
                 }
             }
 
             val result = extracted.toString().trim()
-            return if (result.isNotEmpty()) result else rawOutput
+            return result.ifEmpty { rawOutput }
         }
 
-        private fun unescapeJson(s: String): String {
-            // Process in correct order: \\ first, then other escapes
-            var result = s
-                .replace("\\\\", "\u0000") // Temporary placeholder for literal backslash
-                .replace("\\n", "\n")
-                .replace("\\r", "\r")
-                .replace("\\t", "\t")
-                .replace("\\\"", "\"")
-                .replace("\\b", "\b")
-                .replace("\\f", "\u000C")
-                .replace("\\/", "/")
-                .replace("\u0000", "\\") // Restore literal backslash
-
-            // Handle unicode escapes \uXXXX
-            val unicodeRegex = Regex("""\\u([0-9a-fA-F]{4})""")
-            result = unicodeRegex.replace(result) { match ->
-                val codePoint = match.groupValues[1].toInt(16)
-                codePoint.toChar().toString()
+        private fun parseJsonObject(line: String): JsonObject? {
+            val event = try {
+                codexJsonParser.parseToJsonElement(line)
+            } catch (_: Exception) {
+                return null
             }
+            return event as? JsonObject
+        }
 
-            return result
+        private fun appendCompletedItem(extracted: StringBuilder, item: JsonObject?) {
+            if (item == null) return
+
+            when (item.stringField("type")) {
+                "agent_message" -> {
+                    item.stringField("text")
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { extracted.appendLine(it) }
+                }
+
+                "command_execution" -> {
+                    item.extractOutputText()
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { extracted.appendLine(it) }
+                }
+
+                "tool_call", "function_call", "mcp_tool_call" -> {
+                    item.extractOutputText()
+                        ?.trim()
+                        ?.takeIf { it.isNotEmpty() }
+                        ?.let { output ->
+                            // Keep legacy behavior: only surface short tool outputs
+                            // (or explicit error-like outputs) to avoid assertion noise.
+                            if (output.length < 500 || output.startsWith("[ERROR")) {
+                                extracted.appendLine(output)
+                            }
+                        }
+                }
+            }
+        }
+
+        private fun appendTokenUsage(extracted: StringBuilder, usage: JsonObject?) {
+            if (usage == null) return
+            val inputTokens = usage.longField("input_tokens")
+            val outputTokens = usage.longField("output_tokens")
+            if (inputTokens == null && outputTokens == null) return
+            extracted.appendLine("[tokens] in=${inputTokens ?: 0} out=${outputTokens ?: 0}")
+        }
+
+        private fun appendError(extracted: StringBuilder, event: JsonObject) {
+            val errorElement = event["error"]
+            val errorObject = errorElement as? JsonObject
+
+            val message = when {
+                errorObject != null -> errorObject.stringField("message") ?: event.stringField("message")
+                errorElement is JsonPrimitive -> errorElement.contentOrNull
+                else -> event.stringField("message")
+            }?.trim()
+
+            if (message.isNullOrEmpty()) return
+
+            val errorType = errorObject?.stringField("type")
+                ?: errorObject?.stringField("code")
+                ?: event.stringField("code")
+
+            if (errorType != null && errorType != "error") {
+                extracted.appendLine("[ERROR $errorType] $message")
+            } else {
+                extracted.appendLine("[ERROR] $message")
+            }
+        }
+
+        private fun JsonObject.extractOutputText(): String? {
+            val output = this["output"]?.jsonStringOrNull()
+            if (output != null) return output
+            return this["aggregated_output"]?.jsonStringOrNull()
+        }
+
+        private fun JsonObject.stringField(fieldName: String): String? {
+            return this[fieldName].jsonStringOrNull()
+        }
+
+        private fun JsonObject.longField(fieldName: String): Long? {
+            val primitive = this[fieldName] as? JsonPrimitive ?: return null
+            return primitive.contentOrNull?.toLongOrNull()
+        }
+
+        private fun JsonElement?.jsonStringOrNull(): String? {
+            val primitive = this as? JsonPrimitive ?: return null
+            if (!primitive.isString) return null
+            return primitive.contentOrNull
         }
     }
 }

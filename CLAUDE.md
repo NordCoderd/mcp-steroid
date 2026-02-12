@@ -11,6 +11,7 @@ Never include AI as co-author or mention AI in commit messages.
 - No test-only branches (`isUnitTestMode`) — use correct IntelliJ actions (`writeIntentReadAction`, `writeCommandAction`)
 - Tests must show reality — a failing test is better than a fake passing test
 - No `@Suppress("DEPRECATION")` — find the non-deprecated replacement
+- Prefer JSON libraries for JSON parsing/manipulation; only static final JSON constants may be hand-written as raw JSON strings
 - Log new ideas/tasks in TODO* files (TODO.md, TODO-*.md)
 
 ## Workflow
