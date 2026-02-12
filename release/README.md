@@ -24,4 +24,10 @@ Publish stage available in non-dry-run mode with explicit `--publish` flag:
 release/scripts/run-release.sh --no-dry-run --publish
 ```
 
+Publish safety defaults:
+
+- Uses tag `v<VERSION>` and targets the recorded version-bump commit SHA
+- Refuses `--publish` together with `--skip-build` or `--skip-notes` unless `--allow-existing-artifacts` is passed
+- Refuses to publish if the GitHub release tag already exists
+
 Container builds use an isolated `.intellijPlatform` Docker volume to prevent host-OS IDE cache conflicts.

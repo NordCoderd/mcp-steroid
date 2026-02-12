@@ -63,6 +63,7 @@ release/scripts/run-release.sh --no-dry-run --publish
 2. Verify Docker daemon is reachable.
 3. Verify `gh auth status` is valid (only required when publish is enabled).
 4. Ensure `VERSION` is in semantic format `major.minor.patch`.
+5. For publish runs, do not skip build/notes unless explicitly using `--allow-existing-artifacts`.
 
 The preflight stage enforces a clean working tree to prevent accidental inclusion of uncommitted changes in the release. Use `--allow-dirty` to bypass this check if intentionally building from a modified tree (e.g., for local testing).
 
@@ -101,6 +102,7 @@ Matrix goals:
 
 - Build plugin with stable line (default `2025.3`) and run baseline tests.
 - Build plugin with EAP line (default `2026.1`) and run baseline tests.
+- `RELEASE_STABLE_*` and `RELEASE_EAP_*` overrides are forwarded into the Docker builder container.
 - Run selected test-integration category across:
   - IDEA stable
   - IDEA EAP
@@ -147,6 +149,12 @@ The publish stage is available in non-dry-run mode with the explicit `--publish`
 release/scripts/run-release.sh --no-dry-run --publish
 ```
 
+Explicit override for publishing previously prepared artifacts:
+
+```bash
+release/scripts/run-release.sh --no-dry-run --publish --skip-build --skip-notes --allow-existing-artifacts
+```
+
 Target command when enabled:
 
 ```bash
@@ -156,10 +164,13 @@ gh release create <tag> <stable-plugin-zip> --repo jonnyzzz/mcp-steroid --notes-
 Required inputs for publish stage:
 
 - **Tag**: defaults to `v<version>` derived from `VERSION` file (e.g., `v0.15.0`)
+- **Tag target**: defaults to recorded version-bump commit (`release/state/version-bump.env`) and falls back to `HEAD`
 - **Notes file**: defaults to `release/out/release-notes-final.md`
 - **Plugin ZIP**: defaults to `release/out/plugin-idea-2025.3.zip`
 - `gh` CLI must be installed and authenticated (`gh auth status`)
 - Notes file and ZIP file must exist before publish stage starts
+- Existing release tag on GitHub is treated as a hard stop (no overwrite)
+- Publish with `--skip-build`/`--skip-notes` is blocked unless `--allow-existing-artifacts` is explicitly provided
 
 This stage remains disabled in dry-run mode regardless of the `--publish` flag. In dry-run mode, version remains unchanged and no GitHub release is created.
 

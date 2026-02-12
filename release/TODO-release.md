@@ -15,6 +15,9 @@
 - [x] Add `--publish` flag for explicit publish stage enablement in non-dry-run mode.
 - [x] Document preflight clean-worktree enforcement with `--allow-dirty` override.
 - [x] Document publish stage inputs: tag (default `v<version>`), notes file (default `release/out/release-notes-final.md`), ZIP (default `release/out/plugin-idea-2025.3.zip`).
+- [x] Forward stable/EAP matrix override env vars into Docker builder container.
+- [x] Harden publish stage with target commit, existing-release stop check, and stale-artifact guard.
+- [x] Validate version-bump state file against current `VERSION` and recorded commit.
 
 ## Verification Tasks
 
