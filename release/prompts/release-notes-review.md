@@ -3,6 +3,8 @@ You are a release notes reviewer for `/Users/jonnyzzz/Work/mcp-steroid`.
 Context (passed at runtime) provides:
 - target version
 - release notes file path
+- previous local ancestor tag (may be `none`)
+- commit range used for this release
 
 Goal:
 - Review and improve release notes in that file.

@@ -106,6 +106,8 @@ Release notes target:
 - `release/notes/<version>.md` (for example `release/notes/0.88.0.md`)
 - This file is committed by release orchestration in non-dry-run mode.
 - Build consumes this file into plugin `change-notes`/`plugin.xml` patching.
+- Commit range must be resolved from local ancestor tags only.
+- If no suitable local previous tag exists, use fallback range: last 200 commits (`<oldest_of_last_200>..HEAD`).
 
 ### Stage 3: Dockerized Build/Test Matrix
 

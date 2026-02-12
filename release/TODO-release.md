@@ -20,6 +20,7 @@
 - [x] Validate version-bump state file against current `VERSION` and recorded commit.
 - [x] Use committed release notes file at `release/notes/<version>.md` and include it into plugin `change-notes`.
 - [x] Release matrix uses non-snapshot version format (`<version>-<gitHash>`) for build artifacts.
+- [x] Constrain release notes generation to local-ancestor commit ranges (with 200-commit fallback when no prior local tag exists).
 
 ## Verification Tasks
 

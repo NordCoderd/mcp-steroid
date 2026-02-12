@@ -21,6 +21,8 @@ RELEASE_NOTES_FILE="${RELEASE_NOTES_FILE:-}"
 RELEASE_ZIP_FILE="${RELEASE_ZIP_FILE:-$ROOT_DIR/release/out/plugin-${RELEASE_STABLE_PRODUCT}-${RELEASE_STABLE_VERSION}.zip}"
 RELEASE_TAG="${RELEASE_TAG:-}"
 RELEASE_TARGET=""
+RELEASE_NOTES_PREVIOUS_TAG=""
+RELEASE_NOTES_COMMIT_RANGE=""
 VERSION=""
 
 normalize_bool() {
@@ -100,6 +102,46 @@ resolve_release_notes_file() {
   mkdir -p "$(dirname "$RELEASE_NOTES_FILE")"
 }
 
+version_lt() {
+  local left="$1"
+  local right="$2"
+  local smallest
+  smallest="$(printf '%s\n%s\n' "$left" "$right" | sort -V | head -n1)"
+  [[ "$left" == "$smallest" && "$left" != "$right" ]]
+}
+
+determine_release_notes_range() {
+  local current_version="$VERSION"
+  local tag
+  local normalized_tag
+  local tag_base
+  local fallback_start
+
+  RELEASE_NOTES_PREVIOUS_TAG=""
+  while IFS= read -r tag; do
+    normalized_tag="${tag#v}"
+    normalized_tag="${normalized_tag#V}"
+    if [[ ! "$normalized_tag" =~ ^([0-9]+\.[0-9]+\.[0-9]+) ]]; then
+      continue
+    fi
+    tag_base="${BASH_REMATCH[1]}"
+    if version_lt "$tag_base" "$current_version"; then
+      RELEASE_NOTES_PREVIOUS_TAG="$tag"
+    fi
+  done < <(git tag --merged HEAD | sort -V)
+
+  if [[ -n "$RELEASE_NOTES_PREVIOUS_TAG" ]]; then
+    RELEASE_NOTES_COMMIT_RANGE="$RELEASE_NOTES_PREVIOUS_TAG..HEAD"
+    return 0
+  fi
+
+  fallback_start="$(git rev-list --max-count=200 --reverse HEAD | head -n1)"
+  if [[ -z "$fallback_start" ]]; then
+    fallback_start="$(git rev-list --max-count=1 HEAD)"
+  fi
+  RELEASE_NOTES_COMMIT_RANGE="$fallback_start..HEAD"
+}
+
 check_agent_runner_prerequisites() {
   if [[ "$RUN_NOTES" != "1" && "$RUN_WEBSITE" != "1" ]]; then
     return 0
@@ -148,6 +190,8 @@ Release context:
 - target version: $VERSION
 - release notes file: $RELEASE_NOTES_FILE
 - repository root: $ROOT_DIR
+- previous local ancestor tag: ${RELEASE_NOTES_PREVIOUS_TAG:-none}
+- commit range to use exactly: $RELEASE_NOTES_COMMIT_RANGE
 
 $(cat "$collect_prompt_template")
 EOF
@@ -157,6 +201,8 @@ Release context:
 - target version: $VERSION
 - release notes file: $RELEASE_NOTES_FILE
 - repository root: $ROOT_DIR
+- previous local ancestor tag: ${RELEASE_NOTES_PREVIOUS_TAG:-none}
+- commit range used: $RELEASE_NOTES_COMMIT_RANGE
 
 $(cat "$review_prompt_template")
 EOF
@@ -275,6 +321,7 @@ if [[ -z "$RELEASE_TAG" ]]; then
   RELEASE_TAG="v$VERSION"
 fi
 resolve_release_notes_file
+determine_release_notes_range
 
 load_release_target
 check_release_not_exists
@@ -294,6 +341,8 @@ echo "  eap_version=$RELEASE_EAP_VERSION"
 echo "  release_tag=$RELEASE_TAG"
 echo "  release_target=$RELEASE_TARGET"
 echo "  release_notes_file=$RELEASE_NOTES_FILE"
+echo "  release_notes_previous_tag=${RELEASE_NOTES_PREVIOUS_TAG:-none}"
+echo "  release_notes_commit_range=$RELEASE_NOTES_COMMIT_RANGE"
 echo "  release_zip_file=$RELEASE_ZIP_FILE"
 
 if [[ "$RUN_NOTES" == "1" ]]; then
