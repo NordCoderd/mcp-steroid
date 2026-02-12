@@ -182,8 +182,8 @@ run_release_notes_agents() {
   local collect_prompt
   local review_prompt
 
-  collect_prompt="$(mktemp "/tmp/release-notes-collect.${VERSION}.XXXXXX.md")"
-  review_prompt="$(mktemp "/tmp/release-notes-review.${VERSION}.XXXXXX.md")"
+  collect_prompt="$(mktemp -t "release-notes-collect.${VERSION}.XXXXXX")"
+  review_prompt="$(mktemp -t "release-notes-review.${VERSION}.XXXXXX")"
 
   cat > "$collect_prompt" <<EOF
 Release context:
