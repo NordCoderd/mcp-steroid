@@ -17,8 +17,6 @@ import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.file.FileSystem
 import java.security.MessageDigest
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
 import java.util.SortedSet
 
 plugins {
@@ -33,7 +31,37 @@ val baseVersion = file("VERSION").readText().trim()
 val gitHash = providers.exec {
     commandLine("git", "rev-parse", "--short", "HEAD")
 }.standardOutput.asText.get().trim()
-version = "$baseVersion-SNAPSHOT-${LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm"))}-$gitHash"
+fun parseBooleanProperty(propertyName: String, raw: String): Boolean {
+    return when (raw.trim().lowercase()) {
+        "1", "true", "yes", "on" -> true
+        "0", "false", "no", "off" -> false
+        else -> error("Unsupported $propertyName value '$raw' (expected true/false or 1/0)")
+    }
+}
+
+val isReleaseBuild = parseBooleanProperty(
+    propertyName = "mcp.release.build",
+    raw = providers.gradleProperty("mcp.release.build").orElse("false").get()
+)
+version = if (isReleaseBuild) "$baseVersion-$gitHash" else "$baseVersion-SNAPSHOT-$gitHash"
+val releaseNotesVersion = providers.gradleProperty("mcp.release.notes.version").orElse(baseVersion).get()
+val releaseNotesFile = layout.projectDirectory.file("release/notes/$releaseNotesVersion.md")
+val releaseNotesText = providers.provider {
+    val file = releaseNotesFile.asFile
+    val notes = if (file.isFile) {
+        file.readText().trim()
+    } else {
+        "Release notes are not available for version $releaseNotesVersion."
+    }
+
+    // Keep formatting stable in plugin manager without additional markdown tooling.
+    "<pre>${notes.escapeForHtmlPreBlock()}</pre>"
+}
+
+fun String.escapeForHtmlPreBlock(): String = this
+    .replace("&", "&amp;")
+    .replace("<", "&lt;")
+    .replace(">", "&gt;")
 val defaultTargetIdeProduct = "idea"
 val defaultTargetIdeVersion = "2025.3"
 val targetIdeProductRaw = providers.gradleProperty("mcp.platform.product").orElse(defaultTargetIdeProduct).get()
@@ -155,6 +183,7 @@ intellijPlatform {
     pluginConfiguration {
         name = "MCP Steroid"
         version = project.version.toString()
+        changeNotes = releaseNotesText
 
         ideaVersion {
             sinceBuild = "253"

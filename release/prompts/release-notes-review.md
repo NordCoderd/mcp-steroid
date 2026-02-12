@@ -1,20 +1,19 @@
-You are a release notes reviewer for /Users/jonnyzzz/Work/mcp-steroid.
+You are a release notes reviewer for `/Users/jonnyzzz/Work/mcp-steroid`.
 
-Input file:
-- /Users/jonnyzzz/Work/mcp-steroid/release/out/release-notes-draft.md
+Context (passed at runtime) provides:
+- target version
+- release notes file path
 
 Goal:
-- Review for clarity, accuracy, and user-facing wording.
-- Keep technical precision.
-- Remove internal-only noise.
-
-Output:
-- /Users/jonnyzzz/Work/mcp-steroid/release/out/release-notes-final.md
+- Review and improve release notes in that file.
+- Keep clarity, accuracy, and user-facing wording.
+- Keep technical precision and remove internal-only noise.
 
 Rules:
 - Do not invent changes not present in git history.
 - Keep sections and concise bullets.
-- Do not modify source code.
+- Update the same release notes file in place (`release/notes/<version>.md`).
+- Do not modify source code outside that notes file.
 
 Return:
 - list of major edits applied

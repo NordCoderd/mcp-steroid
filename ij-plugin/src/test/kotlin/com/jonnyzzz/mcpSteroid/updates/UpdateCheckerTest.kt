@@ -19,8 +19,8 @@ class UpdateCheckerTest : BasePlatformTestCase() {
         // SNAPSHOT version
         assertEquals("0.86.0", extractBaseVersion("0.86.0-SNAPSHOT"))
 
-        // Full SNAPSHOT with timestamp
-        assertEquals("0.86.0", extractBaseVersion("0.86.0-SNAPSHOT-2026-01-30-12-34"))
+        // Full SNAPSHOT with git hash suffix
+        assertEquals("0.86.0", extractBaseVersion("0.86.0-SNAPSHOT-a1b2c3d"))
 
         // Version with other suffix
         assertEquals("1.2.3", extractBaseVersion("1.2.3-beta1"))
@@ -48,7 +48,7 @@ class UpdateCheckerTest : BasePlatformTestCase() {
      */
     fun testExtractedVersionComparison() {
         // Current has SNAPSHOT suffix, remote is plain - should detect update when remote is higher
-        val current = extractBaseVersion("0.86.0-SNAPSHOT-2026-01-30-12-34")
+        val current = extractBaseVersion("0.86.0-SNAPSHOT-a1b2c3d")
         val remoteNewer = "0.87.0"
         val remoteSame = "0.86.0"
         val remoteOlder = "0.85.0"

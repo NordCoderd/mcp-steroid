@@ -83,7 +83,31 @@ Behavior:
 - If rerun after a failed stage, it must **not** bump again.
 - In dry-run mode (`RELEASE_DRY_RUN=1`), prints planned bump and exits without edits.
 
-### Stage 2: Dockerized Build/Test Matrix
+### Stage 2: Release Notes via Agents (Committed in Repo)
+
+Collect notes from git history with a dedicated agent run:
+
+```bash
+/Users/jonnyzzz/Work/jonnyzzz-ai-coder/run-agent.sh codex \
+  /Users/jonnyzzz/Work/mcp-steroid \
+  /Users/jonnyzzz/Work/mcp-steroid/release/prompts/release-notes-collect.md
+```
+
+Review/edit notes with another independent run:
+
+```bash
+/Users/jonnyzzz/Work/jonnyzzz-ai-coder/run-agent.sh codex \
+  /Users/jonnyzzz/Work/mcp-steroid \
+  /Users/jonnyzzz/Work/mcp-steroid/release/prompts/release-notes-review.md
+```
+
+Release notes target:
+
+- `release/notes/<version>.md` (for example `release/notes/0.88.0.md`)
+- This file is committed by release orchestration in non-dry-run mode.
+- Build consumes this file into plugin `change-notes`/`plugin.xml` patching.
+
+### Stage 3: Dockerized Build/Test Matrix
 
 Run:
 
@@ -97,6 +121,7 @@ Builder container requirements:
 - Mounts host Docker socket (`/var/run/docker.sock`) for Docker-in-Docker style test usage.
 - Uses a dedicated container volume for `/workspace/.intellijPlatform` to avoid host OS cache contamination.
 - Builds plugin and runs tests in containerized environment.
+- Uses release build version format `X.Y.Z-<gitHash>` (no `SNAPSHOT`, no timestamp) by passing `-Pmcp.release.build=true`.
 
 Matrix goals:
 
@@ -123,24 +148,6 @@ Stable plugin artifact handling:
 - Default artifact path: `release/out/plugin-idea-2025.3.zip`
 - This ZIP is the candidate for publishing.
 
-### Stage 3: Release Notes via Agents
-
-Collect notes from git history with a dedicated agent run:
-
-```bash
-/Users/jonnyzzz/Work/jonnyzzz-ai-coder/run-agent.sh codex \
-  /Users/jonnyzzz/Work/mcp-steroid \
-  /Users/jonnyzzz/Work/mcp-steroid/release/prompts/release-notes-collect.md
-```
-
-Review/edit notes with another independent run:
-
-```bash
-/Users/jonnyzzz/Work/jonnyzzz-ai-coder/run-agent.sh codex \
-  /Users/jonnyzzz/Work/mcp-steroid \
-  /Users/jonnyzzz/Work/mcp-steroid/release/prompts/release-notes-review.md
-```
-
 ### Stage 4: GitHub Release Publish
 
 The publish stage is available in non-dry-run mode with the explicit `--publish` flag:
@@ -165,7 +172,7 @@ Required inputs for publish stage:
 
 - **Tag**: defaults to `v<version>` derived from `VERSION` file (e.g., `v0.15.0`)
 - **Tag target**: defaults to recorded version-bump commit (`release/state/version-bump.env`) and falls back to `HEAD`
-- **Notes file**: defaults to `release/out/release-notes-final.md`
+- **Notes file**: defaults to `release/notes/<version>.md` (for example `release/notes/0.88.0.md`)
 - **Plugin ZIP**: defaults to `release/out/plugin-idea-2025.3.zip`
 - `gh` CLI must be installed and authenticated (`gh auth status`)
 - Notes file and ZIP file must exist before publish stage starts

@@ -12,6 +12,7 @@ STABLE_PRODUCT="${RELEASE_STABLE_PRODUCT:-idea}"
 STABLE_VERSION="${RELEASE_STABLE_VERSION:-2025.3}"
 EAP_PRODUCT="${RELEASE_EAP_PRODUCT:-idea}"
 EAP_VERSION="${RELEASE_EAP_VERSION:-2026.1}"
+RELEASE_NOTES_VERSION="${RELEASE_NOTES_VERSION:-$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")}"
 
 GRADLE_COMMON=(./gradlew --no-daemon --stacktrace)
 
@@ -43,8 +44,10 @@ select_single_distribution_zip() {
 echo "== Stage 1: stable build (product=$STABLE_PRODUCT version=$STABLE_VERSION) =="
 "${GRADLE_COMMON[@]}" \
   clean build buildPlugin \
+  -Pmcp.release.build=true \
   -Pmcp.platform.product="$STABLE_PRODUCT" \
-  -Pmcp.platform.version="$STABLE_VERSION"
+  -Pmcp.platform.version="$STABLE_VERSION" \
+  -Pmcp.release.notes.version="$RELEASE_NOTES_VERSION"
 
 stable_zip="$(select_single_distribution_zip)"
 
@@ -55,16 +58,22 @@ echo "Stable plugin ZIP saved: $stable_copy"
 echo "== Stage 2: EAP build (product=$EAP_PRODUCT version=$EAP_VERSION) =="
 "${GRADLE_COMMON[@]}" \
   clean build buildPlugin \
+  -Pmcp.release.build=true \
   -Pmcp.platform.product="$EAP_PRODUCT" \
-  -Pmcp.platform.version="$EAP_VERSION"
+  -Pmcp.platform.version="$EAP_VERSION" \
+  -Pmcp.release.notes.version="$RELEASE_NOTES_VERSION"
 
 echo "== Stage 3: selected integration matrix [IDEA,PyCharm] x [stable,EAP] =="
-"${GRADLE_COMMON[@]}" :test-integration:testReleaseSmokeMatrix
+"${GRADLE_COMMON[@]}" \
+  -Pmcp.release.build=true \
+  :test-integration:testReleaseSmokeMatrix
 
 cat > "$OUT_DIR/build-summary.txt" <<EOF
 stable_product=$STABLE_PRODUCT
 stable_version=$STABLE_VERSION
 stable_plugin_zip=$stable_copy
+release_notes_version=$RELEASE_NOTES_VERSION
+release_build_version_format=version+gitHash_no_snapshot
 eap_product=$EAP_PRODUCT
 eap_version=$EAP_VERSION
 integration_matrix_task=:test-integration:testReleaseSmokeMatrix

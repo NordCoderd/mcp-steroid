@@ -17,7 +17,7 @@ RELEASE_STABLE_PRODUCT="${RELEASE_STABLE_PRODUCT:-idea}"
 RELEASE_STABLE_VERSION="${RELEASE_STABLE_VERSION:-2025.3}"
 RELEASE_EAP_PRODUCT="${RELEASE_EAP_PRODUCT:-idea}"
 RELEASE_EAP_VERSION="${RELEASE_EAP_VERSION:-2026.1}"
-RELEASE_NOTES_FILE="${RELEASE_NOTES_FILE:-$ROOT_DIR/release/out/release-notes-final.md}"
+RELEASE_NOTES_FILE="${RELEASE_NOTES_FILE:-}"
 RELEASE_ZIP_FILE="${RELEASE_ZIP_FILE:-$ROOT_DIR/release/out/plugin-${RELEASE_STABLE_PRODUCT}-${RELEASE_STABLE_VERSION}.zip}"
 RELEASE_TAG="${RELEASE_TAG:-}"
 RELEASE_TARGET=""
@@ -93,6 +93,13 @@ check_publish_prerequisites() {
   fi
 }
 
+resolve_release_notes_file() {
+  if [[ -z "$RELEASE_NOTES_FILE" ]]; then
+    RELEASE_NOTES_FILE="$ROOT_DIR/release/notes/$VERSION.md"
+  fi
+  mkdir -p "$(dirname "$RELEASE_NOTES_FILE")"
+}
+
 check_agent_runner_prerequisites() {
   if [[ "$RUN_NOTES" != "1" && "$RUN_WEBSITE" != "1" ]]; then
     return 0
@@ -125,6 +132,66 @@ check_release_not_exists() {
     echo "Refusing to overwrite. Use gh release edit/upload manually for recovery." >&2
     exit 1
   fi
+}
+
+run_release_notes_agents() {
+  local collect_prompt_template="$ROOT_DIR/release/prompts/release-notes-collect.md"
+  local review_prompt_template="$ROOT_DIR/release/prompts/release-notes-review.md"
+  local collect_prompt
+  local review_prompt
+
+  collect_prompt="$(mktemp "/tmp/release-notes-collect.${VERSION}.XXXXXX.md")"
+  review_prompt="$(mktemp "/tmp/release-notes-review.${VERSION}.XXXXXX.md")"
+
+  cat > "$collect_prompt" <<EOF
+Release context:
+- target version: $VERSION
+- release notes file: $RELEASE_NOTES_FILE
+- repository root: $ROOT_DIR
+
+$(cat "$collect_prompt_template")
+EOF
+
+  cat > "$review_prompt" <<EOF
+Release context:
+- target version: $VERSION
+- release notes file: $RELEASE_NOTES_FILE
+- repository root: $ROOT_DIR
+
+$(cat "$review_prompt_template")
+EOF
+
+  "$RUN_AGENT_SCRIPT" codex \
+    "$ROOT_DIR" \
+    "$collect_prompt"
+
+  "$RUN_AGENT_SCRIPT" codex \
+    "$ROOT_DIR" \
+    "$review_prompt"
+
+  rm -f "$collect_prompt" "$review_prompt"
+}
+
+commit_release_notes_if_needed() {
+  if [[ "$RUN_NOTES" != "1" ]]; then
+    return 0
+  fi
+  if [[ ! -f "$RELEASE_NOTES_FILE" ]]; then
+    echo "Release notes file was not created: $RELEASE_NOTES_FILE" >&2
+    exit 1
+  fi
+  if [[ "$DRY_RUN" == "1" ]]; then
+    echo "[DRY-RUN] Release notes commit skipped."
+    return 0
+  fi
+
+  git add -- "$RELEASE_NOTES_FILE"
+  if git diff --cached --quiet -- "$RELEASE_NOTES_FILE"; then
+    echo "Release notes unchanged, commit skipped."
+    return 0
+  fi
+
+  git commit -m "release: add notes for $VERSION"
 }
 
 validate_publish_inputs() {
@@ -207,6 +274,7 @@ validate_version_file
 if [[ -z "$RELEASE_TAG" ]]; then
   RELEASE_TAG="v$VERSION"
 fi
+resolve_release_notes_file
 
 load_release_target
 check_release_not_exists
@@ -228,22 +296,18 @@ echo "  release_target=$RELEASE_TARGET"
 echo "  release_notes_file=$RELEASE_NOTES_FILE"
 echo "  release_zip_file=$RELEASE_ZIP_FILE"
 
+if [[ "$RUN_NOTES" == "1" ]]; then
+  run_release_notes_agents
+  commit_release_notes_if_needed
+fi
+
 if [[ "$RUN_BUILD" == "1" ]]; then
   RELEASE_STABLE_PRODUCT="$RELEASE_STABLE_PRODUCT" \
     RELEASE_STABLE_VERSION="$RELEASE_STABLE_VERSION" \
     RELEASE_EAP_PRODUCT="$RELEASE_EAP_PRODUCT" \
     RELEASE_EAP_VERSION="$RELEASE_EAP_VERSION" \
+    RELEASE_NOTES_VERSION="$VERSION" \
     release/scripts/run-builder.sh bash release/scripts/run-release-build-matrix.sh
-fi
-
-if [[ "$RUN_NOTES" == "1" ]]; then
-  "$RUN_AGENT_SCRIPT" codex \
-    /Users/jonnyzzz/Work/mcp-steroid \
-    /Users/jonnyzzz/Work/mcp-steroid/release/prompts/release-notes-collect.md
-
-  "$RUN_AGENT_SCRIPT" codex \
-    /Users/jonnyzzz/Work/mcp-steroid \
-    /Users/jonnyzzz/Work/mcp-steroid/release/prompts/release-notes-review.md
 fi
 
 if [[ "$RUN_PUBLISH" == "1" ]]; then
