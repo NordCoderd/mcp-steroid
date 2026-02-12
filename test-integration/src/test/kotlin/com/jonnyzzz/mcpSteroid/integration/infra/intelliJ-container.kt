@@ -41,19 +41,23 @@ class IntelliJContainer(
      */
     fun waitForProjectReady() : IntelliJContainer {
         console.writeStep(0, "Waiting for project import and indexing...")
+        val guestProjectDir = intellijDriver.getGuestProjectDir()
         waitFor(600_000, "Project import and indexing") {
-            val result = mcpSteroid.mcpExecuteCode(
-                code = """
-                    import com.intellij.openapi.project.DumbService
+            val windows = mcpSteroid.mcpListWindows()
+            val projectWindows = windows.filter { it.projectPath == guestProjectDir || it.projectName != null }
 
-                    val isDumb = DumbService.getInstance(project).isDumb
-                    println("dumb=${'$'}isDumb")
-                    if (isDumb) error("Still indexing")
-                """.trimIndent(),
-                taskId = "wait-project-ready",
-                reason = "Wait for project import and indexing to complete",
-            )
-            result.exitCode == 0
+            if (projectWindows.isEmpty()) {
+                return@waitFor false
+            }
+
+            val modalDialogPresent = projectWindows.any { it.modalDialogShowing }
+            if (modalDialogPresent) {
+                return@waitFor false
+            }
+
+            projectWindows.any { window ->
+                window.projectInitialized == true && window.indexingInProgress == false
+            }
         }
         console.writeSuccess("Project import and indexing complete")
         return this
@@ -61,4 +65,3 @@ class IntelliJContainer(
 
     companion object
 }
-

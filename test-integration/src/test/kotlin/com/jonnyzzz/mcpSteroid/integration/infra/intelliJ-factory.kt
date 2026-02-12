@@ -16,6 +16,14 @@ fun IntelliJContainer.Companion.create(
     project : IntelliJProject = IntelliJProject.TestProject,
     layoutManager : LayoutManager = HorizontalLayoutManager(),
 ): IntelliJContainer {
+    val ideProduct = IdeProduct.fromSystemProperty(IdeTestFolders.ideProduct)
+    val selectedDockerBase = if (dockerFileBase == "ide-agent") ideProduct.dockerImageBase else dockerFileBase
+    val selectedProject = if (project == IntelliJProject.TestProject && ideProduct == IdeProduct.PyCharm) {
+        IntelliJProject.PyCharmTestProject
+    } else {
+        project
+    }
+
     val (runDir, realConsoleTitle) = run {
         val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
         val runIdName = consoleTitle.split(" ").joinToString("-") { it.lowercase() }
@@ -25,8 +33,8 @@ fun IntelliJContainer.Companion.create(
     }
 
     println("[IDE-AGENT] Run directory: $runDir")
-    val imageName = "$dockerFileBase-test"
-    val scope = buildIdeImage(dockerFileBase, imageName)
+    val imageName = "$selectedDockerBase-test"
+    val scope = buildIdeImage(selectedDockerBase, imageName)
 
     val containerMountedPath = "/mcp-run-dir"
 
@@ -65,7 +73,7 @@ fun IntelliJContainer.Companion.create(
     val consoleDriver = XcvbConsoleDriver(lifetime, container, windowsDriver)
     val console = consoleDriver.createConsoleDriver(container, realConsoleTitle, windowsLayout.layoutStatusConsoleWindow())
 
-    console.writeInfo("Preparing IntelliJ IDEA...")
+    console.writeInfo("Preparing ${ideProduct.displayName}...")
 
     val inputDriver = XcvbInputDriver(container)
     val skillDriver = XcvbSkillDriver(lifetime, container)
@@ -74,21 +82,22 @@ fun IntelliJContainer.Companion.create(
         lifetime,
         container,
         "$containerMountedPath/intellij",
+        ideProduct,
     )
     console.writeInfo("Deploying MCP Steroid plugin...")
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
 
 
     val ijProjectDriver = IntelliJProjectDriver(lifetime, container, ijDriver, console)
-    ijProjectDriver.deployProject(project)
+    ijProjectDriver.deployProject(selectedProject)
 
-    console.writeInfo("Starting IntelliJ IDEA...")
+    console.writeInfo("Starting ${ideProduct.displayName}...")
     val ijProcess = ijDriver.startIde()
-    console.writeSuccess("IntelliJ IDEA process started")
+    console.writeSuccess("${ideProduct.displayName} process started")
 
-    require(ijProcess.isRunning()) { "IntelliJ IDEA process finished" }
+    require(ijProcess.isRunning()) { "${ideProduct.displayName} process finished" }
 
-    val ijWindowInfo = waitForValue(5_000, "Waiting for IntelliJ IDEA window") {
+    val ijWindowInfo = waitForValue(5_000, "Waiting for ${ideProduct.displayName} window") {
         windowsDriver
             .listWindows()
             .filter { it.pid == ijProcess.pid }

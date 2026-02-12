@@ -2,7 +2,7 @@ FROM mcp-steroid-ide-base-test
 
 USER root
 
-# Copy and extract IntelliJ IDEA archive (pre-downloaded by Gradle)
+# Copy and extract PyCharm archive (pre-downloaded by Gradle)
 COPY ide.tar.gz /tmp/ide.tar.gz
 RUN mkdir -p /opt/idea && chmod a+rwx /opt && \
     tar -xzf /tmp/ide.tar.gz -C /opt/idea --strip-components=1 && \

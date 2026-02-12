@@ -21,6 +21,14 @@ data class McpProjectInfo(
     val path: String,
 )
 
+data class McpWindowInfo(
+    val projectName: String?,
+    val projectPath: String?,
+    val modalDialogShowing: Boolean,
+    val indexingInProgress: Boolean?,
+    val projectInitialized: Boolean?,
+)
+
 class McpSteroidDriver(
     private val driver: ContainerDriver,
     private val ijDriver: IntelliJDriver,
@@ -121,6 +129,48 @@ class McpSteroidDriver(
         val projects = mcpListProjects()
         return projects.singleOrNull { it.path == guestProjectDir }?.name
             ?: error("No project found for path $guestProjectDir. Available: ${projects.map { "${it.name} -> ${it.path}" }}")
+    }
+
+    /**
+     * List all open IDE windows with project/indexing/modal status.
+     */
+    fun mcpListWindows(): List<McpWindowInfo> {
+        val sessionId = mcpInitialize()
+
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 2)
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_list_windows")
+                putJsonObject("arguments") { }
+            }
+        }.toString()
+
+        val run = executeMcpRequest(sessionId, request)
+        val data = json.parseToJsonElement(run)
+
+        val text = data.jsonObject["result"]
+            ?.jsonObject?.get("content")
+            ?.jsonArray?.firstOrNull()
+            ?.jsonObject?.get("text")
+            ?.jsonPrimitive?.contentOrNull
+            ?: error("steroid_list_windows returned no content: $run")
+
+        val response = json.parseToJsonElement(text)
+        return response.jsonObject["windows"]
+            ?.jsonArray
+            ?.map {
+                val window = it.jsonObject
+                McpWindowInfo(
+                    projectName = window["projectName"]?.jsonPrimitive?.contentOrNull,
+                    projectPath = window["projectPath"]?.jsonPrimitive?.contentOrNull,
+                    modalDialogShowing = window["modalDialogShowing"]?.jsonPrimitive?.booleanOrNull ?: false,
+                    indexingInProgress = window["indexingInProgress"]?.jsonPrimitive?.booleanOrNull,
+                    projectInitialized = window["projectInitialized"]?.jsonPrimitive?.booleanOrNull,
+                )
+            }
+            ?: error("steroid_list_windows returned no windows payload: $text")
     }
 
     /**

@@ -19,6 +19,7 @@ class IntelliJDriver(
     private val lifetime: CloseableStack,
     private val driver: ContainerDriver,
     private val guestDir: String,
+    private val ideProduct: IdeProduct,
 ) {
     private val intelliJGuestHomeDir = "/opt/idea"
     private val projectGuestDir = "$guestDir/project-home"
@@ -53,9 +54,11 @@ class IntelliJDriver(
         writeTrustedPaths()
         generateVmOptions()
 
-        println("[IDE-AGENT] Starting IntelliJ IDEA...")
+        println("[IDE-AGENT] Starting ${ideProduct.displayName}...")
+        val launcherPath = "$intelliJGuestHomeDir/bin/${ideProduct.launcherScript}"
+        driver.runInContainer(listOf("ls", "-la", "$intelliJGuestHomeDir/bin"))
         val idea = driver.runInContainerDetached(
-            listOf("/opt/idea/bin/idea.sh", projectGuestDir),
+            listOf(launcherPath, "nosplash", projectGuestDir),
         )
 
         try {
@@ -66,9 +69,9 @@ class IntelliJDriver(
             idea.printProcessInfo()
 
             if (!idea.isRunning()) {
-                throw RuntimeException("IntelliJ IDEA Exited Unexpectedly with code ${idea.exitCode}. See logs above for details.")
+                throw RuntimeException("${ideProduct.displayName} exited unexpectedly with code ${idea.exitCode}. See logs above for details.")
             } else {
-                throw RuntimeException("Problem reading IntelliJ IDEA", t)
+                throw RuntimeException("Problem reading ${ideProduct.displayName} logs", t)
             }
         }
 
@@ -123,6 +126,7 @@ class IntelliJDriver(
             appendLine("-Dwriterside.eula.reviewed.and.accepted=true")
             appendLine("-Didea.initially.ask.config=never")
             appendLine("-Dide.newUsersOnboarding=false")
+            appendLine("-Dnosplash=true")
             appendLine()
             appendLine("# Suppress telemetry and update checks")
             appendLine("-Didea.suppress.statistics.report=true")

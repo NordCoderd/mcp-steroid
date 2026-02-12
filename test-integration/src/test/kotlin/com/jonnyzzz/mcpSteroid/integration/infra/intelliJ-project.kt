@@ -10,6 +10,7 @@ sealed class IntelliJProject{
     abstract fun IntelliJProjectDriver.deploy()
 
     object TestProject : ProjectFromRepository("test-project")
+    object PyCharmTestProject : ProjectFromRepository("test-project-pycharm")
 
     object KeycloakProject : ProjectFromRemoteGit("https://github.com/keycloak/keycloak.git")
 
