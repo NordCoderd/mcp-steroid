@@ -1,0 +1,13 @@
+.git
+.idea
+.gradle
+.gradle-local
+.gradle-tmp
+.gradle-user-home
+.intellijPlatform
+build
+**/build
+runs
+release/out
+release/state
+scripts/__pycache__
