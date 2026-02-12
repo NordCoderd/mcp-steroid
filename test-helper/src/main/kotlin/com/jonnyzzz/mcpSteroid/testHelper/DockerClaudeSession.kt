@@ -71,8 +71,8 @@ class DockerClaudeSession(
      * the final text response appearing at the end). The raw NDJSON output is
      * post-processed to extract the final result text for test assertions.
      *
-     * Flags align with run-agent.sh:
-     * `claude -p --input-format text --output-format stream-json --verbose --tools default --permission-mode bypassPermissions`
+     * Claude CLI flags for progress visibility:
+     * `claude -p --permission-mode bypassPermissions --tools default --input-format text --output-format stream-json --verbose`
      *
      * @param prompt The prompt to send to Claude
      * @param timeoutSeconds Maximum time to wait for the command
@@ -132,11 +132,12 @@ class DockerClaudeSession(
         /**
          * Extract the final result text from Claude's stream-json NDJSON output.
          *
-         * Scans NDJSON lines for events with `"type":"result"` and extracts the
-         * `"result"` field from the last such event.
+         * Scans all NDJSON event lines and extracts the final text from the last
+         * `"type":"result"` event.
          *
-         * Also collects all `content_block_delta` text_delta fragments as a
-         * secondary fallback in case the result event is missing (e.g., timeout).
+         * Also collects `content_block_delta`/`text_delta` fragments from streaming
+         * progress events as a secondary fallback in case the result event is missing
+         * (for example, a timeout).
          *
          * Falls back to the raw output if no structured data can be extracted.
          */
