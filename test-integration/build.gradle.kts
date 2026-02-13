@@ -252,6 +252,9 @@ val downloadIdea by tasks.registering(Download::class) {
     src(stableIdeaArchiveProvider.map { it.url })
     dest(ideDownloadDir.map { it.file(stableIdeaArchiveProvider.get().fileName) })
     onlyIfModified(true)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
 }
 
 val downloadIdeaEap by tasks.registering(Download::class) {
@@ -260,6 +263,9 @@ val downloadIdeaEap by tasks.registering(Download::class) {
     src(ideaEapArchiveProvider.map { it.url })
     dest(ideDownloadDir.map { it.file(ideaEapArchiveProvider.get().fileName) })
     onlyIfModified(true)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
 }
 
 val downloadPyCharm by tasks.registering(Download::class) {
@@ -268,6 +274,9 @@ val downloadPyCharm by tasks.registering(Download::class) {
     src(stablePyCharmArchiveProvider.map { it.url })
     dest(ideDownloadDir.map { it.file(stablePyCharmArchiveProvider.get().fileName) })
     onlyIfModified(true)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
 }
 
 val downloadPyCharmEap by tasks.registering(Download::class) {
@@ -276,6 +285,9 @@ val downloadPyCharmEap by tasks.registering(Download::class) {
     src(pyCharmEapArchiveProvider.map { it.url })
     dest(ideDownloadDir.map { it.file(pyCharmEapArchiveProvider.get().fileName) })
     onlyIfModified(true)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
 }
 
 val integrationTestSourceSet = extensions.getByType<SourceSetContainer>().named("test")

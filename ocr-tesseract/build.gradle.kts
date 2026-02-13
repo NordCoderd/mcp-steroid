@@ -41,6 +41,16 @@ kotlin {
 // Tessdata download configuration
 val tessdataDownloadDir = layout.buildDirectory.dir("tessdata-download")
 val tessdataDir = layout.buildDirectory.dir("tessdata-data")
+val downloadConnectTimeoutMs = 30_000
+val downloadReadTimeoutMs = 15 * 60_000
+val downloadRetryCount = 5
+
+fun Download.configureReliableDownload() {
+    onlyIfModified(true)
+    connectTimeout(downloadConnectTimeoutMs)
+    readTimeout(downloadReadTimeoutMs)
+    retries(downloadRetryCount)
+}
 
 // Download tessdata files
 val downloadTessdata by tasks.registering {
@@ -54,7 +64,7 @@ listOf(
     val task = tasks.register<Download>("download_" + url.substringAfterLast("/").substringBefore(".")) {
         src(url)
         dest(tessdataDownloadDir)
-        onlyIfModified(true)
+        configureReliableDownload()
     }
     downloadTessdata.configure { dependsOn(task) }
 }
