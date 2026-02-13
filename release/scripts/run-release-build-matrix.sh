@@ -14,7 +14,7 @@ EAP_PRODUCT="${RELEASE_EAP_PRODUCT:-idea}"
 EAP_VERSION="${RELEASE_EAP_VERSION:-2026.1}"
 RELEASE_NOTES_VERSION="${RELEASE_NOTES_VERSION:-$(tr -d '[:space:]' < "$ROOT_DIR/VERSION")}"
 
-GRADLE_COMMON=(./gradlew --no-daemon --stacktrace)
+GRADLE_COMMON=(./gradlew --no-daemon --stacktrace --console=plain)
 
 select_single_distribution_zip() {
   local dist_dir="$ROOT_DIR/build/distributions"
