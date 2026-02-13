@@ -55,43 +55,57 @@ class IntelliJDriver(
         generateVmOptions()
 
         println("[IDE-AGENT] Starting ${ideProduct.displayName}...")
-        val launcherPath = "$intelliJGuestHomeDir/bin/${ideProduct.launcherScript}"
+        val launcherPath = "$intelliJGuestHomeDir/bin/${ideProduct.launcherExecutable}"
         driver.runInContainer(listOf("ls", "-la", "$intelliJGuestHomeDir/bin"))
+        driver.runInContainer(
+            listOf("test", "-x", launcherPath),
+            timeoutSeconds = 5,
+            quietly = true,
+        ).assertExitCode(0)
+
         val idea = driver.runInContainerDetached(
-            listOf(launcherPath, "nosplash", projectGuestDir),
+            listOf(launcherPath, projectGuestDir),
         )
 
-        try {
-            waitFor(10_000L) {
-                readLogs().size > 20
+        val logFile = ideaLogsFile()
+        val logsReady = try {
+            waitFor(60_000L, "for ${ideProduct.displayName} log file") {
+                !idea.isRunning() || (logFile.exists() && logFile.length() > 0L)
             }
-        } catch (t: Throwable) {
-            idea.printProcessInfo()
-
-            if (!idea.isRunning()) {
-                throw RuntimeException("${ideProduct.displayName} exited unexpectedly with code ${idea.exitCode}. See logs above for details.")
-            } else {
-                throw RuntimeException("Problem reading ${ideProduct.displayName} logs", t)
-            }
+            logFile.exists() && logFile.length() > 0L
+        } catch (_: Throwable) {
+            false
         }
 
-        val ijLogsStream = thread(isDaemon = true, name = "ijLogsStream") {
-            runCatching {
-                ideaLogsFile().bufferedReader().use { reader ->
-                    while (true) {
-                        val line = reader.readLine()
-                        if (line == null) {
-                            Thread.sleep(100)
-                            continue
+        if (!idea.isRunning()) {
+            idea.printProcessInfo()
+            throw RuntimeException("${ideProduct.displayName} exited unexpectedly with code ${idea.exitCode}. See logs above for details.")
+        }
+
+        if (!logsReady) {
+            println(
+                "[IDE-AGENT] ${ideProduct.displayName} log file is not available yet at ${logFile.absolutePath}. " +
+                        "Continuing startup and relying on window/MCP readiness checks."
+            )
+        } else {
+            val ijLogsStream = thread(isDaemon = true, name = "ijLogsStream") {
+                runCatching {
+                    logFile.bufferedReader().use { reader ->
+                        while (true) {
+                            val line = reader.readLine()
+                            if (line == null) {
+                                Thread.sleep(100)
+                                continue
+                            }
+                            println("[IntelliJ LOG] $line")
                         }
-                        println("[IntelliJ LOG] $line")
                     }
                 }
             }
-        }
 
-        lifetime.registerCleanupAction {
-            ijLogsStream.interrupt()
+            lifetime.registerCleanupAction {
+                ijLogsStream.interrupt()
+            }
         }
 
         return idea

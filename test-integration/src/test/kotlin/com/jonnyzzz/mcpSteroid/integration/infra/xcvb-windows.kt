@@ -75,7 +75,7 @@ class XcvbWindowDriver(
                 val y = parts[2].toIntOrNull() ?: return@mapNotNull null
                 val width = parts[3].toIntOrNull() ?: return@mapNotNull null
                 val height = parts[4].toIntOrNull() ?: return@mapNotNull null
-                val pid = parts[5].toLongOrNull()
+                val pid = parts[5].toLongOrNull()?.takeIf { it > 0 }
                 val title = parts[6]
 
                 WindowInfo(id, title, WindowRect(x, y, width, height), pid)

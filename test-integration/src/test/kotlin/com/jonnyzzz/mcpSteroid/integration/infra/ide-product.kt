@@ -4,19 +4,19 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 enum class IdeProduct(
     val id: String,
     val dockerImageBase: String,
-    val launcherScript: String,
+    val launcherExecutable: String,
     val displayName: String,
 ) {
     IntelliJIdea(
         id = "idea",
         dockerImageBase = "ide-agent",
-        launcherScript = "idea.sh",
+        launcherExecutable = "idea",
         displayName = "IntelliJ IDEA",
     ),
     PyCharm(
         id = "pycharm",
         dockerImageBase = "pycharm-agent",
-        launcherScript = "pycharm.sh",
+        launcherExecutable = "pycharm",
         displayName = "PyCharm",
     );
 

@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
@@ -97,13 +98,37 @@ fun IntelliJContainer.Companion.create(
 
     require(ijProcess.isRunning()) { "${ideProduct.displayName} process finished" }
 
-    val ijWindowInfo = waitForValue(5_000, "Waiting for ${ideProduct.displayName} window") {
-        windowsDriver
-            .listWindows()
-            .filter { it.pid == ijProcess.pid }
-            //IntelliJ will show multiple windows, and we need to wait for the project window here
-            //we need to filter the banner in start
-            .singleOrNull { it.rect.height > 800 }
+    var trackedPids = setOf(ijProcess.pid)
+    var lastPidRefreshAt = 0L
+    var lastWindows = emptyList<WindowInfo>()
+    val ijWindowInfo = try {
+        waitForValue(30_000, "Waiting for ${ideProduct.displayName} window") {
+            val now = System.currentTimeMillis()
+            if (now - lastPidRefreshAt >= 1_000) {
+                trackedPids = discoverProcessFamilyPids(container, ijProcess.pid)
+                lastPidRefreshAt = now
+            }
+
+            lastWindows = windowsDriver.listWindows()
+            pickIdeWindow(lastWindows, trackedPids, realConsoleTitle)
+        }
+    } catch (t: RuntimeException) {
+        val windowsSnapshot = lastWindows.joinToString(separator = "\n") { info ->
+            "id=${info.id} pid=${info.pid} rect=${info.rect.width}x${info.rect.height}+${info.rect.x}+${info.rect.y} title='${info.title}'"
+        }
+        throw RuntimeException(
+            buildString {
+                append("Failed waiting for ${ideProduct.displayName} window.")
+                append(" trackedPids=${trackedPids.sorted()}")
+                if (windowsSnapshot.isNotEmpty()) {
+                    appendLine()
+                    append("Visible windows:")
+                    appendLine()
+                    append(windowsSnapshot)
+                }
+            },
+            t,
+        )
     }
 
     windowsDriver.updateLayout(ijWindowInfo, windowsLayout.layoutIntelliJWindow())
@@ -157,4 +182,65 @@ fun IntelliJContainer.Companion.create(
 
     println("[IDE-AGENT] Session ready: $runDir")
     return session
+}
+
+private fun pickIdeWindow(
+    windows: List<WindowInfo>,
+    candidatePids: Set<Long>,
+    consoleTitle: String,
+): WindowInfo? {
+    val sizableWindows = windows
+        .asSequence()
+        .filter { it.rect.width > 300 && it.rect.height > 300 }
+        .filter { it.pid != null }
+        .filter { it.title.isNotBlank() }
+        .filterNot { it.title.equals("Desktop", ignoreCase = true) }
+        .toList()
+    if (sizableWindows.isEmpty()) return null
+
+    val byProcessFamily = sizableWindows.filter { window ->
+        val pid = window.pid ?: return@filter false
+        pid in candidatePids
+    }
+    if (byProcessFamily.isNotEmpty()) {
+        return byProcessFamily.maxByOrNull { it.rect.width * it.rect.height }
+    }
+
+    return sizableWindows
+        .asSequence()
+        .filterNot { it.title.contains(consoleTitle, ignoreCase = true) }
+        .maxByOrNull { it.rect.width * it.rect.height }
+}
+
+private fun discoverProcessFamilyPids(container: ContainerDriver, rootPid: Long): Set<Long> {
+    val processMap = container.runInContainer(
+        listOf("bash", "-c", "ps -eo pid=,ppid="),
+        timeoutSeconds = 5,
+        quietly = true,
+    )
+    if (processMap.exitCode != 0) return setOf(rootPid)
+
+    val childrenByParent = mutableMapOf<Long, MutableList<Long>>()
+    processMap.output.lineSequence().forEach { line ->
+        val parts = line.trim().split(Regex("\\s+"))
+        if (parts.size != 2) return@forEach
+        val pid = parts[0].toLongOrNull() ?: return@forEach
+        val ppid = parts[1].toLongOrNull() ?: return@forEach
+        childrenByParent.getOrPut(ppid) { mutableListOf() }.add(pid)
+    }
+
+    val discovered = linkedSetOf(rootPid)
+    val queue = ArrayDeque<Long>()
+    queue.add(rootPid)
+
+    while (queue.isNotEmpty()) {
+        val current = queue.removeFirst()
+        for (child in childrenByParent[current].orEmpty()) {
+            if (discovered.add(child)) {
+                queue.add(child)
+            }
+        }
+    }
+
+    return discovered
 }

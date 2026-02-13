@@ -8,6 +8,10 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 class XcvbInputDriver(
     private val driver: ContainerDriver,
 ) {
+    private data class MouseLocation(
+        val x: Int,
+        val y: Int,
+    )
 
     private fun xdotool(vararg args: String): String {
         return driver
@@ -17,6 +21,28 @@ class XcvbInputDriver(
             )
             .assertExitCode(0, "[xcvb] xdotool ${args.joinToString(" ")} failed")
             .output.trim()
+    }
+
+    private fun getMouseLocationOrNull(): MouseLocation? {
+        val result = driver.runInContainer(
+            listOf("xdotool", "getmouselocation", "--shell"),
+            timeoutSeconds = 5,
+        )
+        if (result.exitCode != 0) return null
+
+        var x: Int? = null
+        var y: Int? = null
+        for (line in result.output.lineSequence()) {
+            val separator = line.indexOf('=')
+            if (separator < 0) continue
+
+            when (line.substring(0, separator)) {
+                "X" -> x = line.substring(separator + 1).toIntOrNull()
+                "Y" -> y = line.substring(separator + 1).toIntOrNull()
+            }
+        }
+
+        return if (x != null && y != null) MouseLocation(x, y) else null
     }
 
     /** Copy text to the X11 clipboard. */
@@ -41,18 +67,20 @@ class XcvbInputDriver(
 
     /** Move the mouse cursor to the given display coordinates. */
     fun mouseMove(x: Int, y: Int) {
+        val current = getMouseLocationOrNull()
+        if (current != null && current.x == x && current.y == y) return
         xdotool("mousemove", "--sync", x.toString(), y.toString())
     }
 
     /** Move the mouse to (x, y) and click the given button (1=left, 2=middle, 3=right). */
     fun mouseClick(x: Int, y: Int, button: Int = 1) {
-        xdotool("mousemove", "--sync", x.toString(), y.toString())
+        mouseMove(x, y)
         xdotool("click", button.toString())
     }
 
     /** Move the mouse to (x, y) and double-click. */
     fun mouseDoubleClick(x: Int, y: Int) {
-        xdotool("mousemove", "--sync", x.toString(), y.toString())
+        mouseMove(x, y)
         xdotool("click", "--repeat", "2", "1")
     }
 
