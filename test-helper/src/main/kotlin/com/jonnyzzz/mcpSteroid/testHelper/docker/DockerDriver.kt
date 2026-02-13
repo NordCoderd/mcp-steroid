@@ -133,6 +133,26 @@ class DockerDriver(
             ?: error("Failed to parse host port from: ${result.output}")
     }
 
+    /**
+     * Query bridge-network container IP (for example 172.17.x.x).
+     * Returns null when inspect output does not contain an address.
+     */
+    fun queryContainerIp(containerId: String): String? {
+        val result = processRunner.runProcess(
+            listOf("docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}", containerId),
+            description = "Query container IP",
+            workingDir = workDir,
+            timeoutSeconds = 5,
+            quietly = true,
+        )
+        if (result.exitCode != 0) return null
+
+        return result.output
+            .trim()
+            .split(Regex("\\s+"))
+            .firstOrNull { it.isNotBlank() }
+    }
+
     fun killContainer(containerId: String) {
         processRunner.runProcess(
             listOf("docker", "kill", containerId),
