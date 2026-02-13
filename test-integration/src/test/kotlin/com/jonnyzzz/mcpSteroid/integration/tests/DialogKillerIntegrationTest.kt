@@ -23,69 +23,72 @@ import java.util.concurrent.TimeUnit
  * Uses direct MCP HTTP calls (bypassing AI agents) for reliable testing.
  */
 class DialogKillerIntegrationTest {
+    private val testDialogTitle = "MCP Steroid Test Modal Dialog"
+
     private fun doTest(modeName: String, closeAction: (IntelliJContainer) -> Unit) = runWithCloseableStack { lifetime ->
         val session = IntelliJContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer")
         val console = session.console
 
         console.writeInfo("Mode: $modeName")
 
-        // Step 1: Open Settings dialog and leave it open (dialog killer disabled)
-        console.writeStep(1, "Opening Settings dialog")
+        // Step 1: Open a custom modal DialogWrapper and leave it open (dialog killer disabled)
+        console.writeStep(1, "Opening test modal dialog")
         session.mcpSteroid.mcpExecuteCode(
             code = """
                 // Disable modal cancellation so the dialog stays open after this execution
                 doNotCancelOnModalityStateChange()
 
-                val actionManager = com.intellij.openapi.actionSystem.ActionManager.getInstance()
-                val showSettingsAction = actionManager.getAction("ShowSettings")
-                    ?: error("ShowSettings action not found")
-
-                val dataContext = com.intellij.openapi.actionSystem.impl.SimpleDataContext.builder()
-                    .add(com.intellij.openapi.actionSystem.CommonDataKeys.PROJECT, project)
-                    .build()
-
-                // Open Settings dialog asynchronously so it doesn't block this execution
+                // Open test modal dialog asynchronously so it doesn't block this execution
                 withContext(kotlinx.coroutines.Dispatchers.EDT) {
-                    com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater {
-                        showSettingsAction.actionPerformed(
-                            com.intellij.openapi.actionSystem.AnActionEvent.createFromDataContext(
-                                "test", showSettingsAction.templatePresentation.clone(), dataContext
-                            )
-                        )
-                    }
+                    com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater({
+                        val dialog = object : com.intellij.openapi.ui.DialogWrapper(project) {
+                            init {
+                                title = "$testDialogTitle"
+                                setModal(true)
+                                init()
+                            }
+
+                            override fun createCenterPanel(): javax.swing.JComponent {
+                                val panel = javax.swing.JPanel()
+                                panel.add(javax.swing.JLabel("Dialog killer integration test"))
+                                return panel
+                            }
+                        }
+                        dialog.show()
+                    }, com.intellij.openapi.application.ModalityState.nonModal())
                 }
 
                 kotlinx.coroutines.delay(1000)
-                println("Settings dialog opened")
+                println("Test modal dialog opened")
             """.trimIndent(),
-            taskId = "open-settings",
-            reason = "Open Settings dialog",
+            taskId = "open-test-modal-dialog",
+            reason = "Open test modal dialog",
         ).assertExitCode(0)
 
-        // Step 2: Verify Settings dialog appeared via xcvb window list
-        console.writeStep(2, "Verifying Settings dialog is visible")
-        val settingsWindow = {
+        // Step 2: Verify test modal dialog appeared via xcvb window list
+        console.writeStep(2, "Verifying test modal dialog is visible")
+        val dialogWindow = {
             val idePid = session.pid
             val listWindows = session.windows.listWindows()
-            console.writeInfo("[TEST] Windows after opening Settings:")
+            console.writeInfo("[TEST] Windows after opening test modal dialog:")
             listWindows.filter { it.pid == idePid }.forEach { println("  $it") }
 
-            listWindows.find { it.title == "Settings" && it.pid == idePid }
+            listWindows.find { it.title == testDialogTitle && it.pid == idePid }
         }
 
 
-        Assertions.assertNotNull(settingsWindow(), "Settings dialog should be visible")
-        console.writeSuccess("Settings dialog visible")
+        Assertions.assertNotNull(dialogWindow(), "Test modal dialog should be visible")
+        console.writeSuccess("Test modal dialog visible")
 
         // Step 3: Execute the close action
         console.writeStep(3, "Running dialog killer ($modeName)")
         closeAction(session)
 
-        // Step 4: Verify Settings dialog is gone via xcvb window list
-        console.writeStep(4, "Verifying Settings dialog is gone")
+        // Step 4: Verify test modal dialog is gone via xcvb window list
+        console.writeStep(4, "Verifying test modal dialog is gone")
         console.writeInfo("[TEST] Windows after dialog killer:")
-        Assertions.assertNull(settingsWindow(), "Settings dialog should have been closed by dialog killer")
-        console.writeSuccess("Settings dialog closed")
+        Assertions.assertNull(dialogWindow(), "Test modal dialog should have been closed by dialog killer")
+        console.writeSuccess("Test modal dialog closed")
     }
 
     @Test
@@ -111,11 +114,11 @@ class DialogKillerIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `automatic dialog killer closes Settings dialog`() = doTest("automatic") { session ->
+    fun `automatic dialog killer closes test modal dialog`() = doTest("automatic") { session ->
         session.mcpSteroid.mcpExecuteCode(
             dialogKiller = true,
             code = """
-                println("Dialog killer should have closed the Settings dialog before this runs")
+                println("Dialog killer should have closed the test modal dialog before this runs")
             """.trimIndent(),
             taskId = "automatic-dialog-killer",
             reason = "Trigger automatic dialog killer via dialog_killer=true",
