@@ -8,9 +8,10 @@ import de.undercouch.gradle.tasks.download.Download
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.testing.Test
 import org.gradle.kotlin.dsl.provideDelegate
+import java.net.URI
 
 plugins {
-    kotlin("jvm") version "2.2.21"
+    kotlin("jvm") version "2.3.10"
     id("de.undercouch.download") version "5.6.0"
 }
 
@@ -151,11 +152,12 @@ fun stableArchive(
     overrideUrl: String?,
     overrideVersion: String?,
 ): ResolvedIdeArchive {
-    val fileName = if (isArmArch) "${product.id}-stable-arm.tar.gz" else "${product.id}-stable-x86.tar.gz"
+    val fallbackFileName = if (isArmArch) "${product.id}-stable-arm.tar.gz" else "${product.id}-stable-x86.tar.gz"
     val resolvedUrl = overrideUrl?.trim()?.takeIf { it.isNotEmpty() }
         ?: overrideVersion?.trim()?.takeIf { it.isNotEmpty() }?.let { archiveUrlForVersion(product, it, isArmArch) }
         ?: IdeaReleaseService.latestRelease(product.serviceProduct, IdeaReleaseChannel.STABLE).archiveUrl(isArmArch)
 
+    val fileName = archiveFileNameFromUrl(resolvedUrl, fallbackFileName)
     return ResolvedIdeArchive(url = resolvedUrl, fileName = fileName)
 }
 
@@ -164,12 +166,18 @@ fun eapArchive(
     overrideUrl: String?,
     overrideBuild: String?,
 ): ResolvedIdeArchive {
-    val fileName = if (isArmArch) "${product.id}-eap-arm.tar.gz" else "${product.id}-eap-x86.tar.gz"
+    val fallbackFileName = if (isArmArch) "${product.id}-eap-arm.tar.gz" else "${product.id}-eap-x86.tar.gz"
     val resolvedUrl = overrideUrl?.trim()?.takeIf { it.isNotEmpty() }
         ?: overrideBuild?.trim()?.takeIf { it.isNotEmpty() }?.let { archiveUrlForBuild(product, it, isArmArch) }
         ?: IdeaReleaseService.latestRelease(product.serviceProduct, IdeaReleaseChannel.EAP).archiveUrl(isArmArch)
 
+    val fileName = archiveFileNameFromUrl(resolvedUrl, fallbackFileName)
     return ResolvedIdeArchive(url = resolvedUrl, fileName = fileName)
+}
+
+fun archiveFileNameFromUrl(url: String, fallbackFileName: String): String {
+    val fileName = runCatching { URI(url).path.substringAfterLast('/') }.getOrNull()
+    return fileName?.takeIf { it.isNotBlank() } ?: fallbackFileName
 }
 
 val stableIdeaArchiveProvider = providers.provider {
@@ -345,6 +353,7 @@ fun Test.configureIntegrationTask(
 
 val ideaReleaseSmokeTests = listOf(
     "com.jonnyzzz.mcpSteroid.integration.tests.DialogKiller*",
+    "com.jonnyzzz.mcpSteroid.integration.tests.EapSmokeTest*",
     "com.jonnyzzz.mcpSteroid.integration.tests.IntelliJContainerTest*",
     "com.jonnyzzz.mcpSteroid.integration.tests.InfrastructureTest*",
     "com.jonnyzzz.mcpSteroid.integration.tests.WhatYouSeeTest*",
