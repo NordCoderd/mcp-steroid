@@ -9,7 +9,6 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager.getInstance
 import com.intellij.openapi.util.registry.Registry
-import com.jonnyzzz.mcpSteroid.execution.DialogKiller
 import com.jonnyzzz.mcpSteroid.execution.ExecutionManager
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem

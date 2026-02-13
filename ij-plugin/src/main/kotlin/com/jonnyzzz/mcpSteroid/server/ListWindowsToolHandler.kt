@@ -3,9 +3,11 @@ package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.ex.StatusBarEx
+import com.jonnyzzz.mcpSteroid.execution.dialogWindowsLookup
 import com.jonnyzzz.mcpSteroid.mcp.*
 import com.jonnyzzz.mcpSteroid.vision.WindowIdUtil
 import kotlinx.coroutines.Dispatchers
@@ -36,77 +38,80 @@ class ListWindowsToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(): ToolCallResult {
-        val (windowInfos, progressTasks) = withContext(Dispatchers.EDT) {
-            // Check if any modal dialog is showing in the IDE
-            // Compare current modality state with nonModal - if different, modal is showing
-            val isModalShowing = ModalityState.current() != ModalityState.nonModal()
+        // Use DialogWindowsLookup for reliable modal detection:
+        // fast negative path (canPumpEdtNonModal), then EDT check if needed.
+        val lookup = dialogWindowsLookup()
+        val (windowInfos, progressTasks) = lookup.withModalityCheck { isModalShowing ->
+            // Window enumeration runs on EDT with ModalityState.any() so it works
+            // even when a modal dialog is blocking the normal EDT dispatcher.
+            withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+                val frames = WindowManager.getInstance().allProjectFrames.toList()
 
-            val frames = WindowManager.getInstance().allProjectFrames.toList()
+                // Collect progress indicators from all frames
+                val allProgressTasks = mutableListOf<ProgressTaskInfo>()
 
-            // Collect progress indicators from all frames
-            val allProgressTasks = mutableListOf<ProgressTaskInfo>()
+                val frameInfos = frames.map { frame ->
+                    val project = frame.project
+                    val component = frame.component
+                    val window = SwingUtilities.getWindowAncestor(component)
+                    val bounds = window?.bounds
 
-            val frameInfos = frames.map { frame ->
-                val project = frame.project
-                val component = frame.component
-                val window = SwingUtilities.getWindowAncestor(component)
-                val bounds = window?.bounds
-
-                // Collect progress tasks from the status bar using new ProgressModel API
-                val statusBar = frame.statusBar as? StatusBarEx
-                statusBar?.let { bar ->
-                    val tasks = bar.backgroundProcessModels
-                    tasks.forEach { pair ->
-                        val taskInfo = pair.first
-                        val progressModel = pair.second
-                        allProgressTasks.add(
-                            ProgressTaskInfo(
-                                title = taskInfo.title,
-                                text = progressModel.getText() ?: "",
-                                text2 = progressModel.getDetails() ?: "",
-                                fraction = if (progressModel.isIndeterminate()) null else progressModel.getFraction(),
-                                isIndeterminate = progressModel.isIndeterminate(),
-                                isCancellable = progressModel.isCancellable(),
-                                projectName = project?.name
+                    // Collect progress tasks from the status bar using new ProgressModel API
+                    val statusBar = frame.statusBar as? StatusBarEx
+                    statusBar?.let { bar ->
+                        val tasks = bar.backgroundProcessModels
+                        tasks.forEach { pair ->
+                            val taskInfo = pair.first
+                            val progressModel = pair.second
+                            allProgressTasks.add(
+                                ProgressTaskInfo(
+                                    title = taskInfo.title,
+                                    text = progressModel.getText() ?: "",
+                                    text2 = progressModel.getDetails() ?: "",
+                                    fraction = if (progressModel.isIndeterminate()) null else progressModel.getFraction(),
+                                    isIndeterminate = progressModel.isIndeterminate(),
+                                    isCancellable = progressModel.isCancellable(),
+                                    projectName = project?.name
+                                )
                             )
-                        )
+                        }
                     }
-                }
 
-                WindowInfo(
-                    projectName = project?.name,
-                    projectPath = project?.basePath,
-                    title = (window as? java.awt.Frame)?.title,
-                    isActive = window?.isActive ?: false,
-                    isVisible = window?.isVisible ?: false,
-                    bounds = bounds?.let { WindowBounds(it.x, it.y, it.width, it.height) },
-                    windowId = WindowIdUtil.compute(window, component),
-                    modalDialogShowing = isModalShowing,
-                    indexingInProgress = project?.let { DumbService.isDumb(it) },
-                    projectInitialized = project?.isInitialized,
-                )
-            }
-
-            val knownWindowIds = frameInfos.map { it.windowId }.toMutableSet()
-            val extraInfos = java.awt.Window.getWindows()
-                .filter { it.isDisplayable }
-                .mapNotNull { window ->
-                    val windowId = WindowIdUtil.compute(window, window)
-                    if (!knownWindowIds.add(windowId)) return@mapNotNull null
-                    val bounds = window.bounds
                     WindowInfo(
-                        projectName = null,
-                        projectPath = null,
+                        projectName = project?.name,
+                        projectPath = project?.basePath,
                         title = (window as? java.awt.Frame)?.title,
-                        isActive = window.isActive,
-                        isVisible = window.isVisible,
-                        bounds = WindowBounds(bounds.x, bounds.y, bounds.width, bounds.height),
-                        windowId = windowId,
+                        isActive = window?.isActive ?: false,
+                        isVisible = window?.isVisible ?: false,
+                        bounds = bounds?.let { WindowBounds(it.x, it.y, it.width, it.height) },
+                        windowId = WindowIdUtil.compute(window, component),
                         modalDialogShowing = isModalShowing,
+                        indexingInProgress = project?.let { DumbService.isDumb(it) },
+                        projectInitialized = project?.isInitialized,
                     )
                 }
 
-            (frameInfos + extraInfos) to allProgressTasks.toList()
+                val knownWindowIds = frameInfos.map { it.windowId }.toMutableSet()
+                val extraInfos = java.awt.Window.getWindows()
+                    .filter { it.isDisplayable }
+                    .mapNotNull { window ->
+                        val windowId = WindowIdUtil.compute(window, window)
+                        if (!knownWindowIds.add(windowId)) return@mapNotNull null
+                        val bounds = window.bounds
+                        WindowInfo(
+                            projectName = null,
+                            projectPath = null,
+                            title = (window as? java.awt.Frame)?.title,
+                            isActive = window.isActive,
+                            isVisible = window.isVisible,
+                            bounds = WindowBounds(bounds.x, bounds.y, bounds.width, bounds.height),
+                            windowId = windowId,
+                            modalDialogShowing = isModalShowing,
+                        )
+                    }
+
+                (frameInfos + extraInfos) to allProgressTasks.toList()
+            }
         }
 
         val response = ListWindowsResponse(

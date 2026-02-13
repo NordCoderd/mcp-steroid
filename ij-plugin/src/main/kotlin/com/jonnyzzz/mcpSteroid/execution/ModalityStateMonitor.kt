@@ -21,6 +21,7 @@ data class ModalDialogInfo(
     val modalEntity: Any,
     val screenshotBase64: String? = null,
     val screenshotError: String? = null,
+    val dialogTitles: List<String> = emptyList(),
 )
 
 /**
@@ -152,12 +153,27 @@ class ModalityStateMonitor(
     private suspend fun captureModalDialog(modalEntity: Any): ModalDialogInfo {
         return try {
             log.info("Capturing screenshot of modal dialog for execution $executionId")
+
+            // Use DialogWindowsLookup to enumerate actual dialog windows
+            val lookup = dialogWindowsLookup()
+            val dialogTitles = lookup.withDialogWindows(project) { dialogs ->
+                dialogs.mapNotNull { dialog ->
+                    val window = dialog.window
+                    (window as? java.awt.Frame)?.title
+                        ?: (window as? java.awt.Dialog)?.title
+                }
+            }
+            if (dialogTitles.isNotEmpty()) {
+                log.info("Found ${dialogTitles.size} dialog(s) for execution $executionId: $dialogTitles")
+            }
+
             val artifacts = VisionService.capture(project, executionId)
             val base64 = Base64.getEncoder().encodeToString(artifacts.imageBytes)
             log.info("Screenshot captured successfully for execution $executionId")
             ModalDialogInfo(
                 modalEntity = modalEntity,
                 screenshotBase64 = base64,
+                dialogTitles = dialogTitles,
             )
         } catch (e: Exception) {
             log.warn("Failed to capture screenshot for execution $executionId: ${e.message}", e)

@@ -152,6 +152,10 @@ class ScriptExecutor(
         resultBuilder.logMessage("A modal dialog appeared during execution.")
         resultBuilder.logMessage("Modal entity: ${dialogInfo.modalEntity}")
 
+        if (dialogInfo.dialogTitles.isNotEmpty()) {
+            resultBuilder.logMessage("Dialog windows: ${dialogInfo.dialogTitles.joinToString(", ")}")
+        }
+
         if (dialogInfo.screenshotBase64 != null) {
             resultBuilder.logMessage("Screenshot captured - see image below")
             resultBuilder.logImage("image/png", dialogInfo.screenshotBase64, "modal-dialog.png")
