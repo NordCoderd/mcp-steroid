@@ -90,7 +90,7 @@
         <registryKey key="mcp.steroid.execution.timeout" defaultValue="600"
             description="Script execution timeout in seconds"/>
 
-        <registryKey key="mcp.steroid.dialog.killer.enabled" defaultValue="false"
+        <registryKey key="mcp.steroid.dialog.killer.enabled" defaultValue="true"
             description="Automatically close modal dialogs before code execution"/>
 
         <registryKey key="mcp.steroid.server.port" defaultValue="6315"
