@@ -24,6 +24,7 @@ import org.jetbrains.annotations.TestOnly
 import java.net.BindException
 import java.net.ServerSocket
 import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
@@ -263,6 +264,20 @@ class SteroidsMcpServer(
         """.trimIndent()
     }
 
+    @TestOnly
+    private fun restartServerOnSamePortForTest(bindHost: String, port: Int): Int {
+        require(port > 0) { "Cannot restart test server on non-positive port: $port" }
+
+        val deadlineNanos = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+        while (System.nanoTime() < deadlineNanos) {
+            val started = tryStartServer(bindHost, port)
+            if (started == port) return started
+            Thread.sleep(100)
+        }
+
+        throw IllegalStateException("Failed to restart MCP server on original port $port during test reset")
+    }
+
     override fun dispose() {
         scope.cancel()
         serverRef.get()?.stop(1000, 2000)
@@ -287,7 +302,7 @@ class SteroidsMcpServer(
 
             // 3. Restart on the same port
             val bindHost = Registry.stringValue("mcp.steroid.server.host").takeIf { it.isNotBlank() } ?: "127.0.0.1"
-            val actualPort = startServerOnAvailablePort(bindHost, previousPort)
+            val actualPort = restartServerOnSamePortForTest(bindHost, previousPort)
             log.info("Restarted MCP server on port $actualPort for test reset")
         }
     }

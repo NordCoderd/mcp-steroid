@@ -19,8 +19,11 @@ fun BasePlatformTestCase.setSystemPropertyForTest(name: String, value: String) {
 fun BasePlatformTestCase.setServerPortProperties() {
     // Bind MCP server to 0.0.0.0 so Docker containers can reach it via host.docker.internal
     setSystemPropertyForTest("mcp.steroid.server.host", "0.0.0.0")
-    // Use fixed port for tests
-    setSystemPropertyForTest("mcp.steroid.server.port", "17820")
+    // Allow CI/release-builder to override the test port to avoid host port conflicts.
+    val testPort = System.getenv("MCP_STEROID_TEST_PORT")
+        ?.takeIf { it.isNotBlank() }
+        ?: "17820"
+    setSystemPropertyForTest("mcp.steroid.server.port", testPort)
     // Disable review mode for tests
     setSystemPropertyForTest("mcp.steroid.review.mode", "NEVER")
 }
