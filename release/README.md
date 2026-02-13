@@ -23,7 +23,12 @@ Release notes workflow:
 - In non-dry-run, orchestration commits this file
 - Build injects this file into plugin `change-notes` metadata (plugin.xml patch)
 
-Stable plugin artifact path: `release/out/plugin-idea-2025.3.zip`
+Stable plugin artifact path: `release/out/plugin-idea-2025.3.1.zip`
+
+EAP build selection:
+
+- `RELEASE_EAP_VERSION` defaults to `2026.1` (major request)
+- The matrix resolves it to latest matching EAP build number before Stage 2/3 execution
 
 Release build version format:
 

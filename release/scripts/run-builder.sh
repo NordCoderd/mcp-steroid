@@ -169,6 +169,7 @@ docker_args=(
 if [[ "$RELEASE_BUILDER_ISOLATE_WORKSPACE" == "1" ]]; then
   docker_args+=(
     -v "$ROOT_DIR:/host-workspace"
+    -e MCP_STEROID_DOCKER_HOST_PATH_MAP=/workspace="$ROOT_DIR"
     -v mcp-steroid-intellij-platform-cache:/workspace/.intellijPlatform
     -w /workspace
   )

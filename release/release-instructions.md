@@ -130,8 +130,9 @@ Builder container requirements:
 
 Matrix goals:
 
-- Build plugin with stable line (default `2025.3`) and run baseline tests.
-- Build plugin with EAP line (default `2026.1`) and run baseline tests.
+- Build plugin with stable line (default `2025.3.1`) and run baseline tests.
+- Build plugin with EAP line request (default `2026.1`) resolved to the latest matching EAP build number (for example `261.20869.38`) and run baseline tests.
+- Stage 1/2 exclude full `:test-integration:test`; selected integration coverage runs only in Stage 3.
 - `RELEASE_STABLE_*` and `RELEASE_EAP_*` overrides are forwarded into the Docker builder container.
 - Run selected test-integration category across:
   - IDEA stable
@@ -150,7 +151,7 @@ Selected category currently includes:
 Stable plugin artifact handling:
 
 - Plugin ZIP built from stable build is preserved under a deterministic path: `release/out/plugin-${STABLE_PRODUCT}-${STABLE_VERSION}.zip`
-- Default artifact path: `release/out/plugin-idea-2025.3.zip`
+- Default artifact path: `release/out/plugin-idea-2025.3.1.zip`
 - This ZIP is the candidate for publishing.
 
 ### Stage 4: GitHub Release Publish
@@ -178,7 +179,7 @@ Required inputs for publish stage:
 - **Tag**: defaults to `v<version>` derived from `VERSION` file (e.g., `v0.15.0`)
 - **Tag target**: defaults to recorded version-bump commit (`release/state/version-bump.env`) and falls back to `HEAD`
 - **Notes file**: defaults to `release/notes/<version>.md` (for example `release/notes/0.88.0.md`)
-- **Plugin ZIP**: defaults to `release/out/plugin-idea-2025.3.zip`
+- **Plugin ZIP**: defaults to `release/out/plugin-idea-2025.3.1.zip`
 - `gh` CLI must be installed and authenticated (`gh auth status`)
 - Notes file and ZIP file must exist before publish stage starts
 - Existing release tag on GitHub is treated as a hard stop (no overwrite)
