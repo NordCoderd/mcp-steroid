@@ -17,6 +17,8 @@ import java.util.concurrent.ConcurrentHashMap
 enum class JetBrainsIdeProduct(val code: String) {
     IntelliJIdeaUltimate("IIU"),
     PyCharm("PCP"),
+    GoLand("GO"),
+    WebStorm("WS"),
 }
 
 enum class IdeaReleaseChannel(val apiValue: String) {
@@ -42,6 +44,12 @@ interface IdeaReleaseLookup {
 
     fun latestPyCharmRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
         latestRelease(JetBrainsIdeProduct.PyCharm, channel)
+
+    fun latestGoLandRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
+        latestRelease(JetBrainsIdeProduct.GoLand, channel)
+
+    fun latestWebStormRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor =
+        latestRelease(JetBrainsIdeProduct.WebStorm, channel)
 }
 
 class JetBrainsProductsIdeaReleaseLookup(

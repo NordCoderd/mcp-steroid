@@ -193,7 +193,7 @@ class IdeaEapArchiveResolverTest {
     ) : IdeaReleaseLookup {
         val requestedChannels = mutableListOf<IdeaReleaseChannel>()
 
-        override fun latestIdeaRelease(channel: IdeaReleaseChannel): IdeaReleaseDescriptor {
+        override fun latestRelease(product: JetBrainsIdeProduct, channel: IdeaReleaseChannel): IdeaReleaseDescriptor {
             requestedChannels += channel
             return when (channel) {
                 IdeaReleaseChannel.STABLE -> stable

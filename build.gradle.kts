@@ -24,8 +24,8 @@ import java.util.SortedSet
 plugins {
     id("de.undercouch.download") version "5.6.0"
     id("org.jetbrains.intellij.platform") version "2.10.5"
-    kotlin("jvm") version "2.2.21"
-    kotlin("plugin.serialization") version "2.2.21"
+    kotlin("jvm") version "2.3.10"
+    kotlin("plugin.serialization") version "2.3.10"
 }
 
 group = "com.jonnyzzz.intellij"
@@ -107,6 +107,9 @@ dependencies {
         when (targetIdeProduct) {
             JetBrainsIdeProduct.IntelliJIdeaUltimate -> intellijIdeaUltimate(targetIdeVersion)
             JetBrainsIdeProduct.PyCharm -> pycharm(targetIdeVersion)
+            JetBrainsIdeProduct.GoLand,
+            JetBrainsIdeProduct.WebStorm,
+            -> error("Plugin build targets IntelliJ IDEA or PyCharm only. GoLand/WebStorm are for integration tests.")
         }
         bundledPlugin("org.jetbrains.kotlin")
         testFramework(TestFrameworkType.Platform)
