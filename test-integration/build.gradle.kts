@@ -50,17 +50,32 @@ kotlin {
 enum class IntegrationIdeProduct(
     val id: String,
     val serviceProduct: JetBrainsIdeProduct,
-    val archivePrefix: String,
+    val downloadFolder: String,
+    val archiveFilePrefix: String,
 ) {
     IDEA(
         id = "idea",
         serviceProduct = JetBrainsIdeProduct.IntelliJIdeaUltimate,
-        archivePrefix = "idea",
+        downloadFolder = "idea",
+        archiveFilePrefix = "idea",
     ),
     PYCHARM(
         id = "pycharm",
         serviceProduct = JetBrainsIdeProduct.PyCharm,
-        archivePrefix = "pycharm",
+        downloadFolder = "python",
+        archiveFilePrefix = "pycharm",
+    ),
+    GOLAND(
+        id = "goland",
+        serviceProduct = JetBrainsIdeProduct.GoLand,
+        downloadFolder = "go",
+        archiveFilePrefix = "goland",
+    ),
+    WEBSTORM(
+        id = "webstorm",
+        serviceProduct = JetBrainsIdeProduct.WebStorm,
+        downloadFolder = "webstorm",
+        archiveFilePrefix = "WebStorm",
     ),
 }
 
@@ -125,6 +140,54 @@ val eapPyCharmBuildOverride = gradlePropertyOrEnv(
     envName = "TEST_INTEGRATION_PYCHARM_EAP_BUILD",
 )
 
+// GoLand archive selection (precedence: Gradle property > environment variable > products service default):
+// Stable lane (:test-integration:testGoLand):
+//   -Ptest.integration.goland.stable.url / TEST_INTEGRATION_GOLAND_STABLE_URL
+//   -Ptest.integration.goland.stable.version / TEST_INTEGRATION_GOLAND_STABLE_VERSION
+// EAP lane (:test-integration:testGoLandEap):
+//   -Ptest.integration.goland.eap.url / TEST_INTEGRATION_GOLAND_EAP_URL
+//   -Ptest.integration.goland.eap.build / TEST_INTEGRATION_GOLAND_EAP_BUILD
+val stableGoLandUrlOverride = gradlePropertyOrEnv(
+    gradlePropertyName = "test.integration.goland.stable.url",
+    envName = "TEST_INTEGRATION_GOLAND_STABLE_URL",
+)
+val stableGoLandVersionOverride = gradlePropertyOrEnv(
+    gradlePropertyName = "test.integration.goland.stable.version",
+    envName = "TEST_INTEGRATION_GOLAND_STABLE_VERSION",
+)
+val eapGoLandUrlOverride = gradlePropertyOrEnv(
+    gradlePropertyName = "test.integration.goland.eap.url",
+    envName = "TEST_INTEGRATION_GOLAND_EAP_URL",
+)
+val eapGoLandBuildOverride = gradlePropertyOrEnv(
+    gradlePropertyName = "test.integration.goland.eap.build",
+    envName = "TEST_INTEGRATION_GOLAND_EAP_BUILD",
+)
+
+// WebStorm archive selection (precedence: Gradle property > environment variable > products service default):
+// Stable lane (:test-integration:testWebStorm):
+//   -Ptest.integration.webstorm.stable.url / TEST_INTEGRATION_WEBSTORM_STABLE_URL
+//   -Ptest.integration.webstorm.stable.version / TEST_INTEGRATION_WEBSTORM_STABLE_VERSION
+// EAP lane (:test-integration:testWebStormEap):
+//   -Ptest.integration.webstorm.eap.url / TEST_INTEGRATION_WEBSTORM_EAP_URL
+//   -Ptest.integration.webstorm.eap.build / TEST_INTEGRATION_WEBSTORM_EAP_BUILD
+val stableWebStormUrlOverride = gradlePropertyOrEnv(
+    gradlePropertyName = "test.integration.webstorm.stable.url",
+    envName = "TEST_INTEGRATION_WEBSTORM_STABLE_URL",
+)
+val stableWebStormVersionOverride = gradlePropertyOrEnv(
+    gradlePropertyName = "test.integration.webstorm.stable.version",
+    envName = "TEST_INTEGRATION_WEBSTORM_STABLE_VERSION",
+)
+val eapWebStormUrlOverride = gradlePropertyOrEnv(
+    gradlePropertyName = "test.integration.webstorm.eap.url",
+    envName = "TEST_INTEGRATION_WEBSTORM_EAP_URL",
+)
+val eapWebStormBuildOverride = gradlePropertyOrEnv(
+    gradlePropertyName = "test.integration.webstorm.eap.build",
+    envName = "TEST_INTEGRATION_WEBSTORM_EAP_BUILD",
+)
+
 fun archiveUrlForVersion(
     product: IntegrationIdeProduct,
     version: String,
@@ -133,7 +196,7 @@ fun archiveUrlForVersion(
     val normalizedVersion = version.trim()
     require(normalizedVersion.isNotEmpty()) { "${product.id} stable version must not be blank" }
     val suffix = if (isArmArch) "-aarch64.tar.gz" else ".tar.gz"
-    return "https://download.jetbrains.com/${product.archivePrefix}/${product.archivePrefix}-$normalizedVersion$suffix"
+    return "https://download.jetbrains.com/${product.downloadFolder}/${product.archiveFilePrefix}-$normalizedVersion$suffix"
 }
 
 fun archiveUrlForBuild(
@@ -144,7 +207,7 @@ fun archiveUrlForBuild(
     val normalizedBuild = build.trim()
     require(normalizedBuild.isNotEmpty()) { "${product.id} EAP build must not be blank" }
     val suffix = if (isArmArch) "-aarch64.tar.gz" else ".tar.gz"
-    return "https://download.jetbrains.com/${product.archivePrefix}/${product.archivePrefix}-$normalizedBuild$suffix"
+    return "https://download.jetbrains.com/${product.downloadFolder}/${product.archiveFilePrefix}-$normalizedBuild$suffix"
 }
 
 fun stableArchive(
@@ -209,6 +272,38 @@ val pyCharmEapArchiveProvider = providers.provider {
         product = IntegrationIdeProduct.PYCHARM,
         overrideUrl = eapPyCharmUrlOverride.orNull,
         overrideBuild = eapPyCharmBuildOverride.orNull,
+    )
+}
+
+val stableGoLandArchiveProvider = providers.provider {
+    stableArchive(
+        product = IntegrationIdeProduct.GOLAND,
+        overrideUrl = stableGoLandUrlOverride.orNull,
+        overrideVersion = stableGoLandVersionOverride.orNull,
+    )
+}
+
+val goLandEapArchiveProvider = providers.provider {
+    eapArchive(
+        product = IntegrationIdeProduct.GOLAND,
+        overrideUrl = eapGoLandUrlOverride.orNull,
+        overrideBuild = eapGoLandBuildOverride.orNull,
+    )
+}
+
+val stableWebStormArchiveProvider = providers.provider {
+    stableArchive(
+        product = IntegrationIdeProduct.WEBSTORM,
+        overrideUrl = stableWebStormUrlOverride.orNull,
+        overrideVersion = stableWebStormVersionOverride.orNull,
+    )
+}
+
+val webStormEapArchiveProvider = providers.provider {
+    eapArchive(
+        product = IntegrationIdeProduct.WEBSTORM,
+        overrideUrl = eapWebStormUrlOverride.orNull,
+        overrideBuild = eapWebStormBuildOverride.orNull,
     )
 }
 
@@ -298,6 +393,92 @@ val downloadPyCharmEap by tasks.registering(Download::class) {
     retries(5)
 }
 
+val verifyCurrentGoLandEap by tasks.registering {
+    group = "verification"
+    description = "Assert default GoLand EAP lane resolves to current GoLand EAP from products service"
+
+    doLast {
+        if (!eapGoLandUrlOverride.orNull.isNullOrBlank() || !eapGoLandBuildOverride.orNull.isNullOrBlank()) {
+            logger.lifecycle("Skipping current GoLand EAP assertion because EAP override properties are set")
+            return@doLast
+        }
+
+        val expected = IdeaReleaseService.latestRelease(
+            product = JetBrainsIdeProduct.GoLand,
+            channel = IdeaReleaseChannel.EAP,
+        ).archiveUrl(isArmArch)
+        val actual = goLandEapArchiveProvider.get().url
+        check(actual == expected) {
+            "Expected current GoLand EAP archive '$expected' from products service, but resolved '$actual'"
+        }
+    }
+}
+
+val verifyCurrentWebStormEap by tasks.registering {
+    group = "verification"
+    description = "Assert default WebStorm EAP lane resolves to current WebStorm EAP from products service"
+
+    doLast {
+        if (!eapWebStormUrlOverride.orNull.isNullOrBlank() || !eapWebStormBuildOverride.orNull.isNullOrBlank()) {
+            logger.lifecycle("Skipping current WebStorm EAP assertion because EAP override properties are set")
+            return@doLast
+        }
+
+        val expected = IdeaReleaseService.latestRelease(
+            product = JetBrainsIdeProduct.WebStorm,
+            channel = IdeaReleaseChannel.EAP,
+        ).archiveUrl(isArmArch)
+        val actual = webStormEapArchiveProvider.get().url
+        check(actual == expected) {
+            "Expected current WebStorm EAP archive '$expected' from products service, but resolved '$actual'"
+        }
+    }
+}
+
+val downloadGoLand by tasks.registering(Download::class) {
+    group = "ide"
+    description = "Download configured GoLand"
+    src(stableGoLandArchiveProvider.map { it.url })
+    dest(ideDownloadDir.map { it.file(stableGoLandArchiveProvider.get().fileName) })
+    onlyIfModified(true)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
+}
+
+val downloadGoLandEap by tasks.registering(Download::class) {
+    group = "ide"
+    description = "Download configured GoLand EAP"
+    src(goLandEapArchiveProvider.map { it.url })
+    dest(ideDownloadDir.map { it.file(goLandEapArchiveProvider.get().fileName) })
+    onlyIfModified(true)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
+}
+
+val downloadWebStorm by tasks.registering(Download::class) {
+    group = "ide"
+    description = "Download configured WebStorm"
+    src(stableWebStormArchiveProvider.map { it.url })
+    dest(ideDownloadDir.map { it.file(stableWebStormArchiveProvider.get().fileName) })
+    onlyIfModified(true)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
+}
+
+val downloadWebStormEap by tasks.registering(Download::class) {
+    group = "ide"
+    description = "Download configured WebStorm EAP"
+    src(webStormEapArchiveProvider.map { it.url })
+    dest(ideDownloadDir.map { it.file(webStormEapArchiveProvider.get().fileName) })
+    onlyIfModified(true)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
+}
+
 val integrationTestSourceSet = extensions.getByType<SourceSetContainer>().named("test")
 
 fun Test.configureIntegrationTask(
@@ -360,8 +541,17 @@ val ideaReleaseSmokeTests = listOf(
 )
 
 val pyCharmReleaseSmokeTests = listOf(
+    "com.jonnyzzz.mcpSteroid.integration.tests.EapSmokeTest*",
     "com.jonnyzzz.mcpSteroid.integration.tests.PyCharmContainerIntegrationTest",
     "com.jonnyzzz.mcpSteroid.integration.tests.PyCharmMcpExecutionIntegrationTest",
+)
+
+val goLandReleaseSmokeTests = listOf(
+    "com.jonnyzzz.mcpSteroid.integration.tests.EapSmokeTest*",
+)
+
+val webStormReleaseSmokeTests = listOf(
+    "com.jonnyzzz.mcpSteroid.integration.tests.EapSmokeTest*",
 )
 
 tasks.test {
@@ -404,6 +594,52 @@ val testPyCharmEap by tasks.registering(Test::class) {
     configureIntegrationTask(
         ideProduct = IntegrationIdeProduct.PYCHARM,
         ideaArchivePathProvider = { downloadPyCharmEap.get().dest.absolutePath },
+    )
+}
+
+val testGoLand by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run integration tests against configured GoLand stable"
+    shouldRunAfter(tasks.test)
+    dependsOn(downloadGoLand)
+    configureIntegrationTask(
+        ideProduct = IntegrationIdeProduct.GOLAND,
+        ideaArchivePathProvider = { downloadGoLand.get().dest.absolutePath },
+    )
+}
+
+val testGoLandEap by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run integration tests against configured GoLand EAP"
+    shouldRunAfter(testGoLand)
+    dependsOn(verifyCurrentGoLandEap)
+    dependsOn(downloadGoLandEap)
+    configureIntegrationTask(
+        ideProduct = IntegrationIdeProduct.GOLAND,
+        ideaArchivePathProvider = { downloadGoLandEap.get().dest.absolutePath },
+    )
+}
+
+val testWebStorm by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run integration tests against configured WebStorm stable"
+    shouldRunAfter(tasks.test)
+    dependsOn(downloadWebStorm)
+    configureIntegrationTask(
+        ideProduct = IntegrationIdeProduct.WEBSTORM,
+        ideaArchivePathProvider = { downloadWebStorm.get().dest.absolutePath },
+    )
+}
+
+val testWebStormEap by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run integration tests against configured WebStorm EAP"
+    shouldRunAfter(testWebStorm)
+    dependsOn(verifyCurrentWebStormEap)
+    dependsOn(downloadWebStormEap)
+    configureIntegrationTask(
+        ideProduct = IntegrationIdeProduct.WEBSTORM,
+        ideaArchivePathProvider = { downloadWebStormEap.get().dest.absolutePath },
     )
 }
 
@@ -457,19 +693,73 @@ val testReleaseSmokePyCharmEap by tasks.registering(Test::class) {
     )
 }
 
+val testReleaseSmokeGoLand by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run release-smoke integration tests on GoLand stable"
+    shouldRunAfter(testReleaseSmokePyCharmEap)
+    dependsOn(downloadGoLand)
+    configureIntegrationTask(
+        ideProduct = IntegrationIdeProduct.GOLAND,
+        ideaArchivePathProvider = { downloadGoLand.get().dest.absolutePath },
+        includeClassNamePatterns = goLandReleaseSmokeTests,
+    )
+}
+
+val testReleaseSmokeGoLandEap by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run release-smoke integration tests on GoLand EAP"
+    shouldRunAfter(testReleaseSmokeGoLand)
+    dependsOn(verifyCurrentGoLandEap)
+    dependsOn(downloadGoLandEap)
+    configureIntegrationTask(
+        ideProduct = IntegrationIdeProduct.GOLAND,
+        ideaArchivePathProvider = { downloadGoLandEap.get().dest.absolutePath },
+        includeClassNamePatterns = goLandReleaseSmokeTests,
+    )
+}
+
+val testReleaseSmokeWebStorm by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run release-smoke integration tests on WebStorm stable"
+    shouldRunAfter(testReleaseSmokeGoLandEap)
+    dependsOn(downloadWebStorm)
+    configureIntegrationTask(
+        ideProduct = IntegrationIdeProduct.WEBSTORM,
+        ideaArchivePathProvider = { downloadWebStorm.get().dest.absolutePath },
+        includeClassNamePatterns = webStormReleaseSmokeTests,
+    )
+}
+
+val testReleaseSmokeWebStormEap by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run release-smoke integration tests on WebStorm EAP"
+    shouldRunAfter(testReleaseSmokeWebStorm)
+    dependsOn(verifyCurrentWebStormEap)
+    dependsOn(downloadWebStormEap)
+    configureIntegrationTask(
+        ideProduct = IntegrationIdeProduct.WEBSTORM,
+        ideaArchivePathProvider = { downloadWebStormEap.get().dest.absolutePath },
+        includeClassNamePatterns = webStormReleaseSmokeTests,
+    )
+}
+
 tasks.register("testReleaseSmokeMatrix") {
     group = "verification"
-    description = "Run release-smoke matrix: [IDEA, PyCharm] x [stable, EAP]"
+    description = "Run release-smoke matrix: [IDEA, PyCharm, GoLand, WebStorm] x [stable, EAP]"
     dependsOn(
         testReleaseSmokeIdea,
         testReleaseSmokeIdeaEap,
         testReleaseSmokePyCharm,
         testReleaseSmokePyCharmEap,
+        testReleaseSmokeGoLand,
+        testReleaseSmokeGoLandEap,
+        testReleaseSmokeWebStorm,
+        testReleaseSmokeWebStormEap,
     )
 }
 
 tasks.register("testReleaseCategory") {
     group = "verification"
-    description = "Run selected release category integration tests: [IDEA, PyCharm] x [stable, EAP]"
+    description = "Run selected release category integration tests: [IDEA, PyCharm, GoLand, WebStorm] x [stable, EAP]"
     dependsOn("testReleaseSmokeMatrix")
 }

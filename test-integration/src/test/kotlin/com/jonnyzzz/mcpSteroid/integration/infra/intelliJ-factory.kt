@@ -19,10 +19,12 @@ fun IntelliJContainer.Companion.create(
 ): IntelliJContainer {
     val ideProduct = IdeProduct.fromSystemProperty(IdeTestFolders.ideProduct)
     val selectedDockerBase = if (dockerFileBase == "ide-agent") ideProduct.dockerImageBase else dockerFileBase
-    val selectedProject = if (project == IntelliJProject.TestProject && ideProduct == IdeProduct.PyCharm) {
-        IntelliJProject.PyCharmTestProject
-    } else {
-        project
+    val selectedProject = when {
+        project != IntelliJProject.TestProject -> project
+        ideProduct == IdeProduct.PyCharm -> IntelliJProject.PyCharmTestProject
+        ideProduct == IdeProduct.GoLand -> IntelliJProject.GoLandTestProject
+        ideProduct == IdeProduct.WebStorm -> IntelliJProject.WebStormTestProject
+        else -> project
     }
 
     val (runDir, realConsoleTitle) = run {

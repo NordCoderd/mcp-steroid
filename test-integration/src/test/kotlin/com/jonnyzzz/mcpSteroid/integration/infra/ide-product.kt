@@ -18,13 +18,27 @@ enum class IdeProduct(
         dockerImageBase = "pycharm-agent",
         launcherExecutable = "pycharm",
         displayName = "PyCharm",
+    ),
+    GoLand(
+        id = "goland",
+        dockerImageBase = "goland-agent",
+        launcherExecutable = "goland",
+        displayName = "GoLand",
+    ),
+    WebStorm(
+        id = "webstorm",
+        dockerImageBase = "webstorm-agent",
+        launcherExecutable = "webstorm",
+        displayName = "WebStorm",
     );
 
     companion object {
         fun fromSystemProperty(rawValue: String): IdeProduct = when (rawValue.trim().lowercase()) {
             "idea", "iiu", "intellij", "intellijidea", "intellijideaultimate" -> IntelliJIdea
             "pycharm", "pcp", "python" -> PyCharm
-            else -> error("Unsupported test.integration.ide.product='$rawValue'. Use one of: idea, pycharm.")
+            "goland", "go" -> GoLand
+            "webstorm", "ws" -> WebStorm
+            else -> error("Unsupported test.integration.ide.product='$rawValue'. Use one of: idea, pycharm, goland, webstorm.")
         }
     }
 }
