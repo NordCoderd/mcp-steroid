@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid
 
 import com.intellij.testFramework.common.timeoutRunBlocking
+import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import com.jonnyzzz.mcpSteroid.testHelper.*
 import java.util.*
 import kotlin.time.Duration.Companion.seconds
@@ -95,7 +96,67 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
     }
 
     override fun testExecSessionReset() {
-        //needed to make test runner work
-        super.testExecSessionReset()
+        timeoutRunBlocking(360.seconds) {
+            val firstSession = newAiSession()
+
+            firstSession.runPrompt(
+                """
+                You are testing MCP integration. You MUST call steroid_execute_code exactly two times, in order.
+                Use only the MCP server named "intellij" for tool calls. Do not call list_mcp_resources.
+                Reason: codex cli session reset test.
+                First, call steroid_list_projects exactly once and take the first project's "name" as PROJECT_NAME.
+                For each steroid_execute_code call (#1 and #2), pass project_name=PROJECT_NAME.
+                IMPORTANT: "intellij" is the MCP server name, not a valid project_name value.
+
+                Call #1 code:
+                ```
+                println("EXEC1_OK")
+                ```
+
+                Call #2 code:
+                ```
+                ${SteroidsMcpServer::class.java.name}.getInstance().forgetAllForTest()
+                println("SESSIONS_FORGOTTEN: OK")
+                ```
+                IMPORTANT: Call #2 restarts the MCP server. The connection WILL break and the call WILL fail.
+                This is expected and correct. Do NOT retry call #2 in this prompt.
+
+                After each call, print a result line:
+                RESULT1: <line from call #1 output containing EXEC1_OK>
+                RESULT2: RESET_CONNECTION_BROKEN (if call #2 failed, which is expected) or RESET_OK (if it somehow succeeded)
+
+                Output must be plain text only. Do NOT use Markdown, lists, or code blocks.
+                """.trimIndent(),
+                timeoutSeconds = 300
+            )
+                .assertExitCode(0, "prompt #1")
+                .assertOutputContains("RESULT1:", "EXEC1_OK", message = "exec #1 should run before restart")
+                .assertOutputContains("RESULT2:", "RESET_CONNECTION_BROKEN", message = "exec #2 must report connection broken (server restart kills the HTTP connection)")
+
+            // Codex may keep a broken MCP transport state for the next `exec` after call #2.
+            // Use a fresh Codex session to validate the restarted server behavior deterministically.
+            val secondSession = newAiSession()
+
+            secondSession.runPrompt(
+                """
+                You are continuing an MCP session reset test after a previous connection break.
+                Use only the MCP server named "intellij" for tool calls. Do not call list_mcp_resources.
+                First, call steroid_list_projects exactly once and take the first project's "name" as PROJECT_NAME.
+                Then call steroid_execute_code exactly once with project_name=PROJECT_NAME and this code:
+                ```
+                val count = ${SteroidsMcpServer::class.java.name}.getInstance().getServer().sessionManager.getSessionCount()
+                println("EXEC2_OK: sessions=" + count)
+                ```
+                Print exactly one line:
+                RESULT3: <line from execute_code output containing EXEC2_OK>
+                Output must be plain text only. Do NOT use Markdown, lists, or code blocks.
+                """.trimIndent(),
+                timeoutSeconds = 300
+            )
+                .assertExitCode(0, "prompt #2")
+                .assertNoErrorsInOutput("prompt #2")
+                .assertOutputContains("RESULT3:", "EXEC2_OK", message = "exec #3 should run on the restarted server")
+                .assertOutputContains("sessions=1", message = "restarted server should have exactly 1 fresh session (old sessions were closed, this is a new session)")
+        }
     }
 }
