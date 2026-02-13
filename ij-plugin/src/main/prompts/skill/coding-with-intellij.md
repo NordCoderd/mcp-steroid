@@ -331,6 +331,43 @@ if (DumbService.isDumb(project)) {
 
 **Good news**: `waitForSmartMode()` is called automatically before your script starts!
 
+### Modal Dialogs and ModalityState
+
+When a modal dialog is open in the IDE, the default EDT dispatcher (`Dispatchers.EDT`) will
+**not execute** your code — it waits until the dialog is dismissed. To interact with the IDE
+while a modal dialog is present, use `ModalityState.any()`:
+
+```kotlin
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+// ✓ CORRECT - Runs on EDT even when a modal dialog is showing
+withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    // Enumerate windows, inspect dialogs, close dialogs, etc.
+}
+```
+
+**When to use `ModalityState.any()`:**
+- Enumerating open windows or dialogs while a modal is present
+- Taking screenshots when a dialog is blocking the IDE
+- Closing modal dialogs programmatically (e.g., `dialog.close(...)`)
+- Any EDT work that must run regardless of modal state
+
+**When NOT to use it:**
+- Normal UI operations — use plain `Dispatchers.EDT` instead
+- Read/write actions — use `readAction { }` / `writeAction { }` instead
+
+**Detecting modal dialogs:**
+```kotlin
+withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    val isModal = ModalityState.current() != ModalityState.nonModal()
+    println("Modal dialog showing: $isModal")
+}
+```
+
 ---
 
 ## Common Patterns
