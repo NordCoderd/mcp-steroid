@@ -10,7 +10,6 @@ import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.WindowManager
 import com.intellij.util.ui.ImageUtil
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
-import com.jonnyzzz.mcpSteroid.storage.ExecutionStorage
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -25,9 +24,13 @@ import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseEvent
 import java.awt.image.BufferedImage
+import java.io.ByteArrayInputStream
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.nio.file.Path
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.concurrent.atomic.AtomicLong
 import javax.swing.SwingUtilities
 import kotlin.math.roundToInt
 
@@ -98,6 +101,7 @@ data class ScreenshotArtifacts(
 
 object VisionService {
     private const val META_FILE = "screenshot-meta.json"
+    private val screenshotCounter = AtomicLong(0)
 
     private val json = Json {
         prettyPrint = true
@@ -108,6 +112,16 @@ object VisionService {
         val storage = project.executionStorage
         val executionDir = storage.resolveExecutionDir(executionId)
 
+        // Create a unique screenshot subdirectory to prevent filename collisions
+        // when multiple screenshots are captured within the same execution.
+        val timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS"))
+        val counter = screenshotCounter.incrementAndGet()
+        val screenshotDir = withContext(Dispatchers.IO) {
+            val dir = executionDir.resolve("screenshot-$timestamp-$counter")
+            Files.createDirectories(dir)
+            dir
+        }
+
         // Capture component info on EDT (use ModalityState.any() so this works even when modal dialogs are showing)
         val edtAnyModality = Dispatchers.EDT + ModalityState.any().asContextElement()
         val capture = withContext(edtAnyModality) { captureOnEdt(project, windowId) }
@@ -116,11 +130,11 @@ object VisionService {
         val initialContext = ScreenCaptureContext(
             project = project,
             component = withContext(edtAnyModality) { resolveComponent(project, windowId) },
-            executionDir = executionDir,
+            executionDir = screenshotDir,
         )
 
         // Collect metadata from all providers (including screenshot image)
-        val collectedMetadata = collectMetadataFromProviders(initialContext, storage, executionId)
+        val collectedMetadata = collectMetadataFromProviders(initialContext, screenshotDir)
 
         // Find screenshot image from collected metadata
         val screenshotMetadata = collectedMetadata.find { it.type == ScreenshotImageProvider.TYPE }
@@ -135,7 +149,7 @@ object VisionService {
 
         // Load image to get dimensions
         val imageSize = withContext(Dispatchers.IO) {
-            val image = javax.imageio.ImageIO.read(java.io.ByteArrayInputStream(imageBytes))
+            val image = javax.imageio.ImageIO.read(ByteArrayInputStream(imageBytes))
             Size(image.width, image.height)
         }
 
@@ -157,23 +171,56 @@ object VisionService {
             capturedAt = LocalDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME),
         )
 
-        val metaPath = storage.writeCodeExecutionData(executionId, META_FILE, json.encodeToString(ScreenshotMeta.serializer(), meta))
-
-        // Get paths for artifacts
-        val imagePath = storage.resolveExecutionPath(executionId, imageFileName)
-        val treePath = if (treeFiles.isNotEmpty()) {
-            storage.resolveExecutionPath(executionId, treeFiles.first())
-        } else {
-            storage.resolveExecutionPath(executionId, "screenshot-tree.md")
+        val metaPath = withContext(Dispatchers.IO) {
+            val path = screenshotDir.resolve(META_FILE)
+            path.toFile().writeText(json.encodeToString(ScreenshotMeta.serializer(), meta))
+            path
         }
+
+        val imagePathInCaptureDir = screenshotDir.resolve(imageFileName)
+        val treePathInCaptureDir = if (treeFiles.isNotEmpty()) {
+            screenshotDir.resolve(treeFiles.first())
+        } else {
+            screenshotDir.resolve("screenshot-tree.md")
+        }
+
+        // Keep compatibility with existing API/docs/tests:
+        // expose fixed filenames in execution root while still keeping timestamped snapshots.
+        val (imagePath, treePath, rootMetaPath) = mirrorLatestArtifactsToExecutionRoot(
+            executionDir = executionDir,
+            imagePathInCaptureDir = imagePathInCaptureDir,
+            treePathInCaptureDir = treePathInCaptureDir,
+            metaPathInCaptureDir = metaPath,
+        )
 
         return ScreenshotArtifacts(
             imageBytes = imageBytes,
             imagePath = imagePath,
             treePath = treePath,
-            metaPath = metaPath,
+            metaPath = rootMetaPath,
             meta = meta,
         )
+    }
+
+    private suspend fun mirrorLatestArtifactsToExecutionRoot(
+        executionDir: Path,
+        imagePathInCaptureDir: Path,
+        treePathInCaptureDir: Path,
+        metaPathInCaptureDir: Path,
+    ): Triple<Path, Path, Path> {
+        return withContext(Dispatchers.IO) {
+            val rootImagePath = executionDir.resolve(ScreenshotImageProvider.FILE_NAME)
+            val rootTreePath = executionDir.resolve(SwingComponentTreeProvider.FILE_NAME)
+            val rootMetaPath = executionDir.resolve(META_FILE)
+
+            Files.copy(imagePathInCaptureDir, rootImagePath, StandardCopyOption.REPLACE_EXISTING)
+            if (Files.exists(treePathInCaptureDir)) {
+                Files.copy(treePathInCaptureDir, rootTreePath, StandardCopyOption.REPLACE_EXISTING)
+            }
+            Files.copy(metaPathInCaptureDir, rootMetaPath, StandardCopyOption.REPLACE_EXISTING)
+
+            Triple(rootImagePath, rootTreePath, rootMetaPath)
+        }
     }
 
     /**
@@ -181,12 +228,11 @@ object VisionService {
      * Providers are called iteratively until all return Success or Skip.
      * Providers returning DependsOnOthers are retried after others complete.
      * The context is updated with collected metadata after each provider completes.
-     * Files are written to storage as each provider completes (so dependent providers can read them).
+     * Files are written to the screenshot directory as each provider completes.
      */
     private suspend fun collectMetadataFromProviders(
         initialContext: ScreenCaptureContext,
-        storage: ExecutionStorage,
-        executionId: ExecutionId,
+        screenshotDir: Path,
     ): List<ScreenshotMetadata> {
         val providers = ScreenshotMetadataProvider.EP_NAME.extensionList
         if (providers.isEmpty()) {
@@ -207,9 +253,9 @@ object VisionService {
                 val provider = iterator.next()
                 when (val result = provider.provide(context)) {
                     is ProviderResult.Success -> {
-                        // Write files to storage immediately so dependent providers can access them
+                        // Write files to screenshot directory immediately so dependent providers can access them
                         for (metadata in result.metadata) {
-                            writeMetadataToStorage(storage, executionId, metadata)
+                            writeMetadataToDir(screenshotDir, metadata)
                         }
                         results.addAll(result.metadata)
                         // Update context with the new metadata for subsequent providers
@@ -230,17 +276,19 @@ object VisionService {
     }
 
     /**
-     * Write metadata content to storage (text or binary).
+     * Write metadata content directly to the screenshot directory.
      */
-    private suspend fun writeMetadataToStorage(
-        storage: ExecutionStorage,
-        executionId: ExecutionId,
+    private suspend fun writeMetadataToDir(
+        screenshotDir: Path,
         metadata: ScreenshotMetadata,
     ) {
-        if (metadata.content != null) {
-            storage.writeCodeExecutionData(executionId, metadata.fileName, metadata.content)
-        } else if (metadata.binaryContent != null) {
-            storage.writeBinaryExecutionData(executionId, metadata.fileName, metadata.binaryContent)
+        withContext(Dispatchers.IO) {
+            val path = screenshotDir.resolve(metadata.fileName)
+            if (metadata.content != null) {
+                path.toFile().writeText(metadata.content)
+            } else if (metadata.binaryContent != null) {
+                Files.write(path, metadata.binaryContent)
+            }
         }
     }
 
@@ -253,8 +301,23 @@ object VisionService {
     }
 
     suspend fun loadScreenshotMeta(project: Project, executionId: ExecutionId): ScreenshotMeta {
-        val metaPath = project.executionStorage.resolveExecutionPath(executionId, META_FILE)
-        val content = withContext(Dispatchers.IO) { java.nio.file.Files.readString(metaPath) }
+        val executionDir = project.executionStorage.resolveExecutionDir(executionId)
+        val metaPath = withContext(Dispatchers.IO) {
+            // First try the legacy flat location (executionDir/screenshot-meta.json)
+            val flatPath = executionDir.resolve(META_FILE)
+            if (Files.exists(flatPath)) return@withContext flatPath
+
+            // Find the most recent screenshot-* subdirectory containing the meta file
+            Files.list(executionDir).use { stream ->
+                stream.toList()
+                    .filter { Files.isDirectory(it) && it.fileName.toString().startsWith("screenshot-") }
+                    .sortedByDescending { it.fileName.toString() }
+                    .map { it.resolve(META_FILE) }
+                    .firstOrNull { Files.exists(it) }
+                    ?: throw IllegalStateException("No screenshot metadata found in execution: ${executionId.executionId}")
+            }
+        }
+        val content = withContext(Dispatchers.IO) { Files.readString(metaPath) }
         return json.decodeFromString(ScreenshotMeta.serializer(), content)
     }
 
