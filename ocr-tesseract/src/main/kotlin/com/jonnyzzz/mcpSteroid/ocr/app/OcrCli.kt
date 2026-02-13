@@ -18,6 +18,8 @@ import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
+import java.util.Comparator
 import javax.imageio.ImageIO
 import kotlin.system.exitProcess
 
@@ -187,11 +189,52 @@ private fun findAppRoot(): Path {
 }
 
 private fun ensureNativeLibraries() {
-    Loader.load(leptonica::class.java)
-    Loader.load(tesseract::class.java)
+    val leptonicaJniLib = Paths.get(Loader.load(leptonica::class.java))
+    val tesseractJniLib = Paths.get(Loader.load(tesseract::class.java))
 
-    val cacheDir = Loader.getCacheDir().absolutePath
+    val leptonicaLibDir = leptonicaJniLib.parent ?: error("Cannot resolve Leptonica JNI directory from $leptonicaJniLib")
+    val tesseractLibDir = tesseractJniLib.parent ?: error("Cannot resolve Tesseract JNI directory from $tesseractJniLib")
+
+    val leptonicaVersionedLib = findFirstSharedLibrary(leptonicaLibDir, "libleptonica.so.")
+    val tesseractVersionedLib = findFirstSharedLibrary(tesseractLibDir, "libtesseract.so.")
+
+    // Tess4J/Lept4J look for unversioned sonames, while JavaCPP provides only versioned files.
+    // Create local aliases in JavaCPP cache dirs so JNA binds to matching bundled natives.
+    ensureLibraryAlias(leptonicaLibDir, "libleptonica.so", leptonicaVersionedLib)
+    ensureLibraryAlias(leptonicaLibDir, "liblept.so", leptonicaVersionedLib)
+    ensureLibraryAlias(leptonicaLibDir, "liblept.so.5", leptonicaVersionedLib)
+    ensureLibraryAlias(tesseractLibDir, "libtesseract.so", tesseractVersionedLib)
+
     val existing = System.getProperty("jna.library.path").orEmpty()
-    val updated = if (existing.isBlank()) cacheDir else existing + File.pathSeparator + cacheDir
+    val updated = buildList {
+        add(leptonicaLibDir.toString())
+        add(tesseractLibDir.toString())
+        if (existing.isNotBlank()) add(existing)
+    }.joinToString(File.pathSeparator)
+
     System.setProperty("jna.library.path", updated)
+    System.setProperty("jna.nosys", "true")
+}
+
+private fun findFirstSharedLibrary(directory: Path, prefix: String): Path {
+    Files.list(directory).use { entries ->
+        return entries
+            .filter { Files.isRegularFile(it) && it.fileName.toString().startsWith(prefix) }
+            .sorted(Comparator.comparing<Path, String> { it.fileName.toString() }.reversed())
+            .findFirst()
+            .orElseThrow { IllegalStateException("No shared library matching '$prefix*' found in $directory") }
+    }
+}
+
+private fun ensureLibraryAlias(directory: Path, aliasName: String, target: Path) {
+    val alias = directory.resolve(aliasName)
+    if (Files.exists(alias)) return
+
+    try {
+        Files.createSymbolicLink(alias, target.fileName)
+    } catch (_: UnsupportedOperationException) {
+        Files.copy(target, alias, StandardCopyOption.REPLACE_EXISTING)
+    } catch (_: SecurityException) {
+        Files.copy(target, alias, StandardCopyOption.REPLACE_EXISTING)
+    }
 }

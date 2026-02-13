@@ -17,13 +17,17 @@ repositories {
 
 // Version constants - tessdata version should be compatible with tesseract version
 val tess4jVersion = "5.17.0"
+val lept4jVersion = "1.21.1"
 val tesseractPlatformVersion = "5.5.1-1.5.12"
 val leptonicaPlatformVersion = "1.85.0-1.5.12"
 val tessdataVersion = "4.1.0" // tessdata 4.1.0 is compatible with Tesseract 4.x and 5.x
 
 dependencies {
     implementation(project(":ocr-common"))
-    implementation("net.sourceforge.tess4j:tess4j:$tess4jVersion")
+    implementation("net.sourceforge.tess4j:tess4j:$tess4jVersion") {
+        exclude(group = "net.sourceforge.lept4j", module = "lept4j")
+    }
+    implementation("net.sourceforge.lept4j:lept4j:$lept4jVersion")
     implementation("org.bytedeco:tesseract-platform:$tesseractPlatformVersion")
     implementation("org.bytedeco:leptonica-platform:$leptonicaPlatformVersion")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
