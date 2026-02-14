@@ -2,7 +2,7 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
-import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
+import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import java.io.File
@@ -59,17 +59,16 @@ object DockerReaper {
         try {
             val driver = DockerDriver(workDir, "REAPER")
 
-            // Build the reaper image from classpath resources
-            val buildContext = prepareBuildContext()
-            try {
-                driver.buildDockerImage(
-                    IMAGE_NAME,
-                    File(buildContext, "Dockerfile"),
-                    120
-                )
-            } finally {
-                buildContext.deleteRecursively()
-            }
+            // Build the reaper image from the docker/reaper directory
+            val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory().toFile()
+            val reaperDockerfile = projectHome.resolve("test-helper/src/main/docker/reaper/Dockerfile")
+            require(reaperDockerfile.isFile) { "Reaper Dockerfile must exist: $reaperDockerfile" }
+
+            driver.buildDockerImage(
+                IMAGE_NAME,
+                reaperDockerfile,
+                120
+            )
 
             // Start the reaper container using ContainerDriver infrastructure.
             // startContainerDriver calls back into registerContainer()
@@ -211,20 +210,4 @@ object DockerReaper {
         error("Failed to connect to reaper after retries (targets: $targets): ${lastException?.message}")
     }
 
-    private fun prepareBuildContext(): File {
-        val dir = createTempDirectory("reaper-build")
-
-        for (name in listOf("Dockerfile", "reaper.sh")) {
-            val resourcePath = "docker/reaper/$name"
-            val content = DockerReaper::class.java.classLoader
-                .getResourceAsStream(resourcePath)
-                ?.use { it.bufferedReader().readText() }
-                ?: error("Resource not found: $resourcePath")
-            val file = File(dir, name)
-            file.writeText(content)
-            file.setExecutable(true)
-        }
-
-        return dir
-    }
 }
