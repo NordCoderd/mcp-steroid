@@ -1,7 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddCommand
+import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddArgs
+import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import kotlinx.serialization.json.Json
@@ -22,39 +23,20 @@ class DockerGeminiSession(
 ) : AiAgentSession {
     private val userHome = "/home/gemini"
 
-    override fun registerMcp(mcpUrl: String, mcpName: String) : AiAgentSession {
-        var command = geminiMcpAddCommand(mcpUrl, mcpName)
-            .split(" ")
-
-        require(command[0] == "gemini")
-        command = command.drop(1)
-
-        runInContainer(args = command.toTypedArray())
+    override fun registerHttpMcp(mcpUrl: String, mcpName: String) : AiAgentSession {
+        runInContainer(args = geminiMcpAddArgs(mcpUrl, mcpName).toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput(message = "MCP server registration")
 
         return this
     }
 
-    override fun registerMcpViaNpx(mcpUrl: String, mcpName: String): AiAgentSession {
+    override fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         val container = session as? ContainerDriver
             ?: error("Container driver is required for NPX registration")
         val npxCommand = container.prepareNpxProxyForUrl(mcpUrl, userHome)
 
-        val args = buildList {
-            add("mcp")
-            add("add")
-            add("--type")
-            add("stdio")
-            add("--scope")
-            add("user")
-            add("--trust")
-            add(mcpName)
-            add(npxCommand.command)
-            addAll(npxCommand.args)
-        }
-
-        runInContainer(*args.toTypedArray())
+        runInContainer(*geminiMcpAddStdioArgs(npxCommand, mcpName).toTypedArray())
             .assertExitCode(0, message = "NPX MCP server registration")
             .assertNoErrorsInOutput(message = "NPX MCP server registration")
 

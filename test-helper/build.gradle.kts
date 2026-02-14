@@ -1,3 +1,5 @@
+import org.gradle.api.attributes.Usage
+
 plugins {
     kotlin("jvm") version "2.3.10"
 }
@@ -9,7 +11,16 @@ repositories {
     mavenCentral()
 }
 
+val npxPackage by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "npx-package"))
+    }
+}
+
 dependencies {
+    npxPackage(project(path = ":npx", configuration = "npxPackageElements"))
     implementation(project(":ai-agents"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
@@ -24,4 +35,10 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
+}
+
+tasks.processResources {
+    from(npxPackage) {
+        rename { "mcp-steroid-npx.zip" }
+    }
 }

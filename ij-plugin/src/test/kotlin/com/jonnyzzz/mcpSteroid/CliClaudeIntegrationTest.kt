@@ -60,7 +60,7 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
         val session = claudeSession()
 
         val mcpName = "intellij-steroid-test-${UUID.randomUUID()}"
-        session.registerMcp(resolveDockerUrl(), mcpName)
+        session.registerHttpMcp(resolveDockerUrl(), mcpName)
 
         session
             .runInContainer("mcp", "get", mcpName)

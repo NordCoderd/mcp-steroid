@@ -10,8 +10,19 @@ interface AiAgentSession {
         timeoutSeconds: Long = 120
     ): ProcessResult
 
+    fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession
 
-    fun registerMcp(mcpUrl: String, mcpName : String) : AiAgentSession
+    fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession
 
-    fun registerMcpViaNpx(mcpUrl: String, mcpName: String): AiAgentSession
+    @Deprecated(
+        message = "Use registerHttpMcp for explicit HTTP registration",
+        replaceWith = ReplaceWith("registerHttpMcp(mcpUrl, mcpName)")
+    )
+    fun registerMcp(mcpUrl: String, mcpName: String): AiAgentSession = registerHttpMcp(mcpUrl, mcpName)
+
+    @Deprecated(
+        message = "Use registerNpxMcp for explicit NPX stdio registration",
+        replaceWith = ReplaceWith("registerNpxMcp(mcpUrl, mcpName)")
+    )
+    fun registerMcpViaNpx(mcpUrl: String, mcpName: String): AiAgentSession = registerNpxMcp(mcpUrl, mcpName)
 }

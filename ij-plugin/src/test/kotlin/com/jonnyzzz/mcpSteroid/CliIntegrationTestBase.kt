@@ -8,9 +8,7 @@ import com.jonnyzzz.mcpSteroid.mcp.McpJson
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import com.jonnyzzz.mcpSteroid.testHelper.*
 import kotlinx.serialization.json.*
-import java.io.File
 import java.util.*
-import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 abstract class CliIntegrationTestBase : BasePlatformTestCase() {
@@ -28,12 +26,12 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
     protected abstract fun createAiSession(): AiAgentSession
 
     protected open fun newAiSession(): AiAgentSession {
-        return createAiSession().registerMcp(resolveDockerUrl(), "intellij")
+        return createAiSession().registerHttpMcp(resolveDockerUrl(), "intellij")
     }
 
     protected open fun newAiSessionViaNpx(): AiAgentSession {
         ensureNpxBuild()
-        return createAiSession().registerMcpViaNpx(resolveDockerUrl(), "intellij")
+        return createAiSession().registerNpxMcp(resolveDockerUrl(), "intellij")
     }
 
     /**
@@ -243,24 +241,12 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
     private fun ensureNpxBuild() {
         synchronized(npxBuildLock) {
             if (isNpxBuilt) return
-            runLocalCommand(listOf("npm", "--prefix", "npx", "install", "--silent"))
-            runLocalCommand(listOf("npm", "--prefix", "npx", "run", "build", "--silent"))
-            val distFile = File("npx/dist/index.js")
-            check(distFile.isFile) { "Expected built NPX proxy at ${distFile.path}" }
+            val resource = javaClass.classLoader.getResource("mcp-steroid-npx.zip")
+            check(resource != null) {
+                "Missing test-helper NPX artifact resource 'mcp-steroid-npx.zip'. " +
+                        "Ensure :test-helper resolves :npx:npxPackageElements."
+            }
             isNpxBuilt = true
-        }
-    }
-
-    private fun runLocalCommand(command: List<String>) {
-        val process = ProcessBuilder(command)
-            .directory(File("."))
-            .redirectErrorStream(true)
-            .start()
-        val output = process.inputStream.bufferedReader().readText()
-        val finished = process.waitFor(240, TimeUnit.SECONDS)
-        check(finished) { "Command timed out: ${command.joinToString(" ")}\n$output" }
-        check(process.exitValue() == 0) {
-            "Command failed (${process.exitValue()}): ${command.joinToString(" ")}\n$output"
         }
     }
 

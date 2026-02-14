@@ -1,7 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddCommand
+import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddArgs
+import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import kotlinx.serialization.json.Json
@@ -24,34 +25,20 @@ class DockerClaudeSession(
 ) : AiAgentSession {
     private val userHome = "/home/claude"
 
-    override fun registerMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        var command = claudeMcpAddCommand(mcpUrl, mcpName)
-            .split(" ")
-
-        require(command[0] == "claude")
-        command = command.drop(1)
-        runInContainer(args = command.toTypedArray())
+    override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
+        runInContainer(args = claudeMcpAddArgs(mcpUrl, mcpName).toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput("MCP server registration")
 
         return this
     }
 
-    override fun registerMcpViaNpx(mcpUrl: String, mcpName: String): AiAgentSession {
+    override fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         val container = session as? ContainerDriver
             ?: error("Container driver is required for NPX registration")
         val npxCommand = container.prepareNpxProxyForUrl(mcpUrl, userHome)
 
-        val args = buildList {
-            add("mcp")
-            add("add")
-            add(mcpName)
-            add("--")
-            add(npxCommand.command)
-            addAll(npxCommand.args)
-        }
-
-        runInContainer(*args.toTypedArray())
+        runInContainer(*claudeMcpAddStdioArgs(npxCommand, mcpName).toTypedArray())
             .assertExitCode(0, message = "NPX MCP server registration")
             .assertNoErrorsInOutput("NPX MCP server registration")
 

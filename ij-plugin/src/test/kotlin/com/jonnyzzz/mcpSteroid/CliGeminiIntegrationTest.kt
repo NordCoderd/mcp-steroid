@@ -37,7 +37,7 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
         val mcpName = "intellij"
         timeoutRunBlocking(180.seconds) {
             val session = geminiSession()
-            session.registerMcp(resolveDockerUrl(), mcpName)
+            session.registerHttpMcp(resolveDockerUrl(), mcpName)
             session.runInContainer("mcp", "list", )
                 .assertExitCode(0, "mcp list should succeed")
                 .assertOutputContains(mcpName, message = "mcp list should contain registered server")

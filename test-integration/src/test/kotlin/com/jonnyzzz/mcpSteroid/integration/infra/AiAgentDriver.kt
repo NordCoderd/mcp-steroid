@@ -61,7 +61,7 @@ class AiAgentDriver(
 
     private fun prepareAIAgent(agent: AiAgentSession, displayName: String): AiAgentSession {
         if (connectMcpSteroid) {
-            agent.registerMcp(mcpSteroidGuestUrl, mcpSteroidName)
+            agent.registerHttpMcp(mcpSteroidGuestUrl, mcpSteroidName)
         }
 
         // Wrap with console-aware session if console is available

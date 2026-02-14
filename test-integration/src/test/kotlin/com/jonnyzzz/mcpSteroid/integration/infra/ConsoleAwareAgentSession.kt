@@ -37,16 +37,16 @@ class ConsoleAwareAgentSession(
         return result
     }
 
-    override fun registerMcp(mcpUrl: String, mcpName: String): AiAgentSession {
+    override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         return ConsoleAwareAgentSession(
-            delegate.registerMcp(mcpUrl, mcpName),
+            delegate.registerHttpMcp(mcpUrl, mcpName),
             console, agentName,
         )
     }
 
-    override fun registerMcpViaNpx(mcpUrl: String, mcpName: String): AiAgentSession {
+    override fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         return ConsoleAwareAgentSession(
-            delegate.registerMcpViaNpx(mcpUrl, mcpName),
+            delegate.registerNpxMcp(mcpUrl, mcpName),
             console, agentName,
         )
     }
