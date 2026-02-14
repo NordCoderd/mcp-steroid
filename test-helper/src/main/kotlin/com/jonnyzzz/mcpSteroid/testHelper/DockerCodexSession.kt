@@ -23,6 +23,7 @@ class DockerCodexSession(
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
+    private val userHome = "/home/codex"
 
     override fun registerMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         var command = codexMcpAddCommand(mcpUrl, mcpName)
@@ -33,6 +34,27 @@ class DockerCodexSession(
         runInContainer(args = command.toTypedArray())
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput("MCP server registration")
+
+        return this
+    }
+
+    override fun registerMcpViaNpx(mcpUrl: String, mcpName: String): AiAgentSession {
+        val container = session as? ContainerDriver
+            ?: error("Container driver is required for NPX registration")
+        val npxCommand = container.prepareNpxProxyForUrl(mcpUrl, userHome)
+
+        val args = buildList {
+            add("mcp")
+            add("add")
+            add(mcpName)
+            add("--")
+            add(npxCommand.command)
+            addAll(npxCommand.args)
+        }
+
+        runInContainer(*args.toTypedArray())
+            .assertExitCode(0, message = "NPX MCP server registration")
+            .assertNoErrorsInOutput("NPX MCP server registration")
 
         return this
     }

@@ -12,4 +12,6 @@ interface AiAgentSession {
 
 
     fun registerMcp(mcpUrl: String, mcpName : String) : AiAgentSession
+
+    fun registerMcpViaNpx(mcpUrl: String, mcpName: String): AiAgentSession
 }

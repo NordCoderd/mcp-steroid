@@ -25,7 +25,7 @@ import kotlin.time.Duration.Companion.seconds
 class CliGeminiIntegrationTest : CliIntegrationTestBase() {
     private fun geminiSession() = DockerGeminiSession.create(lifetime)
 
-    override fun newAiSession(): AiAgentSession = geminiSession().registerMcp(resolveDockerUrl(), "intellij")
+    override fun createAiSession(): AiAgentSession = geminiSession()
 
     fun testGeminiInstalled(): Unit = timeoutRunBlocking(180.seconds) {
         geminiSession()
@@ -53,6 +53,16 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
     override fun testSystemPropertyCanBeRead() {
         //needed to make test runner work
         super.testSystemPropertyCanBeRead()
+    }
+
+    override fun testDiscoversSteroidToolsViaNpx() {
+        //needed to make test runner work
+        super.testDiscoversSteroidToolsViaNpx()
+    }
+
+    override fun testSystemPropertyCanBeReadViaNpx() {
+        //needed to make test runner work
+        super.testSystemPropertyCanBeReadViaNpx()
     }
 
     override fun testExecSessionReset() {

@@ -8,7 +8,9 @@ import com.jonnyzzz.mcpSteroid.mcp.McpJson
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import com.jonnyzzz.mcpSteroid.testHelper.*
 import kotlinx.serialization.json.*
+import java.io.File
 import java.util.*
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 abstract class CliIntegrationTestBase : BasePlatformTestCase() {
@@ -23,7 +25,16 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
         super.setUp()
     }
 
-    protected abstract fun newAiSession(): AiAgentSession
+    protected abstract fun createAiSession(): AiAgentSession
+
+    protected open fun newAiSession(): AiAgentSession {
+        return createAiSession().registerMcp(resolveDockerUrl(), "intellij")
+    }
+
+    protected open fun newAiSessionViaNpx(): AiAgentSession {
+        ensureNpxBuild()
+        return createAiSession().registerMcpViaNpx(resolveDockerUrl(), "intellij")
+    }
 
     /**
      * This test validates the discovery of tools and the use of the CLI.
@@ -45,14 +56,16 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
      * If any of these fail, the test fails. Do not weaken these assertions.
      */
     open fun testDiscoversSteroidTools(): Unit = timeoutRunBlocking(300.seconds) {
-        val session = newAiSession()
+        assertDiscoversSteroidTools(newAiSession())
+    }
 
-        // Run Claude in print mode to discover tools
-        // MCP tools must be explicitly allowed in print mode using mcp__<serverName>__* pattern
-        // Permission mode must be set to bypass tool approval prompts in CI
-        val result = session
-            .runPrompt(
-                """
+    open fun testDiscoversSteroidToolsViaNpx(): Unit = timeoutRunBlocking(300.seconds) {
+        assertDiscoversSteroidTools(newAiSessionViaNpx())
+    }
+
+    private fun assertDiscoversSteroidTools(session: AiAgentSession) {
+        val result = session.runPrompt(
+            """
             You are testing an MCP server integration. You MUST use the MCP tools.
             Use only the MCP server named "intellij" for tool calls. Do not call list_mcp_resources.
             Steps:
@@ -61,7 +74,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             Output must be plain text only. Do NOT use Markdown, bold, bullets, or code blocks.
             Do not skip any step. If a step fails, print ERROR: <reason>.
             """,
-            )
+        )
             .assertExitCode(0, "prompt")
             .assertNoErrorsInOutput(message = "prompt")
             .assertOutputContains(
@@ -124,8 +137,14 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
      * 3. Verifies AI's output contains the correct value
      */
     open fun testSystemPropertyCanBeRead(): Unit = timeoutRunBlocking(300.seconds) {
-        val session = newAiSession()
+        assertSystemPropertyCanBeRead(newAiSession())
+    }
 
+    open fun testSystemPropertyCanBeReadViaNpx(): Unit = timeoutRunBlocking(300.seconds) {
+        assertSystemPropertyCanBeRead(newAiSessionViaNpx())
+    }
+
+    private fun assertSystemPropertyCanBeRead(session: AiAgentSession) {
         // Set a system property with a random value
         val propertyKey = "mcp.test.ai.random.value"
         val randomValue = "ai-${UUID.randomUUID()}"
@@ -219,5 +238,35 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             .assertOutputContains("RESULT2:", "RESET_CONNECTION_BROKEN", message = "exec #2 must report connection broken (server restart kills the HTTP connection)")
             .assertOutputContains("RESULT3:", "EXEC2_OK", message = "exec #3 should run on the restarted server")
             .assertOutputContains("sessions=1", message = "restarted server should have exactly 1 fresh session (old sessions were closed, this is a new one)")
+    }
+
+    private fun ensureNpxBuild() {
+        synchronized(npxBuildLock) {
+            if (isNpxBuilt) return
+            runLocalCommand(listOf("npm", "--prefix", "npx", "install", "--silent"))
+            runLocalCommand(listOf("npm", "--prefix", "npx", "run", "build", "--silent"))
+            val distFile = File("npx/dist/index.js")
+            check(distFile.isFile) { "Expected built NPX proxy at ${distFile.path}" }
+            isNpxBuilt = true
+        }
+    }
+
+    private fun runLocalCommand(command: List<String>) {
+        val process = ProcessBuilder(command)
+            .directory(File("."))
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().readText()
+        val finished = process.waitFor(240, TimeUnit.SECONDS)
+        check(finished) { "Command timed out: ${command.joinToString(" ")}\n$output" }
+        check(process.exitValue() == 0) {
+            "Command failed (${process.exitValue()}): ${command.joinToString(" ")}\n$output"
+        }
+    }
+
+    companion object {
+        private val npxBuildLock = Any()
+        @Volatile
+        private var isNpxBuilt = false
     }
 }

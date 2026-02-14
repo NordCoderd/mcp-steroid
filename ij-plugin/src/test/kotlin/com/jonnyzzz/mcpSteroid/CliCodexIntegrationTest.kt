@@ -46,7 +46,7 @@ import kotlin.time.Duration.Companion.seconds
 class CliCodexIntegrationTest : CliIntegrationTestBase() {
     private fun codexSession() = DockerCodexSession.create(lifetime)
 
-    override fun newAiSession(): AiAgentSession = codexSession().registerMcp(resolveDockerUrl(), "intellij")
+    override fun createAiSession(): AiAgentSession = codexSession()
 
     /**
      * Tests that Codex CLI is properly installed in the Docker container.
@@ -93,6 +93,16 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
     override fun testSystemPropertyCanBeRead() {
         //needed to make test runner work
         super.testSystemPropertyCanBeRead()
+    }
+
+    override fun testDiscoversSteroidToolsViaNpx() {
+        //needed to make test runner work
+        super.testDiscoversSteroidToolsViaNpx()
+    }
+
+    override fun testSystemPropertyCanBeReadViaNpx() {
+        //needed to make test runner work
+        super.testSystemPropertyCanBeReadViaNpx()
     }
 
     override fun testExecSessionReset() {

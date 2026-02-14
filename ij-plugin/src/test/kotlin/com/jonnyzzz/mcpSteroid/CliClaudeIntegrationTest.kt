@@ -45,7 +45,7 @@ import kotlin.time.Duration.Companion.seconds
 class CliClaudeIntegrationTest : CliIntegrationTestBase() {
     private fun claudeSession() = DockerClaudeSession.create(lifetime)
 
-    override fun newAiSession(): AiAgentSession = claudeSession().registerMcp(resolveDockerUrl(), "intellij")
+    override fun createAiSession(): AiAgentSession = claudeSession()
 
     /**
      * Tests that Claude CLI is properly installed in the Docker container.
@@ -77,6 +77,16 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
     override fun testSystemPropertyCanBeRead() {
         //needed to make test runner work
         super.testSystemPropertyCanBeRead()
+    }
+
+    override fun testDiscoversSteroidToolsViaNpx() {
+        //needed to make test runner work
+        super.testDiscoversSteroidToolsViaNpx()
+    }
+
+    override fun testSystemPropertyCanBeReadViaNpx() {
+        //needed to make test runner work
+        super.testSystemPropertyCanBeReadViaNpx()
     }
 
     override fun testExecSessionReset() {
