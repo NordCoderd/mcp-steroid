@@ -884,41 +884,6 @@ class ServerRegistry {
         server.resources = server.resources || [];
       }
     }
-
-    if (!server.metadata || now - server.metadataFetchedAt > ttlMs) {
-      const payload = await this.fetchToolPayload(server, AGGREGATE_TOOL_NAMES.metadata, {});
-      if (payload) {
-        this.applyMetadata(server.serverId, normalizeServerMetadataPayload(payload));
-        server.metadataFetchedAt = now;
-      }
-    }
-
-    if (!server.products || now - server.productsFetchedAt > ttlMs) {
-      const payload = await this.fetchToolPayload(server, AGGREGATE_TOOL_NAMES.products, {});
-      if (payload && Array.isArray(payload.products)) {
-        server.products = payload.products;
-        this.applyMetadata(server.serverId, metadataFromProductsPayload(payload));
-        server.productsFetchedAt = now;
-      }
-    }
-
-    if (!server.projects || now - server.projectsFetchedAt > ttlMs) {
-      const payload = await this.fetchToolPayload(server, AGGREGATE_TOOL_NAMES.projects, {});
-      if (payload && Array.isArray(payload.projects)) {
-        server.projects = payload.projects;
-        this.applyMetadata(server.serverId, metadataFromProjectsPayload(payload));
-        server.projectsFetchedAt = now;
-      }
-    }
-
-    if (!server.windows || now - server.windowsFetchedAt > ttlMs) {
-      const payload = await this.fetchToolPayload(server, AGGREGATE_TOOL_NAMES.windows, {});
-      if (payload && Array.isArray(payload.windows)) {
-        server.windows = payload.windows;
-        this.applyMetadata(server.serverId, metadataFromWindowsPayload(payload));
-        server.windowsFetchedAt = now;
-      }
-    }
   }
 
   async fetchToolPayload(server, toolName, args) {
@@ -1501,16 +1466,20 @@ function createServerInfo(config) {
 }
 
 async function handleRpc(method, params, registry) {
-  await registry.ensureFresh();
+  if (method !== "initialize" && method !== "ping") {
+    await registry.ensureFresh();
+  }
 
   if (method === "initialize") {
     return {
       protocolVersion: PROTOCOL_VERSION,
       capabilities: {
         tools: { listChanged: false },
+        prompts: { listChanged: false },
         resources: { subscribe: false, listChanged: false }
       },
-      serverInfo: createServerInfo(registry.config)
+      serverInfo: createServerInfo(registry.config),
+      instructions: "Proxy MCP server for MCP Steroid instances discovered from local IDE metadata."
     };
   }
 
@@ -1597,6 +1566,11 @@ function decodeContentLength(headersText) {
   return null;
 }
 
+function startsLikeJsonPayload(buffer) {
+  const prefix = buffer.toString("utf8", 0, Math.min(buffer.length, 64)).trimStart();
+  return prefix.startsWith("{") || prefix.startsWith("[");
+}
+
 function readNextFramedMessage(buffer) {
   const headerSep = Buffer.from("\r\n\r\n");
   const altHeaderSep = Buffer.from("\n\n");
@@ -1620,6 +1594,12 @@ function readNextFramedMessage(buffer) {
         payloadText
       };
     }
+  }
+
+  // Newline-delimited JSON fallback is supported only when input starts as JSON.
+  // This prevents mis-parsing partial Content-Length headers as JSON payload.
+  if (!startsLikeJsonPayload(buffer)) {
+    return null;
   }
 
   const newline = buffer.indexOf(0x0a);

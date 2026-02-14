@@ -12,6 +12,7 @@ const {
   buildAliasUri,
   parseAliasUri,
   extractJsonFromToolResult,
+  readNextFramedMessage,
   ServerRegistry,
   DEFAULT_CONFIG
 } = require("../src/index.js");
@@ -135,6 +136,19 @@ test("extractJsonFromToolResult parses JSON text", () => {
   };
   const parsed = extractJsonFromToolResult(result);
   assert.equal(parsed.projects[0].name, "x");
+});
+
+test("readNextFramedMessage does not parse partial Content-Length headers as JSON lines", () => {
+  const request = "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{}}";
+  const headerOnly = Buffer.from(`Content-Length: ${Buffer.byteLength(request, "utf8")}\r\n`);
+  const complete = Buffer.concat([
+    headerOnly,
+    Buffer.from(`\r\n${request}`, "utf8")
+  ]);
+
+  assert.equal(readNextFramedMessage(headerOnly), null);
+  const frame = readNextFramedMessage(complete);
+  assert.equal(frame.payloadText, request);
 });
 
 test("resolveServerForToolCall prefers server_id and project name", () => {
