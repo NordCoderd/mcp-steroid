@@ -1,22 +1,25 @@
 # NPX MCP Steroid Stdio Proxy Specification
 
-Status: validated spec
-Last updated: 2026-01-29
+Status: validated spec (bridge-aware update)
+Last updated: 2026-02-14
 
 ## 1. Purpose
-Create a local NPX-run stdio MCP proxy that discovers all running IntelliJ MCP Steroid servers on the machine and exposes them as a single MCP server to any agent. The proxy aggregates discovery, routes tool calls to the correct upstream server, and optionally records all MCP traffic under the user's home directory.
+Create a local NPX-run stdio MCP proxy (TypeScript implementation) that discovers all running IntelliJ MCP Steroid servers on the machine and exposes them as a single MCP server to any agent. The proxy aggregates discovery, routes tool calls to the correct upstream server, and optionally records MCP traffic under the user's home directory.
 
 ## 2. Goals
 - Provide a single stdio MCP endpoint that dynamically aggregates multiple running MCP Steroid servers.
 - Offer the same tool methods as MCP Steroid without requiring proxy updates when new upstream tools appear.
 - Aggregate `steroid_list_projects` and `steroid_list_windows` across all servers.
+- Maintain dynamic mapping `<project name + path> -> IDE instance/port` and refresh on IDE restart/crash.
 - Re-check for marker files and server health continuously; servers can join/leave at any time (IDE restarts included).
 - Optional traffic log under `~/.mcp-steroid/`.
+- Keep proxy metadata/instructions sourced from IDE/plugin data (no hardcoded IDE metadata in NPX).
+- Keep NPX source and tests in TypeScript (`.ts`) only.
 
 ## 3. Non-goals
-- No upstream MCP Steroid behavior changes required to function.
 - No remote discovery or network scanning beyond explicit local configuration.
 - No UI; this is a headless CLI/service.
+- No NPX local HTTP endpoint for MCP clients (client-facing mode is stdio MCP).
 
 ## 4. RLM-informed design principles
 - Use explicit decision trees for discovery, routing, and error handling.
@@ -28,11 +31,12 @@ Create a local NPX-run stdio MCP proxy that discovers all running IntelliJ MCP S
 MCP Steroid writes a marker file in the user's home directory on startup:
 - File name pattern: `.<pid>.mcp-steroid`
 - Content: **first line is the MCP server URL** (e.g., `http://localhost:<port>/mcp`).
-- Remaining lines are human-readable info and quick start instructions.
+- Remaining lines may include human-readable info and optional machine-readable key-value metadata.
 
 Proxy requirements:
 - Scan `~` for files matching `\\.(\\d+)\\.mcp-steroid`.
-- Parse the **first line only** as `serverUrl`.
+- Parse the **first line** as `serverUrl`.
+- Optionally parse additional lines (`Key: Value`) for bridge URL/token/version and IDE/plugin hints.
 - Treat the file as valid only if the PID is still running (same user).
 - If PID is dead, ignore (do not delete; upstream already does cleanup).
 
@@ -56,6 +60,16 @@ For each discovered `serverUrl`:
 - Upstream transport: HTTP MCP to each server URL from marker files.
 - Support concurrent requests; preserve request IDs and tool call results.
 - No proxy restart needed for new tools or server changes.
+
+## 6.1 Control plane vs data plane
+- MCP API remains the data plane for tool/resource operations.
+- A dedicated plugin bridge API is allowed for NPX control-plane concerns (metadata snapshots, mapping freshness, heartbeat/progress stream wrapper, capability detection).
+- NPX must feature-detect bridge support and fall back to MCP-only behavior.
+
+## 6.2 Compatibility requirements
+- Older NPX + newer plugin: continue to work via MCP baseline.
+- Newer NPX + older plugin: bridge probe may fail; NPX must degrade gracefully and continue MCP-only.
+- Bridge APIs/metadata are additive-only; existing MCP behavior is preserved.
 
 ## 7. Server registry model
 Each upstream server is represented as:
@@ -188,9 +202,14 @@ CLI flags (minimum):
 - Servers can join/leave without proxy restart.
 - Traffic log writes under `~/.mcp-steroid/traffic` when enabled.
 - Proxy never writes to stdout except valid MCP responses.
+- Newer NPX falls back to MCP-only mode when bridge endpoints are absent.
+- Older NPX remains functional against newer plugin versions.
 
 ## 14. Upstream improvements (optional, tracked separately)
 These are not required for the proxy to work but would simplify and harden it:
+- Add dedicated bridge endpoints (Ktor handlers) for NPX control plane, for example:
+  - `GET /npx/v1/summary`
+  - `POST /npx/v1/tools/call/stream`
 - Publish a stable discovery document (e.g., `/.well-known/mcp.json`) with transports, URL, auth, version, and tools hash.
 - Add a server info tool/endpoint returning plugin/build version, IDE/platform version, and feature flags.
 - Define deterministic error codes plus retryable flag for proxy classification.
