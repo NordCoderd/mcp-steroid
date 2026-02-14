@@ -34,6 +34,10 @@
 - [ ] IDEA EAP lane
 - [ ] PyCharm stable lane
 - [ ] PyCharm EAP lane
+- [ ] GoLand stable lane
+- [ ] GoLand EAP lane
+- [ ] WebStorm stable lane
+- [ ] WebStorm EAP lane
 - [ ] Confirm stable ZIP copied to `release/out/plugin-idea-2025.3.1.zip`.
 
 ## Later (Enhancements)
