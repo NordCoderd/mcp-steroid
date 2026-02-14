@@ -30,20 +30,7 @@ class ListProjectsToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(): ToolCallResult {
-        val openProjects = readAction {
-            ProjectManager.getInstance().openProjects.toList()
-        }
-
-        val projects = openProjects.map { project ->
-            ProjectInfo(
-                name = project.name,
-                path = project.basePath ?: ""
-            )
-        }
-
-        val response = ListProjectsResponse(
-            projects = projects
-        )
+        val response = collectListProjectsResponse()
         val json = McpJson.encodeToString(response)
 
         return ToolCallResult(
@@ -52,9 +39,27 @@ class ListProjectsToolHandler : McpRegistrar {
     }
 }
 
+suspend fun collectListProjectsResponse(): ListProjectsResponse {
+    val openProjects = readAction {
+        ProjectManager.getInstance().openProjects.toList()
+    }
+
+    val projects = openProjects.map { project ->
+        ProjectInfo(
+            name = project.name,
+            path = project.basePath ?: ""
+        )
+    }
+
+    return ListProjectsResponse(
+        projects = projects
+    )
+}
+
 @Serializable
 data class ListProjectsResponse(
     val ide: IdeInfo = IdeInfo.ofApplication(),
+    val plugin: PluginInfo = PluginInfo.ofCurrentPlugin(),
     val pid: Long = ProcessHandle.current().pid(),
     val projects: List<ProjectInfo>
 )

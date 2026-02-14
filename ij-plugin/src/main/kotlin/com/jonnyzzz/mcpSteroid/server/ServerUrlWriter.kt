@@ -8,6 +8,7 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.util.Disposer
+import com.jonnyzzz.mcpSteroid.PluginDescriptorProvider
 import java.nio.file.Files
 import java.nio.file.Path
 import java.text.SimpleDateFormat
@@ -65,12 +66,19 @@ class ServerUrlWriter : Disposable {
     }
 
     private fun buildMarkerContent(serverUrl: String): String = buildString {
+        val plugin = PluginDescriptorProvider.getInstance()
+        val appInfo = ApplicationInfo.getInstance()
+
         appendLine(serverUrl)
         appendLine()
         appendLine("IntelliJ MCP Steroid Server")
         appendLine("URL: $serverUrl")
         appendLine()
         appendLine("Created: ${ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)}")
+        appendLine("Plugin Version: ${plugin.version}")
+        appendLine("Plugin ID: ${plugin.pluginId}")
+        appendLine("IDE Version: ${appInfo.fullVersion}")
+        appendLine("IDE Build: ${appInfo.build.asString()}")
         appendLine()
         appendLine(IdeaDescriptionWriter.getInstance().buildDescriptionContent(serverUrl))
         appendLine()

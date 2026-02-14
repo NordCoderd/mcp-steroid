@@ -1,0 +1,303 @@
+/* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+package com.jonnyzzz.mcpSteroid.server
+
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.thisLogger
+import com.jonnyzzz.mcpSteroid.mcp.*
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.collect
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.*
+import java.util.UUID
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.time.Duration.Companion.seconds
+
+@Service(Service.Level.APP)
+class NpxBridgeService {
+    private val log = thisLogger()
+    private val seqCounter = AtomicLong(0)
+
+    val instanceId: String = "npx-${UUID.randomUUID()}"
+    val token: String = UUID.randomUUID().toString().replace("-", "")
+    val schemaVersion: String = "1"
+
+    fun isAuthorized(authorizationHeader: String?): Boolean {
+        if (authorizationHeader.isNullOrBlank()) return false
+        if (!authorizationHeader.startsWith("Bearer ")) return false
+        return authorizationHeader.removePrefix("Bearer ").trim() == token
+    }
+
+    fun markerTokenLine(): String = "NPX Token: $token"
+
+    private fun nextSeq(): Long = seqCounter.incrementAndGet()
+
+    private fun nowIso(): String = java.time.Instant.now().toString()
+
+    fun buildMetadata(mcpUrl: String): NpxBridgeMetadataResponse {
+        val seq = nextSeq()
+        val paths = ServerPathInfo.current()
+        val scriptName = com.intellij.openapi.application.ApplicationNamesInfo.getInstance().scriptName
+        val executable = ServerExecutableInfo.detect(scriptName, paths)
+
+        return NpxBridgeMetadataResponse(
+            pid = ProcessHandle.current().pid(),
+            mcpUrl = mcpUrl,
+            ide = IdeInfo.ofApplication(),
+            plugin = PluginInfo.ofCurrentPlugin(),
+            paths = paths,
+            executable = executable,
+            instanceId = instanceId,
+            seq = seq,
+            schemaVersion = schemaVersion,
+            updatedAt = nowIso()
+        )
+    }
+
+    suspend fun buildProjects(mcpUrl: String): NpxBridgeProjectsResponse {
+        val seq = nextSeq()
+        val projects = collectListProjectsResponse()
+        return NpxBridgeProjectsResponse(
+            projects = projects.projects,
+            pid = projects.pid,
+            mcpUrl = mcpUrl,
+            instanceId = instanceId,
+            seq = seq,
+            schemaVersion = schemaVersion,
+            updatedAt = nowIso()
+        )
+    }
+
+    suspend fun buildWindows(mcpUrl: String): NpxBridgeWindowsResponse {
+        val seq = nextSeq()
+        val windows = collectListWindowsResponse()
+        return NpxBridgeWindowsResponse(
+            windows = windows.windows,
+            backgroundTasks = windows.backgroundTasks,
+            pid = windows.pid,
+            mcpUrl = mcpUrl,
+            instanceId = instanceId,
+            seq = seq,
+            schemaVersion = schemaVersion,
+            updatedAt = nowIso()
+        )
+    }
+
+    suspend fun buildSummary(mcpUrl: String): NpxBridgeSummaryResponse {
+        val seq = nextSeq()
+        val metadata = buildMetadata(mcpUrl)
+        val projects = collectListProjectsResponse().projects
+        val windows = collectListWindowsResponse()
+        return NpxBridgeSummaryResponse(
+            metadata = metadata,
+            projects = projects,
+            windows = windows.windows,
+            backgroundTasks = windows.backgroundTasks,
+            instanceId = instanceId,
+            seq = seq,
+            schemaVersion = schemaVersion,
+            updatedAt = nowIso()
+        )
+    }
+
+    fun buildResources(serverCore: McpServerCore): NpxBridgeResourcesResponse {
+        val seq = nextSeq()
+        val resources = serverCore.resourceRegistry.listResources()
+        return NpxBridgeResourcesResponse(
+            resources = resources,
+            instanceId = instanceId,
+            seq = seq,
+            schemaVersion = schemaVersion,
+            updatedAt = nowIso()
+        )
+    }
+
+    fun readResource(serverCore: McpServerCore, uri: String): ResourceReadResult? {
+        if (!uri.startsWith("mcp-steroid://")) return null
+        return serverCore.resourceRegistry.readResource(uri)
+    }
+
+    suspend fun streamToolCall(
+        serverCore: McpServerCore,
+        request: NpxBridgeToolCallRequest,
+        emit: suspend (JsonObject) -> Unit
+    ) {
+        val session = serverCore.sessionManager.createSession()
+        val progressToken = "npx-${UUID.randomUUID()}"
+
+        val argsWithMeta = injectProgressMeta(request.arguments, progressToken)
+        val rawParams = buildJsonObject {
+            put("name", request.name)
+            put("arguments", argsWithMeta)
+        }
+        val params = ToolCallParams(
+            name = request.name,
+            arguments = argsWithMeta,
+            rawArguments = rawParams
+        )
+
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        val heartbeatJob = scope.launch {
+            while (isActive) {
+                delay(2.seconds)
+                emit(
+                    buildJsonObject {
+                        put("type", "heartbeat")
+                        put("instanceId", instanceId)
+                        put("seq", seqCounter.incrementAndGet())
+                        put("updatedAt", nowIso())
+                    }
+                )
+            }
+        }
+        val progressJob = scope.launch {
+            session.notifications().collect { notification ->
+                if (notification.method != McpMethods.PROGRESS) return@collect
+                val paramsElement = notification.params ?: return@collect
+                val progress = runCatching { McpJson.decodeFromJsonElement(ProgressParams.serializer(), paramsElement) }.getOrNull()
+                    ?: return@collect
+                if (progress.progressToken.jsonPrimitive.content != progressToken) return@collect
+
+                emit(
+                    buildJsonObject {
+                        put("type", "progress")
+                        put("instanceId", instanceId)
+                        put("seq", seqCounter.incrementAndGet())
+                        put("progress", progress.progress)
+                        progress.total?.let { put("total", it) }
+                        progress.message?.let { put("message", it) }
+                        put("updatedAt", nowIso())
+                    }
+                )
+            }
+        }
+
+        try {
+            emit(
+                buildJsonObject {
+                    put("type", "progress")
+                    put("instanceId", instanceId)
+                    put("seq", seqCounter.incrementAndGet())
+                    put("message", "Tool call started: ${request.name}")
+                    put("progress", 0.0)
+                    put("updatedAt", nowIso())
+                }
+            )
+
+            val result = serverCore.toolRegistry.callTool(params, session)
+            emit(
+                buildJsonObject {
+                    put("type", "result")
+                    put("instanceId", instanceId)
+                    put("seq", seqCounter.incrementAndGet())
+                    put("updatedAt", nowIso())
+                    put("result", McpJson.encodeToJsonElement(ToolCallResult.serializer(), result))
+                }
+            )
+        } catch (e: Exception) {
+            log.warn("Failed to stream bridge tool call '${request.name}'", e)
+            emit(
+                buildJsonObject {
+                    put("type", "error")
+                    put("instanceId", instanceId)
+                    put("seq", seqCounter.incrementAndGet())
+                    put("updatedAt", nowIso())
+                    put("message", e.message ?: "Tool call failed")
+                }
+            )
+        } finally {
+            heartbeatJob.cancel()
+            progressJob.cancel()
+            scope.cancel()
+            serverCore.sessionManager.removeSession(session.id)
+        }
+    }
+
+    private fun injectProgressMeta(arguments: JsonObject?, progressToken: String): JsonObject {
+        val args = arguments ?: buildJsonObject { }
+        val existingMeta = args["_meta"]?.jsonObject
+        return buildJsonObject {
+            for ((key, value) in args.entries) {
+                if (key == "_meta") continue
+                put(key, value)
+            }
+            putJsonObject("_meta") {
+                if (existingMeta != null) {
+                    for ((key, value) in existingMeta.entries) {
+                        put(key, value)
+                    }
+                }
+                put("progressToken", progressToken)
+            }
+        }
+    }
+
+    companion object {
+        fun getInstance(): NpxBridgeService = service()
+    }
+}
+
+@Serializable
+data class NpxBridgeMetadataResponse(
+    val pid: Long,
+    val mcpUrl: String,
+    val ide: IdeInfo,
+    val plugin: PluginInfo,
+    val paths: ServerPathInfo,
+    val executable: ServerExecutableInfo,
+    val instanceId: String,
+    val seq: Long,
+    val schemaVersion: String,
+    val updatedAt: String
+)
+
+@Serializable
+data class NpxBridgeProjectsResponse(
+    val projects: List<ProjectInfo>,
+    val pid: Long,
+    val mcpUrl: String,
+    val instanceId: String,
+    val seq: Long,
+    val schemaVersion: String,
+    val updatedAt: String
+)
+
+@Serializable
+data class NpxBridgeWindowsResponse(
+    val windows: List<WindowInfo>,
+    val backgroundTasks: List<ProgressTaskInfo>,
+    val pid: Long,
+    val mcpUrl: String,
+    val instanceId: String,
+    val seq: Long,
+    val schemaVersion: String,
+    val updatedAt: String
+)
+
+@Serializable
+data class NpxBridgeSummaryResponse(
+    val metadata: NpxBridgeMetadataResponse,
+    val projects: List<ProjectInfo>,
+    val windows: List<WindowInfo>,
+    val backgroundTasks: List<ProgressTaskInfo>,
+    val instanceId: String,
+    val seq: Long,
+    val schemaVersion: String,
+    val updatedAt: String
+)
+
+@Serializable
+data class NpxBridgeResourcesResponse(
+    val resources: List<Resource>,
+    val instanceId: String,
+    val seq: Long,
+    val schemaVersion: String,
+    val updatedAt: String
+)
+
+@Serializable
+data class NpxBridgeToolCallRequest(
+    val name: String,
+    val arguments: JsonObject? = null
+)
+

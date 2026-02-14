@@ -38,86 +38,7 @@ class ListWindowsToolHandler : McpRegistrar {
     }
 
     private suspend fun handle(): ToolCallResult {
-        // Use DialogWindowsLookup for reliable modal detection:
-        // fast negative path (canPumpEdtNonModal), then EDT check if needed.
-        val lookup = dialogWindowsLookup()
-        val (windowInfos, progressTasks) = lookup.withModalityCheck { isModalShowing ->
-            // Window enumeration runs on EDT with ModalityState.any() so it works
-            // even when a modal dialog is blocking the normal EDT dispatcher.
-            withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-                val frames = WindowManager.getInstance().allProjectFrames.toList()
-
-                // Collect progress indicators from all frames
-                val allProgressTasks = mutableListOf<ProgressTaskInfo>()
-
-                val frameInfos = frames.map { frame ->
-                    val project = frame.project
-                    val component = frame.component
-                    val window = SwingUtilities.getWindowAncestor(component)
-                    val bounds = window?.bounds
-
-                    // Collect progress tasks from the status bar using new ProgressModel API
-                    val statusBar = frame.statusBar as? StatusBarEx
-                    statusBar?.let { bar ->
-                        val tasks = bar.backgroundProcessModels
-                        tasks.forEach { pair ->
-                            val taskInfo = pair.first
-                            val progressModel = pair.second
-                            allProgressTasks.add(
-                                ProgressTaskInfo(
-                                    title = taskInfo.title,
-                                    text = progressModel.getText() ?: "",
-                                    text2 = progressModel.getDetails() ?: "",
-                                    fraction = if (progressModel.isIndeterminate()) null else progressModel.getFraction(),
-                                    isIndeterminate = progressModel.isIndeterminate(),
-                                    isCancellable = progressModel.isCancellable(),
-                                    projectName = project?.name
-                                )
-                            )
-                        }
-                    }
-
-                    WindowInfo(
-                        projectName = project?.name,
-                        projectPath = project?.basePath,
-                        title = (window as? java.awt.Frame)?.title,
-                        isActive = window?.isActive ?: false,
-                        isVisible = window?.isVisible ?: false,
-                        bounds = bounds?.let { WindowBounds(it.x, it.y, it.width, it.height) },
-                        windowId = WindowIdUtil.compute(window, component),
-                        modalDialogShowing = isModalShowing,
-                        indexingInProgress = project?.let { DumbService.isDumb(it) },
-                        projectInitialized = project?.isInitialized,
-                    )
-                }
-
-                val knownWindowIds = frameInfos.map { it.windowId }.toMutableSet()
-                val extraInfos = java.awt.Window.getWindows()
-                    .filter { it.isDisplayable }
-                    .mapNotNull { window ->
-                        val windowId = WindowIdUtil.compute(window, window)
-                        if (!knownWindowIds.add(windowId)) return@mapNotNull null
-                        val bounds = window.bounds
-                        WindowInfo(
-                            projectName = null,
-                            projectPath = null,
-                            title = (window as? java.awt.Frame)?.title,
-                            isActive = window.isActive,
-                            isVisible = window.isVisible,
-                            bounds = WindowBounds(bounds.x, bounds.y, bounds.width, bounds.height),
-                            windowId = windowId,
-                            modalDialogShowing = isModalShowing,
-                        )
-                    }
-
-                (frameInfos + extraInfos) to allProgressTasks.toList()
-            }
-        }
-
-        val response = ListWindowsResponse(
-            windows = windowInfos,
-            backgroundTasks = progressTasks,
-        )
+        val response = collectListWindowsResponse()
         val json = McpJson.encodeToString(response)
         return ToolCallResult(
             content = listOf(ContentItem.Text(text = json))
@@ -125,9 +46,93 @@ class ListWindowsToolHandler : McpRegistrar {
     }
 }
 
+suspend fun collectListWindowsResponse(): ListWindowsResponse {
+    // Use DialogWindowsLookup for reliable modal detection:
+    // fast negative path (canPumpEdtNonModal), then EDT check if needed.
+    val lookup = dialogWindowsLookup()
+    val (windowInfos, progressTasks) = lookup.withModalityCheck { isModalShowing ->
+        // Window enumeration runs on EDT with ModalityState.any() so it works
+        // even when a modal dialog is blocking the normal EDT dispatcher.
+        withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+            val frames = WindowManager.getInstance().allProjectFrames.toList()
+
+            // Collect progress indicators from all frames
+            val allProgressTasks = mutableListOf<ProgressTaskInfo>()
+
+            val frameInfos = frames.map { frame ->
+                val project = frame.project
+                val component = frame.component
+                val window = SwingUtilities.getWindowAncestor(component)
+                val bounds = window?.bounds
+
+                // Collect progress tasks from the status bar using new ProgressModel API
+                val statusBar = frame.statusBar as? StatusBarEx
+                statusBar?.let { bar ->
+                    val tasks = bar.backgroundProcessModels
+                    tasks.forEach { pair ->
+                        val taskInfo = pair.first
+                        val progressModel = pair.second
+                        allProgressTasks.add(
+                            ProgressTaskInfo(
+                                title = taskInfo.title,
+                                text = progressModel.getText() ?: "",
+                                text2 = progressModel.getDetails() ?: "",
+                                fraction = if (progressModel.isIndeterminate()) null else progressModel.getFraction(),
+                                isIndeterminate = progressModel.isIndeterminate(),
+                                isCancellable = progressModel.isCancellable(),
+                                projectName = project?.name
+                            )
+                        )
+                    }
+                }
+
+                WindowInfo(
+                    projectName = project?.name,
+                    projectPath = project?.basePath,
+                    title = (window as? java.awt.Frame)?.title,
+                    isActive = window?.isActive ?: false,
+                    isVisible = window?.isVisible ?: false,
+                    bounds = bounds?.let { WindowBounds(it.x, it.y, it.width, it.height) },
+                    windowId = WindowIdUtil.compute(window, component),
+                    modalDialogShowing = isModalShowing,
+                    indexingInProgress = project?.let { DumbService.isDumb(it) },
+                    projectInitialized = project?.isInitialized,
+                )
+            }
+
+            val knownWindowIds = frameInfos.map { it.windowId }.toMutableSet()
+            val extraInfos = java.awt.Window.getWindows()
+                .filter { it.isDisplayable }
+                .mapNotNull { window ->
+                    val windowId = WindowIdUtil.compute(window, window)
+                    if (!knownWindowIds.add(windowId)) return@mapNotNull null
+                    val bounds = window.bounds
+                    WindowInfo(
+                        projectName = null,
+                        projectPath = null,
+                        title = (window as? java.awt.Frame)?.title,
+                        isActive = window.isActive,
+                        isVisible = window.isVisible,
+                        bounds = WindowBounds(bounds.x, bounds.y, bounds.width, bounds.height),
+                        windowId = windowId,
+                        modalDialogShowing = isModalShowing,
+                    )
+                }
+
+            (frameInfos + extraInfos) to allProgressTasks.toList()
+        }
+    }
+
+    return ListWindowsResponse(
+        windows = windowInfos,
+        backgroundTasks = progressTasks,
+    )
+}
+
 @Serializable
 data class ListWindowsResponse(
     val ide: IdeInfo = IdeInfo.ofApplication(),
+    val plugin: PluginInfo = PluginInfo.ofCurrentPlugin(),
     val pid: Long = ProcessHandle.current().pid(),
 
     val windows: List<WindowInfo>,
