@@ -9,7 +9,8 @@ The proxy is an MCP stdio server that:
 
 ## Runtime model
 
-- Client-facing transport: stdio MCP only (`stdin`/`stdout`)
+- Default mode: stdio MCP server (`stdin`/`stdout`)
+- Optional mode: direct CLI invocation of the same MCP methods/tools
 - Upstream transport: HTTP MCP to plugin `/mcp` endpoints discovered from marker files
 - No local HTTP server is exposed by NPX
 
@@ -25,6 +26,12 @@ The proxy is an MCP stdio server that:
 npm --prefix npx install
 npm --prefix npx run build
 node npx/dist/index.js
+
+# CLI mode examples
+node npx/dist/index.js --cli
+node npx/dist/index.js --cli --tool steroid_list_projects
+node npx/dist/index.js --cli --tool steroid_execute_code --arguments-json '{"project_name":"MyProject","code":"println(\"hello\")"}'
+node npx/dist/index.js --cli --cli-method resources/read --cli-params-json '{"uri":"mcp-steroid://skill/SKILL.md"}'
 ```
 
 Or via package binary once published:
@@ -59,6 +66,12 @@ CLI flags:
 --config <path>         Custom config file
 --scan-interval <ms>    Marker scan interval override
 --log-traffic           Enable traffic logging
+--cli                   Run single-shot CLI mode instead of stdio server
+--cli-method <method>   MCP method for CLI mode (default: tools/list)
+--cli-params-json <js>  JSON object for method params in CLI mode
+--tool <name>           Shortcut for tools/call in CLI mode
+--arguments-json <js>   JSON object for tools/call arguments in CLI mode
+--uri <resourceUri>     Shortcut for resources/read in CLI mode
 -h, --help              Print help
 ```
 

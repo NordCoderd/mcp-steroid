@@ -56,6 +56,7 @@ For each discovered `serverUrl`:
 
 ## 6. Transport and topology
 - Client-facing transport: **stdio MCP server** (JSON-RPC over stdin/stdout).
+- Optional local operator mode: **CLI mode** that invokes the same MCP methods/tools in single-shot command execution.
 - The proxy must never emit non-MCP output on stdout. Logs go to stderr.
 - Upstream transport: HTTP MCP to each server URL from marker files.
 - Support concurrent requests; preserve request IDs and tool call results.
