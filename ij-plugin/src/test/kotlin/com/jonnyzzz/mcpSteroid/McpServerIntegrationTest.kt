@@ -5,8 +5,10 @@ import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.mcp.*
 import com.jonnyzzz.mcpSteroid.server.ActionDiscoveryResponse
+import com.jonnyzzz.mcpSteroid.server.ListProductsResponse
 import com.jonnyzzz.mcpSteroid.server.ListProjectsResponse
 import com.jonnyzzz.mcpSteroid.server.ListWindowsResponse
+import com.jonnyzzz.mcpSteroid.server.ServerMetadataResponse
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
@@ -83,7 +85,15 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val toolNames = toolsList.tools.map { it.name }.toSet()
         assertTrue(
             "Steroid tools should be advertised",
-            toolNames.containsAll(setOf("steroid_list_projects", "steroid_list_windows", "steroid_execute_code"))
+            toolNames.containsAll(
+                setOf(
+                    "steroid_list_projects",
+                    "steroid_list_windows",
+                    "steroid_list_products",
+                    "steroid_server_metadata",
+                    "steroid_execute_code"
+                )
+            )
         )
 
         val listProjectsResponse = client.post(server.mcpUrl) {
@@ -103,6 +113,8 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertTrue("IDE name should be reported", projects.ide.name.isNotBlank())
         assertTrue("IDE version should be reported", projects.ide.version.isNotBlank())
         assertTrue("IDE build should be reported", projects.ide.build.isNotBlank())
+        assertTrue("Plugin id should be reported", projects.plugin.id.isNotBlank())
+        assertTrue("Plugin version should be reported", projects.plugin.version.isNotBlank())
         assertTrue(
             "Current project should be discoverable via the MCP tool",
             projects.projects.any { it.name == project.name }
@@ -158,12 +170,69 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val payload = listWindowsResult.content.filterIsInstance<ContentItem.Text>().firstOrNull()?.text ?: ""
         val windows = McpJson.decodeFromString(ListWindowsResponse.serializer(), payload)
         assertNotNull("Should return windows payload", windows)
+        assertTrue("Plugin id should be reported", windows.plugin.id.isNotBlank())
+        assertTrue("Plugin version should be reported", windows.plugin.version.isNotBlank())
         if (windows.windows.isNotEmpty()) {
             assertTrue(
                 "windows should include windowId values",
                 windows.windows.any { it.windowId.isNotBlank() }
             )
         }
+    }
+
+    fun testListProductsTool(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+        val sessionId = startSession(server)
+
+        val response = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":"call-list-products","method":"tools/call","params":{"name":"steroid_list_products"}}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val rpc = McpJson.decodeFromString<JsonRpcResponse>(response.bodyAsText())
+        assertNull("steroid_list_products should not return JSON-RPC error", rpc.error)
+        val toolResult = McpJson.decodeFromJsonElement<ToolCallResult>(rpc.result!!)
+        assertFalse("steroid_list_products should succeed", toolResult.isError)
+
+        val payload = toolResult.content.filterIsInstance<ContentItem.Text>().firstOrNull()?.text ?: ""
+        val products = McpJson.decodeFromString(ListProductsResponse.serializer(), payload)
+        assertTrue("Expected at least one product entry", products.products.isNotEmpty())
+        val first = products.products.first()
+        assertTrue("Product IDE name should be reported", first.ide.name.isNotBlank())
+        assertTrue("Product IDE version should be reported", first.ide.version.isNotBlank())
+        assertTrue("Product plugin version should be reported", first.plugin.version.isNotBlank())
+    }
+
+    fun testServerMetadataTool(): Unit = timeoutRunBlocking(30.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+        val sessionId = startSession(server)
+
+        val response = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody("""{"jsonrpc":"2.0","id":"call-server-metadata","method":"tools/call","params":{"name":"steroid_server_metadata"}}""")
+        }
+
+        assertEquals(HttpStatusCode.OK, response.status)
+        val rpc = McpJson.decodeFromString<JsonRpcResponse>(response.bodyAsText())
+        assertNull("steroid_server_metadata should not return JSON-RPC error", rpc.error)
+        val toolResult = McpJson.decodeFromJsonElement<ToolCallResult>(rpc.result!!)
+        assertFalse("steroid_server_metadata should succeed", toolResult.isError)
+
+        val payload = toolResult.content.filterIsInstance<ContentItem.Text>().firstOrNull()?.text ?: ""
+        val metadata = McpJson.decodeFromString(ServerMetadataResponse.serializer(), payload)
+        assertTrue("IDE name should be reported", metadata.ide.name.isNotBlank())
+        assertTrue("Plugin version should be reported", metadata.plugin.version.isNotBlank())
+        assertTrue("IDE home path should be reported", metadata.paths.homePath.isNotBlank())
+        assertTrue("IDE bin path should be reported", metadata.paths.binPath.isNotBlank())
+        assertTrue("Executable candidates should be reported", metadata.executable.candidates.isNotEmpty())
+        assertTrue("MCP URL should be reported", metadata.mcpUrl.contains("/mcp"))
     }
 
     private fun buildInitializeRequest() = buildJsonObject {
