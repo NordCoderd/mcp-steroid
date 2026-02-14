@@ -26,3 +26,11 @@ Thumbs.db
 # Integration test temporary files
 integration-test/tmp/
 integration-test/*.tmp
+
+# NPX package artifacts
+npx/node_modules/
+npx/dist/
+npx/dist-test/
+npx/.npm/
+npx/.cache/
+npx/*.log
