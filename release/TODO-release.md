@@ -40,6 +40,18 @@
 - [ ] WebStorm EAP lane
 - [ ] Confirm stable ZIP copied to `release/out/plugin-idea-2025.3.1.zip`.
 
+## Completed (0.88.0 Release)
+
+- [x] Quick release path (non-Docker, agent-driven) — used successfully for 0.88.0.
+- [x] `updatePlugins.xml` generation — auto-generated on each website build via Python DOM API.
+- [x] Auto-obsolete banners on older release pages (Hugo template logic, no manual content changes).
+- [x] Plugin repository promotion on releases list page and individual release pages.
+- [x] Mark older GitHub releases obsolete with banner pointing to latest.
+- [x] Release ordering by version descending (`.ByTitle.Reverse`) instead of weight-based.
+- [x] `CLAUDECODE` env var unset in `run-agent.sh` for nested agent support.
+- [x] Release tag format uses no `v` prefix (e.g., `0.88.0` not `v0.88.0`).
+- [x] GoLand and WebStorm added to integration test verification matrix.
+
 ## Later (Enhancements)
 
 - [ ] Add post-publish validation (GitHub release asset checksum + website link checks).
