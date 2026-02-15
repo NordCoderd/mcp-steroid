@@ -78,6 +78,24 @@ class DockerGeminiSession(
      * We retry once with modern syntax when the legacy flag is rejected.
      */
     override fun runPrompt(prompt: String, timeoutSeconds: Long): ProcessResult {
+        var effectiveResult = runPromptOnce(prompt, timeoutSeconds)
+
+        // Gemini API occasionally drops the socket mid-stream (UND_ERR_SOCKET / terminated).
+        // Retry once because this is an external transient failure unrelated to MCP behavior.
+        if (shouldRetryTransientApiError(effectiveResult)) {
+            effectiveResult = runPromptOnce(prompt, timeoutSeconds)
+        }
+
+        val resultText = extractGeminiStreamJsonResult(effectiveResult.output)
+        return ProcessResultValue(
+            exitCode = effectiveResult.exitCode ?: -1,
+            output = resultText,
+            stderr = effectiveResult.stderr,
+            rawOutput = effectiveResult.output,
+        )
+    }
+
+    private fun runPromptOnce(prompt: String, timeoutSeconds: Long): ProcessResult {
         val rawResult = runInContainer(
             "--screen-reader", "true",
             "--sandbox-mode", "none",
@@ -99,14 +117,16 @@ class DockerGeminiSession(
         } else {
             rawResult
         }
+        return effectiveResult
+    }
 
-        val resultText = extractGeminiStreamJsonResult(effectiveResult.output)
-        return ProcessResultValue(
-            exitCode = effectiveResult.exitCode ?: -1,
-            output = resultText,
-            stderr = effectiveResult.stderr,
-            rawOutput = effectiveResult.output,
-        )
+    private fun shouldRetryTransientApiError(result: ProcessResult): Boolean {
+        if (result.exitCode == 0) return false
+        val combined = (result.output + "\n" + result.stderr).lowercase(Locale.US)
+        return combined.contains("api error: terminated") ||
+                combined.contains("error when talking to gemini api") ||
+                combined.contains("und_err_socket") ||
+                combined.contains("other side closed")
     }
 
     private fun shouldRetryWithModernSandboxFlag(result: ProcessResult): Boolean {

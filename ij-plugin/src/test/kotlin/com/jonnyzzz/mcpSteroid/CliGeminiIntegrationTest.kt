@@ -14,13 +14,6 @@ import kotlin.time.Duration.Companion.seconds
  * Prerequisites:
  * - Docker must be installed and running
  * - GEMINI_API_KEY must be available (either in env or ~/.vertex)
- *
- * KNOWN ISSUE: Gemini CLI v0.22.2 has a bug where `gemini mcp add --transport http`
- * creates a settings.json with `"type": "http"` key, but then fails to read it with
- * "Unrecognized key(s) in object: 'type'" error (exit code 52).
- *
- * The tests that require MCP are disabled until this is fixed upstream.
- * See: https://github.com/google-gemini/gemini-cli/issues/15449
  */
 class CliGeminiIntegrationTest : CliIntegrationTestBase() {
     private fun geminiSession() = DockerGeminiSession.create(lifetime)
