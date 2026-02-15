@@ -12,10 +12,6 @@ import java.io.OutputStream
  * Handles item.completed, item.started, turn.completed, and error events.
  */
 class CodexJsonFilter : OutputFilter {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
 
     override fun process(input: InputStream, output: OutputStream) {
         val writer = output.bufferedWriter()
@@ -34,7 +30,7 @@ class CodexJsonFilter : OutputFilter {
                 }
 
                 try {
-                    val event = json.parseToJsonElement(trimmed).jsonObject
+                    val event = filterJson.parseToJsonElement(trimmed).jsonObject
                     processEvent(event, writer)
                 } catch (e: Exception) {
                     // Malformed JSON - pass through for debugging visibility
@@ -87,7 +83,7 @@ class CodexJsonFilter : OutputFilter {
             for (part in output.lines()) {
                 val trimmed = part.trimEnd()
                 if (trimmed.isNotEmpty()) {
-                    writer.write("  ${truncate(trimmed)}")
+                    writer.write("  $trimmed")
                     writer.newLine()
                 }
             }
@@ -98,7 +94,7 @@ class CodexJsonFilter : OutputFilter {
             val cmd = item["command"]?.jsonPrimitive?.contentOrNull ?: ""
             var label = ">> exit $exitCode"
             if (cmd.isNotEmpty()) {
-                label += " (${truncate(cmd, 80)})"
+                label += " ($cmd)"
             }
             writer.write(label)
             writer.newLine()
@@ -125,8 +121,7 @@ class CodexJsonFilter : OutputFilter {
             label += " [$execId]"
         }
         if (output.isNotEmpty()) {
-            val summary = truncate(output.replace("\n", " "), 120)
-            label += ": $summary"
+            label += ": ${output.replace("\n", " ")}"
         }
 
         writer.write(label)
@@ -156,7 +151,7 @@ class CodexJsonFilter : OutputFilter {
                 ?: item["arguments"]?.jsonPrimitive?.contentOrNull
             if (inputStr != null) {
                 inputObj = try {
-                    json.parseToJsonElement(inputStr) as? JsonObject
+                    filterJson.parseToJsonElement(inputStr) as? JsonObject
                 } catch (e: Exception) {
                     null
                 }
@@ -201,49 +196,5 @@ class CodexJsonFilter : OutputFilter {
         writer.write(message)
         writer.newLine()
         writer.flush()
-    }
-
-    private fun toolDetail(name: String, input: JsonObject): String {
-        return when (name) {
-            "steroid_execute_code" -> {
-                val reason = input["reason"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (reason.isNotEmpty()) {
-                    val truncated = if (reason.length > 80) reason.take(77) + "..." else reason
-                    " ($truncated)"
-                } else ""
-            }
-            "read_mcp_resource" -> {
-                val uri = input["uri"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (uri.isNotEmpty()) " ($uri)" else ""
-            }
-            "Bash", "bash" -> {
-                val cmd = input["command"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (cmd.isNotEmpty()) {
-                    val truncated = if (cmd.length > 60) cmd.take(57) + "..." else cmd
-                    " ($truncated)"
-                } else ""
-            }
-            "Read", "read" -> {
-                val path = input["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (path.isNotEmpty()) " ($path)" else ""
-            }
-            "Edit", "edit", "Write", "write" -> {
-                val path = input["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (path.isNotEmpty()) " ($path)" else ""
-            }
-            "Grep", "grep" -> {
-                val pattern = input["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (pattern.isNotEmpty()) " ($pattern)" else ""
-            }
-            "Glob", "glob" -> {
-                val pattern = input["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (pattern.isNotEmpty()) " ($pattern)" else ""
-            }
-            else -> ""
-        }
-    }
-
-    private fun truncate(text: String, maxLen: Int = 200): String {
-        return if (text.length <= maxLen) text else text.take(maxLen) + "..."
     }
 }

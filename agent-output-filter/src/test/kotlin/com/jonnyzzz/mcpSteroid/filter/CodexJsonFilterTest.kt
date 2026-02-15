@@ -46,12 +46,12 @@ class CodexJsonFilterTest {
     }
 
     @Test
-    fun `test tool_call item started with long reason truncation`() {
+    fun `test tool_call item started with long reason is not truncated`() {
         val longReason = "a".repeat(100)
         val input = """{"type":"item.started","item":{"type":"tool_call","name":"steroid_execute_code","input":{"reason":"$longReason"}}}"""
         val output = runFilter(input)
         assertTrue(output.contains(">> steroid_execute_code"))
-        assertTrue(output.contains("..."))
+        assertTrue(output.contains(longReason), "Full reason should be preserved: $output")
     }
 
     @Test
@@ -133,12 +133,11 @@ class CodexJsonFilterTest {
     }
 
     @Test
-    fun `test output truncation for long text`() {
+    fun `test long output is not truncated`() {
         val longOutput = "a".repeat(250)
         val input = """{"type":"item.completed","item":{"type":"tool_call","name":"Test","output":"$longOutput"}}"""
         val output = runFilter(input)
-        assertTrue(output.contains("..."))
-        assertTrue(output.length < longOutput.length + 50)
+        assertTrue(output.contains(longOutput), "Full output should be preserved: $output")
     }
 
     @Test

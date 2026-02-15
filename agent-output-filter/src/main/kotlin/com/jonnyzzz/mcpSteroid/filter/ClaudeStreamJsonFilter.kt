@@ -1,8 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.filter
 
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import java.io.InputStream
 import java.io.OutputStream
@@ -14,10 +12,6 @@ import java.io.OutputStream
  * Handles all known event types including tool_use, tool_result, text deltas, etc.
  */
 class ClaudeStreamJsonFilter : OutputFilter {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
 
     override fun process(input: InputStream, output: OutputStream) {
         val writer = output.bufferedWriter()
@@ -36,7 +30,7 @@ class ClaudeStreamJsonFilter : OutputFilter {
                 }
 
                 try {
-                    val event = json.parseToJsonElement(trimmed).jsonObject
+                    val event = filterJson.parseToJsonElement(trimmed).jsonObject
                     processEvent(event, writer)
                 } catch (e: Exception) {
                     // Malformed JSON - pass through for debugging visibility
@@ -212,61 +206,18 @@ class ClaudeStreamJsonFilter : OutputFilter {
         }
     }
 
-    private fun toolDetail(name: String, input: JsonObject): String {
-        return when (name) {
-            "steroid_execute_code" -> {
-                val reason = input["reason"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (reason.isNotEmpty()) {
-                    val truncated = if (reason.length > 80) reason.take(77) + "..." else reason
-                    " ($truncated)"
-                } else ""
-            }
-            "read_mcp_resource" -> {
-                val uri = input["uri"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (uri.isNotEmpty()) " ($uri)" else ""
-            }
-            "Bash", "bash" -> {
-                val cmd = input["command"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (cmd.isNotEmpty()) {
-                    val truncated = if (cmd.length > 60) cmd.take(57) + "..." else cmd
-                    " ($truncated)"
-                } else ""
-            }
-            "Read", "read" -> {
-                val path = input["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (path.isNotEmpty()) " ($path)" else ""
-            }
-            "Edit", "edit", "Write", "write" -> {
-                val path = input["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (path.isNotEmpty()) " ($path)" else ""
-            }
-            "Grep", "grep" -> {
-                val pattern = input["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (pattern.isNotEmpty()) " ($pattern)" else ""
-            }
-            "Glob", "glob" -> {
-                val pattern = input["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (pattern.isNotEmpty()) " ($pattern)" else ""
-            }
-            else -> ""
-        }
-    }
-
     private fun toolResultSummary(event: JsonObject): String {
         val content = event["content"] ?: return ""
 
         return when (content) {
             is JsonPrimitive -> {
-                // String content - show first meaningful line
                 val text = content.contentOrNull ?: return ""
                 text.lineSequence()
                     .map { it.trim() }
                     .firstOrNull { it.isNotEmpty() }
-                    ?.let { if (it.length > 100) it.take(97) + "..." else it }
                     ?: ""
             }
             is JsonArray -> {
-                // Content blocks (text, image, etc.)
                 val parts = mutableListOf<String>()
                 for (block in content) {
                     if (block is JsonObject && block["type"]?.jsonPrimitive?.contentOrNull == "text") {
@@ -274,7 +225,6 @@ class ClaudeStreamJsonFilter : OutputFilter {
                         text.lineSequence()
                             .map { it.trim() }
                             .firstOrNull { it.isNotEmpty() }
-                            ?.let { if (it.length > 100) it.take(97) + "..." else it }
                             ?.let { parts.add(it) }
                         if (parts.isNotEmpty()) break
                     }

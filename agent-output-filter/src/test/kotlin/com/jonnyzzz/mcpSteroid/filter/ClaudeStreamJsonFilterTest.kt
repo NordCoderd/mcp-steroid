@@ -18,13 +18,12 @@ class ClaudeStreamJsonFilterTest {
     }
 
     @Test
-    fun `test tool_use with long reason truncation`() {
+    fun `test tool_use with long reason is not truncated`() {
         val longReason = "a".repeat(100)
         val input = """{"type":"content_block_start","content_block":{"type":"tool_use","name":"steroid_execute_code","input":{"reason":"$longReason"}}}"""
         val output = runFilter(input)
         assertTrue(output.contains(">> steroid_execute_code"))
-        assertTrue(output.contains("..."))
-        assertTrue(output.length < input.length) // Should be truncated
+        assertTrue(output.contains(longReason), "Full reason should be preserved: $output")
     }
 
     @Test

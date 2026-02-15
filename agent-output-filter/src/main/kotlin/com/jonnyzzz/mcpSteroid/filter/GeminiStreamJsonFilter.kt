@@ -13,13 +13,8 @@ import java.util.Locale
  * Handles: message (assistant text), tool_use, tool_result, result, error events.
  *
  * This is used when Gemini CLI is invoked with `--output-format stream-json`.
- * For text-mode output (ANSI stripping), use [GeminiFilter] instead.
  */
 class GeminiStreamJsonFilter : OutputFilter {
-    private val json = Json {
-        ignoreUnknownKeys = true
-        isLenient = true
-    }
 
     override fun process(input: InputStream, output: OutputStream) {
         val writer = output.bufferedWriter()
@@ -50,7 +45,7 @@ class GeminiStreamJsonFilter : OutputFilter {
                 }
 
                 val event = try {
-                    json.parseToJsonElement(trimmed).jsonObject
+                    filterJson.parseToJsonElement(trimmed).jsonObject
                 } catch (_: Exception) {
                     flushAssistantText()
                     writer.write(line)
@@ -134,14 +129,14 @@ class GeminiStreamJsonFilter : OutputFilter {
         return when (output) {
             is JsonPrimitive -> {
                 val value = output.contentOrNull?.trim().orEmpty()
-                if (value.isEmpty()) null else truncate(firstNonBlankLine(value), maxLength = 120)
+                if (value.isEmpty()) null else firstNonBlankLine(value)
             }
 
             is JsonObject -> {
                 val value = output["message"]?.jsonPrimitive?.contentOrNull
                     ?: output["text"]?.jsonPrimitive?.contentOrNull
                     ?: output["error"]?.jsonPrimitive?.contentOrNull
-                value?.trim()?.takeIf { it.isNotEmpty() }?.let { truncate(firstNonBlankLine(it), maxLength = 120) }
+                value?.trim()?.takeIf { it.isNotEmpty() }?.let { firstNonBlankLine(it) }
             }
 
             else -> null
@@ -213,50 +208,5 @@ class GeminiStreamJsonFilter : OutputFilter {
         }
         writer.newLine()
         writer.flush()
-    }
-
-    private fun toolDetail(toolName: String, input: JsonObject?): String {
-        if (input == null) return ""
-        return when (toolName) {
-            "steroid_execute_code" -> {
-                val reason = input["reason"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (reason.isNotEmpty()) {
-                    val truncated = if (reason.length > 80) reason.take(77) + "..." else reason
-                    " ($truncated)"
-                } else ""
-            }
-
-            "read_mcp_resource" -> {
-                val uri = input["uri"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (uri.isNotEmpty()) " ($uri)" else ""
-            }
-
-            "Bash", "bash", "run_shell_command" -> {
-                val cmd = input["command"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (cmd.isNotEmpty()) {
-                    val truncated = if (cmd.length > 60) cmd.take(57) + "..." else cmd
-                    " ($truncated)"
-                } else ""
-            }
-
-            "read_file", "write_file", "edit_file", "replace", "Read", "read", "Edit", "edit", "Write", "write" -> {
-                val path = input["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (path.isNotEmpty()) " ($path)" else ""
-            }
-
-            "Grep", "grep", "Glob", "glob" -> {
-                val pattern = input["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
-                if (pattern.isNotEmpty()) " ($pattern)" else ""
-            }
-
-            else -> ""
-        }
-    }
-
-    private fun truncate(value: String?, maxLength: Int): String? {
-        if (value == null) return null
-        if (value.length <= maxLength) return value
-        if (maxLength <= 3) return value.take(maxLength)
-        return value.take(maxLength - 3) + "..."
     }
 }
