@@ -208,17 +208,18 @@ class DockerDriver(
         // Ensure parent directory exists
         val parentDir = containerPath.substringBeforeLast('/')
         if (parentDir.isNotEmpty()) {
-            runInContainer(containerId, listOf("mkdir", "-p", parentDir), timeoutSeconds = 5).assertExitCode(0)
+            runInContainer(containerId, listOf("mkdir", "-p", parentDir), timeoutSeconds = 5, quietly = true).assertExitCode(0)
         }
 
         runInContainer(
             containerId,
             listOf("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF"),
             timeoutSeconds = 5,
+            quietly = true,
         ).assertExitCode(0)
 
         if (executable) {
-            runInContainer(containerId, listOf("chmod", "+x", containerPath), timeoutSeconds = 5).assertExitCode(0)
+            runInContainer(containerId, listOf("chmod", "+x", containerPath), timeoutSeconds = 5, quietly = true).assertExitCode(0)
         }
     }
 
