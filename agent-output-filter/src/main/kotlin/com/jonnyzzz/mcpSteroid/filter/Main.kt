@@ -13,6 +13,7 @@ import kotlin.system.exitProcess
  *   - stream-json, claude (default): Claude stream-json NDJSON filter
  *   - codex: Codex CLI --json NDJSON filter
  *   - gemini: Gemini CLI text filter (ANSI stripping)
+ *   - gemini-json, gemini-stream-json: Gemini CLI stream-json NDJSON filter
  */
 fun main(args: Array<String>) {
     val filterType = args.getOrNull(0) ?: "stream-json"
@@ -21,6 +22,7 @@ fun main(args: Array<String>) {
         "stream-json", "claude" -> ClaudeStreamJsonFilter()
         "codex" -> CodexJsonFilter()
         "gemini" -> GeminiFilter()
+        "gemini-json", "gemini-stream-json" -> GeminiStreamJsonFilter()
         "--help", "-h" -> {
             printHelp()
             exitProcess(0)
@@ -57,6 +59,7 @@ private fun printHelp() {
           stream-json, claude    Claude stream-json NDJSON filter (default)
           codex                  Codex CLI --json NDJSON filter
           gemini                 Gemini CLI text filter (ANSI stripping)
+          gemini-json            Gemini CLI stream-json NDJSON filter
 
         Options:
           --help, -h             Show this help message
