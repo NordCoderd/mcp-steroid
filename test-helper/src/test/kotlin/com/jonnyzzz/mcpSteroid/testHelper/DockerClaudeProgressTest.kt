@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.filter.ClaudeStreamJsonFilter
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -91,8 +92,8 @@ class DockerClaudeProgressTest {
     }
 
     @Test
-    fun `test Claude extractStreamJsonResult handles tool_use in content blocks`() {
-        // Test the stream-json parser with real tool_use event structure
+    fun `test Claude filter handles tool_use in content blocks`() {
+        // Test the stream-json filter with real tool_use event structure
         val raw = """
             {"type":"message_start","message":{"id":"msg_123","type":"message"}}
             {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_456","name":"bash","input":{}}}
@@ -105,15 +106,19 @@ class DockerClaudeProgressTest {
             {"type":"content_block_stop","index":1}
             {"type":"message_delta","delta":{"stop_reason":"end_turn"}}
             {"type":"message_stop"}
-            {"type":"result","result":"The files are listed above."}
         """.trimIndent()
 
-        val result = DockerClaudeSession.extractStreamJsonResult(raw)
+        val filter = ClaudeStreamJsonFilter()
+        val result = filter.filterText(raw)
 
-        // Should extract the final result event
+        // Should show tool call and text content
+        assertTrue(
+            result.contains(">> bash"),
+            "Should show tool_use block for bash: $result"
+        )
         assertTrue(
             result.contains("files are listed"),
-            "Should extract final result text"
+            "Should extract text_delta content: $result"
         )
     }
 }

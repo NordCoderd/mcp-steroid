@@ -19,6 +19,7 @@ val npxPackage by configurations.creating {
 dependencies {
     npxPackage(project(path = ":npx", configuration = "npxPackageElements"))
     implementation(project(":ai-agents"))
+    implementation(project(":agent-output-filter"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 

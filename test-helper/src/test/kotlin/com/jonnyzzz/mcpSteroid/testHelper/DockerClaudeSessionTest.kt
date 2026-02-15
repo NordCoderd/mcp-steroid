@@ -1,45 +1,42 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.filter.ClaudeStreamJsonFilter
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+/**
+ * Tests that [ClaudeStreamJsonFilter] produces readable output from NDJSON.
+ * Detailed filter behavior is covered by ClaudeStreamJsonFilterTest in agent-output-filter.
+ */
 class DockerClaudeSessionTest {
-    @Test
-    fun extractsLastResultEventText() {
-        val raw = """
-            {"type":"result","result":"first"}
-            {"type":"result","result":"final\nvalue"}
-        """.trimIndent()
-
-        val result = DockerClaudeSession.extractStreamJsonResult(raw)
-
-        assertEquals("final\nvalue", result)
-    }
+    private val filter = ClaudeStreamJsonFilter()
 
     @Test
-    fun resultEventTakesPrecedenceOverTextDeltaFragments() {
-        val raw = """
-            {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello "}}
-            {"type":"content_block_delta","delta":{"type":"text_delta","text":"world"}}
-            {"type":"result","result":"final answer"}
-        """.trimIndent()
-
-        val result = DockerClaudeSession.extractStreamJsonResult(raw)
-
-        assertEquals("final answer", result)
-    }
-
-    @Test
-    fun fallsBackToTextDeltaFragmentsWhenResultEventIsMissing() {
+    fun textDeltaFragmentsAreExtracted() {
         val raw = """
             {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello "}}
             {"type":"content_block_delta","delta":{"type":"text_delta","text":"world"}}
         """.trimIndent()
 
-        val result = DockerClaudeSession.extractStreamJsonResult(raw)
+        val result = filter.filterText(raw)
 
-        assertEquals("hello world", result)
+        assertTrue(result.contains("hello world"), "Expected 'hello world' in: $result")
+    }
+
+    @Test
+    fun resultEventProducesDoneSummary() {
+        val raw = """
+            {"type":"content_block_delta","delta":{"type":"text_delta","text":"hello "}}
+            {"type":"content_block_delta","delta":{"type":"text_delta","text":"world"}}
+            {"type":"result","cost_usd":0.01,"duration_ms":5000,"num_turns":1}
+        """.trimIndent()
+
+        val result = filter.filterText(raw)
+
+        assertTrue(result.contains("hello world"), "Expected text in: $result")
+        assertTrue(result.contains("[done]"), "Expected [done] summary in: $result")
     }
 
     @Test
@@ -50,20 +47,32 @@ class DockerClaudeSessionTest {
             {"type":"content_block_delta","delta":{"type":"text_delta","text":"world"}}
         """.trimIndent()
 
-        val result = DockerClaudeSession.extractStreamJsonResult(raw)
+        val result = filter.filterText(raw)
 
-        assertEquals("hello world", result)
+        assertTrue(result.contains("hello "), "Expected 'hello ' in: $result")
+        assertTrue(result.contains("world"), "Expected 'world' in: $result")
     }
 
     @Test
-    fun fallsBackToRawOutputWhenNothingCanBeExtracted() {
+    fun nonJsonLinesPassThrough() {
         val raw = """
             plain line
             {"type":"ping"}
         """.trimIndent()
 
-        val result = DockerClaudeSession.extractStreamJsonResult(raw)
+        val result = filter.filterText(raw)
 
-        assertEquals(raw, result)
+        assertEquals("plain line", result)
+    }
+
+    @Test
+    fun toolUseIsShown() {
+        val raw = """
+            {"type":"content_block_start","content_block":{"type":"tool_use","name":"Bash","input":{"command":"ls"}}}
+        """.trimIndent()
+
+        val result = filter.filterText(raw)
+
+        assertTrue(result.contains(">> Bash"), "Expected '>> Bash' in: $result")
     }
 }
