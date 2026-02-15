@@ -1,39 +1,36 @@
-import org.gradle.api.tasks.Exec
+import com.github.gradle.node.npm.task.NpmTask
 import org.gradle.api.attributes.Usage
 import org.gradle.api.tasks.bundling.Zip
 
 plugins {
     base
+    id("com.github.node-gradle.node") version "7.1.0"
 }
 
 group = "com.jonnyzzz.intellij"
 version = rootProject.version
 
-val npmInstall = tasks.register<Exec>("npmInstall") {
-    group = "npx"
-    workingDir = projectDir
-    commandLine("bash", "-lc", "npm ci")
+node {
+    download.set(true)
+    version.set("20.20.0")
 }
 
-val npmBuild = tasks.register<Exec>("npmBuild") {
+val npmBuild = tasks.register<NpmTask>("npmBuild") {
     group = "npx"
-    workingDir = projectDir
-    commandLine("bash", "-lc", "npm run build")
-    dependsOn(npmInstall)
+    npmCommand.set(listOf("run", "build"))
+    dependsOn(tasks.npmInstall)
 }
 
-val npmBuildTest = tasks.register<Exec>("npmBuildTest") {
+val npmBuildTest = tasks.register<NpmTask>("npmBuildTest") {
     group = "npx"
-    workingDir = projectDir
-    commandLine("bash", "-lc", "npm run build:test")
-    dependsOn(npmInstall)
+    npmCommand.set(listOf("run", "build:test"))
+    dependsOn(tasks.npmInstall)
 }
 
-val npmTest = tasks.register<Exec>("npmTest") {
+val npmTest = tasks.register<NpmTask>("npmTest") {
     group = "npx"
-    workingDir = projectDir
-    commandLine("bash", "-lc", "npm run test")
-    dependsOn(npmInstall)
+    npmCommand.set(listOf("run", "test"))
+    dependsOn(tasks.npmInstall)
 }
 
 val npxPackageZip = tasks.register<Zip>("npxPackageZip") {

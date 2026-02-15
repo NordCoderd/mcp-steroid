@@ -12,7 +12,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:test": "tsc -p tsconfig.test.json",
-    "test": "npm run build --silent && npm run build:test --silent && node --test dist-test/test/**/*.test.js"
+    "test": "npm run build --silent && npm run build:test --silent && node --test $(find dist-test/test -name '*.test.js')"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
