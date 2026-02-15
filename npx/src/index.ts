@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 // @ts-nocheck
 "use strict";
 
@@ -15,9 +14,7 @@ const SESSION_HEADER = "Mcp-Session-Id";
 
 const AGGREGATE_TOOL_NAMES = {
   projects: "steroid_list_projects",
-  windows: "steroid_list_windows",
-  products: "steroid_list_products",
-  metadata: "steroid_server_metadata"
+  windows: "steroid_list_windows"
 };
 
 const BEACON_EVENTS = Object.freeze({
@@ -1657,31 +1654,6 @@ function proxyTools() {
   const emptySchema = { type: "object", properties: {}, required: [] };
   return [
     {
-      name: "proxy_list_servers",
-      description: "List discovered MCP Steroid servers and metadata.",
-      inputSchema: emptySchema
-    },
-    {
-      name: "proxy_list_projects",
-      description: "Aggregate projects across all running IDE servers.",
-      inputSchema: emptySchema
-    },
-    {
-      name: "proxy_list_windows",
-      description: "Aggregate windows across all running IDE servers.",
-      inputSchema: emptySchema
-    },
-    {
-      name: "proxy_list_products",
-      description: "Aggregate product entries across all running IDE servers.",
-      inputSchema: emptySchema
-    },
-    {
-      name: "proxy_list_server_metadata",
-      description: "Aggregate server metadata across all running IDE servers.",
-      inputSchema: emptySchema
-    },
-    {
       name: AGGREGATE_TOOL_NAMES.projects,
       description: "Aggregate projects across all running IDE servers.",
       inputSchema: emptySchema
@@ -1689,16 +1661,6 @@ function proxyTools() {
     {
       name: AGGREGATE_TOOL_NAMES.windows,
       description: "Aggregate windows across all running IDE servers.",
-      inputSchema: emptySchema
-    },
-    {
-      name: AGGREGATE_TOOL_NAMES.products,
-      description: "Aggregate product entries across all running IDE servers.",
-      inputSchema: emptySchema
-    },
-    {
-      name: AGGREGATE_TOOL_NAMES.metadata,
-      description: "Aggregate server metadata across all running IDE servers.",
       inputSchema: emptySchema
     }
   ];
@@ -1878,7 +1840,7 @@ async function handleAggregateProducts(registry, args) {
         return;
       }
 
-      const result = await registry.callTool(serverId, AGGREGATE_TOOL_NAMES.products, {});
+      const result = await registry.callTool(serverId, "steroid_list_products", {});
 
       if (result.isError) {
         // Fallback: metadata from dedicated metadata handler/caches is still source data from IDE.
@@ -1947,7 +1909,7 @@ async function handleAggregateServerMetadata(registry, args) {
         return;
       }
 
-      const result = await registry.callTool(serverId, AGGREGATE_TOOL_NAMES.metadata, {});
+      const result = await registry.callTool(serverId, "steroid_server_metadata", {});
       if (result.isError) {
         const server = registry.getServer(serverId);
         if (server && server.metadata) {
@@ -2204,20 +2166,11 @@ async function handleRpc(method, params, registry, beacon = null, notify = null)
       return captureToolCall(toolError("Missing tool name"), "invalid");
     }
 
-    if (toolName === "proxy_list_servers") {
-      return captureToolCall(await handleListServers(registry), "proxy");
-    }
-    if (toolName === "proxy_list_projects" || toolName === AGGREGATE_TOOL_NAMES.projects) {
+    if (toolName === AGGREGATE_TOOL_NAMES.projects) {
       return captureToolCall(await handleAggregateProjects(registry, args), "aggregate");
     }
-    if (toolName === "proxy_list_windows" || toolName === AGGREGATE_TOOL_NAMES.windows) {
+    if (toolName === AGGREGATE_TOOL_NAMES.windows) {
       return captureToolCall(await handleAggregateWindows(registry, args), "aggregate");
-    }
-    if (toolName === "proxy_list_products" || toolName === AGGREGATE_TOOL_NAMES.products) {
-      return captureToolCall(await handleAggregateProducts(registry, args), "aggregate");
-    }
-    if (toolName === "proxy_list_server_metadata" || toolName === AGGREGATE_TOOL_NAMES.metadata) {
-      return captureToolCall(await handleAggregateServerMetadata(registry, args), "aggregate");
     }
 
     const resolved = registry.resolveServerForToolCall(toolName, args || {});
