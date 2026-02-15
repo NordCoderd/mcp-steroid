@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.vision
 
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 import com.intellij.util.ui.ImageUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,8 +22,8 @@ class ScreenshotImageProvider : ScreenshotMetadataProvider {
     override val type: String = TYPE
 
     override suspend fun provide(context: ScreenCaptureContext): ProviderResult {
-        // Capture the component on EDT
-        val image = withContext(Dispatchers.EDT) {
+        // Capture the component on EDT (use ModalityState.any() so this works when modal dialogs are showing)
+        val image = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             captureComponent(context.component)
         }
 

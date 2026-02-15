@@ -11,6 +11,7 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.util.ui.ImageUtil
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -109,6 +110,12 @@ object VisionService {
     }
 
     suspend fun capture(project: Project, executionId: ExecutionId, windowId: String? = null): ScreenshotArtifacts {
+        return withContext(Dispatchers.IO + CoroutineName("VisionService")) {
+            captureImpl(project, executionId, windowId)
+        }
+    }
+
+    private suspend fun captureImpl(project: Project, executionId: ExecutionId, windowId: String? = null): ScreenshotArtifacts {
         val storage = project.executionStorage
         val executionDir = storage.resolveExecutionDir(executionId)
 
@@ -123,13 +130,21 @@ object VisionService {
         }
 
         // Capture component info on EDT (use ModalityState.any() so this works even when modal dialogs are showing)
-        val edtAnyModality = Dispatchers.EDT + ModalityState.any().asContextElement()
-        val capture = withContext(edtAnyModality) { captureOnEdt(project, windowId) }
+        val capture = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+            captureOnEdt(project, windowId)
+        }
 
         // Create context for metadata providers (image is provided by ScreenshotImageProvider)
+        val component = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+            resolveComponent(
+                project,
+                windowId
+            )
+        }
+
         val initialContext = ScreenCaptureContext(
             project = project,
-            component = withContext(edtAnyModality) { resolveComponent(project, windowId) },
+            component = component,
             executionDir = screenshotDir,
         )
 
