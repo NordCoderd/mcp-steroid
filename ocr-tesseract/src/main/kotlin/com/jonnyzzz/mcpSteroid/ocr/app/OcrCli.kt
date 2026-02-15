@@ -195,15 +195,25 @@ private fun ensureNativeLibraries() {
     val leptonicaLibDir = leptonicaJniLib.parent ?: error("Cannot resolve Leptonica JNI directory from $leptonicaJniLib")
     val tesseractLibDir = tesseractJniLib.parent ?: error("Cannot resolve Tesseract JNI directory from $tesseractJniLib")
 
-    val leptonicaVersionedLib = findFirstSharedLibrary(leptonicaLibDir, "libleptonica.so.")
-    val tesseractVersionedLib = findFirstSharedLibrary(tesseractLibDir, "libtesseract.so.")
+    val leptonicaVersionedLib = findFirstSharedLibrary(
+        leptonicaLibDir,
+        "libleptonica.so.",
+        "libleptonica."
+    )
+    val tesseractVersionedLib = findFirstSharedLibrary(
+        tesseractLibDir,
+        "libtesseract.so.",
+        "libtesseract."
+    )
 
     // Tess4J/Lept4J look for unversioned sonames, while JavaCPP provides only versioned files.
     // Create local aliases in JavaCPP cache dirs so JNA binds to matching bundled natives.
     ensureLibraryAlias(leptonicaLibDir, "libleptonica.so", leptonicaVersionedLib)
     ensureLibraryAlias(leptonicaLibDir, "liblept.so", leptonicaVersionedLib)
     ensureLibraryAlias(leptonicaLibDir, "liblept.so.5", leptonicaVersionedLib)
+    ensureLibraryAlias(leptonicaLibDir, "libleptonica.dylib", leptonicaVersionedLib)
     ensureLibraryAlias(tesseractLibDir, "libtesseract.so", tesseractVersionedLib)
+    ensureLibraryAlias(tesseractLibDir, "libtesseract.dylib", tesseractVersionedLib)
 
     val existing = System.getProperty("jna.library.path").orEmpty()
     val updated = buildList {
@@ -216,13 +226,22 @@ private fun ensureNativeLibraries() {
     System.setProperty("jna.nosys", "true")
 }
 
-private fun findFirstSharedLibrary(directory: Path, prefix: String): Path {
+private fun findFirstSharedLibrary(directory: Path, vararg prefixes: String): Path {
+    val requiredPrefixes = prefixes.toList()
     Files.list(directory).use { entries ->
         return entries
-            .filter { Files.isRegularFile(it) && it.fileName.toString().startsWith(prefix) }
+            .filter {
+                Files.isRegularFile(it) && requiredPrefixes.any { prefix ->
+                    it.fileName.toString().startsWith(prefix)
+                }
+            }
             .sorted(Comparator.comparing<Path, String> { it.fileName.toString() }.reversed())
             .findFirst()
-            .orElseThrow { IllegalStateException("No shared library matching '$prefix*' found in $directory") }
+            .orElseThrow {
+                IllegalStateException(
+                    "No shared library matching any of ${requiredPrefixes.joinToString { "'$it*'" }} found in $directory"
+                )
+            }
     }
 }
 
