@@ -185,6 +185,10 @@ class SteroidsMcpServer(
                 with(McpHttpTransport) {
                     installMcp("/mcp", mcpServer)
                 }
+                installNpxBridgeRoutes(
+                    serverCoreProvider = { mcpServer },
+                    mcpUrlProvider = { mcpUrl }
+                )
                 get("/.well-known/mcp.json") {
                     // Use request local info to build correct URL for the client
                     val local = call.request.local

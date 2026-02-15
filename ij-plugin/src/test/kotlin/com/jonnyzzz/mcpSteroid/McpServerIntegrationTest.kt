@@ -89,8 +89,6 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 setOf(
                     "steroid_list_projects",
                     "steroid_list_windows",
-                    "steroid_list_products",
-                    "steroid_server_metadata",
                     "steroid_execute_code"
                 )
             )
@@ -180,26 +178,13 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         }
     }
 
-    fun testListProductsTool(): Unit = timeoutRunBlocking(30.seconds) {
+    fun testNpxProductsEndpoint(): Unit = timeoutRunBlocking(30.seconds) {
         val server = SteroidsMcpServer.getInstance()
         server.startServerIfNeeded()
-        val sessionId = startSession(server)
-
-        val response = client.post(server.mcpUrl) {
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Application.Json)
-            header(McpHttpTransport.SESSION_HEADER, sessionId)
-            setBody("""{"jsonrpc":"2.0","id":"call-list-products","method":"tools/call","params":{"name":"steroid_list_products"}}""")
-        }
+        val response = client.get("http://localhost:${server.port}/npx/v1/products")
 
         assertEquals(HttpStatusCode.OK, response.status)
-        val rpc = McpJson.decodeFromString<JsonRpcResponse>(response.bodyAsText())
-        assertNull("steroid_list_products should not return JSON-RPC error", rpc.error)
-        val toolResult = McpJson.decodeFromJsonElement<ToolCallResult>(rpc.result!!)
-        assertFalse("steroid_list_products should succeed", toolResult.isError)
-
-        val payload = toolResult.content.filterIsInstance<ContentItem.Text>().firstOrNull()?.text ?: ""
-        val products = McpJson.decodeFromString(ListProductsResponse.serializer(), payload)
+        val products = McpJson.decodeFromString(ListProductsResponse.serializer(), response.bodyAsText())
         assertTrue("Expected at least one product entry", products.products.isNotEmpty())
         val first = products.products.first()
         assertTrue("Product IDE name should be reported", first.ide.name.isNotBlank())
@@ -207,26 +192,13 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertTrue("Product plugin version should be reported", first.plugin.version.isNotBlank())
     }
 
-    fun testServerMetadataTool(): Unit = timeoutRunBlocking(30.seconds) {
+    fun testNpxServerMetadataEndpoint(): Unit = timeoutRunBlocking(30.seconds) {
         val server = SteroidsMcpServer.getInstance()
         server.startServerIfNeeded()
-        val sessionId = startSession(server)
-
-        val response = client.post(server.mcpUrl) {
-            contentType(ContentType.Application.Json)
-            accept(ContentType.Application.Json)
-            header(McpHttpTransport.SESSION_HEADER, sessionId)
-            setBody("""{"jsonrpc":"2.0","id":"call-server-metadata","method":"tools/call","params":{"name":"steroid_server_metadata"}}""")
-        }
+        val response = client.get("http://localhost:${server.port}/npx/v1/server-metadata")
 
         assertEquals(HttpStatusCode.OK, response.status)
-        val rpc = McpJson.decodeFromString<JsonRpcResponse>(response.bodyAsText())
-        assertNull("steroid_server_metadata should not return JSON-RPC error", rpc.error)
-        val toolResult = McpJson.decodeFromJsonElement<ToolCallResult>(rpc.result!!)
-        assertFalse("steroid_server_metadata should succeed", toolResult.isError)
-
-        val payload = toolResult.content.filterIsInstance<ContentItem.Text>().firstOrNull()?.text ?: ""
-        val metadata = McpJson.decodeFromString(ServerMetadataResponse.serializer(), payload)
+        val metadata = McpJson.decodeFromString(ServerMetadataResponse.serializer(), response.bodyAsText())
         assertTrue("IDE name should be reported", metadata.ide.name.isNotBlank())
         assertTrue("Plugin version should be reported", metadata.plugin.version.isNotBlank())
         assertTrue("IDE home path should be reported", metadata.paths.homePath.isNotBlank())

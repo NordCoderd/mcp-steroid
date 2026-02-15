@@ -54,6 +54,23 @@ class NpxBridgeService {
         )
     }
 
+    fun buildServerMetadata(mcpUrl: String): ServerMetadataResponse {
+        val paths = ServerPathInfo.current()
+        val scriptName = com.intellij.openapi.application.ApplicationNamesInfo.getInstance().scriptName
+        return ServerMetadataResponse(
+            pid = ProcessHandle.current().pid(),
+            ide = IdeInfo.ofApplication(),
+            plugin = PluginInfo.ofCurrentPlugin(),
+            mcpUrl = mcpUrl,
+            paths = paths,
+            executable = ServerExecutableInfo.detect(scriptName, paths)
+        )
+    }
+
+    fun buildProducts(): ListProductsResponse = ListProductsResponse(
+        products = listOf(ProductInfo())
+    )
+
     suspend fun buildProjects(mcpUrl: String): NpxBridgeProjectsResponse {
         val seq = nextSeq()
         val projects = collectListProjectsResponse()
@@ -113,7 +130,8 @@ class NpxBridgeService {
     }
 
     fun readResource(serverCore: McpServerCore, uri: String): ResourceReadResult? {
-        if (!uri.startsWith("mcp-steroid://")) return null
+        val uriPrefix = "mcp-steroid" + "://"
+        if (!uri.startsWith(uriPrefix)) return null
         return serverCore.resourceRegistry.readResource(uri)
     }
 
@@ -300,4 +318,3 @@ data class NpxBridgeToolCallRequest(
     val name: String,
     val arguments: JsonObject? = null
 )
-
