@@ -19,6 +19,8 @@
     <p>Download and changelog for each MCP Steroid release.</p>
 </div>
 
+{{ partial "plugin-repo.html" . }}
+
 {{ $releases := site.GetPage "section" "releases" }}
 {{ $all := $releases.Pages.ByTitle.Reverse }}
 {{ $latest := index $all 0 }}

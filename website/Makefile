@@ -15,6 +15,7 @@
 .PHONY: dev build clean setup update-config ensure-public-repo
 
 VERSION := $(shell cat ../VERSION 2>/dev/null || echo "0.0.0")
+RELEASE_ZIP_NAME := $(shell gh release view $(VERSION) --repo jonnyzzz/mcp-steroid --json assets --jq '.assets[0].name' 2>/dev/null || echo "mcp-steroid-$(VERSION).zip")
 
 # First time setup - clone the public repository
 setup:
@@ -33,6 +34,9 @@ update-config: ensure-public-repo
 	@sed -i.bak 's/version = ".*"/version = "$(VERSION)"/' hugo.toml && rm -f hugo.toml.bak
 	@echo "Generating version.json"
 	@echo '{"version-base": "$(VERSION)"}' > static/version.json
+	@echo "Generating updatePlugins.xml (zip: $(RELEASE_ZIP_NAME))"
+	@printf '<?xml version="1.0" encoding="UTF-8"?>\n<plugins>\n  <plugin id="com.jonnyzzz.mcp-steroid" url="https://github.com/jonnyzzz/mcp-steroid/releases/download/$(VERSION)/$(RELEASE_ZIP_NAME)" version="$(VERSION)">\n    <idea-version since-build="253"/>\n    <name>MCP Steroid</name>\n  </plugin>\n</plugins>\n' > static/updatePlugins.xml
+	@xmllint --noout static/updatePlugins.xml 2>/dev/null && echo "updatePlugins.xml is valid XML" || echo "WARNING: xmllint not available, skipping XML validation"
 	@mkdir -p mcp-steroid-public/docs
 
 # Start development server with live reload
