@@ -28,7 +28,6 @@ This is a common pattern for GitHub Pages deployment where the source (Hugo mark
 - `layouts/` - Hugo templates
 - `static/` - Static assets (logo, CNAME)
 - `content/` - Content files (markdown)
-- `scripts/` - Build helpers (`generate-update-plugins-xml.sh`, `generate-update-plugins-xml.py`)
 - `mcp-steroid-public/` - Checkout of the public repository (build output destination)
 
 ## Adding Documentation Pages
@@ -106,12 +105,6 @@ git push origin main
 6. **CNAME**: The `static/CNAME` file configures the custom domain. Do not remove it.
 
 7. **version.json**: Published at `/version.json` with the current version. Generated automatically during build.
-
-8. **updatePlugins.xml**: Published at `/updatePlugins.xml` — IntelliJ custom plugin repository XML. Generated automatically during build by `scripts/generate-update-plugins-xml.py` (Python XML DOM API with CDATA sections). Always points to the latest release only. The Makefile queries `gh` for the actual ZIP asset filename.
-
-9. **Release Pages**: Releases are ordered by title descending (`.ByTitle.Reverse`). The latest release appears as a featured tile; older releases show an auto-generated obsolete banner (handled by `layouts/releases/single.html`). No manual obsolete banners needed in content files.
-
-10. **Plugin Repository Promotion**: The custom plugin repository URL (`https://mcp-steroid.jonnyzzz.com/updatePlugins.xml`) is promoted on the releases list page and in the Download section of release pages (starting from 0.88.0).
 
 ## Workflow Summary
 
