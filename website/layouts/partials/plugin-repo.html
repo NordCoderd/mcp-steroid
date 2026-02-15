@@ -13,18 +13,9 @@
   See the License for the specific language governing permissions and
   limitations under the License.
 */}}
-{{ define "main" }}
-<article class="page-content">
-    <h1>{{ .Title }}</h1>
-    {{ $releases := site.GetPage "section" "releases" }}
-    {{ $all := $releases.Pages.ByTitle.Reverse }}
-    {{ $latest := index $all 0 }}
-    {{ if ne .File.Path $latest.File.Path }}
-    <div class="warning">
-        <p><strong>This release is obsolete.</strong> Please use the latest release: <a href="{{ $latest.RelPermalink }}">{{ $latest.Title }}</a></p>
-    </div>
-    {{ end }}
-    {{ .Content }}
-    {{ partial "plugin-repo.html" . }}
-</article>
-{{ end }}
+<div class="info" style="margin: 1.5rem 0; padding: 1rem 1.5rem; border-left: 4px solid #0366d6; background: #f1f8ff;">
+    <h3 style="margin-top: 0;">Install via Custom Plugin Repository</h3>
+    <p>Add this URL in <strong>Settings &rarr; Plugins &rarr; &#x2699; &rarr; Manage Plugin Repositories...</strong></p>
+    <pre style="background: #e8f0fe; padding: 0.5rem 1rem; border-radius: 4px; user-select: all;">https://mcp-steroid.jonnyzzz.com/updatePlugins.xml</pre>
+    <p style="margin-bottom: 0;">The IDE will notify you when updates are available.</p>
+</div>
