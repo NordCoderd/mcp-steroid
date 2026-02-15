@@ -12,36 +12,56 @@ node {
     version.set("20.20.0")
 }
 
-val patchPackageVersion = tasks.register("patchPackageVersion") {
+val preparePackageFiles = tasks.register("preparePackageFiles") {
     group = "npx"
-    description = "Set package.json version from Gradle project.version"
+    description = "Copy package.json and package-lock.json to build/package/ with patched version"
     dependsOn(tasks.npmInstall)
 
-    val packageJsonFile = projectDir.resolve("package.json")
+    val sourcePackageJson = projectDir.resolve("package.json")
+    val sourceLockJson = projectDir.resolve("package-lock.json")
+    val outputDir = layout.buildDirectory.dir("package")
+
     inputs.property("projectVersion", project.version.toString())
-    inputs.file(packageJsonFile)
-    outputs.file(packageJsonFile)
+    inputs.file(sourcePackageJson)
+    inputs.file(sourceLockJson)
+    outputs.dir(outputDir)
 
     doLast {
-        val content = packageJsonFile.readText()
-        val updated = content.replace(
-            Regex(""""version"\s*:\s*"[^"]*""""),
-            """"version": "${project.version}""""
+        val dir = outputDir.get().asFile
+        dir.mkdirs()
+
+        val version = project.version.toString()
+
+        // Patch package.json version
+        val pkgJson = sourcePackageJson.readText()
+        dir.resolve("package.json").writeText(
+            pkgJson.replace(
+                Regex(""""version"\s*:\s*"[^"]*""""),
+                """"version": "$version""""
+            )
         )
-        packageJsonFile.writeText(updated)
+
+        // Patch package-lock.json version (appears in two places)
+        val lockJson = sourceLockJson.readText()
+        dir.resolve("package-lock.json").writeText(
+            lockJson.replace(
+                Regex(""""version"\s*:\s*"0\.0\.0-dev""""),
+                """"version": "$version""""
+            )
+        )
     }
 }
 
 val npmBuild = tasks.register<NpmTask>("npmBuild") {
     group = "npx"
     npmCommand.set(listOf("run", "build"))
-    dependsOn(patchPackageVersion)
+    dependsOn(tasks.npmInstall)
 }
 
 val npmBuildTest = tasks.register<NpmTask>("npmBuildTest") {
     group = "npx"
     npmCommand.set(listOf("run", "build:test"))
-    dependsOn(patchPackageVersion)
+    dependsOn(tasks.npmInstall)
 }
 
 val npmTest = tasks.register<NpmTask>("npmTest") {
@@ -53,18 +73,21 @@ val npmTest = tasks.register<NpmTask>("npmTest") {
 val npxPackageZip = tasks.register<Zip>("npxPackageZip") {
     group = "npx"
     description = "Build distributable NPX package for integration tests"
-    dependsOn(npmBuild)
+    dependsOn(npmBuild, preparePackageFiles)
 
     archiveBaseName.set("mcp-steroid-npx")
     archiveVersion.set(project.version.toString())
     destinationDirectory.set(layout.buildDirectory.dir("distributions"))
 
-    from(projectDir) {
+    from(layout.buildDirectory.dir("package")) {
         include("package.json")
         include("package-lock.json")
     }
     from(projectDir.resolve("dist")) {
         into("dist")
+    }
+    from(projectDir) {
+        include("LICENSE")
     }
 }
 
