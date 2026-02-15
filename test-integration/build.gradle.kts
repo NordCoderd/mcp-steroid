@@ -564,6 +564,13 @@ val webStormReleaseSmokeTests = listOf(
 )
 
 tasks.test {
+    // Integration tests require downloading IDE archives and Docker — run explicitly via named tasks below
+    enabled = false
+}
+
+val testIdea by tasks.registering(Test::class) {
+    group = "verification"
+    description = "Run integration tests against configured IntelliJ IDEA stable"
     dependsOn(downloadIdea)
     configureIntegrationTask(
         ideProduct = IntegrationIdeProduct.IDEA,
@@ -574,7 +581,7 @@ tasks.test {
 val testEap by tasks.registering(Test::class) {
     group = "verification"
     description = "Run integration tests against configured IntelliJ IDEA EAP"
-    shouldRunAfter(tasks.test)
+    shouldRunAfter(testIdea)
     dependsOn(verifyCurrentIdeaEap)
     dependsOn(downloadIdeaEap)
     configureIntegrationTask(
@@ -586,7 +593,7 @@ val testEap by tasks.registering(Test::class) {
 val testPyCharm by tasks.registering(Test::class) {
     group = "verification"
     description = "Run integration tests against configured PyCharm stable"
-    shouldRunAfter(tasks.test)
+    shouldRunAfter(testIdea)
     dependsOn(downloadPyCharm)
     configureIntegrationTask(
         ideProduct = IntegrationIdeProduct.PYCHARM,
@@ -609,7 +616,7 @@ val testPyCharmEap by tasks.registering(Test::class) {
 val testGoLand by tasks.registering(Test::class) {
     group = "verification"
     description = "Run integration tests against configured GoLand stable"
-    shouldRunAfter(tasks.test)
+    shouldRunAfter(testIdea)
     dependsOn(downloadGoLand)
     configureIntegrationTask(
         ideProduct = IntegrationIdeProduct.GOLAND,
@@ -632,7 +639,7 @@ val testGoLandEap by tasks.registering(Test::class) {
 val testWebStorm by tasks.registering(Test::class) {
     group = "verification"
     description = "Run integration tests against configured WebStorm stable"
-    shouldRunAfter(tasks.test)
+    shouldRunAfter(testIdea)
     dependsOn(downloadWebStorm)
     configureIntegrationTask(
         ideProduct = IntegrationIdeProduct.WEBSTORM,
@@ -655,7 +662,7 @@ val testWebStormEap by tasks.registering(Test::class) {
 val testReleaseSmokeIdea by tasks.registering(Test::class) {
     group = "verification"
     description = "Run selected release-smoke integration tests on IntelliJ IDEA stable"
-    shouldRunAfter(tasks.test)
+    shouldRunAfter(testIdea)
     dependsOn(downloadIdea)
     configureIntegrationTask(
         ideProduct = IntegrationIdeProduct.IDEA,
