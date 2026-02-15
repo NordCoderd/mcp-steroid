@@ -22,7 +22,7 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
 
     fun testGeminiInstalled(): Unit = timeoutRunBlocking(180.seconds) {
         geminiSession()
-            .runInContainer("--version")
+            .runInContainer(args = listOf("--version"))
             .assertExitCode(0, "Gemini")
     }
 
