@@ -113,6 +113,8 @@ class DialogKiller {
             withTimeout(5_000) {
                 VisionService.capture(project, executionId).logMessages().forEach { logMessage(it) }
             }
+        } catch (e: TimeoutCancellationException) {
+            log.warn("Screenshot capture timed out, proceeding to close dialog: ${e.message}")
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -157,6 +159,10 @@ class DialogKiller {
 
                 // Let it pump events!
                 delay(10)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: ProcessCanceledException) {
+                throw e
             } catch (e: Exception) {
                 log.warn("Failed to close dialog: ${e.message}", e)
             }

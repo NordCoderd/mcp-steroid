@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration.tests
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
@@ -123,5 +124,59 @@ class DialogKillerIntegrationTest {
             taskId = "automatic-dialog-killer",
             reason = "Trigger automatic dialog killer via dialog_killer=true",
         ).assertExitCode(0)
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `dialog killer captures screenshot before closing`() = doTest("screenshot") { session ->
+        session.mcpSteroid.mcpExecuteCode(
+            code = """
+                import com.jonnyzzz.mcpSteroid.execution.dialogKiller
+                import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+
+                dialogKiller().killProjectDialogs(
+                    project = project,
+                    executionId = ExecutionId("dialog-killer-screenshot-test"),
+                    logMessage = { println(it) },
+                    forceEnabled = true,
+                )
+                println("Dialog killer with screenshot completed")
+            """.trimIndent(),
+            taskId = "dialog-killer-screenshot",
+            reason = "Dialog killer with screenshot verification",
+        ).assertExitCode(0)
+            .assertOutputContains("Screenshot saved to", message = "Dialog killer must capture screenshot before closing dialog")
+    }
+
+    @Test
+    @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `screenshot tool works in IDE`() = runWithCloseableStack { lifetime ->
+        val session = IntelliJContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer")
+        val console = session.console
+
+        console.writeStep(1, "Taking screenshot of IDE via execute_code")
+        val result = session.mcpSteroid.mcpExecuteCode(
+            code = """
+                import com.jonnyzzz.mcpSteroid.vision.VisionService
+                import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+
+                val executionId = ExecutionId("screenshot-tool-test")
+                val artifacts = VisionService.capture(project, executionId)
+                println("Screenshot captured: ${'$'}{artifacts.imagePath}")
+                println("Image size: ${'$'}{artifacts.meta.imageSize.width}x${'$'}{artifacts.meta.imageSize.height}")
+                println("Component tree: ${'$'}{artifacts.treePath}")
+                println("Screenshot metadata: ${'$'}{artifacts.metaPath}")
+                println("Screenshot bytes: ${'$'}{artifacts.imageBytes.size}")
+            """.trimIndent(),
+            taskId = "screenshot-tool-test",
+            reason = "Verify VisionService.capture works in IDE",
+        )
+
+        result.assertExitCode(0)
+        result.assertOutputContains("Screenshot captured:", message = "VisionService.capture must produce image")
+        result.assertOutputContains("Image size:", message = "Screenshot must have dimensions")
+        result.assertOutputContains("Screenshot bytes:", message = "Screenshot must have non-empty bytes")
+
+        console.writeSuccess("Screenshot tool works")
     }
 }

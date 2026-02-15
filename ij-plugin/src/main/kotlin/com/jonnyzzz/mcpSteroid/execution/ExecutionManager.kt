@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
@@ -63,7 +64,7 @@ class ExecutionManager(
                 try {
                     builder.logMessage("execution_id: ${executionId.executionId}\n use it to report feedback: steroid_execute_feedback")
 
-                    runCatching {
+                    try {
                         // Kill any pending modal dialogs before execution
                         // This prevents execution failures when dialogs are blocking the IDE
                         dialogKiller().killProjectDialogs(
@@ -72,6 +73,12 @@ class ExecutionManager(
                             logMessage = builder::logMessage,
                             forceEnabled = exec.dialogKiller,
                         )
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: ProcessCanceledException) {
+                        throw e
+                    } catch (e: Exception) {
+                        log.warn("Dialog killer failed: ${e.message}", e)
                     }
 
                     val finalResult = project.service<ReviewManager>().requestReview(executionId, exec, builder)
