@@ -50,7 +50,7 @@ class CodexJsonFilter : OutputFilter {
 
     private fun processEvent(event: JsonObject, writer: java.io.BufferedWriter) {
         val type = event["type"]?.jsonPrimitive?.contentOrNull ?: return
-        val item = event["item"]?.jsonObject
+        val item = event["item"] as? JsonObject
         val itemType = item?.get("type")?.jsonPrimitive?.contentOrNull ?: ""
 
         when {
@@ -109,7 +109,7 @@ class CodexJsonFilter : OutputFilter {
 
     private fun handleToolCompleted(item: JsonObject, writer: java.io.BufferedWriter) {
         val name = item["name"]?.jsonPrimitive?.contentOrNull
-            ?: item["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull
+            ?: (item["function"] as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
             ?: "?"
 
         // Extract output - handle both string primitives and complex objects
@@ -145,10 +145,10 @@ class CodexJsonFilter : OutputFilter {
 
     private fun handleToolStarted(item: JsonObject, writer: java.io.BufferedWriter) {
         val name = item["name"]?.jsonPrimitive?.contentOrNull
-            ?: item["function"]?.jsonObject?.get("name")?.jsonPrimitive?.contentOrNull
+            ?: (item["function"] as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
             ?: "?"
 
-        var inputObj = item["input"]?.jsonObject ?: item["arguments"]?.jsonObject
+        var inputObj = (item["input"] as? JsonObject) ?: (item["arguments"] as? JsonObject)
 
         // Handle string-encoded JSON
         if (inputObj == null) {
@@ -156,7 +156,7 @@ class CodexJsonFilter : OutputFilter {
                 ?: item["arguments"]?.jsonPrimitive?.contentOrNull
             if (inputStr != null) {
                 inputObj = try {
-                    json.parseToJsonElement(inputStr).jsonObject
+                    json.parseToJsonElement(inputStr) as? JsonObject
                 } catch (e: Exception) {
                     null
                 }
@@ -170,7 +170,7 @@ class CodexJsonFilter : OutputFilter {
     }
 
     private fun handleTurnCompleted(event: JsonObject, writer: java.io.BufferedWriter) {
-        val usage = event["usage"]?.jsonObject ?: return
+        val usage = event["usage"] as? JsonObject ?: return
         val inputTokens = usage["input_tokens"]?.jsonPrimitive?.intOrNull ?: 0
         val outputTokens = usage["output_tokens"]?.jsonPrimitive?.intOrNull ?: 0
 
