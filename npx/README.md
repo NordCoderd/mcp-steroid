@@ -6,6 +6,7 @@ The proxy is an MCP stdio server that:
 - discovers all running MCP Steroid plugin instances via `~/.<pid>.mcp-steroid`
 - aggregates MCP metadata/tools/resources across IDE instances
 - routes tool calls to the freshest matching IDE/plugin instance
+- maintains dynamic mapping `<project name + path> -> IDE instance + port`
 - reports dedicated PostHog beacon events for runtime health and routing usage
 
 ## Runtime model
@@ -13,6 +14,7 @@ The proxy is an MCP stdio server that:
 - Default mode: stdio MCP server (`stdin`/`stdout`)
 - Optional mode: direct CLI invocation of the same MCP methods/tools
 - Upstream transport: HTTP MCP to plugin `/mcp` endpoints discovered from marker files
+- Control-plane bridge: plugin Ktor routes under `/npx/v1/*` for metadata/products/streaming
 - No local HTTP server is exposed by NPX
 - Update checks use the same remote `version-base` endpoint pattern as MCP Server and print upgrade notices to stderr
 
@@ -58,7 +60,7 @@ Example:
   "allowHosts": ["127.0.0.1", "localhost"],
   "cache": { "enabled": false, "dir": "~/.mcp-steroid/proxy", "ttlSeconds": 5 },
   "trafficLog": { "enabled": false, "redactFields": ["code"] },
-  "upstreamTimeoutMs": 5000,
+  "upstreamTimeoutMs": 120000,
   "updates": {
     "enabled": true,
     "initialDelayMs": 30000,
@@ -96,6 +98,53 @@ CLI flags:
 - Older NPX + newer plugin: must continue working using MCP baseline behavior.
 - Newer NPX + older plugin: NPX must degrade gracefully to MCP-only discovery/routing.
 - Bridge-specific metadata must be additive and feature-detected; no hard requirement for legacy plugin versions.
+- IDE metadata is sourced from running IDE/plugin instances; NPX does not invent IDE/product metadata locally.
+
+## Bridge Contract (Plugin Ktor API)
+
+NPX uses dedicated plugin HTTP routes for NPX-specific control-plane needs:
+
+- `GET /npx/v1/server-metadata`
+- `GET /npx/v1/products`
+- `POST /npx/v1/tools/call/stream`
+- `GET /npx/v1/projects`
+- `GET /npx/v1/windows`
+- `GET /npx/v1/resources`
+- `GET /npx/v1/resources/read?uri=...`
+- `GET /npx/v1/summary`
+
+NPX still uses MCP `/mcp` for MCP data-plane operations (`tools/list`, `tools/call`, `resources/list`, `resources/read`) and falls back to MCP-only behavior if bridge routes are unavailable.
+
+## Routing
+
+- `steroid_list_projects` and `steroid_list_windows` fan out across all online servers and merge results.
+- `steroid_list_products` and `steroid_server_metadata` use bridge endpoints first, then MCP fallback.
+- NPX keeps a live `<project name + path> -> serverId` index and rebuilds it on discovery refresh.
+- Project-scoped tool calls route to the freshest matching server (plugin version + IDE version/build freshness ordering).
+- `server_id` can override routing; `intellij`/`default_api` aliases resolve when only one server is online.
+
+## Progress and Timeout Safety
+
+- During delegated `tools/call`, NPX emits `notifications/progress`.
+- Sequence is start (`progress=0`), forwarded upstream `progress` events, forwarded upstream `heartbeat` events, completion (`progress=1`).
+- This keeps MCP clients informed and reduces timeout risk for long-running tool calls.
+
+## Proxy Tools
+
+NPX adds proxy-native tools in `tools/list`:
+
+- `proxy_list_servers`
+- `proxy_list_projects`
+- `proxy_list_windows`
+- `proxy_list_products`
+- `proxy_list_server_metadata`
+
+Aggregate aliases are also exposed:
+
+- `steroid_list_projects`
+- `steroid_list_windows`
+- `steroid_list_products`
+- `steroid_server_metadata`
 
 ## Upgrade checks
 
@@ -113,11 +162,11 @@ NPX sends dedicated PostHog events (best-effort, non-blocking):
 - `npx_tool_call`
 - `npx_upgrade_recommended`
 
-## Architecture direction
+## Architecture
 
-Current routing works through MCP API (`tools/list`, `tools/call`, `resources/list`, `resources/read`).
-
-For NPX-internal control-plane concerns (fresh metadata snapshots, project/path mapping stability, timeout-safe progress heartbeats), the intended direction is a dedicated plugin bridge API served by Ktor, while keeping external MCP client behavior unchanged.
+- Data plane: MCP protocol over stdio (client-facing) and MCP HTTP `/mcp` (upstream).
+- Control plane: plugin Ktor bridge API under `/npx/v1/*`.
+- NPX never exposes its own HTTP interface to MCP clients.
 
 ## Spec
 

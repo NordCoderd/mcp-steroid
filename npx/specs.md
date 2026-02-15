@@ -1,7 +1,7 @@
 # NPX MCP Steroid Stdio Proxy Specification
 
 Status: validated spec (bridge-aware update)
-Last updated: 2026-02-14
+Last updated: 2026-02-15
 
 ## 1. Purpose
 Create a local NPX-run stdio MCP proxy (TypeScript implementation) that discovers all running IntelliJ MCP Steroid servers on the machine and exposes them as a single MCP server to any agent. The proxy aggregates discovery, routes tool calls to the correct upstream server, and optionally records MCP traffic under the user's home directory.
@@ -16,6 +16,7 @@ Create a local NPX-run stdio MCP proxy (TypeScript implementation) that discover
 - Perform MCP-Server-style remote update checks and notify users when NPX upgrade is recommended.
 - Emit dedicated, explicit beacon events for NPX runtime and routing behavior.
 - Keep proxy metadata/instructions sourced from IDE/plugin data (no hardcoded IDE metadata in NPX).
+- Forward progress/heartbeat updates from upstream tool execution as MCP `notifications/progress`.
 - Keep NPX source and tests in TypeScript (`.ts`) only.
 
 ## 3. Non-goals
@@ -64,9 +65,17 @@ For each discovered `serverUrl`:
 - Support concurrent requests; preserve request IDs and tool call results.
 - No proxy restart needed for new tools or server changes.
 
-## 6.1 Control plane vs data plane
+## 6.1 Control plane bridge contract
 - MCP API remains the data plane for tool/resource operations.
-- A dedicated plugin bridge API is allowed for NPX control-plane concerns (metadata snapshots, mapping freshness, heartbeat/progress stream wrapper, capability detection).
+- Plugin Ktor bridge API under `/npx/v1/*` is used for NPX control-plane concerns and streaming wrappers:
+  - `GET /npx/v1/server-metadata`
+  - `GET /npx/v1/products`
+  - `POST /npx/v1/tools/call/stream`
+  - `GET /npx/v1/projects`
+  - `GET /npx/v1/windows`
+  - `GET /npx/v1/resources`
+  - `GET /npx/v1/resources/read?uri=...`
+  - `GET /npx/v1/summary`
 - NPX must feature-detect bridge support and fall back to MCP-only behavior.
 
 ## 6.2 Compatibility requirements
@@ -106,6 +115,19 @@ Each upstream server is represented as:
 ## 8. Dynamic tool aggregation
 ### 8.1 Tool listing
 `tools/list` returns the union of upstream tools plus proxy-native tools.
+
+Proxy-native tools:
+- `proxy_list_servers`
+- `proxy_list_projects`
+- `proxy_list_windows`
+- `proxy_list_products`
+- `proxy_list_server_metadata`
+
+Aggregate aliases (kept for compatibility with MCP Steroid naming):
+- `steroid_list_projects`
+- `steroid_list_windows`
+- `steroid_list_products`
+- `steroid_server_metadata`
 
 ### 8.2 Collision handling
 When multiple upstream servers provide the same tool name:
@@ -150,15 +172,31 @@ Fan-out to all online servers (Map) and return a merged result (Reduce):
 - Include `backgroundTasks` with server identity.
 - Include `errors` for per-server failures.
 
-### 10.3 Proxy-native introspection tools
-- `proxy_list_servers`: registry entries (id, label, url, status, lastSeenAt, toolCount, resourceCount).
-- `proxy_list_projects` and `proxy_list_windows`: same as aggregated calls plus `servers` block and timing metadata.
+### 10.3 `steroid_list_products` and `steroid_server_metadata` (aggregated)
+- Fan-out order is freshness-first (newest to oldest).
+- Data sources:
+  - Preferred: bridge endpoints (`/npx/v1/products`, `/npx/v1/server-metadata`)
+  - Fallback: MCP tools (for older plugin compatibility)
+- Merge result keeps per-server identity (`serverId`, label/url/port, IDE/plugin metadata when available).
+- Include `errors` for per-server failures.
+
+### 10.4 Proxy-native introspection tools
+- `proxy_list_servers`: registry entries (id, label, url, status, lastSeenAt, toolCount, resourceCount, IDE/plugin snapshot).
+- `proxy_list_projects`, `proxy_list_windows`, `proxy_list_products`, `proxy_list_server_metadata`: aggregated proxy outputs with server identity and per-server errors.
+
+### 10.5 Progress forwarding and heartbeat
+- For delegated `tools/call`, NPX sends MCP `notifications/progress`:
+  - start (`progress=0`)
+  - upstream `progress` events
+  - upstream `heartbeat` events
+  - completion (`progress=1`)
+- Progress token uses client-provided token when available (`_meta.progressToken`), otherwise NPX creates one.
 
 ## 11. Caching and traffic recording
 ### 11.1 Directory layout
-Default: `~/.mcp-steroid/`
-- `~/.mcp-steroid/proxy-cache/` (tool/resource lists, aggregated list results)
-- `~/.mcp-steroid/traffic/` (JSONL traffic log)
+Default: `~/.mcp-steroid/proxy/`
+- cache TTL applies to in-memory snapshots; optional filesystem writes use `cache.dir`
+- traffic log file is written under the same `cache.dir` path when enabled
 
 ### 11.2 Traffic log (optional)
 When enabled, append JSONL records for every MCP message:
@@ -180,26 +218,19 @@ Default config file: `~/.mcp-steroid/proxy.json`
 Suggested structure:
 ```
 {
+  "homeDir": null,
   "scanIntervalMs": 2000,
   "defaultServerId": null,
   "allowHosts": ["127.0.0.1", "localhost"],
-  "toolListTtlMs": 5000,
-  "listProjectsTtlMs": 2000,
-  "listWindowsTtlMs": 2000,
+  "upstreamTimeoutMs": 120000,
   "cache": {
     "enabled": false,
-    "dir": "~/.mcp-steroid/proxy-cache",
-    "ttlMs": 5000
+    "dir": "~/.mcp-steroid/proxy",
+    "ttlSeconds": 5
   },
   "trafficLog": {
     "enabled": false,
-    "dir": "~/.mcp-steroid/traffic",
-    "redactFields": ["code", "content"]
-  },
-  "concurrency": {
-    "maxFanout": 4,
-    "requestTimeoutMs": 15000,
-    "backoffMs": 2000
+    "redactFields": ["code"]
   },
   "updates": {
     "enabled": true,
@@ -223,6 +254,12 @@ CLI flags (minimum):
 --config <path>      Custom config file
 --scan-interval <ms> Override scan interval
 --log-traffic        Enable traffic logging
+--cli                Run single-shot CLI mode
+--cli-method <m>     Execute arbitrary MCP method in CLI mode
+--cli-params-json    JSON params object for --cli-method
+--tool <name>        Shortcut for tools/call in CLI mode
+--arguments-json     JSON arguments object for --tool
+--uri <resourceUri>  Shortcut for resources/read in CLI mode
 ```
 
 ## 13. Validation checklist
@@ -233,16 +270,13 @@ CLI flags (minimum):
 - `windowId` is namespaced and collision-safe.
 - Routing decision tree resolves with `server_id` and errors on ambiguity.
 - Servers can join/leave without proxy restart.
-- Traffic log writes under `~/.mcp-steroid/traffic` when enabled.
+- Traffic log writes under configured `cache.dir` when enabled.
 - Proxy never writes to stdout except valid MCP responses.
 - Newer NPX falls back to MCP-only mode when bridge endpoints are absent.
 - Older NPX remains functional against newer plugin versions.
 
 ## 14. Upstream improvements (optional, tracked separately)
 These are not required for the proxy to work but would simplify and harden it:
-- Add dedicated bridge endpoints (Ktor handlers) for NPX control plane, for example:
-  - `GET /npx/v1/summary`
-  - `POST /npx/v1/tools/call/stream`
 - Publish a stable discovery document (e.g., `/.well-known/mcp.json`) with transports, URL, auth, version, and tools hash.
 - Add a server info tool/endpoint returning plugin/build version, IDE/platform version, and feature flags.
 - Define deterministic error codes plus retryable flag for proxy classification.
