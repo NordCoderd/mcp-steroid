@@ -44,16 +44,16 @@ version = if (isReleaseBuild) {
 }
 val releaseNotesVersion = providers.gradleProperty("mcp.release.notes.version").orElse(baseVersion).get()
 val releaseNotesFile = layout.projectDirectory.file("release/notes/$releaseNotesVersion.md")
-val releaseNotesText = providers.provider {
-    val file = releaseNotesFile.asFile
-    val notes = if (file.isFile) {
-        file.readText().trim()
-    } else {
-        "Release notes are not available for version $releaseNotesVersion."
+val releaseNotesText: Provider<String>? = if (isReleaseBuild) {
+    providers.provider {
+        val file = releaseNotesFile.asFile
+        require(file.isFile) {
+            "Release build requires release notes at ${file.absolutePath}"
+        }
+        "<pre>${file.readText().trim().escapeForHtmlPreBlock()}</pre>"
     }
-
-    // Keep formatting stable in plugin manager without additional markdown tooling.
-    "<pre>${notes.escapeForHtmlPreBlock()}</pre>"
+} else {
+    null
 }
 
 fun String.escapeForHtmlPreBlock(): String = this
@@ -188,7 +188,9 @@ intellijPlatform {
     pluginConfiguration {
         name = "MCP Steroid"
         version = project.version.toString()
-        changeNotes = releaseNotesText
+        if (releaseNotesText != null) {
+            changeNotes = releaseNotesText
+        }
 
         ideaVersion {
             sinceBuild = "253"
@@ -200,6 +202,14 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
+    }
+
+    patchPluginXml {
+        if (isReleaseBuild) {
+            // Release builds require release notes — track the file as a
+            // mandatory input so changes trigger a rebuild.
+            inputs.file(releaseNotesFile)
+        }
     }
 }
 
