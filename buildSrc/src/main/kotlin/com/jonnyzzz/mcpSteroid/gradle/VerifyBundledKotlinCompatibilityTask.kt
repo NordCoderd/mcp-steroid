@@ -6,7 +6,9 @@ import org.gradle.api.GradleException
 import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Classpath
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.PathSensitive
@@ -26,6 +28,9 @@ abstract class VerifyBundledKotlinCompatibilityTask : DefaultTask() {
     @get:PathSensitive(PathSensitivity.RELATIVE)
     abstract val kotlincHome: DirectoryProperty
 
+    @get:Input
+    abstract val kotlinPluginVersion: Property<String>
+
     @get:OutputFile
     abstract val reportFile: RegularFileProperty
 
@@ -33,7 +38,11 @@ abstract class VerifyBundledKotlinCompatibilityTask : DefaultTask() {
     fun verify() {
         val ideKotlinVersion = probeKotlinVersionFromMainRuntimeClasspath(mainRuntimeClasspath.files.map { it.toPath() })
         val bundledKotlincVersion = detectBundledKotlincVersion(kotlincHome.get().asFile.toPath())
-        val compatible = KotlinVersionCompatibility.isCompatible(ideKotlinVersion, bundledKotlincVersion)
+        val pluginVersion = KotlinVersionCompatibility.parseStrictVersion(kotlinPluginVersion.get())
+            ?: throw GradleException("Cannot parse Kotlin plugin version: ${kotlinPluginVersion.get()}")
+
+        val bundledCompatible = KotlinVersionCompatibility.isCompatible(ideKotlinVersion, bundledKotlincVersion)
+        val pluginNotNewer = pluginVersion <= ideKotlinVersion
         val latestStableKotlinVersion = fetchLatestStableKotlinVersionOrNull()
         val latestStableStatus = when {
             latestStableKotlinVersion == null -> "Latest stable Kotlin release: unavailable"
@@ -44,8 +53,10 @@ abstract class VerifyBundledKotlinCompatibilityTask : DefaultTask() {
 
         val report = buildString {
             appendLine("IDE Kotlin version: $ideKotlinVersion")
+            appendLine("Kotlin plugin version: $pluginVersion")
             appendLine("Bundled kotlinc version: $bundledKotlincVersion")
-            appendLine("Compatible (major match, minor diff <= 1): $compatible")
+            appendLine("Kotlin plugin not newer than IDE: $pluginNotNewer")
+            appendLine("Bundled kotlinc compatible (major match, minor diff <= 1): $bundledCompatible")
             appendLine(latestStableStatus)
         }
 
@@ -53,7 +64,14 @@ abstract class VerifyBundledKotlinCompatibilityTask : DefaultTask() {
         reportPath.parent?.let { Files.createDirectories(it) }
         Files.writeString(reportPath, report)
 
-        if (!compatible) {
+        if (!pluginNotNewer) {
+            throw GradleException(
+                "Kotlin plugin version $pluginVersion is newer than IDE kotlin-stdlib $ideKotlinVersion. " +
+                        "The Kotlin plugin version must not exceed the IDE bundled Kotlin.\n$report"
+            )
+        }
+
+        if (!bundledCompatible) {
             throw GradleException(
                 "Bundled kotlinc $bundledKotlincVersion is too far from IDE kotlin-stdlib $ideKotlinVersion. " +
                         "Expected same major and minor distance <= 1.\n$report"

@@ -73,4 +73,16 @@ class KotlinVersionCompatibilityTest {
             )
         )
     }
+
+    @Test
+    fun pluginVersionNotNewerThanIde() {
+        // plugin == IDE → OK
+        assertTrue(KotlinVersion(2, 3, 10) <= KotlinVersion(2, 3, 10))
+        // plugin older than IDE → OK
+        assertTrue(KotlinVersion(2, 2, 21) <= KotlinVersion(2, 3, 10))
+        // plugin newer than IDE → FAIL
+        assertFalse(KotlinVersion(2, 3, 10) <= KotlinVersion(2, 2, 21))
+        // plugin newer by patch only → FAIL
+        assertFalse(KotlinVersion(2, 3, 11) <= KotlinVersion(2, 3, 10))
+    }
 }
