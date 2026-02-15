@@ -4,23 +4,20 @@
     <idea-version since-build="253"/>
     <name>MCP Steroid</name>
     <vendor>jonnyzzz.com</vendor>
-    <description><![CDATA[
-      <p><b>MCP Steroid</b> brings the full power of the IntelliJ Platform to AI agents through the Model Context Protocol (MCP).</p>
-      <p>IntelliJ platform works for AI agents as great as for human developers.</p>
-      <ul>
-        <li><b>9 MCP Tools:</b> Control IntelliJ IDEA programmatically — execute code, take screenshots, discover actions, debug, and more</li>
-        <li><b>58 MCP Resources:</b> Comprehensive guides covering LSP, IDE operations, debugger, tests, VCS, and more</li>
-        <li><b>Vision Capabilities:</b> AI agents can see your IDE with screenshots and OCR</li>
-        <li><b>Deep Integration:</b> Access PSI, inspections, refactorings, and full IntelliJ Platform API</li>
-        <li><b>Human Oversight:</b> Review and approve code execution with configurable safety controls</li>
-      </ul>
-      <p>Compatible with all IntelliJ Platform-based IDEs: IntelliJ IDEA, PyCharm, WebStorm, GoLand, CLion, Rider, and more.</p>
-      <p>Requirements: IntelliJ IDEA 2025.3 or newer (build 253 or later).</p>
-      <p>Visit <a href="https://mcp-steroid.jonnyzzz.com">mcp-steroid.jonnyzzz.com</a> for documentation and examples.</p>
-    ]]></description>
-    <change-notes><![CDATA[
-      <h2>What's New in v0.88.0</h2>
-      <h3>IntelliJ 2026.1 EAP Support</h3>
+    <description><![CDATA[<p><b>MCP Steroid</b> brings the full power of the IntelliJ Platform to AI agents through the Model Context Protocol (MCP).</p>
+<p>IntelliJ platform works for AI agents as great as for human developers.</p>
+<ul>
+<li><b>9 MCP Tools:</b> Control IntelliJ IDEA programmatically — execute code, take screenshots, discover actions, debug, and more</li>
+<li><b>58 MCP Resources:</b> Comprehensive guides covering LSP, IDE operations, debugger, tests, VCS, and more</li>
+<li><b>Vision Capabilities:</b> AI agents can see your IDE with screenshots and OCR</li>
+<li><b>Deep Integration:</b> Access PSI, inspections, refactorings, and full IntelliJ Platform API</li>
+<li><b>Human Oversight:</b> Review and approve code execution with configurable safety controls</li>
+</ul>
+<p>Compatible with all IntelliJ Platform-based IDEs: IntelliJ IDEA, PyCharm, WebStorm, GoLand, CLion, Rider, and more.</p>
+<p>Requirements: IntelliJ IDEA 2025.3 or newer (build 253 or later).</p>
+<p>Visit <a href="https://mcp-steroid.jonnyzzz.com">mcp-steroid.jonnyzzz.com</a> for documentation and examples.</p>]]></description>
+    <change-notes><![CDATA[<h2>What's New in v0.88.0</h2>
+<h3>IntelliJ 2026.1 EAP Support</h3>
 <p>MCP Steroid now supports IntelliJ 2026.1 EAP IDE versions, with EAP smoke testing infrastructure to ensure compatibility with upcoming IDE releases.</p>
 <h3>Kotlin Compiler 2.3.10</h3>
 <p>The bundled Kotlin compiler has been updated to 2.3.10, aligned with the version shipped in the latest IDE builds.</p>
@@ -45,7 +42,7 @@
 <li>Refactored test infrastructure with extracted LayoutManager, GitDriver, and ConsoleDriver</li>
 <li>Three new debugger integration tests with improved evidence validation</li>
 <li>Enforced no hardcoded MCP resource URIs in source code</li>
-      <p>Full release notes: <a href="https://mcp-steroid.jonnyzzz.com/releases/0.88.0/">mcp-steroid.jonnyzzz.com/releases/0.88.0/</a></p>
-    ]]></change-notes>
+<p>Full release notes: <a href="https://mcp-steroid.jonnyzzz.com/releases/0.88.0/">mcp-steroid.jonnyzzz.com/releases/0.88.0/</a></p>]]></change-notes>
   </plugin>
 </plugins>
+
