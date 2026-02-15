@@ -5,7 +5,6 @@ import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.CodexJsonFilter
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import java.io.File
 
 /**
@@ -16,7 +15,7 @@ import java.io.File
  * The API key is read from ~/.openai mounted into the container.
  */
 class DockerCodexSession(
-    private val session: ContainerProcessRunner,
+    private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
@@ -31,9 +30,7 @@ class DockerCodexSession(
     }
 
     override fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        val container = session as? ContainerDriver
-            ?: error("Container driver is required for NPX registration")
-        val npxCommand = container.prepareNpxProxyForUrl(mcpUrl, userHome)
+        val npxCommand = session.prepareNpxProxyForUrl(mcpUrl, userHome)
 
         runInContainer(args = codexMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0, message = "NPX MCP server registration")

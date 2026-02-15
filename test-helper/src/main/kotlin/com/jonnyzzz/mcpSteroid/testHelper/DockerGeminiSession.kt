@@ -5,7 +5,6 @@ import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.GeminiStreamJsonFilter
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import java.io.File
 import java.util.Locale
 
@@ -13,7 +12,7 @@ import java.util.Locale
  * Manages a Gemini CLI session running inside a Docker container.
  */
 class DockerGeminiSession(
-    private val session: ContainerProcessRunner,
+    private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
@@ -28,9 +27,7 @@ class DockerGeminiSession(
     }
 
     override fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        val container = session as? ContainerDriver
-            ?: error("Container driver is required for NPX registration")
-        val npxCommand = container.prepareNpxProxyForUrl(mcpUrl, userHome)
+        val npxCommand = session.prepareNpxProxyForUrl(mcpUrl, userHome)
 
         runInContainer(args = geminiMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0, message = "NPX MCP server registration")
