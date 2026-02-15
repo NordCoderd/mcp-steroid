@@ -12,8 +12,7 @@ import kotlin.system.exitProcess
  * Filter types:
  *   - stream-json, claude (default): Claude stream-json NDJSON filter
  *   - codex: Codex CLI --json NDJSON filter
- *   - gemini: Gemini CLI text filter (ANSI stripping)
- *   - gemini-json, gemini-stream-json: Gemini CLI stream-json NDJSON filter
+ *   - gemini, gemini-json, gemini-stream-json: Gemini CLI stream-json NDJSON filter
  */
 fun main(args: Array<String>) {
     val filterType = args.getOrNull(0) ?: "stream-json"
@@ -21,8 +20,7 @@ fun main(args: Array<String>) {
     val filter = when (filterType.lowercase()) {
         "stream-json", "claude" -> ClaudeStreamJsonFilter()
         "codex" -> CodexJsonFilter()
-        "gemini" -> GeminiFilter()
-        "gemini-json", "gemini-stream-json" -> GeminiStreamJsonFilter()
+        "gemini", "gemini-json", "gemini-stream-json" -> GeminiStreamJsonFilter()
         "--help", "-h" -> {
             printHelp()
             exitProcess(0)
@@ -50,7 +48,7 @@ fun main(args: Array<String>) {
 
 private fun printHelp() {
     println("""
-        Agent Output Filter - Convert AI agent NDJSON/text output to human-readable format
+        Agent Output Filter - Convert AI agent NDJSON output to human-readable format
 
         Usage:
           agent-output-filter [filter-type]
@@ -58,8 +56,7 @@ private fun printHelp() {
         Filter types:
           stream-json, claude    Claude stream-json NDJSON filter (default)
           codex                  Codex CLI --json NDJSON filter
-          gemini                 Gemini CLI text filter (ANSI stripping)
-          gemini-json            Gemini CLI stream-json NDJSON filter
+          gemini, gemini-json   Gemini CLI stream-json NDJSON filter
 
         Options:
           --help, -h             Show this help message
@@ -68,8 +65,6 @@ private fun printHelp() {
         Examples:
           cat agent-output.ndjson | agent-output-filter stream-json
           codex exec --json ... | agent-output-filter codex
-          gemini chat --screen-reader true ... | agent-output-filter gemini
-
-          echo '{"type":"tool_use","name":"bash"}' | agent-output-filter stream-json
+          gemini chat --output-format stream-json ... | agent-output-filter gemini
     """.trimIndent())
 }

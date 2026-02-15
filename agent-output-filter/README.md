@@ -76,9 +76,9 @@ Processes Gemini CLI text output:
 ## Architecture
 
 - **OutputFilter** interface: `process(InputStream, OutputStream)`
-- **ClaudeStreamJsonFilter**: kotlinx.serialization.json for JSON parsing
-- **CodexJsonFilter**: kotlinx.serialization.json for JSON parsing
-- **GeminiFilter**: Regex-based ANSI/noise filtering
+- **ClaudeStreamJsonFilter**: Claude stream-json NDJSON filter
+- **CodexJsonFilter**: Codex --json NDJSON filter
+- **GeminiStreamJsonFilter**: Gemini stream-json NDJSON filter
 - **Main.kt**: Entry point with filter selection
 
 All filters:
