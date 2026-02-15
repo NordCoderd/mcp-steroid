@@ -122,7 +122,7 @@ class DialogWindowsLookup {
      *
      * Must be called on EDT.
      */
-    internal fun findDialogsOwnedBy(ownerWindow: Window): List<DialogWrapper> {
+    private fun findDialogsOwnedBy(ownerWindow: Window): List<DialogWrapper> {
         val result = mutableListOf<DialogWrapper>()
         for (window in Window.getWindows()) {
             if (window !is DialogWrapperDialog) continue
