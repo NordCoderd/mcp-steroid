@@ -16,14 +16,6 @@
 {{ define "main" }}
 <article class="page-content">
     <h1>{{ .Title }}</h1>
-    {{ $releases := site.GetPage "section" "releases" }}
-    {{ $all := $releases.Pages.ByTitle.Reverse }}
-    {{ $latest := index $all 0 }}
-    {{ if ne .File.Path $latest.File.Path }}
-    <div class="warning">
-        <p><strong>This release is obsolete.</strong> Please use the latest release: <a href="{{ $latest.RelPermalink }}">{{ $latest.Title }}</a></p>
-    </div>
-    {{ end }}
     {{ .Content }}
 </article>
 {{ end }}
