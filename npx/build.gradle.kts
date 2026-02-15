@@ -12,27 +12,27 @@ version = rootProject.version
 val npmInstall = tasks.register<Exec>("npmInstall") {
     group = "npx"
     workingDir = projectDir
-    commandLine("npm", "ci")
+    commandLine("bash", "-lc", "npm ci")
 }
 
 val npmBuild = tasks.register<Exec>("npmBuild") {
     group = "npx"
     workingDir = projectDir
-    commandLine("npm", "run", "build")
+    commandLine("bash", "-lc", "npm run build")
     dependsOn(npmInstall)
 }
 
 val npmBuildTest = tasks.register<Exec>("npmBuildTest") {
     group = "npx"
     workingDir = projectDir
-    commandLine("npm", "run", "build:test")
+    commandLine("bash", "-lc", "npm run build:test")
     dependsOn(npmInstall)
 }
 
 val npmTest = tasks.register<Exec>("npmTest") {
     group = "npx"
     workingDir = projectDir
-    commandLine("npm", "run", "test")
+    commandLine("bash", "-lc", "npm run test")
     dependsOn(npmInstall)
 }
 
