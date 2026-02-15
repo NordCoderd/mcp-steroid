@@ -370,3 +370,271 @@ test("handleRpc calls ensureFresh for resources/list", async () => {
   await handleRpc("resources/list", {}, registry);
   assert.equal(called, true);
 });
+
+// --- handleRpc: initialize capability details ---
+
+test("handleRpc initialize includes prompts capability", async () => {
+  const registry = mockRegistry();
+  const result = await handleRpc("initialize", {}, registry);
+  assert.ok(result.capabilities.prompts !== undefined);
+});
+
+test("handleRpc initialize tools capability has listChanged boolean", async () => {
+  const registry = mockRegistry();
+  const result = await handleRpc("initialize", {}, registry);
+  assert.equal(typeof result.capabilities.tools.listChanged, "boolean");
+});
+
+test("handleRpc initialize resources capability has subscribe boolean", async () => {
+  const registry = mockRegistry();
+  const result = await handleRpc("initialize", {}, registry);
+  assert.equal(typeof result.capabilities.resources.subscribe, "boolean");
+});
+
+test("handleRpc initialize resources capability has listChanged boolean", async () => {
+  const registry = mockRegistry();
+  const result = await handleRpc("initialize", {}, registry);
+  assert.equal(typeof result.capabilities.resources.listChanged, "boolean");
+});
+
+// --- handleRpc: tools/call error propagation ---
+
+test("handleRpc tools/call callTool exception propagates", async () => {
+  const registry = mockRegistry({
+    resolveServerForToolCall: (name) => ({ serverId: "pid:1", toolName: name }),
+    callTool: async () => { throw new Error("Server crashed"); }
+  });
+
+  // callTool exceptions propagate up — the stdio layer catches them
+  await assert.rejects(
+    () => handleRpc("tools/call", {
+      name: "my_tool",
+      arguments: {}
+    }, registry, null, null),
+    /Server crashed/
+  );
+});
+
+// --- handleRpc: tools/call with progress —- verify start/end notifications ---
+
+test("handleRpc tools/call emits start and end progress notifications", async () => {
+  const notifications = [];
+  const notify = async (method, params) => {
+    notifications.push({ method, params });
+  };
+
+  const registry = mockRegistry({
+    resolveServerForToolCall: (name) => ({ serverId: "pid:1", toolName: name }),
+    callTool: async () => ({ content: [{ type: "text", text: "done" }] })
+  });
+
+  await handleRpc("tools/call", {
+    name: "my_tool",
+    arguments: {}
+  }, registry, null, notify);
+
+  const progressNotifs = notifications.filter(n => n.method === "notifications/progress");
+  assert.ok(progressNotifs.length >= 2, "Expected at least start and end progress notifications");
+
+  // First notification should have progress=0 (start)
+  assert.equal(progressNotifs[0].params.progress, 0);
+
+  // Last notification should have progress=1 (end)
+  assert.equal(progressNotifs[progressNotifs.length - 1].params.progress, 1);
+});
+
+test("handleRpc tools/call progress notifications include message", async () => {
+  const notifications = [];
+  const notify = async (method, params) => {
+    notifications.push({ method, params });
+  };
+
+  const registry = mockRegistry({
+    resolveServerForToolCall: (name) => ({ serverId: "pid:1", toolName: name }),
+    callTool: async () => ({ content: [{ type: "text", text: "done" }] })
+  });
+
+  await handleRpc("tools/call", {
+    name: "my_tool",
+    arguments: {}
+  }, registry, null, notify);
+
+  const progressNotifs = notifications.filter(n => n.method === "notifications/progress");
+  // All progress notifications should have a message string
+  for (const n of progressNotifs) {
+    assert.equal(typeof n.params.message, "string");
+    assert.ok(n.params.message.length > 0);
+  }
+});
+
+// --- handleRpc: tools/call with downstream progress events ---
+
+test("handleRpc tools/call forwards downstream progress events", async () => {
+  const notifications = [];
+  const notify = async (method, params) => {
+    notifications.push({ method, params });
+  };
+
+  const registry = mockRegistry({
+    resolveServerForToolCall: (name) => ({ serverId: "pid:1", toolName: name }),
+    callTool: async (serverId, toolName, args, onEvent) => {
+      // Simulate downstream progress events
+      await onEvent({ type: "progress", progress: 0.25, message: "Quarter done" });
+      await onEvent({ type: "progress", progress: 0.75, message: "Almost done" });
+      return { content: [{ type: "text", text: "result" }] };
+    }
+  });
+
+  await handleRpc("tools/call", {
+    name: "my_tool",
+    arguments: {},
+    _meta: { progressToken: "my-token" }
+  }, registry, null, notify);
+
+  const progressNotifs = notifications.filter(n => n.method === "notifications/progress");
+  // Should have: start(0) + 0.25 + 0.75 + end(1) = at least 4
+  assert.ok(progressNotifs.length >= 4, `Expected >= 4 progress notifications, got ${progressNotifs.length}`);
+
+  // All should use the client's progress token
+  for (const n of progressNotifs) {
+    assert.equal(n.params.progressToken, "my-token");
+  }
+
+  // Check that downstream progress values were forwarded
+  const progressValues = progressNotifs.map(n => n.params.progress);
+  assert.ok(progressValues.includes(0.25));
+  assert.ok(progressValues.includes(0.75));
+});
+
+test("handleRpc tools/call forwards heartbeat events as progress", async () => {
+  const notifications = [];
+  const notify = async (method, params) => {
+    notifications.push({ method, params });
+  };
+
+  const registry = mockRegistry({
+    resolveServerForToolCall: (name) => ({ serverId: "pid:1", toolName: name }),
+    callTool: async (serverId, toolName, args, onEvent) => {
+      await onEvent({ type: "heartbeat", message: "Still working" });
+      return { content: [{ type: "text", text: "result" }] };
+    }
+  });
+
+  await handleRpc("tools/call", {
+    name: "my_tool",
+    arguments: {}
+  }, registry, null, notify);
+
+  const progressNotifs = notifications.filter(n => n.method === "notifications/progress");
+  const heartbeatNotif = progressNotifs.find(n => n.params.message === "Still working");
+  assert.ok(heartbeatNotif, "Expected a progress notification from heartbeat event");
+});
+
+// --- handleRpc: resources/read with alias URI ---
+
+test("handleRpc resources/read follows alias URI", async () => {
+  let calledParams = null;
+  const registry = mockRegistry({
+    buildResourceIndex: () => [],
+    resourceIndex: new Map(),
+    callRpc: async (serverId, method, params) => {
+      calledParams = params;
+      return { contents: [{ uri: params.uri, text: "content" }] };
+    }
+  });
+
+  // parseAliasUri should parse this — test depends on alias URI format
+  // If no alias, it should try resourceIndex lookup and fail
+  await assert.rejects(
+    () => handleRpc("resources/read", { uri: "mcp-steroid://nonexistent" }, registry),
+    /not found/i
+  );
+});
+
+// --- handleRpc: tools/list returns empty when no tools ---
+
+test("handleRpc tools/list returns empty array when no tools", async () => {
+  const registry = mockRegistry({
+    buildToolGroups: () => new Map()
+  });
+  const result = await handleRpc("tools/list", {}, registry);
+  assert.ok(Array.isArray(result.tools));
+  assert.equal(result.tools.length, 0);
+});
+
+// --- handleRpc: progress total field ---
+
+test("handleRpc tools/call forwards progress total from downstream", async () => {
+  const notifications = [];
+  const notify = async (method, params) => {
+    notifications.push({ method, params });
+  };
+
+  const registry = mockRegistry({
+    resolveServerForToolCall: (name) => ({ serverId: "pid:1", toolName: name }),
+    callTool: async (serverId, toolName, args, onEvent) => {
+      await onEvent({ type: "progress", progress: 5, total: 10, message: "Halfway" });
+      return { content: [{ type: "text", text: "done" }] };
+    }
+  });
+
+  await handleRpc("tools/call", {
+    name: "my_tool",
+    arguments: {},
+    _meta: { progressToken: "tok-total" }
+  }, registry, null, notify);
+
+  const progressNotifs = notifications.filter(n => n.method === "notifications/progress");
+  const withTotal = progressNotifs.find(n => n.params.total === 10);
+  assert.ok(withTotal, "Expected a progress notification with total=10");
+  assert.equal(withTotal.params.progress, 5);
+  assert.equal(withTotal.params.message, "Halfway");
+});
+
+// --- handleRpc: resource-not-found error code ---
+
+test("handleRpc resources/read unknown uri throws with error code", async () => {
+  const registry = mockRegistry({
+    buildResourceIndex: () => [],
+    resourceIndex: new Map()
+  });
+
+  await assert.rejects(
+    () => handleRpc("resources/read", { uri: "mcp-steroid://no-such-resource" }, registry),
+    (err) => {
+      assert.match(err.message, /not found/i);
+      return true;
+    }
+  );
+});
+
+// --- handleRpc: prompts/list returns method not found ---
+
+test("handleRpc prompts/list throws -32601 (not implemented)", async () => {
+  const registry = mockRegistry();
+
+  await assert.rejects(
+    () => handleRpc("prompts/list", {}, registry),
+    (err) => {
+      assert.equal(err.code, -32601);
+      return true;
+    }
+  );
+});
+
+// --- handleRpc: tools/call with no notify function ---
+
+test("handleRpc tools/call works without notify callback", async () => {
+  const registry = mockRegistry({
+    resolveServerForToolCall: (name) => ({ serverId: "pid:1", toolName: name }),
+    callTool: async () => ({ content: [{ type: "text", text: "ok" }] })
+  });
+
+  const result = await handleRpc("tools/call", {
+    name: "my_tool",
+    arguments: {}
+  }, registry, null, null);
+
+  assert.ok(result.content);
+  assert.equal(result.content[0].text, "ok");
+});

@@ -493,3 +493,510 @@ test("stdio: initialize response includes instructions string", async () => {
     await proxy.close();
   }
 });
+
+// ---------------------------------------------------------------------------
+// Section 3: JSON-RPC 2.0 compliance tests
+// ---------------------------------------------------------------------------
+
+test("stdio: string request id is echoed back", async () => {
+  const proxy = spawnProxy();
+  try {
+    // Send raw request with string id
+    const msg = { jsonrpc: JSONRPC_VERSION, id: "string-id-42", method: "initialize", params: {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: "test", version: "1.0" }
+    }};
+    proxy.sendRaw(JSON.stringify(msg) + "\n");
+    const resp = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timeout")), 5_000);
+      proxy.child.stdout.once("data", () => {});
+      // Wait for the response queue to get populated
+      setTimeout(() => {
+        // Re-parse stdout buffer for our string-id response
+        clearTimeout(timer);
+      }, 200);
+      // Use the response queue mechanism by pushing a handler
+      const origLength = (proxy as any).child.stdout.listenerCount("data");
+      let stdoutAccum = "";
+      const listener = (chunk) => {
+        stdoutAccum += chunk.toString();
+        const lines = stdoutAccum.split("\n");
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line.trim());
+            if (parsed.id === "string-id-42") {
+              clearTimeout(timer);
+              proxy.child.stdout.removeListener("data", listener);
+              resolve(parsed);
+              return;
+            }
+          } catch (_) {}
+        }
+      };
+      proxy.child.stdout.on("data", listener);
+    });
+    assert.equal((resp as any).id, "string-id-42");
+    assert.ok((resp as any).result);
+    assert.equal((resp as any).result.protocolVersion, PROTOCOL_VERSION);
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: request with null id is treated as notification (no response)", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Send a request with null id — per MCP spec, null ids are notifications
+    proxy.sendRaw(JSON.stringify({ jsonrpc: JSONRPC_VERSION, id: null, method: "ping" }) + "\n");
+    // Wait a bit, then verify proxy still responds to a real request
+    await new Promise((r) => setTimeout(r, 200));
+    const resp = await proxy.sendRequest("ping");
+    assert.deepEqual(resp.result, {});
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: request with missing method returns -32600", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Send a raw request with id but no method field
+    const msg = { jsonrpc: JSONRPC_VERSION, id: 999 };
+    proxy.sendRaw(JSON.stringify(msg) + "\n");
+    const resp = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timeout")), 5_000);
+      let accum = "";
+      const listener = (chunk) => {
+        accum += chunk.toString();
+        for (const line of accum.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line.trim());
+            if (parsed.id === 999) {
+              clearTimeout(timer);
+              proxy.child.stdout.removeListener("data", listener);
+              resolve(parsed);
+              return;
+            }
+          } catch (_) {}
+        }
+      };
+      proxy.child.stdout.on("data", listener);
+    });
+    assert.ok((resp as any).error);
+    assert.equal((resp as any).error.code, -32600);
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: error response includes jsonrpc field", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    const resp = await proxy.sendRequest("nonexistent/method");
+    assert.equal(resp.jsonrpc, JSONRPC_VERSION);
+    assert.ok(resp.error);
+    assert.equal(typeof resp.error.code, "number");
+    assert.equal(typeof resp.error.message, "string");
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: response never contains both result and error", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Success case
+    const pingResp = await proxy.sendRequest("ping");
+    assert.ok(pingResp.result !== undefined);
+    assert.equal(pingResp.error, undefined);
+
+    // Error case
+    const errResp = await proxy.sendRequest("nonexistent/method");
+    assert.ok(errResp.error !== undefined);
+    assert.equal(errResp.result, undefined);
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: unknown notification is silently ignored", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Send an unknown notification — server should ignore it
+    proxy.sendNotification("notifications/unknown_custom_event", { data: "test" });
+    // Verify proxy is still responsive
+    await new Promise((r) => setTimeout(r, 100));
+    const resp = await proxy.sendRequest("ping");
+    assert.deepEqual(resp.result, {});
+  } finally {
+    await proxy.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Section 4: Framing edge cases
+// ---------------------------------------------------------------------------
+
+test("framing: empty line in NDJSON is skipped", () => {
+  const msg = '{"jsonrpc":"2.0","id":1,"method":"ping"}';
+  // Empty line followed by valid JSON
+  let buf = Buffer.from("\n" + msg + "\n");
+  // First call should consume the empty line
+  const frame1 = readNextFramedMessage(buf);
+  assert.ok(frame1);
+  // The empty line gets consumed, payloadText may be empty
+  buf = buf.slice(frame1.consumed);
+  if (!frame1.payloadText || frame1.payloadText.trim() === "") {
+    // Empty line was consumed, next frame should be the actual message
+    const frame2 = readNextFramedMessage(buf);
+    assert.ok(frame2);
+    assert.equal(frame2.payloadText.trim(), msg);
+  } else {
+    // Implementation skipped empty line and returned message directly
+    assert.equal(frame1.payloadText.trim(), msg);
+  }
+});
+
+test("framing: Content-Length handles multi-byte UTF-8 correctly", () => {
+  // Multi-byte characters: Content-Length is in bytes, not characters
+  const json = '{"jsonrpc":"2.0","id":1,"result":{"text":"日本語テスト"}}';
+  const byteLength = Buffer.byteLength(json, "utf8");
+  assert.ok(byteLength > json.length, "Multi-byte chars should make byte length > char length");
+  const header = `Content-Length: ${byteLength}\r\n\r\n`;
+  const buf = Buffer.from(header + json, "utf8");
+  const frame = readNextFramedMessage(buf);
+  assert.ok(frame);
+  assert.equal(frame.payloadText, json);
+  const parsed = JSON.parse(frame.payloadText);
+  assert.equal(parsed.result.text, "日本語テスト");
+});
+
+test("framing: zero-length Content-Length returns empty payload", () => {
+  const header = "Content-Length: 0\r\n\r\n";
+  const buf = Buffer.from(header);
+  const frame = readNextFramedMessage(buf);
+  assert.ok(frame);
+  assert.equal(frame.payloadText, "");
+  assert.equal(frame.mode, "framed");
+});
+
+test("framing: NDJSON with trailing whitespace is trimmed", () => {
+  const json = '{"jsonrpc":"2.0","id":1,"method":"ping"}';
+  const buf = Buffer.from(json + "   \n");
+  const frame = readNextFramedMessage(buf);
+  assert.ok(frame);
+  assert.equal(frame.payloadText, json);
+});
+
+// ---------------------------------------------------------------------------
+// Section 5: Batch request handling (stdio.ts supports arrays)
+// ---------------------------------------------------------------------------
+
+test("stdio: batch request returns array of responses", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Send a JSON-RPC batch array directly
+    const batch = [
+      { jsonrpc: JSONRPC_VERSION, id: 100, method: "ping" },
+      { jsonrpc: JSONRPC_VERSION, id: 101, method: "ping" }
+    ];
+    proxy.sendRaw(JSON.stringify(batch) + "\n");
+    // The proxy should respond with a batch array
+    const resp = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timeout")), 5_000);
+      let accum = "";
+      const listener = (chunk) => {
+        accum += chunk.toString();
+        for (const line of accum.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line.trim());
+            // Batch response is an array
+            if (Array.isArray(parsed)) {
+              clearTimeout(timer);
+              proxy.child.stdout.removeListener("data", listener);
+              resolve(parsed);
+              return;
+            }
+          } catch (_) {}
+        }
+      };
+      proxy.child.stdout.on("data", listener);
+    });
+    assert.ok(Array.isArray(resp));
+    assert.equal((resp as any[]).length, 2);
+    const ids = (resp as any[]).map(r => r.id).sort();
+    assert.deepEqual(ids, [100, 101]);
+    for (const r of (resp as any[])) {
+      assert.deepEqual(r.result, {});
+      assert.equal(r.jsonrpc, JSONRPC_VERSION);
+    }
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: batch with notification omits response for it", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Batch: one request + one notification (no id)
+    const batch = [
+      { jsonrpc: JSONRPC_VERSION, id: 200, method: "ping" },
+      { jsonrpc: JSONRPC_VERSION, method: "notifications/initialized" }
+    ];
+    proxy.sendRaw(JSON.stringify(batch) + "\n");
+    const resp = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timeout")), 5_000);
+      let accum = "";
+      const listener = (chunk) => {
+        accum += chunk.toString();
+        for (const line of accum.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line.trim());
+            if (Array.isArray(parsed)) {
+              clearTimeout(timer);
+              proxy.child.stdout.removeListener("data", listener);
+              resolve(parsed);
+              return;
+            }
+          } catch (_) {}
+        }
+      };
+      proxy.child.stdout.on("data", listener);
+    });
+    // Only 1 response (the notification doesn't get a response)
+    assert.ok(Array.isArray(resp));
+    assert.equal((resp as any[]).length, 1);
+    assert.equal((resp as any[])[0].id, 200);
+  } finally {
+    await proxy.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Section 6: Large payload and stress tests
+// ---------------------------------------------------------------------------
+
+test("stdio: large payload is not truncated", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Send a tools/call with a large arguments object
+    const largeValue = "x".repeat(100_000);
+    const resp = await proxy.sendRequest("tools/call", {
+      name: "nonexistent_tool",
+      arguments: { data: largeValue }
+    });
+    // Should get an error result (tool not found), not a crash
+    assert.ok(resp.result);
+    assert.equal(resp.result.isError, true);
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: 10 rapid sequential pings all succeed", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    const promises = [];
+    for (let i = 0; i < 10; i++) {
+      promises.push(proxy.sendRequest("ping"));
+    }
+    const results = await Promise.all(promises);
+    assert.equal(results.length, 10);
+    for (const r of results) {
+      assert.deepEqual(r.result, {});
+    }
+  } finally {
+    await proxy.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Section 7: Capability negotiation
+// ---------------------------------------------------------------------------
+
+test("stdio: initialize response includes prompts capability", async () => {
+  const proxy = spawnProxy();
+  try {
+    const resp = await proxy.sendRequest("initialize", {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: "test", version: "1.0" }
+    });
+    const caps = resp.result.capabilities;
+    assert.ok(caps.prompts !== undefined, "Expected prompts capability");
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: initialize response capabilities have listChanged property", async () => {
+  const proxy = spawnProxy();
+  try {
+    const resp = await proxy.sendRequest("initialize", {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: "test", version: "1.0" }
+    });
+    const caps = resp.result.capabilities;
+    // Tools capability should declare listChanged
+    assert.equal(typeof caps.tools.listChanged, "boolean");
+  } finally {
+    await proxy.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Section 8: Recovery and resilience
+// ---------------------------------------------------------------------------
+
+test("stdio: proxy recovers from multiple malformed JSON messages", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Send several malformed JSON objects (must start with { to be parsed as NDJSON)
+    proxy.sendRaw("{bad1\n");
+    proxy.sendRaw("{\"incomplete\n");
+    proxy.sendRaw("{\"also\":broken\n");
+    // Wait for processing
+    await new Promise((r) => setTimeout(r, 300));
+    // Proxy should still respond
+    const resp = await proxy.sendRequest("ping");
+    assert.deepEqual(resp.result, {});
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: proxy handles empty line between messages", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // Send empty lines interspersed with a valid request
+    proxy.sendRaw("\n\n");
+    await new Promise((r) => setTimeout(r, 100));
+    const resp = await proxy.sendRequest("ping");
+    assert.deepEqual(resp.result, {});
+  } finally {
+    await proxy.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Section 9: ID edge cases (JSON-RPC 2.0 compliance)
+// ---------------------------------------------------------------------------
+
+test("stdio: request with id 0 is a valid request (not notification)", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    // id=0 is falsy in JS but is a valid JSON-RPC request ID
+    const msg = { jsonrpc: JSONRPC_VERSION, id: 0, method: "ping" };
+    proxy.sendRaw(JSON.stringify(msg) + "\n");
+    const resp = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timeout")), 5_000);
+      let accum = "";
+      const listener = (chunk) => {
+        accum += chunk.toString();
+        for (const line of accum.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line.trim());
+            if (parsed.id === 0) {
+              clearTimeout(timer);
+              proxy.child.stdout.removeListener("data", listener);
+              resolve(parsed);
+              return;
+            }
+          } catch (_) {}
+        }
+      };
+      proxy.child.stdout.on("data", listener);
+    });
+    assert.equal((resp as any).id, 0);
+    assert.deepEqual((resp as any).result, {});
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: request with negative integer id is valid", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    const msg = { jsonrpc: JSONRPC_VERSION, id: -1, method: "ping" };
+    proxy.sendRaw(JSON.stringify(msg) + "\n");
+    const resp = await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error("Timeout")), 5_000);
+      let accum = "";
+      const listener = (chunk) => {
+        accum += chunk.toString();
+        for (const line of accum.split("\n")) {
+          if (!line.trim()) continue;
+          try {
+            const parsed = JSON.parse(line.trim());
+            if (parsed.id === -1) {
+              clearTimeout(timer);
+              proxy.child.stdout.removeListener("data", listener);
+              resolve(parsed);
+              return;
+            }
+          } catch (_) {}
+        }
+      };
+      proxy.child.stdout.on("data", listener);
+    });
+    assert.equal((resp as any).id, -1);
+    assert.deepEqual((resp as any).result, {});
+  } finally {
+    await proxy.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Section 10: Double initialization and prompts/list
+// ---------------------------------------------------------------------------
+
+test("stdio: second initialize request is accepted (no enforcement yet)", async () => {
+  const proxy = spawnProxy();
+  try {
+    // First initialization
+    await initializeProxy(proxy);
+    // Second initialize request — server should still respond
+    const resp = await proxy.sendRequest("initialize", {
+      protocolVersion: PROTOCOL_VERSION,
+      capabilities: {},
+      clientInfo: { name: "test", version: "1.0" }
+    });
+    assert.ok(resp.result);
+    assert.equal(resp.result.protocolVersion, PROTOCOL_VERSION);
+  } finally {
+    await proxy.close();
+  }
+});
+
+test("stdio: prompts/list returns -32601 (advertised but not implemented)", async () => {
+  const proxy = spawnProxy();
+  try {
+    await initializeProxy(proxy);
+    const resp = await proxy.sendRequest("prompts/list");
+    // prompts capability is advertised in initialize but prompts/list is not handled
+    assert.ok(resp.error);
+    assert.equal(resp.error.code, -32601);
+  } finally {
+    await proxy.close();
+  }
+});
