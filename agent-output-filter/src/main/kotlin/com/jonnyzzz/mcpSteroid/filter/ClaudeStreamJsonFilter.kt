@@ -144,6 +144,15 @@ class ClaudeStreamJsonFilter : OutputFilter {
     }
 
     private fun handleResult(event: JsonObject, writer: java.io.BufferedWriter) {
+        // The result event carries the final answer text in the "result" field
+        val resultText = event["result"]?.jsonPrimitive?.contentOrNull
+        if (!resultText.isNullOrBlank()) {
+            writer.write(resultText)
+            if (!resultText.endsWith("\n")) {
+                writer.newLine()
+            }
+        }
+
         val cost = event["cost_usd"]?.jsonPrimitive?.doubleOrNull ?: 0.0
         val duration = event["duration_ms"]?.jsonPrimitive?.longOrNull ?: 0L
         val totalCost = event["total_cost_usd"]?.jsonPrimitive?.doubleOrNull ?: 0.0

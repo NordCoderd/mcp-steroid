@@ -80,6 +80,15 @@ class ClaudeStreamJsonFilterTest {
     }
 
     @Test
+    fun `test result with result text`() {
+        val input = """{"type":"result","result":"TOOL: steroid_list_projects\nPROJECTS: {\"projects\":[]}","cost_usd":0.05,"duration_ms":10000,"num_turns":2}"""
+        val output = runFilter(input)
+        assertTrue(output.contains("TOOL: steroid_list_projects"), "Should contain result text: $output")
+        assertTrue(output.contains("PROJECTS:"), "Should contain PROJECTS line: $output")
+        assertTrue(output.contains("[done]"), "Should contain done marker: $output")
+    }
+
+    @Test
     fun `test error event`() {
         val input = """{"type":"error","error":{"type":"invalid_request","message":"Bad request"}}"""
         val output = runFilter(input)
