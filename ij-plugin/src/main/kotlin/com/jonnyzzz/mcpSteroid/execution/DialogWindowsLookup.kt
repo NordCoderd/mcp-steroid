@@ -8,6 +8,7 @@ import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.serviceAsync
 import com.intellij.openapi.diagnostic.Logger
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.DialogWrapperDialog
@@ -32,19 +33,21 @@ suspend inline fun dialogWindowsLookup() = serviceAsync<DialogWindowsLookup>()
  */
 @Service(Service.Level.APP)
 class DialogWindowsLookup {
-    private val log = Logger.getInstance(DialogWindowsLookup::class.java)
-
     /**
      * Fast negative path: try dispatching to EDT without modality context.
      * If EDT responds within the timeout, no modal dialog is blocking.
+     *
+     * NOTE! It can return false positive, when IDE is overloaded and not able to process EDT on time.
      *
      * @return true if EDT is responsive (no modal), false if timeout/error (modal may be present)
      */
     private suspend fun canPumpEdtNonModal(): Boolean {
         if (ApplicationManager.getApplication().isHeadlessEnvironment) return true
         return try {
-            withTimeout(100) {
-                withContext(Dispatchers.EDT) { true }
+            withContext(Dispatchers.IO + CoroutineName("DialogWindowsLookup#check")) {
+                withTimeout(100) {
+                    async(Dispatchers.EDT) { true }.await()
+                }
             }
         } catch (_: TimeoutCancellationException) {
             false
