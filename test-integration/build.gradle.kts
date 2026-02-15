@@ -42,6 +42,7 @@ dependencies {
     agentOutputFilterJar(project(":agent-output-filter"))
 
     testImplementation(project(":test-helper"))
+    testImplementation(project(":ai-agents"))
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
     testImplementation("org.junit.jupiter:junit-jupiter-params")
@@ -546,6 +547,7 @@ val ideaReleaseSmokeTests = listOf(
     "com.jonnyzzz.mcpSteroid.integration.tests.EapSmokeTest*",
     "com.jonnyzzz.mcpSteroid.integration.tests.IntelliJContainerTest*",
     "com.jonnyzzz.mcpSteroid.integration.tests.InfrastructureTest*",
+    "com.jonnyzzz.mcpSteroid.integration.tests.NpxToolVisibilityTest*",
     "com.jonnyzzz.mcpSteroid.integration.tests.WhatYouSeeTest*",
 )
 
