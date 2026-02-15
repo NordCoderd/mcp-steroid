@@ -19,7 +19,7 @@
     "esbuild": "^0.25.0",
     "typescript": "^5.9.2"
   },
-  "license": "UNLICENSED",
+  "license": "SEE LICENSE IN LICENSE",
   "dependencies": {
     "posthog-node": "^5.24.15"
   }
