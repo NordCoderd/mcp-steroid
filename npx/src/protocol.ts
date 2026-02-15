@@ -118,7 +118,7 @@ async function handleRpc(method, params, registry, beacon = null, notify = null)
       return captureToolCall(toolError(resolved.error), "resolve");
     }
 
-    const progressToken = extractClientProgressToken(args) || createProgressToken();
+    const progressToken = extractClientProgressToken(params) || createProgressToken();
     let lastProgress = 0;
     const emitProgress = async (progress, message, total = null) => {
       if (typeof notify !== "function") return;

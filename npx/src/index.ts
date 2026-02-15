@@ -1,5 +1,5 @@
-import { BEACON_EVENTS, DEFAULT_CONFIG } from "./constants";
-import { readNextFramedMessage, encodeFramedMessage } from "./framing";
+import { BEACON_EVENTS, DEFAULT_CONFIG, PROTOCOL_VERSION, JSONRPC_VERSION } from "./constants";
+import { readNextFramedMessage, encodeFramedMessage, encodeNdjsonMessage } from "./framing";
 import { parseSseEventBlock } from "./sse";
 import {
   isPidAlive, parseMarkerContent, scanMarkers,
@@ -15,7 +15,7 @@ import { TrafficLogger } from "./traffic";
 import { buildBeaconConfig, NpxBeacon } from "./beacon";
 import { ServerRegistry } from "./registry";
 import { buildUpdateCheckConfig, buildUpgradeNotice, pickRecommendedVersion, needsUpgradeByServerRule } from "./update-check";
-import { handleRpc } from "./protocol";
+import { handleRpc, extractClientProgressToken, createProgressToken, createServerInfo, jsonRpcResult, jsonRpcError } from "./protocol";
 import { createStdioServer, runCliMode } from "./stdio";
 
 async function main() {
@@ -115,6 +115,8 @@ if (require.main === module) {
 module.exports = {
   BEACON_EVENTS,
   DEFAULT_CONFIG,
+  PROTOCOL_VERSION,
+  JSONRPC_VERSION,
   parseArgs,
   loadConfig,
   isPidAlive,
@@ -142,6 +144,12 @@ module.exports = {
   ServerRegistry,
   readNextFramedMessage,
   encodeFramedMessage,
+  encodeNdjsonMessage,
   parseSseEventBlock,
-  handleRpc
+  handleRpc,
+  extractClientProgressToken,
+  createProgressToken,
+  createServerInfo,
+  jsonRpcResult,
+  jsonRpcError
 };
