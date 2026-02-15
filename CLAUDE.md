@@ -233,6 +233,10 @@ Atomic commits, descriptive messages (what and why). Test and build before commi
 
 Hugo site at `website/`. Build: `cd website && make build`. Dev: `make dev`. See [website/CLAUDE.md](website/CLAUDE.md).
 
+## IntelliJ Source Research
+
+Use `run-agent.sh` from `~/Work/jonnyzzz-ai-coder/` to launch AI agents for researching IntelliJ Platform internals in `~/Work/intellij`. This is for manual investigation only -- code must never reference or depend on `run-agent.sh` programmatically (see BANNED rules above).
+
 ## AI Tests
 
 Deploy fresh plugin (`./gradlew deployPlugin`), run prompts from `ai-tests/*.md`, validate outcomes. See `ai-tests/_INSTRUCTIONS.md`.
