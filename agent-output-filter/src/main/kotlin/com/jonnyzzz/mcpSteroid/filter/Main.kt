@@ -10,17 +10,17 @@ import kotlin.system.exitProcess
  *   java -jar agent-output-filter.jar [filter-type]
  *
  * Filter types:
- *   - stream-json, claude (default): Claude stream-json NDJSON filter
- *   - codex: Codex CLI --json NDJSON filter
- *   - gemini, gemini-json, gemini-stream-json: Gemini CLI stream-json NDJSON filter
+ *   - claude (default): Claude NDJSON filter
+ *   - codex: Codex NDJSON filter
+ *   - gemini: Gemini NDJSON filter
  */
 fun main(args: Array<String>) {
-    val filterType = args.getOrNull(0) ?: "stream-json"
+    val filterType = args.getOrNull(0) ?: "claude"
 
     val filter = when (filterType.lowercase()) {
-        "stream-json", "claude" -> ClaudeStreamJsonFilter()
+        "claude" -> ClaudeStreamJsonFilter()
         "codex" -> CodexJsonFilter()
-        "gemini", "gemini-json", "gemini-stream-json" -> GeminiStreamJsonFilter()
+        "gemini" -> GeminiStreamJsonFilter()
         "--help", "-h" -> {
             printHelp()
             exitProcess(0)
@@ -54,17 +54,12 @@ private fun printHelp() {
           agent-output-filter [filter-type]
 
         Filter types:
-          stream-json, claude    Claude stream-json NDJSON filter (default)
-          codex                  Codex CLI --json NDJSON filter
-          gemini, gemini-json   Gemini CLI stream-json NDJSON filter
+          claude    Claude NDJSON filter (default)
+          codex     Codex NDJSON filter
+          gemini    Gemini NDJSON filter
 
         Options:
-          --help, -h             Show this help message
-          --version, -v          Show version information
-
-        Examples:
-          cat agent-output.ndjson | agent-output-filter stream-json
-          codex exec --json ... | agent-output-filter codex
-          gemini chat --output-format stream-json ... | agent-output-filter gemini
+          --help, -h     Show this help message
+          --version, -v  Show version information
     """.trimIndent())
 }

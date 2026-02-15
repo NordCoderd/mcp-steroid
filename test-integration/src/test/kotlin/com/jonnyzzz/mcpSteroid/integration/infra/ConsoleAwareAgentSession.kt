@@ -149,7 +149,7 @@ class ConsolePumpingContainerDriver(
          * Build a filter command for the given filter type.
          * The command uses `java -jar` to invoke the agent-output-filter JAR.
          *
-         * @param filterType one of: "claude", "codex", "gemini-json"
+         * @param filterType one of: "claude", "codex", "gemini"
          */
         fun filterCommand(filterType: String): String {
             return "java -jar $FILTER_JAR_PATH $filterType"

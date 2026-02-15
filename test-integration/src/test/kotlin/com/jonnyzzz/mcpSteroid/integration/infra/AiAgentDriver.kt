@@ -14,12 +14,12 @@ import kotlin.collections.iterator
 enum class ConsoleFilterKind(val filterType: String?) {
     /** No filtering -- raw output is pumped to console. */
     NONE(null),
-    /** Claude stream-json filter (content_block_delta, tool_use, etc). */
-    CLAUDE_STREAM_JSON("claude"),
-    /** Codex --json filter (item.completed/agent_message, item.started/command_execution, etc). */
-    CODEX_JSON("codex"),
-    /** Gemini stream-json filter (message, tool_use, tool_result, etc). */
-    GEMINI("gemini-json"),
+    /** Claude NDJSON filter (content_block_delta, tool_use, etc). */
+    CLAUDE("claude"),
+    /** Codex NDJSON filter (item.completed/agent_message, item.started/command_execution, etc). */
+    CODEX("codex"),
+    /** Gemini NDJSON filter (message, tool_use, tool_result, etc). */
+    GEMINI("gemini"),
 }
 
 class AiAgentDriver(
@@ -69,8 +69,8 @@ class AiAgentDriver(
     }
 
     private val agentFactories: Map<String, () -> AiAgentSession> = mapOf(
-        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME, consoleFilter = ConsoleFilterKind.CLAUDE_STREAM_JSON)), DockerClaudeSession.DISPLAY_NAME) },
-        "codex" to { prepareAIAgent(DockerCodexSession.create(scopeForAgent(DockerCodexSession.DISPLAY_NAME, consoleFilter = ConsoleFilterKind.CODEX_JSON)), DockerCodexSession.DISPLAY_NAME) },
+        "claude" to { prepareAIAgent(DockerClaudeSession.create(scopeForAgent(DockerClaudeSession.DISPLAY_NAME, consoleFilter = ConsoleFilterKind.CLAUDE)), DockerClaudeSession.DISPLAY_NAME) },
+        "codex" to { prepareAIAgent(DockerCodexSession.create(scopeForAgent(DockerCodexSession.DISPLAY_NAME, consoleFilter = ConsoleFilterKind.CODEX)), DockerCodexSession.DISPLAY_NAME) },
         "gemini" to { prepareAIAgent(DockerGeminiSession.create(scopeForAgent(DockerGeminiSession.DISPLAY_NAME, consoleFilter = ConsoleFilterKind.GEMINI)), DockerGeminiSession.DISPLAY_NAME) },
     )
 }
