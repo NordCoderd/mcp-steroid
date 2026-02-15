@@ -85,6 +85,9 @@ val isTargetIdeOverridden = providers.gradleProperty("mcp.platform.product").isP
         providers.gradleProperty("mcp.platform.version").isPresent
 val hostArchitecture = resolveHostArchitecture()
 
+subprojects {
+    version = rootProject.version
+}
 
 repositories {
     mavenCentral()
