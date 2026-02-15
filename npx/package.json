@@ -1,6 +1,6 @@
 {
   "name": "mcp-steroid-proxy",
-  "version": "0.1.0",
+  "version": "0.0.0-dev",
   "description": "NPX proxy that aggregates multiple IntelliJ MCP Steroid servers",
   "type": "commonjs",
   "bin": {
@@ -10,12 +10,13 @@
     "node": ">=18"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "node esbuild.config.mjs",
     "build:test": "tsc -p tsconfig.test.json",
     "test": "npm run build --silent && npm run build:test --silent && node --test $(find dist-test/test -name '*.test.js')"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",
+    "esbuild": "^0.25.0",
     "typescript": "^5.9.2"
   },
   "license": "UNLICENSED",

@@ -12,16 +12,36 @@ node {
     version.set("20.20.0")
 }
 
+val patchPackageVersion = tasks.register("patchPackageVersion") {
+    group = "npx"
+    description = "Set package.json version from Gradle project.version"
+    dependsOn(tasks.npmInstall)
+
+    val packageJsonFile = projectDir.resolve("package.json")
+    inputs.property("projectVersion", project.version.toString())
+    inputs.file(packageJsonFile)
+    outputs.file(packageJsonFile)
+
+    doLast {
+        val content = packageJsonFile.readText()
+        val updated = content.replace(
+            Regex(""""version"\s*:\s*"[^"]*""""),
+            """"version": "${project.version}""""
+        )
+        packageJsonFile.writeText(updated)
+    }
+}
+
 val npmBuild = tasks.register<NpmTask>("npmBuild") {
     group = "npx"
     npmCommand.set(listOf("run", "build"))
-    dependsOn(tasks.npmInstall)
+    dependsOn(patchPackageVersion)
 }
 
 val npmBuildTest = tasks.register<NpmTask>("npmBuildTest") {
     group = "npx"
     npmCommand.set(listOf("run", "build:test"))
-    dependsOn(tasks.npmInstall)
+    dependsOn(patchPackageVersion)
 }
 
 val npmTest = tasks.register<NpmTask>("npmTest") {
