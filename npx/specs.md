@@ -13,6 +13,8 @@ Create a local NPX-run stdio MCP proxy (TypeScript implementation) that discover
 - Maintain dynamic mapping `<project name + path> -> IDE instance/port` and refresh on IDE restart/crash.
 - Re-check for marker files and server health continuously; servers can join/leave at any time (IDE restarts included).
 - Optional traffic log under `~/.mcp-steroid/`.
+- Perform MCP-Server-style remote update checks and notify users when NPX upgrade is recommended.
+- Emit dedicated, explicit beacon events for NPX runtime and routing behavior.
 - Keep proxy metadata/instructions sourced from IDE/plugin data (no hardcoded IDE metadata in NPX).
 - Keep NPX source and tests in TypeScript (`.ts`) only.
 
@@ -71,6 +73,22 @@ For each discovered `serverUrl`:
 - Older NPX + newer plugin: continue to work via MCP baseline.
 - Newer NPX + older plugin: bridge probe may fail; NPX must degrade gracefully and continue MCP-only.
 - Bridge APIs/metadata are additive-only; existing MCP behavior is preserved.
+- NPX update checks must remain backward-compatible: if remote update endpoint or bridge metadata is unavailable, continue normal operation without failing requests.
+
+## 6.3 Update checks and beacon
+- Update checks:
+  - Use `https://mcp-steroid.jonnyzzz.com/version.json?intellij-version=<build>` when IDE build is known.
+  - Read `version-base` and use MCP-Server-style comparison semantics.
+  - Print upgrade recommendation to stderr at most once per process, while continuing periodic checks.
+- Beacon:
+  - Use PostHog client with best-effort, non-blocking delivery.
+  - Dedicated event names:
+    - `npx_started`
+    - `npx_heartbeat`
+    - `npx_discovery_changed`
+    - `npx_tool_call`
+    - `npx_upgrade_recommended`
+  - Beacon failures must never fail MCP request handling.
 
 ## 7. Server registry model
 Each upstream server is represented as:
@@ -182,6 +200,20 @@ Suggested structure:
     "maxFanout": 4,
     "requestTimeoutMs": 15000,
     "backoffMs": 2000
+  },
+  "updates": {
+    "enabled": true,
+    "initialDelayMs": 30000,
+    "intervalMs": 900000,
+    "requestTimeoutMs": 10000
+  },
+  "beacon": {
+    "enabled": true,
+    "host": "https://us.i.posthog.com",
+    "apiKey": "phc_...",
+    "timeoutMs": 3000,
+    "heartbeatIntervalMs": 1800000,
+    "distinctIdFile": "~/.mcp-steroid/proxy-beacon-id"
   }
 }
 ```

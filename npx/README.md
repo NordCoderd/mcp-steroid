@@ -6,6 +6,7 @@ The proxy is an MCP stdio server that:
 - discovers all running MCP Steroid plugin instances via `~/.<pid>.mcp-steroid`
 - aggregates MCP metadata/tools/resources across IDE instances
 - routes tool calls to the freshest matching IDE/plugin instance
+- reports dedicated PostHog beacon events for runtime health and routing usage
 
 ## Runtime model
 
@@ -13,6 +14,7 @@ The proxy is an MCP stdio server that:
 - Optional mode: direct CLI invocation of the same MCP methods/tools
 - Upstream transport: HTTP MCP to plugin `/mcp` endpoints discovered from marker files
 - No local HTTP server is exposed by NPX
+- Update checks use the same remote `version-base` endpoint pattern as MCP Server and print upgrade notices to stderr
 
 ## TypeScript-only policy
 
@@ -56,7 +58,21 @@ Example:
   "allowHosts": ["127.0.0.1", "localhost"],
   "cache": { "enabled": false, "dir": "~/.mcp-steroid/proxy", "ttlSeconds": 5 },
   "trafficLog": { "enabled": false, "redactFields": ["code"] },
-  "upstreamTimeoutMs": 5000
+  "upstreamTimeoutMs": 5000,
+  "updates": {
+    "enabled": true,
+    "initialDelayMs": 30000,
+    "intervalMs": 900000,
+    "requestTimeoutMs": 10000
+  },
+  "beacon": {
+    "enabled": true,
+    "host": "https://us.i.posthog.com",
+    "apiKey": "phc_IPtbjwwy9YIGg0YNHNxYBePijvTvHEcKAjohah6obYW",
+    "timeoutMs": 3000,
+    "heartbeatIntervalMs": 1800000,
+    "distinctIdFile": "~/.mcp-steroid/proxy-beacon-id"
+  }
 }
 ```
 
@@ -80,6 +96,22 @@ CLI flags:
 - Older NPX + newer plugin: must continue working using MCP baseline behavior.
 - Newer NPX + older plugin: NPX must degrade gracefully to MCP-only discovery/routing.
 - Bridge-specific metadata must be additive and feature-detected; no hard requirement for legacy plugin versions.
+
+## Upgrade checks
+
+- NPX periodically fetches `https://mcp-steroid.jonnyzzz.com/version.json?intellij-version=<build>` (when IDE build metadata is available).
+- If current NPX version does not match remote `version-base` semantics, NPX prints an upgrade recommendation to stderr once per process.
+- Checks continue in background even after the first notice, matching MCP Server behavior.
+
+## Beacon events
+
+NPX sends dedicated PostHog events (best-effort, non-blocking):
+
+- `npx_started`
+- `npx_heartbeat`
+- `npx_discovery_changed`
+- `npx_tool_call`
+- `npx_upgrade_recommended`
 
 ## Architecture direction
 

@@ -20,6 +20,14 @@ const AGGREGATE_TOOL_NAMES = {
   metadata: "steroid_server_metadata"
 };
 
+const BEACON_EVENTS = Object.freeze({
+  started: "npx_started",
+  heartbeat: "npx_heartbeat",
+  discoveryChanged: "npx_discovery_changed",
+  toolCall: "npx_tool_call",
+  upgradeRecommended: "npx_upgrade_recommended"
+});
+
 const DEFAULT_CONFIG = {
   homeDir: null,
   scanIntervalMs: 2000,
@@ -34,7 +42,21 @@ const DEFAULT_CONFIG = {
     redactFields: ["code"]
   },
   defaultServerId: null,
-  upstreamTimeoutMs: 5000
+  upstreamTimeoutMs: 120_000,
+  updates: {
+    enabled: true,
+    initialDelayMs: 30_000,
+    intervalMs: 15 * 60 * 1000,
+    requestTimeoutMs: 10_000
+  },
+  beacon: {
+    enabled: true,
+    host: "https://us.i.posthog.com",
+    apiKey: "phc_IPtbjwwy9YIGg0YNHNxYBePijvTvHEcKAjohah6obYW",
+    timeoutMs: 3_000,
+    heartbeatIntervalMs: 30 * 60 * 1000,
+    distinctIdFile: "~/.mcp-steroid/proxy-beacon-id"
+  }
 };
 
 function loadPackageVersion() {
@@ -187,6 +209,9 @@ async function loadConfig(args) {
   if (config.homeDir) {
     config.homeDir = expandHome(config.homeDir);
   }
+  if (config.beacon && config.beacon.distinctIdFile) {
+    config.beacon.distinctIdFile = expandHome(config.beacon.distinctIdFile);
+  }
   return config;
 }
 
@@ -315,6 +340,28 @@ function compareVersionPartsDescending(leftParts, rightParts) {
 
 function compareVersionStringsDescending(left, right) {
   return compareVersionPartsDescending(versionParts(left), versionParts(right));
+}
+
+function extractBaseVersion(fullVersion) {
+  if (typeof fullVersion !== "string") return "";
+  const trimmed = fullVersion.trim();
+  if (!trimmed) return "";
+  const snapshotIndex = trimmed.indexOf("-SNAPSHOT");
+  if (snapshotIndex > 0) {
+    return trimmed.slice(0, snapshotIndex);
+  }
+  const dashIndex = trimmed.indexOf("-");
+  if (dashIndex > 0) {
+    return trimmed.slice(0, dashIndex);
+  }
+  return trimmed;
+}
+
+function isVersionNewer(candidateVersion, currentVersion) {
+  const candidate = extractBaseVersion(candidateVersion);
+  const current = extractBaseVersion(currentVersion);
+  if (!candidate || !current) return false;
+  return compareVersionStringsDescending(candidate, current) < 0;
 }
 
 function compareIsoTimesDescending(left, right) {
@@ -565,6 +612,220 @@ class TrafficLogger {
   }
 }
 
+function buildBeaconConfig(config) {
+  const raw = config && config.beacon && typeof config.beacon === "object" ? config.beacon : {};
+  const timeoutMs = Number.isFinite(raw.timeoutMs) && raw.timeoutMs > 0
+    ? raw.timeoutMs
+    : DEFAULT_CONFIG.beacon.timeoutMs;
+  const heartbeatIntervalMs = Number.isFinite(raw.heartbeatIntervalMs) && raw.heartbeatIntervalMs > 0
+    ? raw.heartbeatIntervalMs
+    : DEFAULT_CONFIG.beacon.heartbeatIntervalMs;
+  const host = typeof raw.host === "string" && raw.host.trim()
+    ? raw.host.trim()
+    : DEFAULT_CONFIG.beacon.host;
+  const apiKey = typeof raw.apiKey === "string" && raw.apiKey.trim()
+    ? raw.apiKey.trim()
+    : DEFAULT_CONFIG.beacon.apiKey;
+  const distinctIdFile = expandHome(
+    typeof raw.distinctIdFile === "string" && raw.distinctIdFile.trim()
+      ? raw.distinctIdFile.trim()
+      : DEFAULT_CONFIG.beacon.distinctIdFile
+  );
+  return {
+    enabled: raw.enabled !== false,
+    host,
+    apiKey,
+    timeoutMs,
+    heartbeatIntervalMs,
+    distinctIdFile
+  };
+}
+
+function createBeaconDistinctId() {
+  if (typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return crypto.randomBytes(16).toString("hex");
+}
+
+class NpxBeacon {
+  constructor(config) {
+    this.config = buildBeaconConfig(config);
+    this.proxyVersion = config.version || "0.1.0";
+    this.distinctId = null;
+    this.lastDiscoverySignature = null;
+    this.heartbeatTimer = null;
+    this.client = null;
+
+    if (!this.config.enabled) return;
+    if (!this.config.apiKey) {
+      this.config.enabled = false;
+      return;
+    }
+
+    let PostHogClient = null;
+    try {
+      PostHogClient = require("posthog-node").PostHog;
+    } catch (_) {
+      this.config.enabled = false;
+      this.client = null;
+      return;
+    }
+
+    try {
+      this.client = new PostHogClient(this.config.apiKey, {
+        host: this.config.host,
+        flushAt: 1,
+        flushInterval: 1_000,
+        maxQueueSize: 50,
+        maxBatchSize: 5,
+        requestTimeout: this.config.timeoutMs,
+        preloadFeatureFlags: false,
+        sendFeatureFlagEvent: false
+      });
+    } catch (_) {
+      this.config.enabled = false;
+      this.client = null;
+    }
+  }
+
+  async getDistinctId() {
+    if (this.distinctId) return this.distinctId;
+    try {
+      const existing = (await fsp.readFile(this.config.distinctIdFile, "utf8")).trim();
+      if (existing) {
+        this.distinctId = existing;
+        return existing;
+      }
+    } catch (_) {
+      // Ignore read failures and create a new id
+    }
+
+    const generated = createBeaconDistinctId();
+    try {
+      await fsp.mkdir(path.dirname(this.config.distinctIdFile), { recursive: true });
+      await fsp.writeFile(this.config.distinctIdFile, `${generated}\n`, {
+        encoding: "utf8",
+        mode: 0o600
+      });
+      try {
+        await fsp.chmod(this.config.distinctIdFile, 0o600);
+      } catch (_) {
+        // Ignore chmod failures on unsupported filesystems/platforms
+      }
+    } catch (_) {
+      // Ignore write failures, keep in-memory id
+    }
+    this.distinctId = generated;
+    return generated;
+  }
+
+  capture(event, properties = {}) {
+    if (!this.client || !this.config.enabled) return;
+    void this.captureAsync(event, properties);
+  }
+
+  async captureAsync(event, properties = {}) {
+    if (!this.client || !this.config.enabled) return;
+    const distinctId = await this.getDistinctId();
+    try {
+      this.client.capture({
+        distinctId,
+        event,
+        properties: {
+          proxy_version: this.proxyVersion,
+          node_version: process.version,
+          platform: process.platform,
+          arch: process.arch,
+          ...properties
+        }
+      });
+    } catch (_) {
+      // Ignore beacon failures
+    }
+  }
+
+  captureDiscoveryChanged(registry, reason) {
+    if (!this.client || !this.config.enabled) return;
+    const summary = [...registry.servers.values()]
+      .map((server) => `${server.serverId}:${server.status}:${server.url}`)
+      .sort()
+      .join("|");
+    if (summary === this.lastDiscoverySignature) return;
+    this.lastDiscoverySignature = summary;
+
+    const totalServers = registry.servers.size;
+    const onlineServers = registry.listOnlineServers().length;
+    this.capture(BEACON_EVENTS.discoveryChanged, {
+      reason,
+      total_servers: totalServers,
+      online_servers: onlineServers,
+      offline_servers: Math.max(0, totalServers - onlineServers)
+    });
+  }
+
+  startHeartbeat(registry) {
+    if (!this.client || !this.config.enabled) return;
+    if (this.heartbeatTimer) return;
+    this.heartbeatTimer = setInterval(() => {
+      this.capture(BEACON_EVENTS.heartbeat, {
+        online_servers: registry.listOnlineServers().length,
+        total_servers: registry.servers.size
+      });
+    }, this.config.heartbeatIntervalMs);
+  }
+
+  async shutdown() {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+    if (!this.client) return;
+    try {
+      await this.client.shutdown();
+    } catch (_) {
+      // Ignore beacon shutdown failures
+    }
+  }
+}
+
+function parseSseEventBlock(block) {
+  if (typeof block !== "string") return null;
+  const lines = block.split(/\r?\n/);
+  let type = null;
+  const dataLines = [];
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    if (!line) continue;
+    if (line.startsWith("event:")) {
+      type = line.slice("event:".length).trim();
+      continue;
+    }
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trimStart());
+    }
+  }
+
+  if (dataLines.length === 0) return null;
+  const dataText = dataLines.join("\n");
+  let data = null;
+  try {
+    data = JSON.parse(dataText);
+  } catch (_) {
+    data = { message: dataText };
+  }
+
+  if (!type && data && typeof data.type === "string") {
+    type = data.type;
+  }
+
+  return {
+    type: type || "message",
+    data
+  };
+}
+
 class UpstreamClient {
   constructor(server, config, traffic) {
     this.server = server;
@@ -620,6 +881,184 @@ class UpstreamClient {
     return response.result;
   }
 
+  async callTool(toolName, args, onEvent = null) {
+    await this.ensureInitialized();
+    try {
+      return await this.callToolViaBridgeStream(toolName, args || {}, onEvent);
+    } catch (err) {
+      // Fallback for older plugin versions without bridge streaming support.
+      if (!err || err.retryable !== true) {
+        throw err;
+      }
+    }
+
+    return this.sendRequest("tools/call", {
+      name: toolName,
+      arguments: args || {}
+    });
+  }
+
+  async callToolViaBridgeStream(toolName, args, onEvent = null) {
+    if (!this.server.bridgeBaseUrl) {
+      const err = new Error("Bridge base URL is missing");
+      err.retryable = true;
+      throw err;
+    }
+
+    const url = `${this.server.bridgeBaseUrl}/tools/call/stream`;
+    const payload = {
+      name: toolName,
+      arguments: args || {}
+    };
+
+    await this.traffic.log({
+      ts: nowIso(),
+      direction: "upstream-out",
+      serverId: this.server.serverId,
+      method: "bridge/tools/call/stream",
+      payload
+    });
+
+    const controller = new AbortController();
+    let timeout = null;
+    const resetTimeout = () => {
+      if (timeout) clearTimeout(timeout);
+      timeout = setTimeout(() => controller.abort(), this.config.upstreamTimeoutMs);
+    };
+
+    resetTimeout();
+    let response;
+    try {
+      response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream"
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal
+      });
+    } finally {
+      if (timeout) clearTimeout(timeout);
+    }
+
+    if (!response.ok) {
+      let details = "";
+      try {
+        details = (await response.text()).slice(0, 400);
+      } catch (_) {
+        // Ignore body parse failures
+      }
+      const err = new Error(
+        `Bridge HTTP ${response.status} ${response.statusText}${details ? `: ${details}` : ""}`
+      );
+      err.retryable = response.status === 404 || response.status === 405 || response.status === 501;
+      throw err;
+    }
+
+    const reader = response.body && response.body.getReader ? response.body.getReader() : null;
+    if (!reader) {
+      const err = new Error("Bridge stream response has no body");
+      err.retryable = true;
+      throw err;
+    }
+
+    const decoder = new TextDecoder("utf8");
+    let buffer = "";
+    let sawEvent = false;
+    let resultPayload = null;
+
+    const handleBlock = async (block) => {
+      const parsed = parseSseEventBlock(block);
+      if (!parsed) return;
+
+      sawEvent = true;
+      await this.traffic.log({
+        ts: nowIso(),
+        direction: "upstream-in",
+        serverId: this.server.serverId,
+        method: "bridge/tools/call/stream",
+        payload: parsed.data
+      });
+
+      if (typeof onEvent === "function" && parsed.data && typeof parsed.data === "object") {
+        await onEvent(parsed.data);
+      }
+
+      if (parsed.type === "result" && parsed.data && typeof parsed.data === "object") {
+        resultPayload = parsed.data.result || null;
+      } else if (parsed.type === "error") {
+        const message = parsed.data && typeof parsed.data.message === "string"
+          ? parsed.data.message
+          : "Bridge stream tool call failed";
+        const err = new Error(message);
+        err.retryable = false;
+        throw err;
+      }
+    };
+
+    try {
+      while (true) {
+        resetTimeout();
+        const chunk = await reader.read();
+        if (timeout) clearTimeout(timeout);
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+
+        while (true) {
+          const lfLf = buffer.indexOf("\n\n");
+          const crlfCrlf = buffer.indexOf("\r\n\r\n");
+          let sepIndex = -1;
+          let sepLen = 0;
+
+          if (lfLf >= 0 && (crlfCrlf < 0 || lfLf < crlfCrlf)) {
+            sepIndex = lfLf;
+            sepLen = 2;
+          } else if (crlfCrlf >= 0) {
+            sepIndex = crlfCrlf;
+            sepLen = 4;
+          }
+
+          if (sepIndex < 0) break;
+          const block = buffer.slice(0, sepIndex);
+          buffer = buffer.slice(sepIndex + sepLen);
+          await handleBlock(block);
+        }
+      }
+
+      if (buffer.trim()) {
+        await handleBlock(buffer);
+      }
+    } catch (err) {
+      if (err && err.name === "AbortError") {
+        const timeoutErr = new Error(
+          `Bridge stream timeout after ${this.config.upstreamTimeoutMs}ms for ${toolName}`
+        );
+        timeoutErr.retryable = !sawEvent;
+        throw timeoutErr;
+      }
+      if (err && typeof err === "object" && "retryable" in err) {
+        throw err;
+      }
+      const streamErr = new Error(err && err.message ? err.message : String(err));
+      streamErr.retryable = !sawEvent;
+      throw streamErr;
+    } finally {
+      try {
+        await reader.cancel();
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    if (resultPayload == null) {
+      const err = new Error("Bridge stream completed without a result payload");
+      err.retryable = !sawEvent;
+      throw err;
+    }
+    return resultPayload;
+  }
+
   async sendPayload(payload, expectResponse) {
     const headers = {
       "Content-Type": "application/json",
@@ -654,6 +1093,17 @@ class UpstreamClient {
     const newSession = response.headers.get(SESSION_HEADER.toLowerCase()) || response.headers.get(SESSION_HEADER);
     if (newSession) {
       this.sessionId = newSession;
+    }
+
+    if (!response.ok) {
+      let details = "";
+      try {
+        details = (await response.text()).slice(0, 400);
+      } catch (_) {
+        // Ignore response body parse failures
+      }
+      const suffix = details ? `: ${details}` : "";
+      throw new Error(`Upstream HTTP ${response.status} ${response.statusText}${suffix}`);
     }
 
     if (!expectResponse) {
@@ -729,6 +1179,25 @@ class ServerRegistry {
     return this.servers.get(serverId) || null;
   }
 
+  resolveServerIdHint(serverHint) {
+    if (serverHint == null) return null;
+    const raw = String(serverHint).trim();
+    if (!raw) return null;
+    if (this.servers.has(raw)) return raw;
+
+    const normalized = raw.toLowerCase();
+    const online = this.listOnlineServersByFreshness();
+
+    const byLabel = online.filter((server) => String(server.label || "").trim().toLowerCase() === normalized);
+    if (byLabel.length === 1) return byLabel[0].serverId;
+
+    if ((normalized === "intellij" || normalized === "default_api" || normalized === "mcp-steroid") && online.length === 1) {
+      return online[0].serverId;
+    }
+
+    return null;
+  }
+
   getServerSummary(serverId) {
     const server = this.getServer(serverId);
     if (!server) return null;
@@ -752,6 +1221,7 @@ class ServerRegistry {
         pid: entry.pid,
         url: entry.url,
         baseUrl: baseUrlFromMcpUrl(entry.url),
+        bridgeBaseUrl: `${baseUrlFromMcpUrl(entry.url)}/npx/v1`,
         port: portFromUrl(entry.url),
         label: entry.label,
         markerPath: entry.markerPath,
@@ -778,6 +1248,7 @@ class ServerRegistry {
     } else {
       server.url = entry.url;
       server.baseUrl = baseUrlFromMcpUrl(entry.url);
+      server.bridgeBaseUrl = `${server.baseUrl}/npx/v1`;
       server.port = portFromUrl(entry.url);
       server.label = entry.label;
       server.markerPath = entry.markerPath;
@@ -865,6 +1336,14 @@ class ServerRegistry {
     const ttlMs = this.config.cache.enabled ? this.config.cache.ttlSeconds * 1000 : 0;
     const now = Date.now();
 
+    if (!server.metadata || now - server.metadataFetchedAt > ttlMs) {
+      const bridgeMetadata = await this.fetchBridgeServerMetadata(server.serverId);
+      if (bridgeMetadata && typeof bridgeMetadata === "object") {
+        this.applyMetadata(server.serverId, normalizeServerMetadataPayload(bridgeMetadata));
+        server.metadataFetchedAt = now;
+      }
+    }
+
     if (!server.tools || now - server.toolsFetchedAt > ttlMs) {
       try {
         const result = await server.client.sendRequest("tools/list", {});
@@ -897,6 +1376,36 @@ class ServerRegistry {
     } catch (_) {
       return null;
     }
+  }
+
+  async fetchBridgeJson(serverId, bridgePath) {
+    const server = this.servers.get(serverId);
+    if (!server || server.status !== "online") return null;
+    const url = `${server.bridgeBaseUrl}${bridgePath}`;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), this.config.upstreamTimeoutMs);
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller.signal
+      });
+      if (!response.ok) return null;
+      return await response.json();
+    } catch (_) {
+      return null;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+
+  async fetchBridgeServerMetadata(serverId) {
+    return this.fetchBridgeJson(serverId, "/server-metadata");
+  }
+
+  async fetchBridgeProducts(serverId) {
+    return this.fetchBridgeJson(serverId, "/products");
   }
 
   applyMetadata(serverId, patch) {
@@ -1056,7 +1565,11 @@ class ServerRegistry {
     const serverIds = new Set(this.servers.keys());
 
     if (args && args.server_id) {
-      return { serverId: args.server_id, toolName: name };
+      const resolved = this.resolveServerIdHint(args.server_id);
+      if (!resolved) {
+        return { error: `Unknown server_id: ${args.server_id}` };
+      }
+      return { serverId: resolved, toolName: name };
     }
 
     const namespaced = parseNamespacedTool(name, serverIds);
@@ -1096,8 +1609,9 @@ class ServerRegistry {
     return { error: "Unable to route tool call; specify server_id or provide project_name/project_path" };
   }
 
-  async callTool(serverId, toolName, args) {
-    const server = this.servers.get(serverId);
+  async callTool(serverId, toolName, args, onEvent = null) {
+    const resolvedServerId = this.resolveServerIdHint(serverId) || serverId;
+    const server = this.servers.get(resolvedServerId);
     if (!server) {
       return toolError(`Unknown server_id: ${serverId}`);
     }
@@ -1108,17 +1622,15 @@ class ServerRegistry {
     const cleanArgs = args ? { ...args } : {};
     delete cleanArgs.server_id;
 
-    const result = await server.client.sendRequest("tools/call", {
-      name: toolName,
-      arguments: cleanArgs
-    });
+    const result = await server.client.callTool(toolName, cleanArgs, onEvent);
 
-    this.captureExecutionIds(serverId, result);
+    this.captureExecutionIds(resolvedServerId, result);
     return result;
   }
 
   async callRpc(serverId, method, params) {
-    const server = this.servers.get(serverId);
+    const resolvedServerId = this.resolveServerIdHint(serverId) || serverId;
+    const server = this.servers.get(resolvedServerId);
     if (!server) {
       throw new Error(`Unknown server_id: ${serverId}`);
     }
@@ -1208,12 +1720,20 @@ function toolError(message) {
 
 function getTargetsByFreshness(registry, args) {
   const targetId = args && args.server_id ? String(args.server_id) : null;
-  if (targetId) return [targetId];
-  return registry.listOnlineServersByFreshness().map((server) => server.serverId);
+  if (targetId) {
+    const resolved = registry.resolveServerIdHint(targetId);
+    if (resolved) return { targets: [resolved], error: null };
+    return { targets: [], error: `Unknown server_id: ${targetId}` };
+  }
+  return {
+    targets: registry.listOnlineServersByFreshness().map((server) => server.serverId),
+    error: null
+  };
 }
 
 async function handleAggregateProjects(registry, args) {
-  const targets = getTargetsByFreshness(registry, args);
+  const { targets, error } = getTargetsByFreshness(registry, args);
+  if (error) return toolError(error);
   const errors = [];
   const projects = [];
 
@@ -1260,7 +1780,8 @@ async function handleAggregateProjects(registry, args) {
 }
 
 async function handleAggregateWindows(registry, args) {
-  const targets = getTargetsByFreshness(registry, args);
+  const { targets, error } = getTargetsByFreshness(registry, args);
+  if (error) return toolError(error);
   const errors = [];
   const windows = [];
   const backgroundTasks = [];
@@ -1333,14 +1854,31 @@ async function handleAggregateWindows(registry, args) {
 }
 
 async function handleAggregateProducts(registry, args) {
-  const targets = getTargetsByFreshness(registry, args);
+  const { targets, error } = getTargetsByFreshness(registry, args);
+  if (error) return toolError(error);
   const errors = [];
   const products = [];
 
   await Promise.all(targets.map(async (serverId) => {
     try {
-      const result = await registry.callTool(serverId, AGGREGATE_TOOL_NAMES.products, {});
       const summary = registry.getServerSummary(serverId);
+      const bridgePayload = await registry.fetchBridgeProducts(serverId);
+
+      if (bridgePayload && Array.isArray(bridgePayload.products)) {
+        registry.updateServerProducts(serverId, bridgePayload.products, metadataFromProductsPayload(bridgePayload));
+        for (const product of bridgePayload.products) {
+          products.push({
+            ...product,
+            serverId,
+            serverLabel: summary && summary.serverLabel,
+            serverUrl: summary && summary.serverUrl,
+            serverPort: summary && summary.serverPort
+          });
+        }
+        return;
+      }
+
+      const result = await registry.callTool(serverId, AGGREGATE_TOOL_NAMES.products, {});
 
       if (result.isError) {
         // Fallback: metadata from dedicated metadata handler/caches is still source data from IDE.
@@ -1387,13 +1925,28 @@ async function handleAggregateProducts(registry, args) {
 }
 
 async function handleAggregateServerMetadata(registry, args) {
-  const targets = getTargetsByFreshness(registry, args);
+  const { targets, error } = getTargetsByFreshness(registry, args);
+  if (error) return toolError(error);
   const errors = [];
   const servers = [];
 
   await Promise.all(targets.map(async (serverId) => {
     const summary = registry.getServerSummary(serverId);
     try {
+      const bridgePayload = await registry.fetchBridgeServerMetadata(serverId);
+      if (bridgePayload && typeof bridgePayload === "object") {
+        const patch = normalizeServerMetadataPayload(bridgePayload);
+        registry.applyMetadata(serverId, patch);
+        servers.push({
+          serverId,
+          serverLabel: summary && summary.serverLabel,
+          serverUrl: summary && summary.serverUrl,
+          serverPort: summary && summary.serverPort,
+          metadata: registry.getServer(serverId).metadata
+        });
+        return;
+      }
+
       const result = await registry.callTool(serverId, AGGREGATE_TOOL_NAMES.metadata, {});
       if (result.isError) {
         const server = registry.getServer(serverId);
@@ -1450,6 +2003,107 @@ async function handleListServers(registry) {
   return toolResult({ servers });
 }
 
+function buildVersionEndpointUrl(registry) {
+  const freshest = registry.listOnlineServersByFreshness()[0];
+  const ideBuild = freshest
+    && freshest.metadata
+    && freshest.metadata.ide
+    && typeof freshest.metadata.ide.build === "string"
+    ? freshest.metadata.ide.build
+    : null;
+  if (!ideBuild) return "https://mcp-steroid.jonnyzzz.com/version.json";
+  return `https://mcp-steroid.jonnyzzz.com/version.json?intellij-version=${encodeURIComponent(ideBuild)}`;
+}
+
+function buildUpdateUserAgent(config, registry) {
+  const freshest = registry.listOnlineServersByFreshness()[0];
+  const ideBuild = freshest
+    && freshest.metadata
+    && freshest.metadata.ide
+    && typeof freshest.metadata.ide.build === "string"
+    ? freshest.metadata.ide.build
+    : null;
+  const proxyVersion = config.version || "0.1.0";
+  if (!ideBuild) {
+    return `MCP-Steroid-Proxy/${proxyVersion}`;
+  }
+  return `MCP-Steroid-Proxy/${proxyVersion} (IntelliJ/${ideBuild})`;
+}
+
+function buildUpdateCheckConfig(config) {
+  const raw = config && config.updates && typeof config.updates === "object" ? config.updates : {};
+  const initialDelayMs = Number.isFinite(raw.initialDelayMs) && raw.initialDelayMs >= 0
+    ? raw.initialDelayMs
+    : DEFAULT_CONFIG.updates.initialDelayMs;
+  const intervalMs = Number.isFinite(raw.intervalMs) && raw.intervalMs > 0
+    ? raw.intervalMs
+    : DEFAULT_CONFIG.updates.intervalMs;
+  const requestTimeoutMs = Number.isFinite(raw.requestTimeoutMs) && raw.requestTimeoutMs > 0
+    ? raw.requestTimeoutMs
+    : DEFAULT_CONFIG.updates.requestTimeoutMs;
+  return {
+    enabled: raw.enabled !== false,
+    initialDelayMs,
+    intervalMs,
+    requestTimeoutMs
+  };
+}
+
+async function fetchRemoteVersionBase(registry, config) {
+  const updateCheck = buildUpdateCheckConfig(config);
+  const url = buildVersionEndpointUrl(registry);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), updateCheck.requestTimeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        "User-Agent": buildUpdateUserAgent(config, registry)
+      },
+      signal: controller.signal
+    });
+    if (!response.ok) return null;
+    const payload = await response.json();
+    if (!payload || typeof payload !== "object") return null;
+    const value = typeof payload["version-base"] === "string" ? payload["version-base"] : null;
+    return value ? extractBaseVersion(value) : null;
+  } catch (_) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function pickRecommendedVersion(remoteBase, pluginBase) {
+  if (remoteBase && pluginBase) {
+    return isVersionNewer(remoteBase, pluginBase) ? remoteBase : pluginBase;
+  }
+  return remoteBase || pluginBase || null;
+}
+
+function needsUpgradeByServerRule(currentVersion, remoteVersionBase) {
+  if (typeof currentVersion !== "string") return false;
+  const current = currentVersion.trim();
+  if (!current) return false;
+  const remoteBase = extractBaseVersion(remoteVersionBase || "");
+  if (!remoteBase) return false;
+  // Match IDE plugin update logic: update when current does not start with remote base.
+  return !current.startsWith(remoteBase);
+}
+
+async function buildUpgradeNotice(registry, config) {
+  const currentVersion = typeof config.version === "string" ? config.version : "";
+  const currentBase = extractBaseVersion(currentVersion);
+  if (!currentBase) return null;
+
+  const remoteBase = await fetchRemoteVersionBase(registry, config);
+  if (!remoteBase) return null;
+  if (!needsUpgradeByServerRule(currentVersion, remoteBase)) return null;
+
+  return `[mcp-steroid-proxy] Upgrade recommended: current ${currentBase}, latest ${remoteBase}. Run: npm i -g mcp-steroid-proxy`;
+}
+
 function jsonRpcResult(id, result) {
   return { jsonrpc: JSONRPC_VERSION, id, result };
 }
@@ -1465,7 +2119,22 @@ function createServerInfo(config) {
   };
 }
 
-async function handleRpc(method, params, registry) {
+function extractClientProgressToken(args) {
+  if (!args || typeof args !== "object") return null;
+  const meta = args._meta;
+  if (!meta || typeof meta !== "object") return null;
+  const token = meta.progressToken;
+  if (typeof token === "string" || typeof token === "number") {
+    return token;
+  }
+  return null;
+}
+
+function createProgressToken() {
+  return `npx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function handleRpc(method, params, registry, beacon = null, notify = null) {
   if (method !== "initialize" && method !== "ping") {
     await registry.ensureFresh();
   }
@@ -1519,31 +2188,86 @@ async function handleRpc(method, params, registry) {
   if (method === "tools/call") {
     const toolName = params && params.name ? params.name : null;
     const args = params && params.arguments ? params.arguments : {};
+    const captureToolCall = (result, route, extra = {}) => {
+      if (beacon) {
+        beacon.capture(BEACON_EVENTS.toolCall, {
+          tool_name: toolName || "<missing>",
+          route,
+          status: result && result.isError ? "error" : "ok",
+          ...extra
+        });
+      }
+      return result;
+    };
+
     if (!toolName) {
-      return toolError("Missing tool name");
+      return captureToolCall(toolError("Missing tool name"), "invalid");
     }
 
     if (toolName === "proxy_list_servers") {
-      return handleListServers(registry);
+      return captureToolCall(await handleListServers(registry), "proxy");
     }
     if (toolName === "proxy_list_projects" || toolName === AGGREGATE_TOOL_NAMES.projects) {
-      return handleAggregateProjects(registry, args);
+      return captureToolCall(await handleAggregateProjects(registry, args), "aggregate");
     }
     if (toolName === "proxy_list_windows" || toolName === AGGREGATE_TOOL_NAMES.windows) {
-      return handleAggregateWindows(registry, args);
+      return captureToolCall(await handleAggregateWindows(registry, args), "aggregate");
     }
     if (toolName === "proxy_list_products" || toolName === AGGREGATE_TOOL_NAMES.products) {
-      return handleAggregateProducts(registry, args);
+      return captureToolCall(await handleAggregateProducts(registry, args), "aggregate");
     }
     if (toolName === "proxy_list_server_metadata" || toolName === AGGREGATE_TOOL_NAMES.metadata) {
-      return handleAggregateServerMetadata(registry, args);
+      return captureToolCall(await handleAggregateServerMetadata(registry, args), "aggregate");
     }
 
     const resolved = registry.resolveServerForToolCall(toolName, args || {});
     if (resolved.error) {
-      return toolError(resolved.error);
+      return captureToolCall(toolError(resolved.error), "resolve");
     }
-    return registry.callTool(resolved.serverId, resolved.toolName, args || {});
+
+    const progressToken = extractClientProgressToken(args) || createProgressToken();
+    let lastProgress = 0;
+    const emitProgress = async (progress, message, total = null) => {
+      if (typeof notify !== "function") return;
+      const safeProgress = Number.isFinite(progress) ? progress : lastProgress;
+      if (Number.isFinite(safeProgress)) {
+        lastProgress = safeProgress;
+      }
+      const payload = {
+        progressToken,
+        progress: lastProgress
+      };
+      if (typeof message === "string" && message.trim()) {
+        payload.message = message;
+      }
+      if (Number.isFinite(total)) {
+        payload.total = total;
+      }
+      await notify("notifications/progress", payload);
+    };
+
+    await emitProgress(0, `Tool call started: ${resolved.toolName}`);
+    const delegated = await registry.callTool(
+      resolved.serverId,
+      resolved.toolName,
+      args || {},
+      async (event) => {
+        if (!event || typeof event !== "object") return;
+        if (event.type === "progress") {
+          await emitProgress(
+            Number.isFinite(event.progress) ? event.progress : lastProgress,
+            typeof event.message === "string" ? event.message : null,
+            Number.isFinite(event.total) ? event.total : null
+          );
+          return;
+        }
+        if (event.type === "heartbeat") {
+          await emitProgress(lastProgress, typeof event.message === "string" ? event.message : "Tool call heartbeat");
+        }
+      }
+    );
+    await emitProgress(1, `Tool call completed: ${resolved.toolName}`);
+    return captureToolCall(delegated, "delegated", { server_id: resolved.serverId });
   }
 
   const err = new Error(`Method not found: ${method}`);
@@ -1591,7 +2315,8 @@ function readNextFramedMessage(buffer) {
       const payloadText = buffer.slice(headerEnd + delimiterLength, total).toString("utf8");
       return {
         consumed: total,
-        payloadText
+        payloadText,
+        mode: "framed"
       };
     }
   }
@@ -1607,7 +2332,8 @@ function readNextFramedMessage(buffer) {
   const payloadText = buffer.slice(0, newline).toString("utf8").trim();
   return {
     consumed: newline + 1,
-    payloadText
+    payloadText,
+    mode: "ndjson"
   };
 }
 
@@ -1617,9 +2343,14 @@ function encodeFramedMessage(payload) {
   return `Content-Length: ${bytes}\r\n\r\n${text}`;
 }
 
-function createStdioServer(registry, traffic) {
+function encodeNdjsonMessage(payload) {
+  return `${JSON.stringify(payload)}\n`;
+}
+
+function createStdioServer(registry, traffic, beacon = null) {
   let inputBuffer = Buffer.alloc(0);
   let chain = Promise.resolve();
+  let outputMode = null;
 
   const writeResponse = async (payload) => {
     await traffic.log({
@@ -1627,7 +2358,10 @@ function createStdioServer(registry, traffic) {
       direction: "proxy-out",
       payload
     });
-    process.stdout.write(encodeFramedMessage(payload));
+    const message = outputMode === "ndjson"
+      ? encodeNdjsonMessage(payload)
+      : encodeFramedMessage(payload);
+    process.stdout.write(message);
   };
 
   const handleSingle = async (request) => {
@@ -1647,7 +2381,19 @@ function createStdioServer(registry, traffic) {
     }
 
     try {
-      const result = await handleRpc(method, request.params || {}, registry);
+      const result = await handleRpc(
+        method,
+        request.params || {},
+        registry,
+        beacon,
+        async (notifyMethod, notifyParams) => {
+          await writeResponse({
+            jsonrpc: JSONRPC_VERSION,
+            method: notifyMethod,
+            params: notifyParams
+          });
+        }
+      );
       return jsonRpcResult(id, result);
     } catch (err) {
       const code = typeof err.code === "number" ? err.code : -32603;
@@ -1697,6 +2443,9 @@ function createStdioServer(registry, traffic) {
       const frame = readNextFramedMessage(inputBuffer);
       if (!frame) break;
       inputBuffer = inputBuffer.slice(frame.consumed);
+      if (!outputMode && frame.mode) {
+        outputMode = frame.mode;
+      }
 
       if (!frame.payloadText) continue;
 
@@ -1719,12 +2468,18 @@ function createStdioServer(registry, traffic) {
 
   process.stdin.on("data", onChunk);
   process.stdin.on("end", () => {
-    process.exit(0);
+    if (!beacon) {
+      process.exit(0);
+      return;
+    }
+    beacon.shutdown().finally(() => {
+      process.exit(0);
+    });
   });
   process.stdin.resume();
 }
 
-async function runCliMode(args, registry, traffic) {
+async function runCliMode(args, registry, traffic, beacon = null) {
   const request = buildCliRequest(args);
   await traffic.log({
     ts: nowIso(),
@@ -1732,7 +2487,7 @@ async function runCliMode(args, registry, traffic) {
     payload: request
   });
 
-  const result = await handleRpc(request.method, request.params, registry);
+  const result = await handleRpc(request.method, request.params, registry, beacon);
   await traffic.log({
     ts: nowIso(),
     direction: "cli-out",
@@ -1768,21 +2523,65 @@ async function main() {
 
   const traffic = new TrafficLogger(config);
   const registry = new ServerRegistry(config, traffic);
+  const beacon = new NpxBeacon(config);
+  const updateCheck = buildUpdateCheckConfig(config);
+  beacon.capture(BEACON_EVENTS.started, { mode: args.mode });
 
   await registry.refreshDiscovery();
+  beacon.captureDiscoveryChanged(registry, "startup");
+  let upgradeNoticeShown = false;
+  let updateCheckInFlight = false;
+  const emitUpgradeNotice = async () => {
+    if (!updateCheck.enabled || updateCheckInFlight) return;
+    updateCheckInFlight = true;
+    try {
+      const notice = await buildUpgradeNotice(registry, config);
+      if (notice && !upgradeNoticeShown) {
+        upgradeNoticeShown = true;
+        process.stderr.write(`${notice}\n`);
+        beacon.capture(BEACON_EVENTS.upgradeRecommended, {
+          current_version: extractBaseVersion(config.version || "")
+        });
+      }
+    } finally {
+      updateCheckInFlight = false;
+    }
+  };
 
   if (args.mode === "cli") {
-    await runCliMode(args, registry, traffic);
+    await emitUpgradeNotice().catch(() => {
+      // Ignore update-check failures in CLI mode
+    });
+    await runCliMode(args, registry, traffic, beacon);
+    await beacon.shutdown();
     return;
   }
 
+  if (updateCheck.enabled) {
+    setTimeout(() => {
+      emitUpgradeNotice().catch(() => {
+        // Ignore periodic update-check failures
+      });
+      setInterval(() => {
+        emitUpgradeNotice().catch(() => {
+          // Ignore periodic update-check failures
+        });
+      }, updateCheck.intervalMs);
+    }, updateCheck.initialDelayMs);
+  }
+
   setInterval(() => {
-    registry.refreshDiscovery().catch(() => {
-      // Ignore refresh failures
-    });
+    registry.refreshDiscovery()
+      .then(() => {
+        beacon.captureDiscoveryChanged(registry, "interval");
+      })
+      .catch(() => {
+        // Ignore refresh/update failures
+      });
   }, config.scanIntervalMs);
 
-  createStdioServer(registry, traffic);
+  beacon.startHeartbeat(registry);
+  createStdioServer(registry, traffic, beacon);
 }
 
 if (require.main === module) {
@@ -1793,6 +2592,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  BEACON_EVENTS,
   DEFAULT_CONFIG,
   parseArgs,
   loadConfig,
@@ -1806,6 +2606,13 @@ module.exports = {
   parseNamespacedTool,
   mergeToolGroups,
   extractJsonFromToolResult,
+  extractBaseVersion,
+  isVersionNewer,
+  pickRecommendedVersion,
+  needsUpgradeByServerRule,
+  buildUpdateCheckConfig,
+  buildBeaconConfig,
+  NpxBeacon,
   mergeServerMetadata,
   metadataFromInitializeResult,
   metadataFromProductsPayload,
@@ -1814,5 +2621,6 @@ module.exports = {
   ServerRegistry,
   readNextFramedMessage,
   encodeFramedMessage,
+  parseSseEventBlock,
   handleRpc
 };
