@@ -23,7 +23,7 @@ class SkillFrontmatterParserTest {
         val parsed = parseSkillFrontmatter(content)
         assertNotNull(parsed.frontmatter)
         assertEquals("yaml-skill", parsed.frontmatter!!.name)
-        assertTrue(parsed.frontmatter!!.description?.contains("Line one") == true)
+        assertTrue(parsed.frontmatter.description?.contains("Line one") == true)
         assertTrue(parsed.body.startsWith("Body starts here"))
     }
 
@@ -40,7 +40,7 @@ class SkillFrontmatterParserTest {
         val parsed = parseSkillFrontmatter(content)
         assertNotNull(parsed.frontmatter)
         assertEquals("toml-skill", parsed.frontmatter!!.name)
-        assertEquals("Toml description", parsed.frontmatter!!.description)
+        assertEquals("Toml description", parsed.frontmatter.description)
         assertTrue(parsed.body.startsWith("Body text"))
     }
 }
