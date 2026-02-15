@@ -18,9 +18,9 @@ fun main(args: Array<String>) {
     val filterType = args.getOrNull(0) ?: "claude"
 
     val filter = when (filterType.lowercase()) {
-        "claude" -> ClaudeStreamJsonFilter()
-        "codex" -> CodexJsonFilter()
-        "gemini" -> GeminiStreamJsonFilter()
+        "claude" -> ClaudeOutputFilter()
+        "codex" -> CodexOutputFilter()
+        "gemini" -> GeminiOutputFilter()
         "--help", "-h" -> {
             printHelp()
             exitProcess(0)

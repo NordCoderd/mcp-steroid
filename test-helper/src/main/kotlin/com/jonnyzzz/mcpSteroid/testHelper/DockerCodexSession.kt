@@ -3,7 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddStdioArgs
-import com.jonnyzzz.mcpSteroid.filter.CodexJsonFilter
+import com.jonnyzzz.mcpSteroid.filter.CodexOutputFilter
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import java.io.File
 
@@ -71,7 +71,7 @@ class DockerCodexSession(
      * `codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check --json <prompt>`.
      * `--json` streams NDJSON events to stdout for real-time console visibility.
      *
-     * The raw NDJSON output is post-processed via [CodexJsonFilter] to produce
+     * The raw NDJSON output is post-processed via [CodexOutputFilter] to produce
      * human-readable text.
      */
     override fun runPrompt(
@@ -102,7 +102,7 @@ class DockerCodexSession(
 
     companion object : AIAgentCompanion<DockerCodexSession>("codex-cli") {
         const val DISPLAY_NAME = "Codex"
-        private val outputFilter = CodexJsonFilter()
+        private val outputFilter = CodexOutputFilter()
 
         override fun readApiKey(): String {
             System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }

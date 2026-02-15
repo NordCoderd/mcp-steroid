@@ -1,17 +1,17 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.jonnyzzz.mcpSteroid.filter.ClaudeStreamJsonFilter
+import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * Tests that [ClaudeStreamJsonFilter] produces readable output from NDJSON.
- * Detailed filter behavior is covered by ClaudeStreamJsonFilterTest in agent-output-filter.
+ * Tests that [ClaudeOutputFilter] produces readable output from NDJSON.
+ * Detailed filter behavior is covered by ClaudeOutputFilterTest in agent-output-filter.
  */
 class DockerClaudeSessionTest {
-    private val filter = ClaudeStreamJsonFilter()
+    private val filter = ClaudeOutputFilter()
 
     @Test
     fun textDeltaFragmentsAreExtracted() {

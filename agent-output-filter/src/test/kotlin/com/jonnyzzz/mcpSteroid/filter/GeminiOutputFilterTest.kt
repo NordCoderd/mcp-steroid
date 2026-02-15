@@ -7,8 +7,8 @@ import java.io.ByteArrayOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class GeminiStreamJsonFilterTest {
-    private val filter = GeminiStreamJsonFilter()
+class GeminiOutputFilterTest {
+    private val filter = GeminiOutputFilter()
 
     @Test
     fun `test assistant message is extracted`() {

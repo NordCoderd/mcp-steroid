@@ -3,7 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddStdioArgs
-import com.jonnyzzz.mcpSteroid.filter.ClaudeStreamJsonFilter
+import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import java.io.File
 
@@ -70,7 +70,7 @@ class DockerClaudeSession(
      * Uses `--output-format stream-json --verbose` so that tool calls, assistant
      * messages, and progress events stream to stdout in real time (instead of only
      * the final text response appearing at the end). The raw NDJSON output is
-     * post-processed via [ClaudeStreamJsonFilter] to produce human-readable text.
+     * post-processed via [ClaudeOutputFilter] to produce human-readable text.
      *
      * @param prompt The prompt to send to Claude
      * @param timeoutSeconds Maximum time to wait for the command
@@ -108,7 +108,7 @@ class DockerClaudeSession(
 
     companion object : AIAgentCompanion<DockerClaudeSession>("claude-cli") {
         const val DISPLAY_NAME = "Claude Code"
-        private val outputFilter = ClaudeStreamJsonFilter()
+        private val outputFilter = ClaudeOutputFilter()
 
         override fun readApiKey(): String {
             System.getenv("ANTHROPIC_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }

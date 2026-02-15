@@ -7,8 +7,8 @@ import java.io.ByteArrayOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class ClaudeStreamJsonFilterTest {
-    private val filter = ClaudeStreamJsonFilter()
+class ClaudeOutputFilterTest {
+    private val filter = ClaudeOutputFilter()
 
     @Test
     fun `test tool_use event with details`() {

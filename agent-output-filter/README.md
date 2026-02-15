@@ -76,9 +76,10 @@ Processes Gemini CLI text output:
 ## Architecture
 
 - **OutputFilter** interface: `process(InputStream, OutputStream)`
-- **ClaudeStreamJsonFilter**: Claude stream-json NDJSON filter
-- **CodexJsonFilter**: Codex --json NDJSON filter
-- **GeminiStreamJsonFilter**: Gemini stream-json NDJSON filter
+- **AbstractOutputFilter**: Base class with common NDJSON read-parse-dispatch loop
+- **ClaudeOutputFilter**: Claude stream-json NDJSON filter
+- **CodexOutputFilter**: Codex --json NDJSON filter
+- **GeminiOutputFilter**: Gemini stream-json NDJSON filter
 - **Main.kt**: Entry point with filter selection
 
 All filters:

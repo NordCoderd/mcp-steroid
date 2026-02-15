@@ -7,8 +7,8 @@ import java.io.ByteArrayOutputStream
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-class CodexJsonFilterTest {
-    private val filter = CodexJsonFilter()
+class CodexOutputFilterTest {
+    private val filter = CodexOutputFilter()
 
     @Test
     fun `test agent_message item completed`() {

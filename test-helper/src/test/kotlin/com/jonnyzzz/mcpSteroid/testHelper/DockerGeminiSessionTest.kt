@@ -1,7 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.jonnyzzz.mcpSteroid.filter.GeminiStreamJsonFilter
+import com.jonnyzzz.mcpSteroid.filter.GeminiOutputFilter
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
@@ -11,11 +11,11 @@ import org.junit.jupiter.api.Test
 import java.io.File
 
 /**
- * Tests that [GeminiStreamJsonFilter] produces readable output from NDJSON.
- * Detailed filter behavior is covered by GeminiStreamJsonFilterTest in agent-output-filter.
+ * Tests that [GeminiOutputFilter] produces readable output from NDJSON.
+ * Detailed filter behavior is covered by GeminiOutputFilterTest in agent-output-filter.
  */
 class DockerGeminiSessionTest {
-    private val filter = GeminiStreamJsonFilter()
+    private val filter = GeminiOutputFilter()
 
     @Test
     fun extractsAssistantTextAndProgressFromStreamJson() {

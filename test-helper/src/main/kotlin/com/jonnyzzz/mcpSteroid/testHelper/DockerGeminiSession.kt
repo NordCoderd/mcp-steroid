@@ -3,7 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddStdioArgs
-import com.jonnyzzz.mcpSteroid.filter.GeminiStreamJsonFilter
+import com.jonnyzzz.mcpSteroid.filter.GeminiOutputFilter
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import java.io.File
 import java.util.Locale
@@ -70,7 +70,7 @@ class DockerGeminiSession(
      * Newer Gemini CLI versions replaced `--sandbox-mode none` with `--sandbox false`.
      * We retry once with modern syntax when the legacy flag is rejected.
      *
-     * The raw NDJSON output is post-processed via [GeminiStreamJsonFilter] to produce
+     * The raw NDJSON output is post-processed via [GeminiOutputFilter] to produce
      * human-readable text.
      */
     override fun runPrompt(prompt: String, timeoutSeconds: Long): ProcessResult {
@@ -138,7 +138,7 @@ class DockerGeminiSession(
 
     companion object : AIAgentCompanion<DockerGeminiSession>("gemini-cli") {
         const val DISPLAY_NAME = "Gemini"
-        private val outputFilter = GeminiStreamJsonFilter()
+        private val outputFilter = GeminiOutputFilter()
 
         override fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }

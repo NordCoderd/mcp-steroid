@@ -2,8 +2,7 @@
 package com.jonnyzzz.mcpSteroid.filter
 
 import kotlinx.serialization.json.*
-import java.io.InputStream
-import java.io.OutputStream
+import java.io.BufferedWriter
 
 /**
  * Filter for Codex CLI NDJSON output (--json flag).
@@ -11,40 +10,9 @@ import java.io.OutputStream
  * Converts Codex NDJSON events to human-readable console text.
  * Handles item.completed, item.started, turn.completed, and error events.
  */
-class CodexJsonFilter : OutputFilter {
+class CodexOutputFilter : AbstractOutputFilter() {
 
-    override fun process(input: InputStream, output: OutputStream) {
-        val writer = output.bufferedWriter()
-
-        input.bufferedReader().useLines { lines ->
-            for (line in lines) {
-                val trimmed = line.trim()
-                if (trimmed.isEmpty()) continue
-
-                // Non-JSON line - pass through
-                if (!trimmed.startsWith('{')) {
-                    writer.write(line)
-                    writer.newLine()
-                    writer.flush()
-                    continue
-                }
-
-                try {
-                    val event = filterJson.parseToJsonElement(trimmed).jsonObject
-                    processEvent(event, writer)
-                } catch (e: Exception) {
-                    // Malformed JSON - pass through for debugging visibility
-                    writer.write(line)
-                    writer.newLine()
-                    writer.flush()
-                }
-            }
-        }
-
-        writer.flush()
-    }
-
-    private fun processEvent(event: JsonObject, writer: java.io.BufferedWriter) {
+    override fun processEvent(event: JsonObject, writer: BufferedWriter) {
         val type = event["type"]?.jsonPrimitive?.contentOrNull ?: return
         val item = event["item"] as? JsonObject
         val itemType = item?.get("type")?.jsonPrimitive?.contentOrNull ?: ""
@@ -58,33 +26,33 @@ class CodexJsonFilter : OutputFilter {
             type == "item.started" && itemType in setOf("tool_call", "function_call", "mcp_tool_call") && item != null ->
                 handleToolStarted(item, writer)
             type == "turn.completed" -> handleTurnCompleted(event, writer)
-            type == "error" -> handleError(event, writer)
+            type == "error" -> {
+                val msg = formatErrorMessage(event) ?: return
+                writer.writeLine(msg)
+            }
             // Silently skip: thread.started, turn.started, item.started/agent_message, etc.
         }
     }
 
-    private fun handleAgentMessage(item: JsonObject, writer: java.io.BufferedWriter) {
+    private fun handleAgentMessage(item: JsonObject, writer: BufferedWriter) {
         val text = item["text"]?.jsonPrimitive?.contentOrNull ?: return
         if (text.isEmpty()) return
 
         for (part in text.lines()) {
             val trimmed = part.trimEnd()
             if (trimmed.isNotEmpty()) {
-                writer.write(trimmed)
-                writer.newLine()
+                writer.writeLine(trimmed)
             }
         }
-        writer.flush()
     }
 
-    private fun handleCommandCompleted(item: JsonObject, writer: java.io.BufferedWriter) {
+    private fun handleCommandCompleted(item: JsonObject, writer: BufferedWriter) {
         val output = item["output"]?.jsonPrimitive?.contentOrNull ?: ""
         if (output.isNotEmpty()) {
             for (part in output.lines()) {
                 val trimmed = part.trimEnd()
                 if (trimmed.isNotEmpty()) {
-                    writer.write("  $trimmed")
-                    writer.newLine()
+                    writer.writeLine("  $trimmed")
                 }
             }
         }
@@ -96,14 +64,11 @@ class CodexJsonFilter : OutputFilter {
             if (cmd.isNotEmpty()) {
                 label += " ($cmd)"
             }
-            writer.write(label)
-            writer.newLine()
+            writer.writeLine(label)
         }
-
-        writer.flush()
     }
 
-    private fun handleToolCompleted(item: JsonObject, writer: java.io.BufferedWriter) {
+    private fun handleToolCompleted(item: JsonObject, writer: BufferedWriter) {
         val name = item["name"]?.jsonPrimitive?.contentOrNull
             ?: (item["function"] as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
             ?: "?"
@@ -124,21 +89,17 @@ class CodexJsonFilter : OutputFilter {
             label += ": ${output.replace("\n", " ")}"
         }
 
-        writer.write(label)
-        writer.newLine()
-        writer.flush()
+        writer.writeLine(label)
     }
 
-    private fun handleCommandStarted(item: JsonObject, writer: java.io.BufferedWriter) {
+    private fun handleCommandStarted(item: JsonObject, writer: BufferedWriter) {
         val cmd = item["command"]?.jsonPrimitive?.contentOrNull ?: return
         if (cmd.isNotEmpty()) {
-            writer.write(">> $cmd")
-            writer.newLine()
-            writer.flush()
+            writer.writeLine(">> $cmd")
         }
     }
 
-    private fun handleToolStarted(item: JsonObject, writer: java.io.BufferedWriter) {
+    private fun handleToolStarted(item: JsonObject, writer: BufferedWriter) {
         val name = item["name"]?.jsonPrimitive?.contentOrNull
             ?: (item["function"] as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
             ?: "?"
@@ -152,49 +113,23 @@ class CodexJsonFilter : OutputFilter {
             if (inputStr != null) {
                 inputObj = try {
                     filterJson.parseToJsonElement(inputStr) as? JsonObject
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     null
                 }
             }
         }
 
         val detail = if (inputObj != null) toolDetail(name, inputObj) else ""
-        writer.write(">> $name$detail")
-        writer.newLine()
-        writer.flush()
+        writer.writeLine(">> $name$detail")
     }
 
-    private fun handleTurnCompleted(event: JsonObject, writer: java.io.BufferedWriter) {
+    private fun handleTurnCompleted(event: JsonObject, writer: BufferedWriter) {
         val usage = event["usage"] as? JsonObject ?: return
         val inputTokens = usage["input_tokens"]?.jsonPrimitive?.intOrNull ?: 0
         val outputTokens = usage["output_tokens"]?.jsonPrimitive?.intOrNull ?: 0
 
         if (inputTokens > 0 || outputTokens > 0) {
-            writer.write("[turn] in=$inputTokens out=$outputTokens")
-            writer.newLine()
-            writer.flush()
+            writer.writeLine("[turn] in=$inputTokens out=$outputTokens")
         }
-    }
-
-    private fun handleError(event: JsonObject, writer: java.io.BufferedWriter) {
-        val error = event["error"] ?: event["message"]
-        val message = when (error) {
-            is JsonObject -> {
-                val msg = error["message"]?.jsonPrimitive?.contentOrNull ?: error.toString()
-                val etype = error["type"]?.jsonPrimitive?.contentOrNull
-                    ?: error["code"]?.jsonPrimitive?.contentOrNull
-                    ?: ""
-                if (etype.isNotEmpty()) {
-                    "[ERROR $etype] $msg"
-                } else {
-                    "[ERROR] $msg"
-                }
-            }
-            else -> "[ERROR] ${error?.toString() ?: ""}"
-        }
-
-        writer.write(message)
-        writer.newLine()
-        writer.flush()
     }
 }

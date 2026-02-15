@@ -3,8 +3,10 @@ package com.jonnyzzz.mcpSteroid.filter
 
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import java.io.BufferedWriter
 
 /**
  * Shared JSON parser for all NDJSON filters.
@@ -12,6 +14,46 @@ import kotlinx.serialization.json.jsonPrimitive
 internal val filterJson = Json {
     ignoreUnknownKeys = true
     isLenient = true
+}
+
+/** Write text followed by a newline and flush. */
+internal fun BufferedWriter.writeLine(text: String) {
+    write(text)
+    newLine()
+    flush()
+}
+
+/**
+ * Format an error message from a JSON event.
+ * Handles both object and primitive error fields, extracts type/code for labeling.
+ * Returns null if no meaningful message can be extracted.
+ */
+internal fun formatErrorMessage(event: JsonObject): String? {
+    val errorElement = event["error"] ?: event["message"]
+
+    val (message, errorType) = when (errorElement) {
+        is JsonObject -> {
+            val msg = errorElement["message"]?.jsonPrimitive?.contentOrNull
+                ?: event["message"]?.jsonPrimitive?.contentOrNull
+                ?: errorElement.toString()
+            val etype = errorElement["type"]?.jsonPrimitive?.contentOrNull
+                ?: errorElement["code"]?.jsonPrimitive?.contentOrNull
+                ?: event["code"]?.jsonPrimitive?.contentOrNull
+                ?: ""
+            msg to etype
+        }
+        is JsonPrimitive -> (errorElement.contentOrNull ?: "") to ""
+        else -> (event["message"]?.jsonPrimitive?.contentOrNull ?: errorElement?.toString() ?: "") to ""
+    }
+
+    val trimmed = message.trim()
+    if (trimmed.isEmpty()) return null
+
+    return if (errorType.isNotEmpty() && errorType != "error") {
+        "[ERROR $errorType] $trimmed"
+    } else {
+        "[ERROR] $trimmed"
+    }
 }
 
 /**

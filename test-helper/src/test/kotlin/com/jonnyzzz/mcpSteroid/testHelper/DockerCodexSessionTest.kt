@@ -1,17 +1,17 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.jonnyzzz.mcpSteroid.filter.CodexJsonFilter
+import com.jonnyzzz.mcpSteroid.filter.CodexOutputFilter
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /**
- * Tests that [CodexJsonFilter] produces readable output from NDJSON.
- * Detailed filter behavior is covered by CodexJsonFilterTest in agent-output-filter.
+ * Tests that [CodexOutputFilter] produces readable output from NDJSON.
+ * Detailed filter behavior is covered by CodexOutputFilterTest in agent-output-filter.
  */
 class DockerCodexSessionTest {
-    private val filter = CodexJsonFilter()
+    private val filter = CodexOutputFilter()
 
     @Test
     fun extractsRepresentativeEvents() {

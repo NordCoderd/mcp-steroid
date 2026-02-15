@@ -1,7 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.jonnyzzz.mcpSteroid.filter.ClaudeStreamJsonFilter
+import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -108,7 +108,7 @@ class DockerClaudeProgressTest {
             {"type":"message_stop"}
         """.trimIndent()
 
-        val filter = ClaudeStreamJsonFilter()
+        val filter = ClaudeOutputFilter()
         val result = filter.filterText(raw)
 
         // Should show tool call and text content
