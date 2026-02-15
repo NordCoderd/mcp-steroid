@@ -81,7 +81,9 @@ class DialogWindowsLookup {
         val dialogs = withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             val projectFrame = WindowManager.getInstance().getFrame(project) ?: return@withContext emptyList()
             findDialogsOwnedBy(projectFrame)
-                .sortedByDescending { dialogDepth(it) }
+                .map { it to dialogDepth(it) }
+                .sortedByDescending { it.second }
+                .map { it.first }
         }
 
         return action(dialogs)
