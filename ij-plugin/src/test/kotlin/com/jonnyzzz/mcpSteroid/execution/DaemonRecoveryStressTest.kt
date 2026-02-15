@@ -25,7 +25,8 @@ import kotlin.time.Duration.Companion.minutes
  * to occasionally trigger daemon failures. The recovery mechanism should
  * handle these failures gracefully.
  */
-class DaemonRecoveryStressTest : BasePlatformTestCase() {
+//This test was created for the embedded Kotlinc in IntelliJ, not needed anymore
+abstract class DaemonRecoveryStressTest : BasePlatformTestCase() {
 
     private val executor: ScriptExecutor get() = project.service()
     private val daemonManager: KotlinDaemonManager get() = kotlinDaemonManager
