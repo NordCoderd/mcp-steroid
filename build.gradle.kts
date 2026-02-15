@@ -275,15 +275,12 @@ val kotlincUrl = "https://github.com/JetBrains/kotlin/releases/download/v${kotli
 val kotlincSha256Url = "$kotlincUrl.sha256"
 val kotlincDownloadDir = layout.buildDirectory.dir("kotlinc-zip")
 val kotlincDir = layout.buildDirectory.dir("kotlinc-unpack")
-val downloadConnectTimeoutMs = 30_000
-val downloadReadTimeoutMs = 15 * 60_000
-val downloadRetryCount = 5
 
 fun Download.configureReliableDownload() {
     onlyIfModified(true)
-    connectTimeout(downloadConnectTimeoutMs)
-    readTimeout(downloadReadTimeoutMs)
-    retries(downloadRetryCount)
+    connectTimeout(30_000)
+    readTimeout(15 * 60_000)
+    retries(5)
 }
 
 val downloadKotlinc by tasks.registering {
