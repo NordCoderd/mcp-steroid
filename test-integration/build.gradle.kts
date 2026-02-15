@@ -11,12 +11,9 @@ import org.gradle.kotlin.dsl.provideDelegate
 import java.net.URI
 
 plugins {
-    kotlin("jvm") version "2.3.10"
-    id("de.undercouch.download") version "5.6.0"
+    kotlin("jvm")
+    id("de.undercouch.download")
 }
-
-group = "com.jonnyzzz.intellij"
-version = rootProject.version
 
 repositories {
     mavenCentral()

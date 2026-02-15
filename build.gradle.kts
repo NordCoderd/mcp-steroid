@@ -24,8 +24,9 @@ import java.util.SortedSet
 plugins {
     id("de.undercouch.download") version "5.6.0"
     id("org.jetbrains.intellij.platform") version "2.11.0"
-    kotlin("jvm") version "2.3.10"
-    kotlin("plugin.serialization") version "2.3.10"
+    id("com.github.node-gradle.node") version "7.1.0" apply false
+    kotlin("jvm") version "2.2.20"
+    kotlin("plugin.serialization") version "2.2.20"
 }
 
 group = "com.jonnyzzz.intellij"
@@ -86,6 +87,7 @@ val isTargetIdeOverridden = providers.gradleProperty("mcp.platform.product").isP
 val hostArchitecture = resolveHostArchitecture()
 
 subprojects {
+    group = rootProject.group
     version = rootProject.version
 }
 
@@ -349,6 +351,9 @@ val verifyBundledKotlinCompatibility by tasks.registering(VerifyBundledKotlinCom
     mainRuntimeClasspath.from(sourceSets.getByName("main").runtimeClasspath)
     mainRuntimeClasspath.from(configurations.getByName("intellijPlatformDependency"))
     kotlincHome.set(kotlincDir.map { it.dir("kotlinc") })
+    kotlinPluginVersion.set(providers.provider {
+        plugins.getPlugin(org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapper::class.java).pluginVersion
+    })
     reportFile.set(layout.buildDirectory.file("reports/kotlin-version-compatibility.txt"))
 }
 

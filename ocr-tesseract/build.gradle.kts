@@ -8,9 +8,6 @@ plugins {
     id("de.undercouch.download")
 }
 
-group = "com.jonnyzzz.intellij"
-version = rootProject.version
-
 repositories {
     mavenCentral()
 }

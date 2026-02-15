@@ -4,11 +4,8 @@ import org.gradle.api.tasks.bundling.Zip
 
 plugins {
     base
-    id("com.github.node-gradle.node") version "7.1.0"
+    id("com.github.node-gradle.node")
 }
-
-group = "com.jonnyzzz.intellij"
-version = rootProject.version
 
 node {
     download.set(true)
