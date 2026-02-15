@@ -100,6 +100,7 @@ object IdeTestFolders {
     // Kept for backward compatibility with existing code.
     val intelliJTarGz get() = ideTarGz
     val ideProduct: String = System.getProperty("test.integration.ide.product", "idea").trim().lowercase()
+    val agentOutputFilterJar = readFilePathFromSystemProperties("test.integration.agent.output.filter.jar")
     val dockerDir = readFilePathFromSystemProperties("test.integration.docker")
     val testOutputDir = remapPathForDockerHost(
         readFilePathFromSystemProperties("test.integration.testOutput"),

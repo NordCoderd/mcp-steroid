@@ -11,15 +11,15 @@ import kotlin.collections.iterator
 /**
  * Specifies which console output filter to use for an agent's NDJSON output.
  */
-enum class ConsoleFilterKind {
+enum class ConsoleFilterKind(val filterType: String?) {
     /** No filtering -- raw output is pumped to console. */
-    NONE,
+    NONE(null),
     /** Claude stream-json filter (content_block_delta, tool_use, etc). */
-    CLAUDE_STREAM_JSON,
+    CLAUDE_STREAM_JSON("claude"),
     /** Codex --json filter (item.completed/agent_message, item.started/command_execution, etc). */
-    CODEX_JSON,
-    /** Gemini text filter (strip ANSI, highlight tool calls, remove noise). */
-    GEMINI,
+    CODEX_JSON("codex"),
+    /** Gemini stream-json filter (message, tool_use, tool_result, etc). */
+    GEMINI("gemini-json"),
 }
 
 class AiAgentDriver(
@@ -36,22 +36,13 @@ class AiAgentDriver(
     private fun scopeForAgent(windowTitle: String, consoleFilter: ConsoleFilterKind = ConsoleFilterKind.NONE): ContainerDriver {
         val base = scope
         return run {
-            val filterScript = when (consoleFilter) {
-                ConsoleFilterKind.CLAUDE_STREAM_JSON -> {
-                    ConsolePumpingContainerDriver.deployStreamJsonFilter(base)
-                    ConsolePumpingContainerDriver.STREAM_JSON_FILTER_PATH
-                }
-                ConsoleFilterKind.CODEX_JSON -> {
-                    ConsolePumpingContainerDriver.deployCodexJsonFilter(base)
-                    ConsolePumpingContainerDriver.CODEX_JSON_FILTER_PATH
-                }
-                ConsoleFilterKind.GEMINI -> {
-                    ConsolePumpingContainerDriver.deployGeminiFilter(base)
-                    ConsolePumpingContainerDriver.GEMINI_FILTER_PATH
-                }
-                ConsoleFilterKind.NONE -> null
+            val filterCommand = if (consoleFilter.filterType != null) {
+                ConsolePumpingContainerDriver.deployFilterJar(base)
+                ConsolePumpingContainerDriver.filterCommand(consoleFilter.filterType)
+            } else {
+                null
             }
-            ConsolePumpingContainerDriver(base, console, windowTitle, consoleFilterScript = filterScript)
+            ConsolePumpingContainerDriver(base, console, windowTitle, consoleFilterCommand = filterCommand)
         }
     }
 
