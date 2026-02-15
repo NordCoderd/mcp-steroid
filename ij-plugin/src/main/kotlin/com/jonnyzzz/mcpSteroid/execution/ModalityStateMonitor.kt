@@ -142,14 +142,6 @@ class ModalityStateMonitor(
      */
     val onModalDialog get() = modalDialogChannel.onReceive
 
-    /**
-     * Try to receive a modal dialog info without suspending.
-     * Returns null if no modal dialog was detected.
-     */
-    fun tryReceiveModalDialog(): ModalDialogInfo? {
-        return modalDialogChannel.tryReceive().getOrNull()
-    }
-
     private suspend fun captureModalDialog(modalEntity: Any): ModalDialogInfo {
         return try {
             log.info("Capturing screenshot of modal dialog for execution $executionId")
