@@ -1,25 +1,15 @@
 @file:Suppress("HasPlatformType")
 
-import com.jonnyzzz.mcpSteroid.gradle.CompilePromptsTask
-import com.jonnyzzz.mcpSteroid.gradle.GenerateMetadataTask
-import com.jonnyzzz.mcpSteroid.gradle.HostArchitecture
-import com.jonnyzzz.mcpSteroid.gradle.IdeaReleaseChannel
-import com.jonnyzzz.mcpSteroid.gradle.IdeaReleaseService
-import com.jonnyzzz.mcpSteroid.gradle.JetBrainsIdeProduct
-import com.jonnyzzz.mcpSteroid.gradle.VerifyBundledKotlinCompatibilityTask
-import com.jonnyzzz.mcpSteroid.gradle.resolveHostArchitecture
+import com.jonnyzzz.mcpSteroid.gradle.*
 import de.undercouch.gradle.tasks.download.Download
-import org.gradle.api.tasks.SourceSetContainer
-import org.gradle.api.tasks.testing.Test
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.HttpURLConnection
 import java.net.URI
-import java.nio.file.FileSystem
 import java.security.MessageDigest
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.util.SortedSet
+import java.util.*
 
 plugins {
     id("de.undercouch.download") version "5.6.0"
