@@ -23,7 +23,7 @@ import java.util.SortedSet
 
 plugins {
     id("de.undercouch.download") version "5.6.0"
-    id("org.jetbrains.intellij.platform") version "2.10.5"
+    id("org.jetbrains.intellij.platform") version "2.11.0"
     kotlin("jvm") version "2.3.10"
     kotlin("plugin.serialization") version "2.3.10"
 }
