@@ -2,10 +2,13 @@
 package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.filter.GeminiStreamJsonFilter
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
+import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import java.io.File
 
 /**
  * Tests that [GeminiStreamJsonFilter] produces readable output from NDJSON.
@@ -87,9 +90,11 @@ class DockerGeminiSessionTest {
         assertEquals(secondRaw, result.rawOutput)
     }
 
-    private class RecordingRunner(vararg results: ProcessResult) : ContainerProcessRunner {
+    private class RecordingRunner(vararg results: ProcessResult) : ContainerDriver {
         private val resultQueue = ArrayDeque(results.toList())
         val commands = mutableListOf<List<String>>()
+
+        override val containerId: String get() = "fake-container"
 
         override fun runInContainer(
             args: List<String>,
@@ -101,5 +106,15 @@ class DockerGeminiSessionTest {
             commands += args
             return resultQueue.removeFirst()
         }
+
+        override fun mapGuestPathToHostPath(path: String): File = error("not needed in test")
+        override fun mapGuestPortToHostPort(port: ContainerPort): Int = error("not needed in test")
+        override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver = error("not needed in test")
+        override fun withSecretPattern(secretPattern: String): ContainerDriver = error("not needed in test")
+        override fun withEnv(key: String, value: String): ContainerDriver = error("not needed in test")
+        override fun runInContainerDetached(args: List<String>, workingDir: String?, extraEnvVars: Map<String, String>): RunningContainerProcess = error("not needed in test")
+        override fun writeFileInContainer(containerPath: String, content: String, executable: Boolean) = error("not needed in test")
+        override fun copyFromContainer(containerPath: String, localPath: File) = error("not needed in test")
+        override fun copyToContainer(localPath: File, containerPath: String) = error("not needed in test")
     }
 }
