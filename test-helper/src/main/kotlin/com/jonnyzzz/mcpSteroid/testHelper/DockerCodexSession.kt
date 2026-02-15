@@ -27,7 +27,7 @@ class DockerCodexSession(
     private val userHome = "/home/codex"
 
     override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        runInContainer(args = codexMcpAddArgs(mcpUrl, mcpName).toTypedArray())
+        runInContainer(args = codexMcpAddArgs(mcpUrl, mcpName))
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput("MCP server registration")
 
@@ -39,7 +39,7 @@ class DockerCodexSession(
             ?: error("Container driver is required for NPX registration")
         val npxCommand = container.prepareNpxProxyForUrl(mcpUrl, userHome)
 
-        runInContainer(*codexMcpAddStdioArgs(npxCommand, mcpName).toTypedArray())
+        runInContainer(args = codexMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0, message = "NPX MCP server registration")
             .assertNoErrorsInOutput("NPX MCP server registration")
 
@@ -50,10 +50,10 @@ class DockerCodexSession(
      * Run a codex command inside the Docker container.
      * Note: Codex doesn't support --verbose flag like Claude does.
      */
-    fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
+    fun runInContainer(args: List<String>, timeoutSeconds: Long = 120): ProcessResult {
         val codexArgs = buildList {
             add("codex")
-            addAll(args.toList())
+            addAll(args)
         }
         val extraEnvVars = buildMap {
             put("OPENAI_API_KEY", apiKey)
@@ -91,7 +91,7 @@ class DockerCodexSession(
         }
 
         val rawResult = runInContainer(
-            *codexArgs.toTypedArray(),
+            args = codexArgs,
             timeoutSeconds = timeoutSeconds
         )
 

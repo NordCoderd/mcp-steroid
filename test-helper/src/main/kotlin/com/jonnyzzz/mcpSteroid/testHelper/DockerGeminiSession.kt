@@ -24,7 +24,7 @@ class DockerGeminiSession(
     private val userHome = "/home/gemini"
 
     override fun registerHttpMcp(mcpUrl: String, mcpName: String) : AiAgentSession {
-        runInContainer(args = geminiMcpAddArgs(mcpUrl, mcpName).toTypedArray())
+        runInContainer(args = geminiMcpAddArgs(mcpUrl, mcpName))
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput(message = "MCP server registration")
 
@@ -36,14 +36,14 @@ class DockerGeminiSession(
             ?: error("Container driver is required for NPX registration")
         val npxCommand = container.prepareNpxProxyForUrl(mcpUrl, userHome)
 
-        runInContainer(*geminiMcpAddStdioArgs(npxCommand, mcpName).toTypedArray())
+        runInContainer(args = geminiMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0, message = "NPX MCP server registration")
             .assertNoErrorsInOutput(message = "NPX MCP server registration")
 
         return this
     }
 
-    fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
+    fun runInContainer(args: List<String>, timeoutSeconds: Long = 120): ProcessResult {
         val geminiArgs = buildList {
             add("gemini")
             if (debug) {
@@ -97,21 +97,25 @@ class DockerGeminiSession(
 
     private fun runPromptOnce(prompt: String, timeoutSeconds: Long): ProcessResult {
         val rawResult = runInContainer(
-            "--screen-reader", "true",
-            "--sandbox-mode", "none",
-            "--approval-mode", "yolo",
-            "--output-format", "stream-json",
-            "--prompt", prompt,
+            args = listOf(
+                "--screen-reader", "true",
+                "--sandbox-mode", "none",
+                "--approval-mode", "yolo",
+                "--output-format", "stream-json",
+                "--prompt", prompt,
+            ),
             timeoutSeconds = timeoutSeconds
         )
 
         val effectiveResult = if (shouldRetryWithModernSandboxFlag(rawResult)) {
             runInContainer(
-                "--screen-reader", "true",
-                "--sandbox", "false",
-                "--approval-mode", "yolo",
-                "--output-format", "stream-json",
-                "--prompt", prompt,
+                args = listOf(
+                    "--screen-reader", "true",
+                    "--sandbox", "false",
+                    "--approval-mode", "yolo",
+                    "--output-format", "stream-json",
+                    "--prompt", prompt,
+                ),
                 timeoutSeconds = timeoutSeconds
             )
         } else {

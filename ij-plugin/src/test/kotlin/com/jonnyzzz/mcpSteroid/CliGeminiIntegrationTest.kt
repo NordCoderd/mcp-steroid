@@ -31,7 +31,7 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
         timeoutRunBlocking(180.seconds) {
             val session = geminiSession()
             session.registerHttpMcp(resolveDockerUrl(), mcpName)
-            session.runInContainer("mcp", "list", )
+            session.runInContainer(listOf("mcp", "list", ))
                 .assertExitCode(0, "mcp list should succeed")
                 .assertOutputContains(mcpName, message = "mcp list should contain registered server")
         }

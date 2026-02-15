@@ -55,7 +55,7 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
         val session = codexSession()
 
         // Check codex version
-        session.runInContainer("--version")
+        session.runInContainer(listOf("--version"))
             .assertNoErrorsInOutput("version command")
             .assertExitCode(0, "version command")
     }
@@ -75,7 +75,7 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
         session.registerHttpMcp(resolveDockerUrl(), mcpName)
 
         session
-            .runInContainer("mcp", "get", mcpName)
+            .runInContainer(listOf("mcp", "get", mcpName))
             .assertExitCode(0, "MCP get command")
             .assertOutputContains(
                 "enabled: true",

@@ -26,7 +26,7 @@ class DockerClaudeSession(
     private val userHome = "/home/claude"
 
     override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        runInContainer(args = claudeMcpAddArgs(mcpUrl, mcpName).toTypedArray())
+        runInContainer(args = claudeMcpAddArgs(mcpUrl, mcpName))
             .assertExitCode(0, message = "MCP server registration")
             .assertNoErrorsInOutput("MCP server registration")
 
@@ -38,7 +38,7 @@ class DockerClaudeSession(
             ?: error("Container driver is required for NPX registration")
         val npxCommand = container.prepareNpxProxyForUrl(mcpUrl, userHome)
 
-        runInContainer(*claudeMcpAddStdioArgs(npxCommand, mcpName).toTypedArray())
+        runInContainer(args = claudeMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0, message = "NPX MCP server registration")
             .assertNoErrorsInOutput("NPX MCP server registration")
 
@@ -49,7 +49,7 @@ class DockerClaudeSession(
      * Runs a Claude command inside the Docker container.
      * Debug mode is always enabled to see MCP connection details.
      */
-    fun runInContainer(vararg args: String, timeoutSeconds: Long = 120): ProcessResult {
+    fun runInContainer(args: List<String>, timeoutSeconds: Long = 120): ProcessResult {
         val claudeArgs = buildList {
             add("claude")
             if (debug) {
@@ -57,7 +57,7 @@ class DockerClaudeSession(
                 add("--mcp-debug")
                 add("--verbose")
             }
-            addAll(args.toList())
+            addAll(args)
         }
         return session.runInContainer(
             args = claudeArgs,
@@ -104,7 +104,7 @@ class DockerClaudeSession(
             add(prompt)
         }
         val rawResult = runInContainer(
-            *claudeArgs.toTypedArray(),
+            args = claudeArgs,
             timeoutSeconds = timeoutSeconds
         )
 
