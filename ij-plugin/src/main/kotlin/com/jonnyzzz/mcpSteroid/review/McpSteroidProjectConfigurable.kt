@@ -6,17 +6,22 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.dsl.builder.Align
+import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.TopGap
 import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
+import com.jonnyzzz.mcpSteroid.aiAgents.McpConnectionInfo
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
-import com.jonnyzzz.mcpSteroid.server.IdeaDescriptionWriter
 
 class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigurable("MCP Steroid") {
 
     override fun createPanel(): DialogPanel {
         val settings = McpSteroidProjectSettings.getInstance(project)
         val registryIsNever = Registry.stringValue(McpSteroidProjectSettings.REVIEW_MODE_REGISTRY_KEY) == "NEVER"
+        val connectionInfo = loadConnectionInfo()
 
         return panel {
             group("Code Review") {
@@ -40,39 +45,54 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
                 }
             }
 
-            val connectionInfo = buildConnectionInfo()
             if (connectionInfo != null) {
                 group("Connection") {
+                    row("Server URL:") {
+                        textField()
+                            .applyToComponent { text = connectionInfo.serverUrl; isEditable = false }
+                            .align(AlignX.FILL)
+                    }
+
+                    group("Quick Start") {
+                        row("Claude Code:") {
+                            textField()
+                                .applyToComponent { text = connectionInfo.claudeCommand; isEditable = false }
+                                .align(AlignX.FILL)
+                        }
+                        row("Codex:") {
+                            textField()
+                                .applyToComponent { text = connectionInfo.codexCommand; isEditable = false }
+                                .align(AlignX.FILL)
+                        }
+                        row("Gemini:") {
+                            textField()
+                                .applyToComponent { text = connectionInfo.geminiCommand; isEditable = false }
+                                .align(AlignX.FILL)
+                        }
+                    }
+
+                    group("Cursor / JSON Config") {
+                        row {
+                            val textArea = JBTextArea(connectionInfo.jsonConfig.trim()).apply {
+                                isEditable = false
+                                rows = 7
+                            }
+                            cell(JBScrollPane(textArea)).align(Align.FILL)
+                        }.topGap(TopGap.NONE)
+                    }
+
                     row {
-                        text(connectionInfo)
-                    }.topGap(TopGap.NONE)
+                        browserLink("Report issues, Join Slack & Community", connectionInfo.feedbackUrl)
+                    }
                 }
             }
         }
     }
 
-    private fun buildConnectionInfo(): String? {
+    private fun loadConnectionInfo(): McpConnectionInfo? {
         val server = ApplicationManager.getApplication().getService(SteroidsMcpServer::class.java)
             ?: return null
         val url = server.mcpUrl.takeIf { server.port > 0 } ?: return null
-        val content = IdeaDescriptionWriter.getInstance().buildDescriptionContent(url)
-        // Convert plain text to simple HTML for display
-        return buildString {
-            for (line in content.lines()) {
-                val trimmed = line.trimStart()
-                when {
-                    trimmed.startsWith("# ") -> append("<b>${trimmed.removePrefix("# ")}</b><br>")
-                    trimmed.startsWith("## ") -> append("<b>${trimmed.removePrefix("## ")}</b><br>")
-                    trimmed.startsWith("- **") -> {
-                        val formatted = trimmed.replace(Regex("\\*\\*(.+?)\\*\\*"), "<b>$1</b>")
-                        append("$formatted<br>")
-                    }
-                    trimmed.startsWith("=== ") -> append("<b>${trimmed.removeSurrounding("=== ", " ===")}</b><br>")
-                    line.startsWith("  ") -> append("<code>${trimmed.replace("<", "&lt;")}</code><br>")
-                    trimmed.isEmpty() -> append("<br>")
-                    else -> append("$trimmed<br>")
-                }
-            }
-        }.removeSuffix("<br>")
+        return McpConnectionInfo.build(url)
     }
 }

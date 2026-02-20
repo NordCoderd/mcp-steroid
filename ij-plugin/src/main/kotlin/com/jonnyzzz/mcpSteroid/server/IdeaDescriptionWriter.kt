@@ -5,14 +5,9 @@ import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddCommand
-import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddCommand
-import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddCommand
-import com.jonnyzzz.mcpSteroid.aiAgents.genericMcpServersJson
+import com.jonnyzzz.mcpSteroid.aiAgents.McpConnectionInfo
 import com.jonnyzzz.mcpSteroid.storage.storagePaths
 import java.nio.file.Files
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
 
 /**
  * Writes the .idea/mcp-steroid.md description file in projects.
@@ -36,33 +31,8 @@ class IdeaDescriptionWriter {
         }
     }
 
-    fun buildDescriptionContent(serverUrl: String): String = buildString {
-        appendLine("# MCP Steroid Server")
-        appendLine()
-        appendLine("- **URL**: $serverUrl")
-        appendLine("- **Generated**: ${ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)}")
-        appendLine()
-        appendLine("=== Quick Start ===")
-        appendLine()
-        appendLine("Claude Code CLI:")
-        appendLine("  " + claudeMcpAddCommand(serverUrl))
-        appendLine()
-        appendLine("Codex CLI:")
-        appendLine("  " + codexMcpAddCommand(serverUrl))
-        appendLine()
-        appendLine("Gemini CLI:")
-        appendLine("  " + geminiMcpAddCommand(serverUrl))
-        appendLine()
-        appendLine("Cursor and other's JSON config:")
-        appendLine()
-        appendLine("This is what `mcpServers` JSON may look like:")
-        genericMcpServersJson(serverUrl).lines().forEach { append("  "); appendLine(it) }
-        appendLine()
-        appendLine("## Feedback")
-        appendLine()
-        appendLine("Report issues, Join Slack & Community: https://mcp-steroid.jonnyzzz.com")
-        appendLine()
-    }
+    fun buildDescriptionContent(serverUrl: String): String =
+        McpConnectionInfo.build(serverUrl).toMarkdown()
 
     companion object {
         fun getInstance(): IdeaDescriptionWriter = service()

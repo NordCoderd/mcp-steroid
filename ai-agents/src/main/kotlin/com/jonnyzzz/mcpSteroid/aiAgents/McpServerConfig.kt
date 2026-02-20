@@ -5,6 +5,56 @@ import kotlin.collections.plus
 
 private const val DEFAULT_SERVER_NAME = "mcp-steroid"
 
+/**
+ * Structured model of the MCP server connection info.
+ * Single source of truth used by both the settings UI and the .md file writer.
+ */
+data class McpConnectionInfo(
+    val serverUrl: String,
+    val claudeCommand: String,
+    val codexCommand: String,
+    val geminiCommand: String,
+    val jsonConfig: String,
+    val feedbackUrl: String = "https://mcp-steroid.jonnyzzz.com",
+) {
+    fun toMarkdown(): String = buildString {
+        appendLine("# MCP Steroid Server")
+        appendLine()
+        appendLine("- **URL**: $serverUrl")
+        appendLine()
+        appendLine("=== Quick Start ===")
+        appendLine()
+        appendLine("Claude Code CLI:")
+        appendLine("  $claudeCommand")
+        appendLine()
+        appendLine("Codex CLI:")
+        appendLine("  $codexCommand")
+        appendLine()
+        appendLine("Gemini CLI:")
+        appendLine("  $geminiCommand")
+        appendLine()
+        appendLine("Cursor and other's JSON config:")
+        appendLine()
+        appendLine("This is what `mcpServers` JSON may look like:")
+        jsonConfig.lines().forEach { append("  "); appendLine(it) }
+        appendLine()
+        appendLine("## Feedback")
+        appendLine()
+        appendLine("Report issues, Join Slack & Community: $feedbackUrl")
+        appendLine()
+    }
+
+    companion object {
+        fun build(serverUrl: String) = McpConnectionInfo(
+            serverUrl = serverUrl,
+            claudeCommand = claudeMcpAddCommand(serverUrl),
+            codexCommand = codexMcpAddCommand(serverUrl),
+            geminiCommand = geminiMcpAddCommand(serverUrl),
+            jsonConfig = genericMcpServersJson(serverUrl),
+        )
+    }
+}
+
 data class StdioMcpCommand(
     val command: String,
     val args: List<String> = emptyList(),
