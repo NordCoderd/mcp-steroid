@@ -12,7 +12,6 @@ import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.EditorNotificationProvider
 import com.intellij.ui.EditorNotifications
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
-import java.util.MissingResourceException
 import java.util.function.Function
 import javax.swing.JComponent
 
@@ -48,7 +47,7 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
                 EditorNotifications.getInstance(project).updateNotifications(file)
             }
 
-            val registryMode = try { Registry.stringValue(ReviewManager.REVIEW_MODE_REGISTRY_KEY) } catch (_: MissingResourceException) { "ALWAYS" }
+            val registryMode = Registry.stringValue(ReviewManager.REVIEW_MODE_REGISTRY_KEY)
             if (registryMode != "NEVER") {
                 createActionLabel("Always Allow") {
                     val result = Messages.showOkCancelDialog(

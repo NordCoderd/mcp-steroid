@@ -61,12 +61,8 @@ class ReviewManager(private val project: Project) {
         execCodeParams: ExecCodeParams,
         resultBuilder: ExecutionResultBuilder,
     ): Boolean = coroutineScope {
-        // Check review mode
-        val reviewMode = try {
-            Registry.stringValue(REVIEW_MODE_REGISTRY_KEY)
-        } catch (_: MissingResourceException) {
-            "ALWAYS"
-        }
+        // Check review mode (key is always defined in plugin.xml)
+        val reviewMode = Registry.stringValue(REVIEW_MODE_REGISTRY_KEY)
 
         // Registry NEVER: global auto-approve (admin/test override, strongest)
         if (reviewMode == "NEVER") {
