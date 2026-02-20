@@ -1,10 +1,14 @@
 rootProject.name = "mcp-steroid"
-include(":mcp-steroid")
-project(":mcp-steroid").projectDir = file("ij-plugin")
-include(":ocr-common")
-include(":ocr-tesseract")
+
 include(":ai-agents")
 include(":agent-output-filter")
+
+include(":ij-plugin")
+
+include(":ocr-common")
+include(":ocr-tesseract")
+
 include(":test-helper")
 include(":test-integration")
+
 include(":npx")
