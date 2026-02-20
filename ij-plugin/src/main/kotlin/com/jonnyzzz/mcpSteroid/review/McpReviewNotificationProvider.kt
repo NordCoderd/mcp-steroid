@@ -43,18 +43,19 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
 
             val registryMode = Registry.stringValue(McpSteroidProjectSettings.REVIEW_MODE_REGISTRY_KEY)
             if (registryMode != "NEVER") {
-                createActionLabel("Always Allow") {
+                createActionLabel("Always Approve") {
                     val result = Messages.showOkCancelDialog(
                         project,
-                        """
-                        This will skip code review and auto-approve all future executions for this project.
-
-                        The setting is saved in .idea/mcp-steroid.xml.
-                        To re-enable review, set alwaysAllow to false in that file.
-                        """.trimIndent(),
-                        "Disable Code Review for This Project",
-                        "Disable Review",
-                        Messages.getCancelButton(),
+                        "Automatically approve all code blocks that an AI Agent sends to the MCP Steroid plugin to execute. " +
+                        "The code in the editor is the example of what you approve.\n\n" +
+                        "There is no guarantee on what an AI Agent will want to execute. " +
+                        "There is a chance it may harm or gain profit.\n\n" +
+                        "You are going to allow all MCP Steroid calls for the current project. " +
+                        "The consent is stored in .idea/mcp-steroid.xml. " +
+                        "To re-enable review, set alwaysAllow to false in that file.",
+                        "Automatically Approve MCP Steroid",
+                        "Approve All",
+                        "Cancel",
                         Messages.getWarningIcon()
                     )
                     if (result == Messages.OK) {
@@ -65,7 +66,7 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
                 }.setIcon(AllIcons.General.Warning)
             }
 
-            createActionLabel("Approve & Execute") {
+            createActionLabel("Approve") {
                 project.service<ReviewManager>().approve(file)
                 EditorNotifications.getInstance(project).updateNotifications(file)
             }

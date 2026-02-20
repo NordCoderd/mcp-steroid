@@ -58,7 +58,7 @@ class ReviewManager(private val project: Project) {
         execCodeParams: ExecCodeParams,
         resultBuilder: ExecutionResultBuilder,
     ): Boolean = coroutineScope {
-        if (McpSteroidProjectSettings.getInstance(project).isAutoApproved()) {
+        if (!McpSteroidProjectSettings.getInstance(project).isReviewRequired()) {
             log.info("Auto-approving $executionId")
             return@coroutineScope true
         }

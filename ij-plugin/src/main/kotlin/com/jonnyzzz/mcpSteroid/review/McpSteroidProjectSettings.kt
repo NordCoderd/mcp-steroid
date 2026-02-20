@@ -14,8 +14,8 @@ import com.intellij.openapi.util.registry.Registry
  * Per-project settings for MCP Steroid, stored in .idea/mcp-steroid.xml.
  * Commit this file to share settings with your team, or add it to .gitignore to keep them local.
  *
- * This service also centralises the "should review?" decision, taking into account
- * both the global registry override and the per-project always-allow flag.
+ * This service also centralises the "is review required?" decision, taking into account
+ * both the global registry override and the per-project always-approve flag.
  */
 @Service(Service.Level.PROJECT)
 @State(
@@ -33,10 +33,10 @@ class McpSteroidProjectSettings(private val project: Project) :
         get() = state.alwaysAllow
         set(value) { state.alwaysAllow = value }
 
-    /** Returns true when execution should proceed without showing the review panel. */
-    fun isAutoApproved(): Boolean {
-        if (Registry.stringValue(REVIEW_MODE_REGISTRY_KEY) == "NEVER") return true
-        return state.alwaysAllow
+    /** Returns true when the review panel should be shown before execution. */
+    fun isReviewRequired(): Boolean {
+        if (Registry.stringValue(REVIEW_MODE_REGISTRY_KEY) == "NEVER") return false
+        return !state.alwaysAllow
     }
 
     companion object {
