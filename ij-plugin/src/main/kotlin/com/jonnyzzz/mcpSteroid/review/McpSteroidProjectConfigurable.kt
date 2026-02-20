@@ -11,6 +11,7 @@ import com.intellij.openapi.util.registry.Registry
 import com.intellij.ui.components.JBScrollBar
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.components.JBTextField
 import com.intellij.ui.components.fields.ExpandableSupport
 import com.intellij.ui.components.fields.ExtendableTextComponent
 import com.intellij.ui.components.fields.ExtendableTextField
@@ -93,6 +94,9 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
         ExtendableTextField().apply {
             text = content
             isEditable = false
+            // Force background painting even for non-editable fields so the copy icon
+            // appears visually INSIDE the field border rather than floating beside it.
+            putClientProperty(JBTextField.IS_FORCE_INNER_BACKGROUND_PAINT, true)
             addExtension(ExtendableTextComponent.Extension.create(
                 AllIcons.General.InlineCopy,
                 AllIcons.General.InlineCopyHover,
@@ -115,6 +119,7 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
             this.rows = rows
         }
         val scrollPane = JBScrollPane(textArea)
+        scrollPane.verticalScrollBarPolicy = JBScrollPane.VERTICAL_SCROLLBAR_ALWAYS
         scrollPane.verticalScrollBar.add(JBScrollBar.LEADING, ExpandableSupport.createLabel(copyExt))
         return scrollPane
     }
