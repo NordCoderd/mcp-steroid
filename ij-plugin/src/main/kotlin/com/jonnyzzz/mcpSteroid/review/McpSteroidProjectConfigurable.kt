@@ -1,7 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.review
 
+import com.intellij.icons.AllIcons
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.ide.CopyPasteManager
 import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
@@ -15,15 +17,34 @@ import com.intellij.ui.dsl.builder.bindSelected
 import com.intellij.ui.dsl.builder.panel
 import com.jonnyzzz.mcpSteroid.aiAgents.McpConnectionInfo
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
+import java.awt.datatransfer.StringSelection
 
 class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigurable("MCP Steroid") {
 
     override fun createPanel(): DialogPanel {
         val settings = McpSteroidProjectSettings.getInstance(project)
         val registryIsNever = Registry.stringValue(McpSteroidProjectSettings.REVIEW_MODE_REGISTRY_KEY) == "NEVER"
-        val connectionInfo = loadConnectionInfo()
+        val info = loadConnectionInfo()
 
         return panel {
+            // 1. Server URL
+            if (info != null) {
+                row("Server URL:") {
+                    textField()
+                        .applyToComponent { text = info.serverUrl; isEditable = false }
+                        .align(AlignX.FILL)
+                    copyButton(info.serverUrl)
+                }
+            }
+
+            // 2. Feedback link
+            if (info != null) {
+                row {
+                    browserLink("Report issues, Join Slack & Community", info.feedbackUrl)
+                }.topGap(TopGap.SMALL)
+            }
+
+            // 3. Code Review
             group("Code Review") {
                 row {
                     checkBox("Automatically approve all MCP Steroid executions for this project")
@@ -45,47 +66,41 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
                 }
             }
 
-            if (connectionInfo != null) {
-                group("Connection") {
-                    row("Server URL:") {
-                        textField()
-                            .applyToComponent { text = connectionInfo.serverUrl; isEditable = false }
-                            .align(AlignX.FILL)
-                    }
-
-                    group("Quick Start") {
-                        row("Claude Code:") {
+            // 4. Quick Start CLI commands
+            if (info != null) {
+                group("Quick Start") {
+                    for ((name, command) in info.commands) {
+                        row("$name:") {
                             textField()
-                                .applyToComponent { text = connectionInfo.claudeCommand; isEditable = false }
+                                .applyToComponent { text = command; isEditable = false }
                                 .align(AlignX.FILL)
-                        }
-                        row("Codex:") {
-                            textField()
-                                .applyToComponent { text = connectionInfo.codexCommand; isEditable = false }
-                                .align(AlignX.FILL)
-                        }
-                        row("Gemini:") {
-                            textField()
-                                .applyToComponent { text = connectionInfo.geminiCommand; isEditable = false }
-                                .align(AlignX.FILL)
+                            copyButton(command)
                         }
                     }
 
+                    // Cursor/JSON Config — one level deep inside Quick Start
                     group("Cursor / JSON Config") {
+                        val json = info.jsonConfig.trim()
                         row {
-                            val textArea = JBTextArea(connectionInfo.jsonConfig.trim()).apply {
-                                isEditable = false
-                                rows = 7
-                            }
-                            cell(JBScrollPane(textArea)).align(Align.FILL)
+                            cell(JBScrollPane(JBTextArea(json).apply { isEditable = false; rows = 7 }))
+                                .align(Align.FILL)
                         }.topGap(TopGap.NONE)
-                    }
-
-                    row {
-                        browserLink("Report issues, Join Slack & Community", connectionInfo.feedbackUrl)
+                        row {
+                            copyButton(json)
+                        }
                     }
                 }
             }
+        }
+    }
+
+    private fun com.intellij.ui.dsl.builder.Row.copyButton(text: String) {
+        button("") {
+            CopyPasteManager.getInstance().setContents(StringSelection(text))
+        }.applyToComponent {
+            icon = AllIcons.Actions.Copy
+            toolTipText = "Copy to clipboard"
+            isBorderPainted = false
         }
     }
 

@@ -8,12 +8,13 @@ private const val DEFAULT_SERVER_NAME = "mcp-steroid"
 /**
  * Structured model of the MCP server connection info.
  * Single source of truth used by both the settings UI and the .md file writer.
+ *
+ * [commands] is an ordered map of display name → CLI command string,
+ * allowing new agents to be added without changing call sites.
  */
 data class McpConnectionInfo(
     val serverUrl: String,
-    val claudeCommand: String,
-    val codexCommand: String,
-    val geminiCommand: String,
+    val commands: Map<String, String>,
     val jsonConfig: String,
     val feedbackUrl: String = "https://mcp-steroid.jonnyzzz.com",
 ) {
@@ -24,15 +25,11 @@ data class McpConnectionInfo(
         appendLine()
         appendLine("=== Quick Start ===")
         appendLine()
-        appendLine("Claude Code CLI:")
-        appendLine("  $claudeCommand")
-        appendLine()
-        appendLine("Codex CLI:")
-        appendLine("  $codexCommand")
-        appendLine()
-        appendLine("Gemini CLI:")
-        appendLine("  $geminiCommand")
-        appendLine()
+        for ((name, command) in commands) {
+            appendLine("$name CLI:")
+            appendLine("  $command")
+            appendLine()
+        }
         appendLine("Cursor and other's JSON config:")
         appendLine()
         appendLine("This is what `mcpServers` JSON may look like:")
@@ -47,9 +44,11 @@ data class McpConnectionInfo(
     companion object {
         fun build(serverUrl: String) = McpConnectionInfo(
             serverUrl = serverUrl,
-            claudeCommand = claudeMcpAddCommand(serverUrl),
-            codexCommand = codexMcpAddCommand(serverUrl),
-            geminiCommand = geminiMcpAddCommand(serverUrl),
+            commands = linkedMapOf(
+                "Claude" to claudeMcpAddCommand(serverUrl),
+                "Codex" to codexMcpAddCommand(serverUrl),
+                "Gemini" to geminiMcpAddCommand(serverUrl),
+            ),
             jsonConfig = genericMcpServersJson(serverUrl),
         )
     }
