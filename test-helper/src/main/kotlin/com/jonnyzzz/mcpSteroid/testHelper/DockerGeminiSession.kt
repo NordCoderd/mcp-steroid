@@ -82,12 +82,20 @@ class DockerGeminiSession(
             effectiveResult = runPromptOnce(prompt, timeoutSeconds)
         }
 
-        val resultText = outputFilter.filterText(effectiveResult.output)
+        val rawOutput = effectiveResult.output
+        val resultText = outputFilter.filterText(rawOutput)
+        // Gemini CLI sometimes exits with 137 (SIGKILL) even after completing successfully.
+        // Treat this as success when the raw NDJSON confirms a successful result was produced.
+        val effectiveExitCode = if (effectiveResult.exitCode == 137 && rawOutput.contains("\"status\":\"success\"")) {
+            0
+        } else {
+            effectiveResult.exitCode ?: -1
+        }
         return ProcessResultValue(
-            exitCode = effectiveResult.exitCode ?: -1,
+            exitCode = effectiveExitCode,
             output = resultText,
             stderr = effectiveResult.stderr,
-            rawOutput = effectiveResult.output,
+            rawOutput = rawOutput,
         )
     }
 

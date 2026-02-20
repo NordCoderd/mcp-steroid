@@ -102,8 +102,8 @@ class WhatYouSeeTest {
             println("  $task -> ${preferredLines[i]}")
         }
 
-        // Strict steroid detection: tool name starts with "steroid_"
-        val steroidCount = preferredLines.count { it.startsWith("steroid_") }
+        // Steroid detection: tool name starts with "steroid_" or uses Codex's "functions.mcp__mcp-steroid__steroid_" prefix
+        val steroidCount = preferredLines.count { it.startsWith("steroid_") || it.contains("__steroid_") }
         println("[${agent.displayName}] Steroid tool count: $steroidCount / ${preferredLines.size}")
 
         // Hard assertions

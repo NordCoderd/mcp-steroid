@@ -65,6 +65,7 @@ class KeycloakArchitectureTest {
             appendLine("At the end, output these markers on separate lines:")
             appendLine("AUTH_FLOW_FOUND: yes")
             appendLine("CLASSES_TRACED: <comma-separated list of at least 3 class names>")
+            appendLine("FILE_PATHS: <at least one file path ending in .java or .kt that you found>")
         }
 
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
@@ -171,6 +172,7 @@ class KeycloakArchitectureTest {
             appendLine("At the end, output these markers on separate lines:")
             appendLine("SPI_FOUND: yes")
             appendLine("SPI_EXAMPLE: <name of a concrete SPI implementation class>")
+            appendLine("FILE_PATHS: <at least one file path ending in .java or .kt that you found>")
         }
 
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)

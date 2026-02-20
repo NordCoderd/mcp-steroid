@@ -63,8 +63,8 @@ class EapSmokeTest {
         console.writeStep(4, "Verifying screenshot capture via execute_code")
         session.mcpSteroid.mcpExecuteCode(
             code = """
-                val artifacts = takeIdeScreenshot()
-                println("SCREENSHOT_OK: ${'$'}{artifacts.imagePath}")
+                val screenshotPath = takeIdeScreenshot()
+                println("SCREENSHOT_OK: ${'$'}screenshotPath")
             """.trimIndent(),
             taskId = "eap-smoke-screenshot",
             reason = "EAP smoke test - screenshot capture",
