@@ -74,7 +74,7 @@ class ConsolePumpingContainerDriver(
 ) : ContainerDriverDelegate<ConsolePumpingContainerDriver>(delegate) {
     private val counter = AtomicInteger(0)
 
-    override fun createNewDriver(delegate: ContainerDriver) = ConsolePumpingContainerDriver(delegate, console, agentName)
+    override fun createNewDriver(delegate: ContainerDriver) = ConsolePumpingContainerDriver(delegate, console, agentName, outputFilter)
 
     override fun runInContainer(
         args: List<String>,
