@@ -8,6 +8,7 @@ import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
@@ -38,6 +39,7 @@ class ReviewManager(private val project: Project) {
 
     companion object {
         private val REVIEW_EXECUTION_CONTEXT_KEY = Key<PendingReviewContext>("mcp-review-manager-key")
+        const val REVIEW_MODE_KEY = "mcp.steroid.review.mode"
     }
 
     private data class PendingReviewContext(
@@ -65,16 +67,15 @@ class ReviewManager(private val project: Project) {
             "ALWAYS"
         }
 
-        // TRUSTED mode: global auto-approve configured by admin
-        if (reviewMode == "TRUSTED") {
-            log.info("Auto-approving $executionId (review mode: TRUSTED)")
+        // Registry NEVER: global auto-approve (admin/test override, strongest)
+        if (reviewMode == "NEVER") {
+            log.info("Auto-approving $executionId (registry: mcp.steroid.review.mode=NEVER)")
             return@coroutineScope true
         }
 
-        // NEVER mode: strongest override — disables Always Allow, always requires review
-        // Per-project Always Allow is also checked below only when mode is ALWAYS
-        if (reviewMode != "NEVER" && project.service<AlwaysAllowService>().isEnabled) {
-            log.info("Auto-approving $executionId (always allow enabled for project)")
+        // Per-project always allow: user clicked "Always Allow" in the review panel
+        if (PropertiesComponent.getInstance(project).getValue(REVIEW_MODE_KEY) == "NEVER") {
+            log.info("Auto-approving $executionId (project always allow)")
             return@coroutineScope true
         }
 

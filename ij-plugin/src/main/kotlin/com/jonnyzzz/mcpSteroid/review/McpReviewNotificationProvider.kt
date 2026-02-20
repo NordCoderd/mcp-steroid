@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.review
 
+import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.project.Project
@@ -46,19 +47,19 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
                 EditorNotifications.getInstance(project).updateNotifications(file)
             }
 
-            val reviewMode = try { Registry.stringValue("mcp.steroid.review.mode") } catch (_: Exception) { "ALWAYS" }
-            if (reviewMode != "NEVER") {
+            val registryMode = try { Registry.stringValue(ReviewManager.REVIEW_MODE_KEY) } catch (_: Exception) { "ALWAYS" }
+            if (registryMode != "NEVER") {
                 createActionLabel("Always Allow") {
                     val result = Messages.showOkCancelDialog(
                         project,
-                        "This will auto-approve all future code executions for this project without review.\nYou can disable this in Settings → Registry → mcp.steroid.review.mode.",
+                        "This will auto-approve all future code executions for this project without review.\nYou can reset this in the project's .idea folder.",
                         "Enable Always Allow",
                         "Enable",
                         Messages.getCancelButton(),
                         Messages.getWarningIcon()
                     )
                     if (result == Messages.OK) {
-                        project.service<AlwaysAllowService>().isEnabled = true
+                        PropertiesComponent.getInstance(project).setValue(ReviewManager.REVIEW_MODE_KEY, "NEVER")
                         project.service<ReviewManager>().approve(file)
                         EditorNotifications.getInstance(project).updateNotifications(file)
                     }
