@@ -6,7 +6,7 @@ repositories {
     mavenCentral()
 }
 
-// Resolvable configuration to get the plugin .zip from :mcp-steroid subproject
+// Resolvable configuration to get the plugin .zip from :ij-plugin subproject
 val pluginZip by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
@@ -53,11 +53,7 @@ tasks.test {
         val testOutDir = layout.buildDirectory.dir("test-logs/test").get().asFile.also { it.mkdirs() }
 
         val resolvedPluginZip = pluginZip.singleFile
-            .takeIf { it.isFile }
-            ?: project(":ij-plugin").layout.buildDirectory.dir("distributions").get().asFile
-                .listFiles()?.filter { it.isFile && it.extension == "zip" && it.name.startsWith("mcp-steroid-") }
-                ?.maxByOrNull { it.lastModified() }
-            ?: error("Cannot resolve plugin ZIP")
+        require(resolvedPluginZip.isFile) { "Plugin ZIP not found: ${resolvedPluginZip.absolutePath}" }
 
         systemProperty("test.integration.plugin.zip", resolvedPluginZip.absolutePath)
         systemProperty(
