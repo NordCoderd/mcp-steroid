@@ -156,6 +156,12 @@ Key classes: `IdeContainer`, `ConsoleDriver`, `XcvbDriver`, `AiAgentDriver`, `Co
 
 **Screen layout**: IDE left 2/3, console right 1/3, managed by `LayoutManager`.
 
+### Test naming
+
+- **NO `@ParameterizedTest`** — create explicit `@Test` methods with descriptive names instead (e.g., `` `describeMcp claude`() ``, `` `describeMcp codex`() ``)
+- For truly dynamic test cases (runtime-discovered), use `@TestFactory` with `DynamicTest.dynamicTest("descriptive-name") { ... }`
+- This ensures IDE test runner, `./gradlew --tests`, and CI reports work optimally
+
 ## Key Types
 
 - **ExecCodeParams**: `taskId`, `code`, `reason`, `timeout`, `rawParams`
