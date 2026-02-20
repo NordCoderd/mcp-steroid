@@ -41,7 +41,7 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
         return EditorNotificationPanel(editor, EditorNotificationPanel.Status.Warning).apply {
             text = "Review - Edit code to add comments, then Approve or Reject"
 
-            val registryMode = Registry.stringValue(ReviewManager.REVIEW_MODE_REGISTRY_KEY)
+            val registryMode = Registry.stringValue(McpSteroidProjectSettings.REVIEW_MODE_REGISTRY_KEY)
             if (registryMode != "NEVER") {
                 createActionLabel("Always Allow") {
                     val result = Messages.showOkCancelDialog(

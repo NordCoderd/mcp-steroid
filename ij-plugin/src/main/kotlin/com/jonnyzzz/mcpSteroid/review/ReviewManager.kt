@@ -38,7 +38,6 @@ class ReviewManager(private val project: Project) {
 
     companion object {
         private val REVIEW_EXECUTION_CONTEXT_KEY = Key<PendingReviewContext>("mcp-review-manager-key")
-        const val REVIEW_MODE_REGISTRY_KEY = "mcp.steroid.review.mode"
     }
 
     private data class PendingReviewContext(
@@ -59,18 +58,8 @@ class ReviewManager(private val project: Project) {
         execCodeParams: ExecCodeParams,
         resultBuilder: ExecutionResultBuilder,
     ): Boolean = coroutineScope {
-        // Check review mode (key is always defined in plugin.xml)
-        val reviewMode = Registry.stringValue(REVIEW_MODE_REGISTRY_KEY)
-
-        // Registry NEVER: global auto-approve (admin/test override, strongest)
-        if (reviewMode == "NEVER") {
-            log.info("Auto-approving $executionId (registry: $REVIEW_MODE_REGISTRY_KEY=NEVER)")
-            return@coroutineScope true
-        }
-
-        // Per-project always allow: user clicked "Always Allow" in the review panel
-        if (McpSteroidProjectSettings.getInstance(project).alwaysAllow) {
-            log.info("Auto-approving $executionId (project always allow)")
+        if (McpSteroidProjectSettings.getInstance(project).isAutoApproved()) {
+            log.info("Auto-approving $executionId")
             return@coroutineScope true
         }
 
