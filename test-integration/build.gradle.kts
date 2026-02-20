@@ -19,7 +19,7 @@ repositories {
     mavenCentral()
 }
 
-// Resolvable configuration to get the plugin .zip from root project
+// Resolvable configuration to get the plugin .zip from :mcp-steroid subproject
 val pluginZip by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
@@ -35,7 +35,7 @@ val agentOutputFilterDist by configurations.creating {
 }
 
 dependencies {
-    pluginZip(project(":"))
+    pluginZip(project(":mcp-steroid"))
     agentOutputFilterDist(project(path = ":agent-output-filter", configuration = "executableDistribution"))
 
     testImplementation(project(":test-helper"))
@@ -519,13 +519,13 @@ fun Test.configureIntegrationTask(
 
         val resolvedPluginZip = pluginZip.singleFile
             .takeIf { it.isFile }
-            ?: rootProject.layout.buildDirectory.dir("distributions").get().asFile
+            ?: project(":mcp-steroid").layout.buildDirectory.dir("distributions").get().asFile
                 .listFiles()
                 ?.filter { it.isFile && it.extension == "zip" && it.name.startsWith("mcp-steroid-") }
                 ?.maxByOrNull { it.lastModified() }
             ?: error(
                 "Cannot resolve plugin ZIP. " +
-                        "Expected pluginZip artifact or latest mcp-steroid-*.zip under ${rootProject.layout.buildDirectory.dir("distributions").get().asFile}"
+                        "Expected pluginZip artifact or latest mcp-steroid-*.zip under ${project(":mcp-steroid").layout.buildDirectory.dir("distributions").get().asFile}"
             )
 
         val archivePath = ideaArchivePathProvider()

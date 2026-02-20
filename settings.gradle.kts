@@ -1,4 +1,6 @@
 rootProject.name = "mcp-steroid"
+include(":mcp-steroid")
+project(":mcp-steroid").projectDir = file("ij-plugin")
 include(":ocr-common")
 include(":ocr-tesseract")
 include(":ai-agents")
