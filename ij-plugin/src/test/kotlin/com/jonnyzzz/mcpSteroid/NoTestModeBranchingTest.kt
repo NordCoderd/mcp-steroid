@@ -9,7 +9,7 @@ import java.util.stream.Collectors
 
 class NoTestModeBranchingTest : BasePlatformTestCase() {
     fun testNoIsUnitTestModeUsageInProject() {
-        val sourceRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("src")
+        val sourceRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("ij-plugin").resolve("src")
         check(Files.isDirectory(sourceRoot)) {
             "Project src directory is missing: $sourceRoot"
         }
