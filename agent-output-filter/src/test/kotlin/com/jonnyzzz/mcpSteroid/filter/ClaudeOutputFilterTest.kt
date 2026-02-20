@@ -166,6 +166,70 @@ class ClaudeOutputFilterTest {
         assertTrue(output.contains("[done]"))
     }
 
+    // ── New-format tests (Claude Code 2.1.x+) ──────────────────────────────
+
+    @Test
+    fun `new format - assistant text content is extracted`() {
+        val input = """{"type":"assistant","message":{"content":[{"type":"text","text":"BUG_FOUND: yes\nROOT_CAUSE: off-by-one"}]}}"""
+        val output = runFilter(input)
+        assertTrue(output.contains("BUG_FOUND: yes"), "Should extract assistant text: $output")
+        assertTrue(output.contains("ROOT_CAUSE: off-by-one"), "Should contain all lines: $output")
+    }
+
+    @Test
+    fun `new format - assistant tool_use is shown`() {
+        val input = """{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__mcp-steroid__steroid_execute_code","input":{"reason":"test","task_id":"t1","code":"println(1)"}}]}}"""
+        val output = runFilter(input)
+        assertTrue(output.contains(">> mcp__mcp-steroid__steroid_execute_code"), "Should show tool name: $output")
+        assertTrue(output.contains("test"), "Should show reason: $output")
+    }
+
+    @Test
+    fun `new format - assistant thinking block is skipped`() {
+        val input = """{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"Internal reasoning"}]}}"""
+        val output = runFilter(input)
+        assertEquals("", output)
+    }
+
+    @Test
+    fun `new format - user tool_result string content`() {
+        val input = """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_x","content":"Execution ID: eid_123\nDone"}]}}"""
+        val output = runFilter(input)
+        assertTrue(output.contains("<< Execution ID: eid_123"), "Should show first line of result: $output")
+    }
+
+    @Test
+    fun `new format - user tool_result array content`() {
+        val input = """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_x","content":[{"type":"text","text":"Line one\nLine two"}]}]}}"""
+        val output = runFilter(input)
+        assertTrue(output.contains("<< Line one"), "Should show first line: $output")
+    }
+
+    @Test
+    fun `new format - result event with empty result but stats`() {
+        val input = """{"type":"result","subtype":"success","result":"","total_cost_usd":0.9224,"duration_ms":212000,"num_turns":28}"""
+        val output = runFilter(input)
+        assertTrue(output.contains("[done]"), "Should contain done marker: $output")
+        assertTrue(output.contains("time=212.0s"), "Should contain duration: $output")
+        assertTrue(output.contains("turns=28"), "Should contain turns: $output")
+    }
+
+    @Test
+    fun `new format - mixed assistant events produce correct output`() {
+        val input = """
+            {"type":"system","subtype":"init","tools":[],"mcp_servers":[]}
+            {"type":"assistant","message":{"content":[{"type":"thinking","thinking":"let me think"},{"type":"tool_use","name":"Glob","input":{"pattern":"*.kt"}}]}}
+            {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"id1","content":"src/Main.kt"}]}}
+            {"type":"assistant","message":{"content":[{"type":"text","text":"BUG_LINE: var i = 1\n"}]}}
+            {"type":"result","result":"","total_cost_usd":0.01,"duration_ms":5000,"num_turns":2}
+        """.trimIndent()
+        val output = runFilter(input)
+        assertTrue(output.contains(">> Glob"), "Should show tool use: $output")
+        assertTrue(output.contains("<< src/Main.kt"), "Should show tool result: $output")
+        assertTrue(output.contains("BUG_LINE: var i = 1"), "Should show assistant text: $output")
+        assertTrue(output.contains("[done]"), "Should have done marker: $output")
+    }
+
     private fun runFilter(input: String): String {
         val inputStream = ByteArrayInputStream(input.toByteArray())
         val outputStream = ByteArrayOutputStream()

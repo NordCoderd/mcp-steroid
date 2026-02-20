@@ -64,29 +64,35 @@ internal fun formatErrorMessage(event: JsonObject): String? {
  */
 internal fun toolDetail(toolName: String, input: JsonObject?): String {
     if (input == null) return ""
-    return when (toolName) {
-        "steroid_execute_code" -> {
+    // Strip MCP server prefix (e.g. "mcp__mcp-steroid__steroid_execute_code" → "steroid_execute_code")
+    val simpleName = toolName.substringAfterLast("__")
+    return when {
+        simpleName == "steroid_execute_code" || toolName == "steroid_execute_code" -> {
             val reason = input["reason"]?.jsonPrimitive?.contentOrNull ?: ""
             if (reason.isNotEmpty()) " ($reason)" else ""
         }
 
-        "read_mcp_resource" -> {
+        simpleName == "read_mcp_resource" || toolName == "read_mcp_resource"
+                || toolName == "ReadMcpResourceTool" -> {
             val uri = input["uri"]?.jsonPrimitive?.contentOrNull ?: ""
             if (uri.isNotEmpty()) " ($uri)" else ""
         }
 
-        "Bash", "bash", "run_shell_command" -> {
+        simpleName == "steroid_list_projects" || simpleName == "steroid_list_windows"
+                || simpleName == "steroid_take_screenshot" || simpleName == "steroid_action_discovery" -> ""
+
+        toolName in setOf("Bash", "bash", "run_shell_command") -> {
             val cmd = input["command"]?.jsonPrimitive?.contentOrNull ?: ""
             if (cmd.isNotEmpty()) " ($cmd)" else ""
         }
 
-        "read_file", "write_file", "edit_file", "replace",
-        "Read", "read", "Edit", "edit", "Write", "write" -> {
+        toolName in setOf("read_file", "write_file", "edit_file", "replace",
+            "Read", "read", "Edit", "edit", "Write", "write") -> {
             val path = input["file_path"]?.jsonPrimitive?.contentOrNull ?: ""
             if (path.isNotEmpty()) " ($path)" else ""
         }
 
-        "Grep", "grep", "Glob", "glob" -> {
+        toolName in setOf("Grep", "grep", "Glob", "glob") -> {
             val pattern = input["pattern"]?.jsonPrimitive?.contentOrNull ?: ""
             if (pattern.isNotEmpty()) " ($pattern)" else ""
         }

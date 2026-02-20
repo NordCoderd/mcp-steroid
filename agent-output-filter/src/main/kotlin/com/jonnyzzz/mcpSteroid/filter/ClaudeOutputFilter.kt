@@ -7,8 +7,17 @@ import java.io.BufferedWriter
 /**
  * Filter for Claude's stream-json NDJSON output.
  *
- * Converts Claude stream-json events to human-readable console text.
- * Handles all known event types including tool_use, tool_result, text deltas, etc.
+ * Handles two formats produced by `--output-format stream-json --verbose`:
+ *
+ * **New format (Claude Code 2.1.x+)** — events: `system`, `assistant`, `user`, `result`.
+ *   - `assistant.message.content[]` contains `text`, `tool_use`, `thinking` blocks.
+ *   - `user.message.content[]` contains `tool_result` blocks.
+ *   - `result.result` is typically empty; stats are in `total_cost_usd`, `duration_ms`.
+ *
+ * **Old streaming format** — events: `message_start`, `content_block_start`,
+ *   `content_block_delta`, `tool_use`, `tool_result`, `message_delta`, `result`.
+ *
+ * Both formats are handled; unrecognised events are silently skipped.
  */
 class ClaudeOutputFilter : AbstractOutputFilter() {
 
@@ -16,19 +25,96 @@ class ClaudeOutputFilter : AbstractOutputFilter() {
         val type = event["type"]?.jsonPrimitive?.contentOrNull ?: return
 
         when (type) {
+            // ── New format (Claude Code 2.1.x+) ───────────────────────────
+            "assistant" -> handleAssistantEvent(event, writer)
+            "user"      -> handleUserEvent(event, writer)
+
+            // ── Old streaming format ───────────────────────────────────────
             "content_block_delta" -> handleContentBlockDelta(event, writer)
             "content_block_start" -> handleContentBlockStart(event, writer)
-            "tool_use" -> handleToolUse(event, writer)
-            "tool_result" -> handleToolResult(event, writer)
-            "message_start" -> handleMessageStart(event, writer)
-            "message_delta" -> handleMessageDelta(event, writer)
+            "tool_use"            -> handleToolUse(event, writer)
+            "tool_result"         -> handleToolResult(event, writer)
+            "message_start"       -> handleMessageStart(event, writer)
+            "message_delta"       -> handleMessageDelta(event, writer)
+
+            // ── Both formats ───────────────────────────────────────────────
             "result" -> handleResult(event, writer)
-            "error" -> {
+            "error"  -> {
                 val msg = formatErrorMessage(event) ?: return
                 writer.writeLine(msg)
             }
             "system" -> handleSystem(event, writer)
             // Silently skip: ping, content_block_stop, message_stop
+        }
+    }
+
+    // ── New-format handlers ────────────────────────────────────────────────
+
+    private fun handleAssistantEvent(event: JsonObject, writer: BufferedWriter) {
+        val message = event["message"]?.jsonObject ?: return
+        val content = message["content"]?.jsonArray ?: return
+
+        for (item in content) {
+            val itemObj = item as? JsonObject ?: continue
+            when (itemObj["type"]?.jsonPrimitive?.contentOrNull) {
+                "text" -> {
+                    val text = itemObj["text"]?.jsonPrimitive?.contentOrNull ?: continue
+                    if (text.isNotEmpty()) {
+                        writer.write(text)
+                        if (!text.endsWith("\n")) writer.newLine()
+                        writer.flush()
+                    }
+                }
+                "tool_use" -> {
+                    val name = itemObj["name"]?.jsonPrimitive?.contentOrNull ?: "?"
+                    val input = itemObj["input"]?.jsonObject ?: JsonObject(emptyMap())
+                    val detail = toolDetail(name, input)
+                    writer.writeLine("\n>> $name$detail")
+                }
+                // "thinking" → skip (internal reasoning, not shown to users)
+            }
+        }
+    }
+
+    private fun handleUserEvent(event: JsonObject, writer: BufferedWriter) {
+        val message = event["message"]?.jsonObject ?: return
+        val content = message["content"]?.jsonArray ?: return
+
+        for (item in content) {
+            val itemObj = item as? JsonObject ?: continue
+            if (itemObj["type"]?.jsonPrimitive?.contentOrNull != "tool_result") continue
+
+            val isError = itemObj["is_error"]?.jsonPrimitive?.booleanOrNull ?: false
+            val summary = extractContentSummary(itemObj["content"])
+
+            val prefix = if (isError) "<< ERROR" else "<<"
+            val parts = mutableListOf(prefix)
+            if (summary.isNotEmpty()) parts.add(summary)
+            writer.writeLine(parts.joinToString(" "))
+        }
+    }
+
+    /**
+     * Extract the first non-blank line from a tool result content element.
+     * Content may be a plain string or an array of text blocks.
+     */
+    private fun extractContentSummary(content: JsonElement?): String {
+        return when (content) {
+            is JsonPrimitive -> {
+                val text = content.contentOrNull ?: return ""
+                text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: ""
+            }
+            is JsonArray -> {
+                for (block in content) {
+                    if (block is JsonObject && block["type"]?.jsonPrimitive?.contentOrNull == "text") {
+                        val text = block["text"]?.jsonPrimitive?.contentOrNull ?: continue
+                        val firstLine = text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
+                        if (firstLine != null) return firstLine
+                    }
+                }
+                ""
+            }
+            else -> ""
         }
     }
 
@@ -143,32 +229,5 @@ class ClaudeOutputFilter : AbstractOutputFilter() {
         }
     }
 
-    private fun toolResultSummary(event: JsonObject): String {
-        val content = event["content"] ?: return ""
-
-        return when (content) {
-            is JsonPrimitive -> {
-                val text = content.contentOrNull ?: return ""
-                text.lineSequence()
-                    .map { it.trim() }
-                    .firstOrNull { it.isNotEmpty() }
-                    ?: ""
-            }
-            is JsonArray -> {
-                val parts = mutableListOf<String>()
-                for (block in content) {
-                    if (block is JsonObject && block["type"]?.jsonPrimitive?.contentOrNull == "text") {
-                        val text = block["text"]?.jsonPrimitive?.contentOrNull ?: continue
-                        text.lineSequence()
-                            .map { it.trim() }
-                            .firstOrNull { it.isNotEmpty() }
-                            ?.let { parts.add(it) }
-                        if (parts.isNotEmpty()) break
-                    }
-                }
-                parts.take(2).joinToString("; ")
-            }
-            else -> ""
-        }
-    }
+    private fun toolResultSummary(event: JsonObject): String = extractContentSummary(event["content"])
 }
