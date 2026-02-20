@@ -19,11 +19,32 @@
     <p>Download and changelog for each MCP Steroid release.</p>
 </div>
 
+<div class="page-content">
+    <div class="success">
+        <p><strong>Custom Plugin Repository:</strong> Add <code>https://mcp-steroid.jonnyzzz.com/updatePlugins.xml</code> in <strong>Settings &rarr; Plugins &rarr; &#x2699; &rarr; Manage Plugin Repositories...</strong> for automatic updates.</p>
+    </div>
+</div>
+
 {{ $releases := site.GetPage "section" "releases" }}
-{{ $all := $releases.Pages.ByWeight }}
+{{ $all := $releases.Pages.ByTitle.Reverse }}
+{{ $latest := index $all 0 }}
+{{ $older := after 1 $all }}
 
 <div class="docs-grid">
-    {{ range $all }}
+    <a href="{{ $latest.RelPermalink }}" class="doc-card">
+        <h2>{{ $latest.Title }} <span style="color: #28a745; font-size: 0.6em; vertical-align: middle;">Latest</span></h2>
+        {{ $desc := $latest.Description | plainify }}
+        {{ if not $desc }}{{ $desc = $latest.Summary | plainify }}{{ end }}
+        {{ if not $desc }}{{ $desc = $latest.Plain | truncate 160 }}{{ end }}
+        <p>{{ $desc }}</p>
+        <span class="arrow">View release &rarr;</span>
+    </a>
+</div>
+
+{{ if $older }}
+<h2 style="margin-top: 2rem;">Older Releases</h2>
+<div class="docs-grid">
+    {{ range $older }}
     <a href="{{ .RelPermalink }}" class="doc-card">
         <h2>{{ .Title }}</h2>
         {{ $desc := .Description | plainify }}
@@ -34,4 +55,5 @@
     </a>
     {{ end }}
 </div>
+{{ end }}
 {{ end }}
