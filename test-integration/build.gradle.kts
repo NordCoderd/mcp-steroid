@@ -28,20 +28,11 @@ val pluginZip by configurations.creating {
     }
 }
 
-// Resolvable configuration to get the agent-output-filter fat JAR for Docker deployment
-val agentOutputFilterJar by configurations.creating {
-    isCanBeConsumed = false
-    isCanBeResolved = true
-    attributes {
-        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "fat-jar"))
-    }
-}
-
 dependencies {
     pluginZip(project(":"))
-    agentOutputFilterJar(project(":agent-output-filter"))
 
     testImplementation(project(":test-helper"))
+    testImplementation(project(":agent-output-filter"))
     testImplementation(project(":ai-agents"))
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
@@ -509,7 +500,6 @@ fun Test.configureIntegrationTask(
     }
 
     dependsOn(pluginZip)
-    dependsOn(agentOutputFilterJar)
     doFirst {
         // Long-running integration runs can be interrupted, leaving corrupted
         // Gradle binary test result blobs that later fail with EOFException.
@@ -538,7 +528,6 @@ fun Test.configureIntegrationTask(
         systemProperty("test.integration.ide.product", ideProduct.id)
         systemProperty("test.integration.docker", layout.projectDirectory.dir("src/test/docker").asFile.absolutePath)
         systemProperty("test.integration.testOutput", testOutDir.absolutePath)
-        systemProperty("test.integration.agent.output.filter.jar", agentOutputFilterJar.singleFile.absolutePath)
     }
 }
 

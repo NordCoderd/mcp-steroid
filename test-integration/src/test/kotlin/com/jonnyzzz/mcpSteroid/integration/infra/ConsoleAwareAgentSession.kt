@@ -1,10 +1,12 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.infra
 
+import com.jonnyzzz.mcpSteroid.filter.OutputFilter
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
+import com.jonnyzzz.mcpSteroid.testHelper.filterText
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -60,15 +62,15 @@ class ConsoleAwareAgentSession(
  * The tee approach ensures output is both captured in [ProcessResult]
  * for assertions and visible in the console xterm window in real-time.
  *
- * When [consoleFilterCommand] is set, the pump pipes raw output through
- * the filter before displaying. This is used to convert NDJSON to
- * human-readable text via the agent-output-filter JAR.
+ * When [outputFilter] is set, the raw NDJSON output is suppressed from
+ * the JVM test runner console and filtered text is printed instead,
+ * using the same [OutputFilter] instances from the agent-output-filter module.
  */
 class ConsolePumpingContainerDriver(
     delegate: ContainerDriver,
     private val console: ConsoleDriver,
     private val agentName: String,
-    private val consoleFilterCommand: String? = null,
+    private val outputFilter: OutputFilter? = null,
 ) : ContainerDriverDelegate<ConsolePumpingContainerDriver>(delegate) {
     private val counter = AtomicInteger(0)
 
@@ -87,10 +89,9 @@ class ConsolePumpingContainerDriver(
         val slug = agentName.lowercase().replace(" ", "-")
         val combinedLog = "/tmp/agent-$slug-$idx-combined.log"
 
-        // Single pump for combined output, with optional filter for readable display
+        // Pump raw output to xterm console for real-time visibility
         val pump = console.startFilePump(
             combinedLog, "[$agentName]", ConsoleDriver.CYAN,
-            filterCommand = consoleFilterCommand,
         )
 
         try {
@@ -108,7 +109,20 @@ class ConsolePumpingContainerDriver(
                 appendLine("exit \${PIPESTATUS[0]}")
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
-            return delegate.runInContainer(listOf("bash", teeScript), workingDir, timeoutSeconds, extraEnvVars)
+
+            // Suppress raw NDJSON from JVM console when we have an output filter;
+            // filtered text is printed below after the command completes.
+            val suppressRawOutput = outputFilter != null
+            val result = delegate.runInContainer(listOf("bash", teeScript), workingDir, timeoutSeconds, extraEnvVars, quietly = suppressRawOutput)
+
+            if (outputFilter != null) {
+                val filteredText = outputFilter.filterText(result.output)
+                for (line in filteredText.lineSequence()) {
+                    println("[$agentName] $line")
+                }
+            }
+
+            return result
         } finally {
             // Let pump catch up with remaining output
             Thread.sleep(500)
@@ -133,28 +147,6 @@ class ConsolePumpingContainerDriver(
     override fun toString(): String = "ConsolePumping[$agentName]($delegate)"
 
     companion object {
-        /** Container path where the agent-output-filter JAR is deployed. */
-        const val FILTER_JAR_PATH = "/tmp/agent-output-filter.jar"
-
-        /**
-         * Deploy the agent-output-filter JAR to the container.
-         * The JAR is built by the :agent-output-filter Gradle module and
-         * resolved via the `agentOutputFilterJar` configuration.
-         */
-        fun deployFilterJar(container: ContainerDriver) {
-            container.copyToContainer(IdeTestFolders.agentOutputFilterJar, FILTER_JAR_PATH)
-        }
-
-        /**
-         * Build a filter command for the given filter type.
-         * The command uses `java -jar` to invoke the agent-output-filter JAR.
-         *
-         * @param filterType one of: "claude", "codex", "gemini"
-         */
-        fun filterCommand(filterType: String): String {
-            return "java -jar $FILTER_JAR_PATH $filterType"
-        }
-
         private fun escapeForBash(args: List<String>): String {
             return args.joinToString(" ") { arg ->
                 "'" + arg.replace("'", "'\\''") + "'"

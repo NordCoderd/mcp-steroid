@@ -93,17 +93,12 @@ class ConsoleDriver(
      * The pump script is written to a file in the container to avoid shell escaping
      * issues with variable expansion.
      *
-     * When [filterCommand] is provided, it is inserted into the pipeline
-     * between `tail` and `awk` to transform raw output (e.g. NDJSON) into
-     * human-readable text before it reaches the console.
-     *
      * Returns a [PumpHandle] to stop the pump when the agent finishes.
      */
     fun startFilePump(
         filePath: String,
         prefix: String,
         prefixColor: String = CYAN,
-        filterCommand: String? = null,
     ): PumpHandle {
         val scriptPath = "/tmp/pump-${System.nanoTime()}.sh"
         val awkPrefix = prefix.replace("\\", "\\\\").replace("\"", "\\\"")
@@ -116,15 +111,13 @@ class ConsoleDriver(
             CYAN -> "36"
             else -> "36"
         }
-        val filterStage = if (filterCommand != null) " | $filterCommand" else ""
         val script = buildString {
             appendLine("#!/bin/bash")
             appendLine("touch $filePath")
             // tail -F follows by name (handles truncation/replacement)
             // -s 0.1 polls every 100ms instead of default 1s for smoother updates
-            // optional filter transforms raw output (e.g. NDJSON) to readable text
             // awk flushes both stdout and the console file after each line
-            appendLine("tail -F -s 0.1 $filePath 2>/dev/null$filterStage | awk '{printf \"\\033[${colorCode}m${awkPrefix}\\033[0m %s\\n\", \$0 >> \"$consoleFile\"; fflush(\"$consoleFile\")}'")
+            appendLine("tail -F -s 0.1 $filePath 2>/dev/null | awk '{printf \"\\033[${colorCode}m${awkPrefix}\\033[0m %s\\n\", \$0 >> \"$consoleFile\"; fflush(\"$consoleFile\")}'")
         }
         container.writeFileInContainer(scriptPath, script, executable = true)
 

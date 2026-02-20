@@ -1,6 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.infra
 
+import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
+import com.jonnyzzz.mcpSteroid.filter.CodexOutputFilter
+import com.jonnyzzz.mcpSteroid.filter.GeminiOutputFilter
+import com.jonnyzzz.mcpSteroid.filter.OutputFilter
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerClaudeSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerCodexSession
@@ -11,15 +15,15 @@ import kotlin.collections.iterator
 /**
  * Specifies which console output filter to use for an agent's NDJSON output.
  */
-enum class ConsoleFilterKind(val filterType: String?) {
+enum class ConsoleFilterKind(val outputFilter: OutputFilter?) {
     /** No filtering -- raw output is pumped to console. */
     NONE(null),
     /** Claude NDJSON filter (content_block_delta, tool_use, etc). */
-    CLAUDE("claude"),
+    CLAUDE(ClaudeOutputFilter()),
     /** Codex NDJSON filter (item.completed/agent_message, item.started/command_execution, etc). */
-    CODEX("codex"),
+    CODEX(CodexOutputFilter()),
     /** Gemini NDJSON filter (message, tool_use, tool_result, etc). */
-    GEMINI("gemini"),
+    GEMINI(GeminiOutputFilter()),
 }
 
 class AiAgentDriver(
@@ -35,15 +39,7 @@ class AiAgentDriver(
 
     private fun scopeForAgent(windowTitle: String, consoleFilter: ConsoleFilterKind = ConsoleFilterKind.NONE): ContainerDriver {
         val base = scope
-        return run {
-            val filterCommand = if (consoleFilter.filterType != null) {
-                ConsolePumpingContainerDriver.deployFilterJar(base)
-                ConsolePumpingContainerDriver.filterCommand(consoleFilter.filterType)
-            } else {
-                null
-            }
-            ConsolePumpingContainerDriver(base, console, windowTitle, consoleFilterCommand = filterCommand)
-        }
+        return ConsolePumpingContainerDriver(base, console, windowTitle, outputFilter = consoleFilter.outputFilter)
     }
 
     val mcpSteroidHostUrl by mcp::hostMcpUrl
