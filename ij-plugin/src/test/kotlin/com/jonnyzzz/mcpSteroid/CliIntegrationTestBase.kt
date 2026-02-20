@@ -31,7 +31,11 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
 
     protected open fun newAiSessionViaNpx(): AiAgentSession {
         ensureNpxBuild()
-        return createAiSession().registerNpxMcp(resolveDockerUrl(), "intellij")
+        val userHome = "/home/claude"
+
+//        val npxCommand = session.prepareNpxProxyForUrl(mcpUrl, userHome)
+        TODO()
+//        return createAiSession().registerNpxMcp(resolveDockerUrl(), "intellij")
     }
 
     /**

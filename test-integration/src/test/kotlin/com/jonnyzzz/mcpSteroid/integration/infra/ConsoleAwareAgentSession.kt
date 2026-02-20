@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.infra
 
+import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.filter.OutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
@@ -23,6 +24,8 @@ class ConsoleAwareAgentSession(
     private val console: ConsoleDriver,
     private val agentName: String,
 ) : AiAgentSession {
+    override val displayName: String
+        get() = delegate.displayName
 
     override fun runPrompt(prompt: String, timeoutSeconds: Long): ProcessResult {
         console.writePrompt(agentName, prompt)
@@ -46,12 +49,8 @@ class ConsoleAwareAgentSession(
         )
     }
 
-    override fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        return ConsoleAwareAgentSession(
-            delegate.registerNpxMcp(mcpUrl, mcpName),
-            console, agentName,
-        )
-    }
+    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String) =
+        ConsoleAwareAgentSession(delegate.registerNpxMcp(npxCommand, mcpName), console, agentName,)
 }
 
 /**

@@ -18,7 +18,7 @@ interface ContainerDriver : ContainerProcessRunner {
     fun mapGuestPortToHostPort(port: ContainerPort): Int
 
     fun withGuestWorkDir(guestWorkDir: String): ContainerDriver
-    fun withSecretPattern(secretPattern: String): ContainerDriver
+    override fun withSecretPattern(secretPattern: String): ContainerDriver
     fun withEnv(key: String, value: String): ContainerDriver
 
     fun mkdirs(guestPath: String) = runInContainer(listOf("mkdir", "-p", guestPath))
@@ -57,6 +57,8 @@ interface ContainerProcessRunner {
         extraEnvVars: Map<String, String> = emptyMap(),
         quietly: Boolean = false,
     ): ProcessResult
+
+    fun withSecretPattern(secretPattern: String): ContainerProcessRunner
 }
 
 fun ContainerDriver.Companion.startDockerSession(

@@ -1,11 +1,12 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.CodexOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import java.io.File
 
 /**
@@ -16,11 +17,11 @@ import java.io.File
  * The API key is read from ~/.openai mounted into the container.
  */
 class DockerCodexSession(
-    private val session: ContainerDriver,
+    private val session: ContainerProcessRunner,
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
-    private val userHome = "/home/codex"
+    override val displayName: String = Companion.displayName
 
     override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         runInContainer(args = codexMcpAddArgs(mcpUrl, mcpName))
@@ -30,9 +31,7 @@ class DockerCodexSession(
         return this
     }
 
-    override fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        val npxCommand = session.prepareNpxProxyForUrl(mcpUrl, userHome)
-
+    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String): AiAgentSession {
         runInContainer(args = codexMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0, message = "NPX MCP server registration")
             .assertNoErrorsInOutput("NPX MCP server registration")
@@ -102,8 +101,8 @@ class DockerCodexSession(
     }
 
     companion object : AIAgentCompanion<DockerCodexSession>("codex-cli") {
-        const val DISPLAY_NAME = "Codex"
-        private val outputFilter = CodexOutputFilter()
+        override val displayName = "Codex"
+        override val outputFilter get() = CodexOutputFilter()
 
         override fun readApiKey(): String {
             System.getenv("OPENAI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
@@ -115,6 +114,6 @@ class DockerCodexSession(
             error("OPENAI_API_KEY is required for Codex CLI tests (set env or ~/.openai)")
         }
 
-        override fun createImpl(session: ContainerDriver,apiKey: String) = DockerCodexSession(session, apiKey)
+        override fun createImpl(session: ContainerProcessRunner, apiKey: String) = DockerCodexSession(session, apiKey)
     }
 }

@@ -1,11 +1,12 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
 import java.io.File
 
 /**
@@ -14,11 +15,11 @@ import java.io.File
  * MCP server registrations from affecting the local Claude config.
  */
 class DockerClaudeSession(
-    private val session: ContainerDriver,
+    private val session: ContainerProcessRunner,
     private val apiKey: String,
     private val debug: Boolean = false,
 ) : AiAgentSession {
-    private val userHome = "/home/claude"
+    override val displayName: String = Companion.displayName
 
     override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         runInContainer(args = claudeMcpAddArgs(mcpUrl, mcpName))
@@ -28,9 +29,7 @@ class DockerClaudeSession(
         return this
     }
 
-    override fun registerNpxMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        val npxCommand = session.prepareNpxProxyForUrl(mcpUrl, userHome)
-
+    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String): AiAgentSession {
         runInContainer(args = claudeMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0, message = "NPX MCP server registration")
             .assertNoErrorsInOutput("NPX MCP server registration")
@@ -108,8 +107,8 @@ class DockerClaudeSession(
     }
 
     companion object : AIAgentCompanion<DockerClaudeSession>("claude-cli") {
-        const val DISPLAY_NAME = "Claude Code"
-        private val outputFilter = ClaudeOutputFilter()
+        override val displayName = "Claude Code"
+        override val outputFilter get() = ClaudeOutputFilter()
 
         override fun readApiKey(): String {
             System.getenv("ANTHROPIC_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
@@ -121,6 +120,6 @@ class DockerClaudeSession(
             error("ANTHROPIC_API_KEY is required for Claude CLI tests (set env or ~/.anthropic)")
         }
 
-        override fun createImpl(session: ContainerDriver, apiKey: String) = DockerClaudeSession(session.withSecretPattern(apiKey), apiKey)
+        override fun createImpl(session: ContainerProcessRunner, apiKey: String) = DockerClaudeSession(session.withSecretPattern(apiKey), apiKey)
     }
 }

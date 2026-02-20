@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.tests
 
+import com.jonnyzzz.mcpSteroid.integration.infra.AiAgentDriver
 import com.jonnyzzz.mcpSteroid.integration.infra.ConsoleDriver
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
@@ -10,10 +11,10 @@ import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import com.jonnyzzz.mcpSteroid.testHelper.titleCase
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assumptions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
 import java.util.concurrent.TimeUnit
+import kotlin.reflect.KProperty1
 
 /**
  * Integration test: debugger demo from ai-tests/07-debugger.md.
@@ -42,37 +43,36 @@ class DebuggerDemoTest {
 
     @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
-    fun `claude finds sortedByDescending bug via debugger`() = runDebuggerDemo("claude")
+    fun `claude finds sortedByDescending bug via debugger`()  = runDebuggerDemo(AiAgentDriver::claude)
 
     @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
-    fun `codex finds sortedByDescending bug via debugger`() = runDebuggerDemo("codex")
+    fun `codex finds sortedByDescending bug via debugger`() = runDebuggerDemo(AiAgentDriver::codex)
 
     @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
-    fun `gemini finds sortedByDescending bug via debugger`() = runDebuggerDemo("gemini")
+    fun `gemini finds sortedByDescending bug via debugger`() = runDebuggerDemo(AiAgentDriver::gemini)
 
     @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
-    fun `test debugger finds null-default bug with Claude`() = runNullDefaultDemo("claude")
+    fun `test debugger finds null-default bug with Claude`() = runNullDefaultDemo(AiAgentDriver::claude)
 
     @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
-    fun `test debugger finds off-by-one bug with Claude`() = runOffByOneDemo("claude")
+    fun `test debugger finds off-by-one bug with Claude`() = runOffByOneDemo(AiAgentDriver::claude)
 
     @Test
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
-    fun `test debugger finds string-format bug with Claude`() = runStringFormatDemo("claude")
+    fun `test debugger finds string-format bug with Claude`() = runStringFormatDemo(AiAgentDriver::claude)
 
-    private fun runDebuggerDemo(agentName: String) {
+    private fun runDebuggerDemo(agentName: KProperty1<AiAgentDriver, AiAgentSession>) {
         val session = IntelliJContainer.create(
             lifetime, "ide-agent",
-            consoleTitle = "Debugger with ${agentName.titleCase()}",
+            consoleTitle = "Debugger with ${agentName.name.titleCase()}",
         ).waitForProjectReady()
         val console = session.console
 
-        val agent: AiAgentSession? = session.aiAgents.aiAgents[agentName]
-        Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        val agent = session.aiAgents.run { agentName(this) }
         console.writeStep(1, "Building prompt for $agentName")
 
         val prompt = buildString {
@@ -111,7 +111,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
         val output = result.output
         // Use rawOutput for evidence checks: Claude's stream-json mode puts
         // execution IDs in NDJSON tool_result events, not in the final extracted text.
@@ -320,15 +320,14 @@ class DebuggerDemoTest {
         }
     }
 
-    private fun runStringFormatDemo(agentName: String) {
+    private fun runStringFormatDemo(agentName: KProperty1<AiAgentDriver, AiAgentSession>) {
         val session = IntelliJContainer.create(
             lifetime, "ide-agent",
-            consoleTitle = "Debugger with ${agentName.titleCase()}",
+            consoleTitle = "Debugger with ${agentName.name.titleCase()}",
         ).waitForProjectReady()
         val console = session.console
 
-        val agent: AiAgentSession? = session.aiAgents.aiAgents[agentName]
-        Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        val agent = session.aiAgents.run { agentName(this) }
         console.writeStep(1, "Building prompt for $agentName")
 
         val prompt = buildString {
@@ -367,7 +366,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
         val output = result.output
         val combined = result.rawOutput + "\n" + result.stderr
 
@@ -445,15 +444,14 @@ class DebuggerDemoTest {
         println("[TEST] Agent '$agentName' successfully identified the string-format bug")
     }
 
-    private fun runNullDefaultDemo(agentName: String) {
+    private fun runNullDefaultDemo(agentName: KProperty1<AiAgentDriver, AiAgentSession>) {
         val session = IntelliJContainer.create(
             lifetime, "ide-agent",
-            consoleTitle = "Null-Default Bug with ${agentName.titleCase()}",
+            consoleTitle = "Null-Default Bug with ${agentName.name.titleCase()}",
         ).waitForProjectReady()
         val console = session.console
 
-        val agent: AiAgentSession? = session.aiAgents.aiAgents[agentName]
-        Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        val agent = session.aiAgents.run { agentName(this) }
         console.writeStep(1, "Building prompt for $agentName")
 
         val prompt = buildString {
@@ -492,7 +490,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
         val output = result.output
         val combined = result.rawOutput + "\n" + result.stderr
 
@@ -542,15 +540,14 @@ class DebuggerDemoTest {
         println("[TEST] Agent '$agentName' successfully identified the null-default bug")
     }
 
-    private fun runOffByOneDemo(agentName: String) {
+    private fun runOffByOneDemo(agentName: KProperty1<AiAgentDriver, AiAgentSession>) {
         val session = IntelliJContainer.create(
             lifetime, "ide-agent",
-            consoleTitle = "Off-by-One Bug with ${agentName.titleCase()}",
+            consoleTitle = "Off-by-One Bug with ${agentName.name.titleCase()}",
         ).waitForProjectReady()
         val console = session.console
 
-        val agent: AiAgentSession? = session.aiAgents.aiAgents[agentName]
-        Assumptions.assumeTrue(agent != null, "Agent '$agentName' is not configured")
+        val agent = session.aiAgents.run { agentName(this) }
         console.writeStep(1, "Building prompt for $agentName")
 
         val prompt = buildString {
@@ -589,7 +586,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent!!.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
         val output = result.output
         val combined = result.rawOutput + "\n" + result.stderr
 
