@@ -8,8 +8,12 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.util.registry.Registry
+import com.intellij.ui.components.JBScrollBar
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
+import com.intellij.ui.components.fields.ExpandableSupport
+import com.intellij.ui.components.fields.ExtendableTextComponent
+import com.intellij.ui.components.fields.ExtendableTextField
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.TopGap
@@ -30,10 +34,7 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
             // 1. Server URL
             if (info != null) {
                 row("Server URL:") {
-                    textField()
-                        .applyToComponent { text = info.serverUrl; isEditable = false }
-                        .align(AlignX.FILL)
-                    copyButton(info.serverUrl)
+                    cell(copyableTextField(info.serverUrl)).align(AlignX.FILL)
                 }
             }
 
@@ -71,37 +72,51 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
                 group("Quick Start") {
                     for ((name, command) in info.commands) {
                         row("$name:") {
-                            textField()
-                                .applyToComponent { text = command; isEditable = false }
-                                .align(AlignX.FILL)
-                            copyButton(command)
+                            cell(copyableTextField(command)).align(AlignX.FILL)
                         }
                     }
 
                     // Cursor/JSON Config — one level deep inside Quick Start
                     group("Cursor / JSON Config") {
                         val json = info.jsonConfig.trim()
+                        val scrollPane = copyableTextArea(json, rows = 10)
                         row {
-                            cell(JBScrollPane(JBTextArea(json).apply { isEditable = false; rows = 7 }))
-                                .align(Align.FILL)
+                            cell(scrollPane).align(Align.FILL)
                         }.topGap(TopGap.NONE)
-                        row {
-                            copyButton(json)
-                        }
                     }
                 }
             }
         }
     }
 
-    private fun com.intellij.ui.dsl.builder.Row.copyButton(text: String) {
-        button("") {
-            CopyPasteManager.getInstance().setContents(StringSelection(text))
-        }.applyToComponent {
-            icon = AllIcons.Actions.Copy
-            toolTipText = "Copy to clipboard"
-            isBorderPainted = false
+    private fun copyableTextField(content: String): ExtendableTextField =
+        ExtendableTextField().apply {
+            text = content
+            isEditable = false
+            addExtension(ExtendableTextComponent.Extension.create(
+                AllIcons.General.InlineCopy,
+                AllIcons.General.InlineCopyHover,
+                "Copy to clipboard"
+            ) {
+                CopyPasteManager.getInstance().setContents(StringSelection(content))
+            })
         }
+
+    private fun copyableTextArea(content: String, rows: Int): JBScrollPane {
+        val copyExt = ExtendableTextComponent.Extension.create(
+            AllIcons.General.InlineCopy,
+            AllIcons.General.InlineCopyHover,
+            "Copy to clipboard"
+        ) {
+            CopyPasteManager.getInstance().setContents(StringSelection(content))
+        }
+        val textArea = JBTextArea(content).apply {
+            isEditable = false
+            this.rows = rows
+        }
+        val scrollPane = JBScrollPane(textArea)
+        scrollPane.verticalScrollBar.add(JBScrollBar.LEADING, ExpandableSupport.createLabel(copyExt))
+        return scrollPane
     }
 
     private fun loadConnectionInfo(): McpConnectionInfo? {
