@@ -43,7 +43,7 @@ class AiAgentDriver(
             appendLine("TOP_DIR=\$(ls \"\$EXTRACT_TMP\" | head -1)")
             appendLine("mkdir -p /opt")
             appendLine("mv \"\$EXTRACT_TMP/\$TOP_DIR\" /opt/agent-output-filter")
-            appendLine("rm -rf \"\$EXTRACT_TMP\" /tmp/agent-output-filter.zip")
+            appendLine("rm -rf \"\$EXTRACT_TMP\"")
             appendLine("chmod +x /opt/agent-output-filter/bin/*")
         }
         container.writeFileInContainer("/tmp/deploy-filter.sh", deployScript, executable = true)
