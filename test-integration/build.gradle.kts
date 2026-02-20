@@ -28,8 +28,15 @@ val pluginZip by configurations.creating {
     }
 }
 
+// Resolvable configuration to get the agent-output-filter executable distribution zip
+val agentOutputFilterDist by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+}
+
 dependencies {
     pluginZip(project(":"))
+    agentOutputFilterDist(project(path = ":agent-output-filter", configuration = "executableDistribution"))
 
     testImplementation(project(":test-helper"))
     testImplementation(project(":agent-output-filter"))
@@ -501,6 +508,7 @@ fun Test.configureIntegrationTask(
     }
 
     dependsOn(pluginZip)
+    dependsOn(agentOutputFilterDist)
     doFirst {
         // Long-running integration runs can be interrupted, leaving corrupted
         // Gradle binary test result blobs that later fail with EOFException.
@@ -529,6 +537,7 @@ fun Test.configureIntegrationTask(
         systemProperty("test.integration.ide.product", ideProduct.id)
         systemProperty("test.integration.docker", layout.projectDirectory.dir("src/test/docker").asFile.absolutePath)
         systemProperty("test.integration.testOutput", testOutDir.absolutePath)
+        systemProperty("test.integration.agent.output.filter.zip", agentOutputFilterDist.singleFile.absolutePath)
     }
 }
 

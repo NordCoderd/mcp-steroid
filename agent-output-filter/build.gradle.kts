@@ -1,4 +1,5 @@
 plugins {
+    application
     kotlin("jvm")
     kotlin("plugin.serialization")
 }
@@ -14,10 +15,24 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
+application {
+    applicationName = "agent-output-filter"
+    mainClass.set("com.jonnyzzz.mcpSteroid.filter.FilterCliKt")
+}
+
 tasks.test {
     useJUnitPlatform()
 }
 
 kotlin {
     jvmToolchain(21)
+}
+
+val executableDistribution by configurations.creating {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+}
+
+artifacts {
+    add(executableDistribution.name, tasks.distZip)
 }
