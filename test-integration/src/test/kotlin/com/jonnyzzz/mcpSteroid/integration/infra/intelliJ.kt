@@ -52,6 +52,8 @@ class IntelliJDriver(
         writeEulaAcceptance()
         writeConsentOptions()
         writeTrustedPaths()
+        writeStartupProperties()
+        writeEarlyAccessRegistry()
         generateVmOptions()
 
         println("[IDE-AGENT] Starting ${ideProduct.displayName}...")
@@ -178,6 +180,45 @@ class IntelliJDriver(
         driver.writeFileInContainer(
             "/home/agent/.config/JetBrains/consentOptions/accepted",
             "rsch.send.usage.stat:1.1:0:${timestamp}",
+        )
+    }
+
+    /**
+     * Pre-write IDE startup properties to suppress first-startup onboarding dialogs.
+     *
+     * IntelliJ 2025.3.3+ (build 253.31033+) shows a "Meet the Islands Theme" modal dialog
+     * on first startup via NewUiOnboardingStartupActivity, which blocks the EDT and prevents
+     * background Gradle import from executing. We suppress the dialog via the proposeOnboarding
+     * code path by marking onboarding as already proposed.
+     */
+    private fun writeStartupProperties() {
+        val otherXml = """<application>
+  <component name="PropertyService"><![CDATA[{"keyToString":{"experimental.ui.on.first.startup":"true","experimental.ui.onboarding.proposed.version":"suppressed"}}]]></component>
+</application>
+"""
+        driver.writeFileInContainer(
+            "$configGuestDir/options/other.xml",
+            otherXml,
+        )
+    }
+
+    /**
+     * Pre-write the early-access registry to suppress the ClassicUiToIslandsMigration.
+     *
+     * IntelliJ 2025.3.3+ runs ClassicUiToIslandsMigration.enableNewUiWithIslands() at bootstrap.
+     * If the IDE detects a Classic→Islands theme migration, it sets SHOW_NEW_UI_ONBOARDING_ON_START=true,
+     * which then causes the "Meet the Islands Theme" blocking modal dialog to appear.
+     *
+     * By pre-setting "switched.from.classic.to.islands=false" in the early-access registry file,
+     * the migration code sees a non-null value and returns early (processed-once guard),
+     * preventing SHOW_NEW_UI_ONBOARDING_ON_START from ever being set to true.
+     */
+    private fun writeEarlyAccessRegistry() {
+        // Format: alternating lines of key and value (one entry per two lines)
+        val content = "switched.from.classic.to.islands\nfalse\n"
+        driver.writeFileInContainer(
+            "$configGuestDir/early-access-registry.txt",
+            content,
         )
     }
 

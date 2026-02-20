@@ -174,6 +174,66 @@ class McpSteroidDriver(
     }
 
     /**
+     * Kill any blocking modal dialogs via steroid_execute_code.
+     *
+     * IntelliJ 2025.3.3+ shows a "NewUI Onboarding" dialog on first startup that blocks
+     * the EDT via WriteIntentReadAction, preventing Gradle import. This method calls the
+     * plugin's DialogKiller with ModalityState.any() to dismiss it from within the modal loop.
+     *
+     * @param guestProjectDir The project path to resolve the project name from.
+     */
+    fun killStartupDialogs(guestProjectDir: String) {
+        try {
+            val projects = mcpListProjects()
+            val projectName = projects.firstOrNull { it.path == guestProjectDir }?.name ?: return
+
+            val code = """
+import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.DialogWrapperDialog
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
+import kotlinx.coroutines.withContext
+import java.awt.Dialog
+import java.awt.Window
+
+withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    val closed = mutableListOf<String>()
+    for (window in Window.getWindows()) {
+        if (!window.isShowing) continue
+        val title = (window as? Dialog)?.title ?: (window as? java.awt.Frame)?.title ?: "(no title)"
+        if (window is DialogWrapperDialog) {
+            val dw = window.dialogWrapper
+            if (dw != null && dw.isModal) {
+                dw.close(DialogWrapper.CANCEL_EXIT_CODE)
+                closed += "DialogWrapper:${'$'}title"
+                continue
+            }
+        }
+        if (window is Dialog && window.isModal) {
+            window.dispose()
+            closed += "AwtDialog:${'$'}title"
+        }
+    }
+    if (closed.isNotEmpty()) {
+        println("[startup-dialog-killer] Closed dialogs: ${'$'}closed")
+    }
+}
+""".trimIndent()
+
+            mcpExecuteCode(
+                code = code,
+                projectName = projectName,
+                reason = "Kill startup blocking dialogs",
+                timeout = 15,
+                dialogKiller = false,
+            )
+        } catch (_: Exception) {
+            // Best-effort — don't fail the wait loop if dialog killing fails
+        }
+    }
+
+    /**
      * Execute Kotlin code via steroid_execute_code tool.
      *
      * This makes a direct HTTP call to the MCP server, bypassing AI agents.

@@ -38,10 +38,14 @@ class IntelliJContainer(
      * Wait for the IDE project to finish import and indexing.
      * Polls via MCP execute_code until DumbService reports smart mode.
      * Writes progress to the console.
+     *
+     * When a modal dialog is detected (e.g. NewUI Onboarding in IntelliJ 2025.3.3+),
+     * actively kills it via steroid_execute_code so Gradle import can proceed.
      */
     fun waitForProjectReady() : IntelliJContainer {
         console.writeStep(0, "Waiting for project import and indexing...")
         val guestProjectDir = intellijDriver.getGuestProjectDir()
+        var lastDialogKillMs = 0L
         waitFor(600_000, "Project import and indexing") {
             val windows = mcpSteroid.mcpListWindows()
             val projectWindows = windows.filter { it.projectPath == guestProjectDir || it.projectName != null }
@@ -52,6 +56,11 @@ class IntelliJContainer(
 
             val modalDialogPresent = projectWindows.any { it.modalDialogShowing }
             if (modalDialogPresent) {
+                val nowMs = System.currentTimeMillis()
+                if (nowMs - lastDialogKillMs > 5_000) {
+                    lastDialogKillMs = nowMs
+                    mcpSteroid.killStartupDialogs(guestProjectDir)
+                }
                 return@waitFor false
             }
 
