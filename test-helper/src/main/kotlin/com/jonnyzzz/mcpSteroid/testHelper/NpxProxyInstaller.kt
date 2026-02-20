@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import java.io.File
+import java.io.InputStream
 import java.nio.file.Files
 import java.util.zip.ZipInputStream
 
@@ -31,30 +32,35 @@ private fun extractNpxPackageDirFromResource(): File {
             .getResourceAsStream(NPX_PACKAGE_ARCHIVE_RESOURCE)
             ?: error("Missing NPX package artifact resource: $NPX_PACKAGE_ARCHIVE_RESOURCE")
 
-        val tempDir = Files.createTempDirectory("mcp-steroid-npx-package").toFile()
-        ZipInputStream(archiveStream).use { zip ->
-            while (true) {
-                val entry = zip.nextEntry ?: break
-                val outFile = File(tempDir, entry.name)
-                if (entry.isDirectory) {
-                    outFile.mkdirs()
-                } else {
-                    outFile.parentFile?.mkdirs()
-                    outFile.outputStream().use { output -> zip.copyTo(output) }
-                }
-                zip.closeEntry()
-            }
-        }
+        val tempDir = extractZipStreamToTempDir(archiveStream)
         cachedNpxPackageDir = tempDir
         return tempDir
     }
 }
 
-fun ContainerDriver.prepareNpxProxyForUrl(
+private fun extractZipStreamToTempDir(archiveStream: InputStream): File {
+    val tempDir = Files.createTempDirectory("mcp-steroid-npx-package").toFile()
+    ZipInputStream(archiveStream).use { zip ->
+        while (true) {
+            val entry = zip.nextEntry ?: break
+            val outFile = File(tempDir, entry.name)
+            if (entry.isDirectory) {
+                outFile.mkdirs()
+            } else {
+                outFile.parentFile?.mkdirs()
+                outFile.outputStream().use { output -> zip.copyTo(output) }
+            }
+            zip.closeEntry()
+        }
+    }
+    return tempDir
+}
+
+private fun ContainerDriver.deployNpxProxy(
+    hostPackageDir: File,
     ideMcpUrl: String,
     userHome: String,
 ): StdioMcpCommand {
-    val hostPackageDir = extractNpxPackageDirFromResource()
     val hostDistFile = hostPackageDir.resolve("dist/index.js")
     val hostPackageJson = hostPackageDir.resolve("package.json")
     val hostLockFile = hostPackageDir.resolve("package-lock.json")
@@ -106,4 +112,21 @@ URL: $ideMcpUrl
         command = "node",
         args = listOf(guestIndex, "--config", guestConfig)
     )
+}
+
+fun ContainerDriver.prepareNpxProxyForUrl(
+    ideMcpUrl: String,
+    userHome: String,
+): StdioMcpCommand {
+    val hostPackageDir = extractNpxPackageDirFromResource()
+    return deployNpxProxy(hostPackageDir, ideMcpUrl, userHome)
+}
+
+fun ContainerDriver.prepareNpxProxyFromZipFile(
+    npxZipFile: File,
+    ideMcpUrl: String,
+    userHome: String,
+): StdioMcpCommand {
+    val hostPackageDir = extractZipStreamToTempDir(npxZipFile.inputStream())
+    return deployNpxProxy(hostPackageDir, ideMcpUrl, userHome)
 }

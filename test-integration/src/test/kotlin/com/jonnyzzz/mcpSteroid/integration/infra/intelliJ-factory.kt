@@ -17,6 +17,7 @@ fun IntelliJContainer.Companion.create(
     project : IntelliJProject = IntelliJProject.TestProject,
     layoutManager : LayoutManager = HorizontalLayoutManager(),
     distribution: IdeDistribution = IdeDistribution.fromSystemProperties(),
+    aiMode: AiMode = AiMode.AI_MCP,
 ): IntelliJContainer {
     val ideArchive = distribution.resolveAndDownload()
     val ideProduct = distribution.product
@@ -142,19 +143,26 @@ fun IntelliJContainer.Companion.create(
     console.writeInfo("Waiting for MCP Steroid server...")
     mcpSteroidDriver.waitForMcpReady()
 
+    val mcpConnectionMode = when (aiMode) {
+        AiMode.NONE -> McpConnectionMode.None
+        AiMode.AI_MCP -> McpConnectionMode.Http
+        AiMode.AI_NPX -> McpConnectionMode.Npx(NpxSteroidDriver.deploy(container, mcpSteroidDriver))
+    }
+
     val aiAgentDriver = AiAgentDriver(
         container = container,
         intellijDriver = ijDriver,
         console = console,
         mcp = mcpSteroidDriver,
         agentsGuestDir = "$containerMountedPath/agents",
+        mcpConnection = mcpConnectionMode,
     )
 
     console.writeSuccess("MCP Steroid server ready")
 
     // Write info file with all ports and URLs for external tools
     val videoPort = container.mapGuestPortToHostPort(XcvbVideoDriver.VIDEO_STREAMING_PORT)
-    val mcpUrl = aiAgentDriver.mcpSteroidHostUrl
+    val mcpUrl = mcpSteroidDriver.hostMcpUrl
     val infoFile = File(runDir, "session-info.txt")
     infoFile.writeText(buildString {
         appendLine("RUN_DIR=$runDir")

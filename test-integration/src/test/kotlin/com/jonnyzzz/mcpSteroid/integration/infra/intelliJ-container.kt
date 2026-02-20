@@ -7,6 +7,35 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import java.io.File
 
 /**
+ * Controls how AI agents connect to MCP Steroid inside the test container.
+ *
+ * [IntelliJContainer.aiAgents] ([AiAgentDriver]) is always created regardless of mode.
+ * This enum only determines which MCP transport (if any) is registered with each agent.
+ *
+ * Pass as [IntelliJContainer.create]'s `aiMode` parameter.
+ */
+enum class AiMode {
+    /**
+     * Agents are available but MCP Steroid is NOT registered with them.
+     * Use for pure IDE/infrastructure tests that don't need MCP Steroid tools.
+     */
+    NONE,
+
+    /**
+     * Agents connect to MCP Steroid via HTTP (default).
+     * Each agent has [AiAgentSession.registerHttpMcp] called with the guest-side URL.
+     */
+    AI_MCP,
+
+    /**
+     * Agents connect to MCP Steroid via an NPX stdio proxy.
+     * [NpxSteroidDriver] is deployed before agents are initialized; each agent
+     * has [AiAgentSession.registerNpxMcp] called with the resulting command.
+     */
+    AI_NPX,
+}
+
+/**
  * Manages a Docker container running IntelliJ IDEA with MCP Steroid plugin.
  * Assembles the Docker build context from separate artifacts and starts a named container.
  *
@@ -28,6 +57,11 @@ class IntelliJContainer(
 
     val console: ConsoleDriver,
     val mcpSteroid: McpSteroidDriver,
+
+    /**
+     * AI agent driver — always present.
+     * Whether agents have MCP Steroid registered depends on the [AiMode] used at creation.
+     */
     val aiAgents: AiAgentDriver,
 
     val windows: XcvbWindowDriver,

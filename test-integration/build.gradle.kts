@@ -21,9 +21,19 @@ val agentOutputFilterDist by configurations.creating {
     isCanBeResolved = true
 }
 
+// Resolvable configuration to get the NPX package zip from :npx subproject
+val npxPackageDist by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "npx-package"))
+    }
+}
+
 dependencies {
     pluginZip(project(":ij-plugin"))
     agentOutputFilterDist(project(path = ":agent-output-filter", configuration = "executableDistribution"))
+    npxPackageDist(project(":npx"))
 
     testImplementation(project(":test-helper"))
     testImplementation(project(":agent-output-filter"))
@@ -47,7 +57,7 @@ tasks.test {
     testLogging { showStandardStreams = true }
     systemProperty("junit.jupiter.execution.timeout.default", "15m")
 
-    dependsOn(pluginZip, agentOutputFilterDist)
+    dependsOn(pluginZip, agentOutputFilterDist, npxPackageDist)
     doFirst {
         delete(layout.buildDirectory.dir("test-results/test/binary"))
         val testOutDir = layout.buildDirectory.dir("test-logs/test").get().asFile.also { it.mkdirs() }
@@ -68,6 +78,10 @@ tasks.test {
         systemProperty(
             "test.integration.agent.output.filter.zip",
             agentOutputFilterDist.singleFile.absolutePath,
+        )
+        systemProperty(
+            "test.integration.npx.package.zip",
+            npxPackageDist.singleFile.absolutePath,
         )
     }
 }

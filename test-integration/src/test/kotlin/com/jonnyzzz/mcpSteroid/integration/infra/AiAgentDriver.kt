@@ -9,13 +9,41 @@ import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import kotlin.getValue
 
+/**
+ * Determines which MCP transport is registered with agents when they are created.
+ *
+ * Set via [AiMode] on [IntelliJContainer.create]; the factory translates the mode
+ * to the appropriate [McpConnectionMode] before constructing [AiAgentDriver].
+ */
+sealed class McpConnectionMode {
+    /** Agents are available but MCP Steroid is NOT registered. */
+    data object None : McpConnectionMode()
+
+    /** Agents connect to MCP Steroid via direct HTTP. */
+    data object Http : McpConnectionMode()
+
+    /** Agents connect to MCP Steroid via an NPX stdio proxy. */
+    data class Npx(val driver: NpxSteroidDriver) : McpConnectionMode()
+}
+
+/**
+ * Manages AI agent sessions (Claude, Codex, Gemini) within an IntelliJ test container.
+ *
+ * On construction the agent-output-filter is deployed so all agent runs can pipe
+ * NDJSON output through it for human-readable logging and UI console display.
+ *
+ * MCP Steroid connectivity is determined by [mcpConnection]:
+ * - [McpConnectionMode.None]  — no MCP registered (infrastructure / smoke tests)
+ * - [McpConnectionMode.Http]  — HTTP transport ([AiMode.AI_MCP])
+ * - [McpConnectionMode.Npx]   — NPX stdio proxy ([AiMode.AI_NPX])
+ */
 class AiAgentDriver(
     private val container: ContainerDriver,
     private val intellijDriver: IntelliJDriver,
     private val mcp: McpSteroidDriver,
     private val console: ConsoleDriver,
     private val agentsGuestDir: String,
-    private val connectMcpSteroid: Boolean = true,
+    private val mcpConnection: McpConnectionMode = McpConnectionMode.Http,
 ) {
     init {
         deployAgentOutputFilter()
@@ -65,11 +93,13 @@ class AiAgentDriver(
         val agent: AiAgentSession = factory.create(session)
         val displayName: String = factory.displayName
 
-        if (connectMcpSteroid) {
-            agent.registerHttpMcp(mcpSteroidGuestUrl, mcpSteroidName)
+        when (val conn = mcpConnection) {
+            is McpConnectionMode.None -> { /* no MCP registered */ }
+            is McpConnectionMode.Http -> agent.registerHttpMcp(mcpSteroidGuestUrl, mcpSteroidName)
+            is McpConnectionMode.Npx  -> agent.registerNpxMcp(conn.driver.npxCommand, mcpSteroidName)
         }
 
-        // Wrap with console-aware session if console is available
+        // Wrap with console-aware session for real-time UI feedback
         return ConsoleAwareAgentSession(agent, console, displayName)
     }
 
