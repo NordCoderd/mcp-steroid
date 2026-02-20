@@ -12,7 +12,8 @@ class XcvbConsoleTest {
     fun testConsoleLayout() = runWithCloseableStack { lifetime ->
         val dockerFileBase = "ide-agent"
         val imageName = "$dockerFileBase-test"
-        val scope = buildIdeImage(dockerFileBase, imageName)
+        val ideArchive = IdeDistribution.fromSystemProperties().resolveAndDownload()
+        val scope = buildIdeImage(dockerFileBase, imageName, ideArchive)
 
         var container = startContainerDriver(
             lifetime, scope, imageName,

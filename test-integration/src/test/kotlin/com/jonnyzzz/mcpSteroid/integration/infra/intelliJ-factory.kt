@@ -12,12 +12,14 @@ import java.time.format.DateTimeFormatter
 //TODO: refactor parameters to a builder object, so we can update easily in the future, add "registerMcpSteroidToAgents" to the builder
 fun IntelliJContainer.Companion.create(
     lifetime: CloseableStack,
-    dockerFileBase: String,
+    dockerFileBase: String = "ide-agent",
     consoleTitle: String,
     project : IntelliJProject = IntelliJProject.TestProject,
     layoutManager : LayoutManager = HorizontalLayoutManager(),
+    distribution: IdeDistribution = IdeDistribution.fromSystemProperties(),
 ): IntelliJContainer {
-    val ideProduct = IdeProduct.fromSystemProperty(IdeTestFolders.ideProduct)
+    val ideArchive = distribution.resolveAndDownload()
+    val ideProduct = distribution.product
     val selectedDockerBase = if (dockerFileBase == "ide-agent") ideProduct.dockerImageBase else dockerFileBase
     val selectedProject = when {
         project != IntelliJProject.TestProject -> project
@@ -37,7 +39,7 @@ fun IntelliJContainer.Companion.create(
 
     println("[IDE-AGENT] Run directory: $runDir")
     val imageName = "$selectedDockerBase-test"
-    val scope = buildIdeImage(selectedDockerBase, imageName)
+    val scope = buildIdeImage(selectedDockerBase, imageName, ideArchive)
 
     val containerMountedPath = "/mcp-run-dir"
 

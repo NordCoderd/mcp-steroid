@@ -9,10 +9,10 @@ import kotlin.io.path.exists
 private const val BASE_DOCKER_CONTEXT = "ide-base"
 private const val BASE_IMAGE_NAME = "mcp-steroid-ide-base-test"
 
-fun buildIdeImage(dockerFileBase: String, imageName: String): DockerDriver {
+fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): DockerDriver {
     buildSharedBaseImage()
     val contextDir = prepareContext("docker-$dockerFileBase", BASE_DOCKER_CONTEXT, dockerFileBase)
-    linkIdeArchive(contextDir)
+    linkIdeArchive(contextDir, ideArchive)
     val scope = DockerDriver(contextDir, "IDE-AGENT")
     scope.buildDockerImage(
         imageName = imageName,
@@ -48,17 +48,16 @@ private fun prepareContext(contextName: String, vararg dockerContexts: String): 
     return contextDir
 }
 
-private fun linkIdeArchive(contextDir: File) {
+private fun linkIdeArchive(contextDir: File, ideArchive: File) {
     // Hard-link large IDE archive to avoid copying ~1GB file.
     // Falls back to copy if hard link fails (e.g. cross-filesystem).
-    val ideArchivePath = IdeTestFolders.ideTarGz
     val ideDest = File(contextDir, "ide.tar.gz").toPath()
     if (ideDest.exists()) return
 
     try {
-        createLink(ideDest, ideArchivePath.toPath())
+        createLink(ideDest, ideArchive.toPath())
     } catch (_: Exception) {
         println("[IDE-AGENT] Hard link failed, copying IDE archive...")
-        ideArchivePath.copyTo(File(contextDir, "ide.tar.gz"), overwrite = true)
+        ideArchive.copyTo(File(contextDir, "ide.tar.gz"), overwrite = true)
     }
 }

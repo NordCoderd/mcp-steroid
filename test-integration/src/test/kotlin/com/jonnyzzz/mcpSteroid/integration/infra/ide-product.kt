@@ -6,30 +6,35 @@ enum class IdeProduct(
     val dockerImageBase: String,
     val launcherExecutable: String,
     val displayName: String,
+    val jetbrainsProductCode: String,
 ) {
     IntelliJIdea(
         id = "idea",
         dockerImageBase = "ide-agent",
         launcherExecutable = "idea",
         displayName = "IntelliJ IDEA",
+        jetbrainsProductCode = "IIU",
     ),
     PyCharm(
         id = "pycharm",
         dockerImageBase = "pycharm-agent",
         launcherExecutable = "pycharm",
         displayName = "PyCharm",
+        jetbrainsProductCode = "PCP",
     ),
     GoLand(
         id = "goland",
         dockerImageBase = "goland-agent",
         launcherExecutable = "goland",
         displayName = "GoLand",
+        jetbrainsProductCode = "GO",
     ),
     WebStorm(
         id = "webstorm",
         dockerImageBase = "webstorm-agent",
         launcherExecutable = "webstorm",
         displayName = "WebStorm",
+        jetbrainsProductCode = "WS",
     );
 
     companion object {

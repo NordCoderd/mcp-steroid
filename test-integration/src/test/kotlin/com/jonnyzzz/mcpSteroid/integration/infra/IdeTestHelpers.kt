@@ -89,17 +89,7 @@ object IdeTestFolders {
     val pluginZip = readFilePathFromSystemProperties("test.integration.plugin.zip") {
         findLatestPluginZipFromDist()
     }
-    val ideTarGz = run {
-        val genericArchive = System.getProperty("test.integration.ide.archive")
-        if (!genericArchive.isNullOrBlank()) {
-            readFilePathFromSystemProperties("test.integration.ide.archive")
-        } else {
-            readFilePathFromSystemProperties("test.integration.idea.archive")
-        }
-    }
-    // Kept for backward compatibility with existing code.
-    val intelliJTarGz get() = ideTarGz
-    val ideProduct: String = System.getProperty("test.integration.ide.product", "idea").trim().lowercase()
+    val ideChannel: String = System.getProperty("test.integration.ide.channel", "stable").trim().lowercase()
     val dockerDir = readFilePathFromSystemProperties("test.integration.docker")
     val testOutputDir = remapPathForDockerHost(
         readFilePathFromSystemProperties("test.integration.testOutput"),
