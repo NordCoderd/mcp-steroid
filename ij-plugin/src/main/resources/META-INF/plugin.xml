@@ -82,7 +82,7 @@
 
         <!-- Registry keys for configuration -->
         <registryKey key="mcp.steroid.review.mode" defaultValue="ALWAYS"
-            description="Code review mode: ALWAYS (default), TRUSTED, NEVER"/>
+            description="Code review mode: ALWAYS (default, requires manual review for each execution), TRUSTED (auto-approve globally), NEVER (force review always, disables the Always Allow option)"/>
 
         <registryKey key="mcp.steroid.review.timeout" defaultValue="600"
             description="Review timeout in seconds"/>

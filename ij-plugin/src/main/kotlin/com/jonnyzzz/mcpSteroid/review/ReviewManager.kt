@@ -6,6 +6,7 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -64,9 +65,16 @@ class ReviewManager(private val project: Project) {
             "ALWAYS"
         }
 
-        // TRUSTED or NEVER mode - auto-approve
-        if (reviewMode == "TRUSTED" || reviewMode == "NEVER") {
-            log.info("Auto-approving $executionId (review mode: $reviewMode)")
+        // TRUSTED mode: global auto-approve configured by admin
+        if (reviewMode == "TRUSTED") {
+            log.info("Auto-approving $executionId (review mode: TRUSTED)")
+            return@coroutineScope true
+        }
+
+        // NEVER mode: strongest override — disables Always Allow, always requires review
+        // Per-project Always Allow is also checked below only when mode is ALWAYS
+        if (reviewMode != "NEVER" && project.service<AlwaysAllowService>().isEnabled) {
+            log.info("Auto-approving $executionId (always allow enabled for project)")
             return@coroutineScope true
         }
 

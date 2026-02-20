@@ -4,6 +4,8 @@ package com.jonnyzzz.mcpSteroid.review
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.EditorNotificationProvider
@@ -42,6 +44,25 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
             createActionLabel("Approve & Execute") {
                 project.service<ReviewManager>().approve(file)
                 EditorNotifications.getInstance(project).updateNotifications(file)
+            }
+
+            val reviewMode = try { Registry.stringValue("mcp.steroid.review.mode") } catch (_: Exception) { "ALWAYS" }
+            if (reviewMode != "NEVER") {
+                createActionLabel("Always Allow") {
+                    val result = Messages.showOkCancelDialog(
+                        project,
+                        "This will auto-approve all future code executions for this project without review.\nYou can disable this in Settings → Registry → mcp.steroid.review.mode.",
+                        "Enable Always Allow",
+                        "Enable",
+                        Messages.getCancelButton(),
+                        Messages.getWarningIcon()
+                    )
+                    if (result == Messages.OK) {
+                        project.service<AlwaysAllowService>().isEnabled = true
+                        project.service<ReviewManager>().approve(file)
+                        EditorNotifications.getInstance(project).updateNotifications(file)
+                    }
+                }
             }
 
             createActionLabel("Reject (send edits to LLM)") {
