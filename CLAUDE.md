@@ -157,6 +157,51 @@ Key classes: `IdeContainer`, `ConsoleDriver`, `XcvbDriver`, `AiAgentDriver`, `Co
 
 **Screen layout**: IDE left 2/3, console right 1/3, managed by `LayoutManager`.
 
+#### Agent CLI Flags
+
+Each agent is invoked with specific flags to produce NDJSON output piped through `agent-output-filter`:
+
+| Agent | Output flag | Auto-approve flag | Verbose |
+|-------|------------|-------------------|---------|
+| **Claude** | `--output-format stream-json` | (uses `--permission-mode bypassPermissions`) | **`--verbose`** |
+| **Codex** | `--json` | `--dangerously-bypass-approvals-and-sandbox` | n/a |
+| **Gemini** | `--output-format stream-json` | `--approval-mode yolo` | n/a |
+
+The `--verbose` flag is **required** for Claude — without it, tool call details are not emitted.
+
+#### Agent Output Format (ClaudeOutputFilter)
+
+Claude Code 2.1.x changed from streaming events (`content_block_delta`, `tool_use`, `tool_result`) to structured events (`assistant`/`user` with full `message.content` arrays). The `result.result` field is empty in new format; actual output is in `assistant.message.content[].type=text` blocks.
+
+`ClaudeOutputFilter` handles **both formats** simultaneously for backward/forward compatibility.
+
+MCP tool names in new format are fully qualified: `mcp__mcp-steroid__steroid_execute_code`. `toolDetail()` strips the prefix with `substringAfterLast("__")`.
+
+#### Integration Test Strategy
+
+- **Run one heavy test at a time** — running multiple 20-minute IDE tests concurrently causes resource exhaustion (IDE window never appears, timeouts)
+- **Infrastructure failures are transient** — "Failed waiting for IntelliJ IDEA window" or "Failed waiting for Project import" are usually environment issues; retry individually with a cooldown
+- One-at-a-time run: `./gradlew :test-integration:test --tests '*DebuggerDemoTest.claude*'`
+
+#### Forcing Agents to Output Required Data
+
+Use explicit output markers in prompts to ensure agents include required information in final text (not just internal reasoning):
+
+```kotlin
+appendLine("OUTPUT_MARKER: <required content description>")
+// e.g.
+appendLine("BUG_LINE: <the exact buggy line of code>")
+appendLine("FILE_PATHS: <at least one file path ending in .java or .kt that you found>")
+```
+
+Agents (especially Gemini) may find the right answer internally but not include it in the final text output — markers force explicit reporting.
+
+#### Known Agent Quirks
+
+- **Gemini exit 137** (SIGKILL): Treat as success when NDJSON confirms success — `DockerGeminiSession` handles this automatically
+- **Codex MCP prefix**: Tool names are not MCP-prefixed in Codex output (no `mcp__` prefix)
+- **Claude new NDJSON**: Since Claude Code 2.1.x, use structured `assistant`/`user` events; filter handles both old and new formats
+
 ### Test naming
 
 - **NO `@ParameterizedTest`** — create explicit `@Test` methods with descriptive names instead (e.g., `` `describeMcp claude`() ``, `` `describeMcp codex`() ``)
