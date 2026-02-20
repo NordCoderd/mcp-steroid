@@ -72,6 +72,47 @@ class GitDriver(
     }
 
     /**
+     * Try to clone a repository from a host-side bare cache mounted inside the container.
+     *
+     * Checks whether `{cacheGuestPath}/{ownerAndRepo}.git` exists in the container.
+     * If it does, clones from it using a fast `file://` local clone.
+     * If it does not, returns false so the caller can fall back to a remote clone.
+     *
+     * @param ownerAndRepo repo identifier without `.git`, e.g. `"dpaia/feature-service"`
+     * @param targetDir guest path for the cloned repository
+     * @param cacheGuestPath guest path where the host repo cache is mounted (default `/repo-cache`)
+     * @return true if cloned from cache; false if the bare repo was not found in the cache
+     */
+    fun cloneFromCachedBare(
+        ownerAndRepo: String,
+        targetDir: String,
+        cacheGuestPath: String = "/repo-cache",
+    ): Boolean {
+        val bareGuestPath = "$cacheGuestPath/$ownerAndRepo.git"
+
+        val check = driver.runInContainer(
+            listOf("test", "-d", bareGuestPath),
+            timeoutSeconds = 5,
+            quietly = true,
+        )
+        if (check.exitCode != 0) {
+            println("[GIT] No cached bare repo at $bareGuestPath, will clone from remote")
+            return false
+        }
+
+        val parent = targetDir.substringBeforeLast("/")
+        driver.mkdirs(parent)
+
+        println("[GIT] Cloning from bare cache: $bareGuestPath -> $targetDir ...")
+        driver.runInContainer(
+            listOf("git", "clone", "file://$bareGuestPath", targetDir),
+            timeoutSeconds = 120,
+        ).assertExitCode(0, "git clone from bare cache $bareGuestPath")
+
+        return true
+    }
+
+    /**
      * Apply a patch to a repository using `git apply`.
      *
      * @param repoDir guest path of the repository

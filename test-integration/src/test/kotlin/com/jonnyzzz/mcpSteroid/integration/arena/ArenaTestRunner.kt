@@ -37,7 +37,16 @@ class ArenaTestRunner(
         val projectDir = "$projectGuestDir/${testCase.repoName}-$suffix"
 
         println("[ARENA] Cloning ${testCase.cloneUrl} into $projectDir ...")
-        git.cloneAndCheckout(testCase.cloneUrl, projectDir, testCase.baseCommit, timeoutSeconds = 120)
+
+        // Try fast local clone from the bare repo cache mounted at /repo-cache
+        val ownerAndRepo = testCase.repo.removeSuffix(".git")
+        val clonedFromCache = git.cloneFromCachedBare(ownerAndRepo, projectDir)
+        if (!clonedFromCache) {
+            // Cache miss: fall back to a full remote clone (needed to checkout any commit)
+            git.clone(testCase.cloneUrl, projectDir, shallow = false, timeoutSeconds = 120)
+        }
+
+        git.checkout(projectDir, testCase.baseCommit)
         return projectDir
     }
 

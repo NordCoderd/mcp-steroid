@@ -93,6 +93,15 @@ object IdeTestFolders {
     val npxPackageZip = readFilePathFromSystemProperties("test.integration.npx.package.zip")
     val ideChannel: String = System.getProperty("test.integration.ide.channel", "stable").trim().lowercase()
     val dockerDir = readFilePathFromSystemProperties("test.integration.docker")
+
+    /**
+     * Host-side bare git repository cache directory, or null if not configured.
+     * Set via `test.integration.repo.cache.dir` system property.
+     * When non-null, it is mounted read-only at `/repo-cache` inside containers so
+     * [com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver.cloneFromCachedBare] can be used.
+     */
+    val repoCacheDirOrNull: File? = System.getProperty("test.integration.repo.cache.dir")
+        ?.let { File(it).also { dir -> dir.mkdirs() } }
     val testOutputDir = remapPathForDockerHost(
         readFilePathFromSystemProperties("test.integration.testOutput"),
         System.getenv(DOCKER_HOST_PATH_MAP_ENV),

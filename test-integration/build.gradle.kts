@@ -83,5 +83,9 @@ tasks.test {
             "test.integration.npx.package.zip",
             npxPackageDist.singleFile.absolutePath,
         )
+        systemProperty(
+            "test.integration.repo.cache.dir",
+            layout.buildDirectory.dir("repo-cache").get().asFile.absolutePath,
+        )
     }
 }

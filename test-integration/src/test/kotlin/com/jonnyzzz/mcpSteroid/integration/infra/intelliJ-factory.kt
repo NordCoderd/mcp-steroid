@@ -18,6 +18,7 @@ fun IntelliJContainer.Companion.create(
     layoutManager : LayoutManager = HorizontalLayoutManager(),
     distribution: IdeDistribution = IdeDistribution.fromSystemProperties(),
     aiMode: AiMode = AiMode.AI_MCP,
+    repoCacheDir: File? = IdeTestFolders.repoCacheDirOrNull,
 ): IntelliJContainer {
     val ideArchive = distribution.resolveAndDownload()
     val ideProduct = distribution.product
@@ -44,12 +45,15 @@ fun IntelliJContainer.Companion.create(
 
     val containerMountedPath = "/mcp-run-dir"
 
+    val volumes = buildList {
+        add(ContainerVolume(runDir, containerMountedPath, "rw"))
+        if (repoCacheDir != null) add(ContainerVolume(repoCacheDir, "/repo-cache", "ro"))
+    }
+
     var container = startContainerDriver(
         lifetime, scope, imageName,
         extraEnvVars = emptyMap(),
-        volumes = listOf(
-            ContainerVolume(runDir, containerMountedPath, "rw"),
-        ),
+        volumes = volumes,
         ports = listOf(
             XcvbVideoDriver.VIDEO_STREAMING_PORT,
             McpSteroidDriver.MCP_STEROID_PORT,

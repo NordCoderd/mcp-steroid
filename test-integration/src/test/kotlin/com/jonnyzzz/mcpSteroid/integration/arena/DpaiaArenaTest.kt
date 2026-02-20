@@ -1,11 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.arena
 
+import com.jonnyzzz.mcpSteroid.integration.infra.IdeTestFolders
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
+import com.jonnyzzz.mcpSteroid.testHelper.docker.BareRepoCache
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DynamicTest
@@ -130,6 +132,13 @@ class DpaiaArenaTest {
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
+            // Warm the bare repo cache on the host before the container starts.
+            // This ensures /repo-cache is populated so cloneFromCachedBare() works inside
+            // the container (avoids slow GitHub clones during each test run).
+            val cacheDir = IdeTestFolders.repoCacheDirOrNull
+            if (cacheDir != null) {
+                BareRepoCache.warmDpaiaRepos(cacheDir)
+            }
             session.toString()
         }
 
