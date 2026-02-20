@@ -120,8 +120,6 @@ class DockerClaudeSession(
             error("ANTHROPIC_API_KEY is required for Claude CLI tests (set env or ~/.anthropic)")
         }
 
-        override fun createImpl(session: ContainerDriver, apiKey: String): DockerClaudeSession {
-            return DockerClaudeSession(session.withSecretPattern(apiKey), apiKey)
-        }
+        override fun createImpl(session: ContainerDriver, apiKey: String) = DockerClaudeSession(session.withSecretPattern(apiKey), apiKey)
     }
 }

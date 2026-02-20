@@ -154,11 +154,6 @@ class DockerGeminiSession(
             error("GEMINI_API_KEY required (set env GEMINI_API_KEY, GOOGLE_API_KEY, or ~/.vertes / ~/.vertex)")
         }
 
-        override fun createImpl(
-            session: ContainerDriver,
-            apiKey: String
-        ): DockerGeminiSession {
-            return DockerGeminiSession(session, apiKey)
-        }
+        override fun createImpl(session: ContainerDriver, apiKey: String) = DockerGeminiSession(session, apiKey)
     }
 }

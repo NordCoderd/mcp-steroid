@@ -114,11 +114,6 @@ class DockerCodexSession(
             error("OPENAI_API_KEY is required for Codex CLI tests (set env or ~/.openai)")
         }
 
-        override fun createImpl(
-            session: ContainerDriver,
-            apiKey: String
-        ): DockerCodexSession {
-            return DockerCodexSession(session, apiKey)
-        }
+        override fun createImpl(session: ContainerDriver,apiKey: String) = DockerCodexSession(session, apiKey)
     }
 }
