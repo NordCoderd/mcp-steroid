@@ -1,6 +1,6 @@
 # Agent Output Filter
 
-Kotlin-based executable JAR for filtering AI agent output streams. Replaces Python regex-based filters with robust JSON parsing using kotlinx.serialization.
+Kotlin library for filtering AI agent output streams. Converts raw NDJSON/text output into human-readable console format using robust JSON parsing with kotlinx.serialization.
 
 ## Overview
 
@@ -16,23 +16,16 @@ This module provides filters to convert NDJSON/text output from AI agents into h
 ./gradlew :agent-output-filter:build
 ```
 
-This produces `agent-output-filter/build/libs/agent-output-filter.jar` (executable fat JAR with all dependencies).
-
 ## Usage
 
-```bash
-# Claude stream-json filter (default)
-cat agent-output.ndjson | java -jar agent-output-filter.jar stream-json
-cat agent-output.ndjson | java -jar agent-output-filter.jar claude
+Used as a library dependency. Each filter implements the `OutputFilter` interface with `process(InputStream, OutputStream)`:
 
-# Codex JSON filter
-codex exec --json ... | java -jar agent-output-filter.jar codex
+```kotlin
+val filter = ClaudeOutputFilter()
+filter.process(inputStream, outputStream)
 
-# Gemini text filter (ANSI stripping)
-gemini chat --screen-reader true ... | java -jar agent-output-filter.jar gemini
-
-# Help
-java -jar agent-output-filter.jar --help
+// Or use the filterText() extension for string-based filtering:
+val readableText = filter.filterText(rawNdjsonOutput)
 ```
 
 ## Features
@@ -80,11 +73,10 @@ Processes Gemini CLI text output:
 - **ClaudeOutputFilter**: Claude stream-json NDJSON filter
 - **CodexOutputFilter**: Codex --json NDJSON filter
 - **GeminiOutputFilter**: Gemini stream-json NDJSON filter
-- **Main.kt**: Entry point with filter selection
 
 All filters:
-- Read NDJSON/text line-by-line from stdin
-- Output human-readable progress markers to stdout
+- Read NDJSON/text line-by-line from input stream
+- Output human-readable progress markers to output stream
 - Pass through non-JSON lines for debugging visibility
 - Gracefully handle malformed JSON (pass through with warning)
 - Preserve output flushing for real-time streaming
@@ -104,7 +96,7 @@ All filters:
 
 ## Integration
 
-Used by Docker integration tests (`test-integration/`) to provide real-time console output during agent execution. The JAR is standalone and can be deployed to any environment with Java 21+.
+Used by Docker integration tests (`test-integration/`) to provide filtered console output during agent execution. The `ConsolePumpingContainerDriver` accepts an `OutputFilter?` instance and applies it JVM-side after the agent process completes, converting raw NDJSON into human-readable text for the test runner console.
 
 ## Implementation Notes
 
