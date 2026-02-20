@@ -147,7 +147,7 @@ fun IntelliJContainer.Companion.create(
         intellijDriver = ijDriver,
         console = console,
         mcp = mcpSteroidDriver,
-
+        agentsGuestDir = "$containerMountedPath/agents",
     )
 
     console.writeSuccess("MCP Steroid server ready")

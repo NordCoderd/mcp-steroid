@@ -89,6 +89,7 @@ object IdeTestFolders {
     val pluginZip = readFilePathFromSystemProperties("test.integration.plugin.zip") {
         findLatestPluginZipFromDist()
     }
+    val agentOutputFilterZip = readFilePathFromSystemProperties("test.integration.agent.output.filter.zip")
     val ideChannel: String = System.getProperty("test.integration.ide.channel", "stable").trim().lowercase()
     val dockerDir = readFilePathFromSystemProperties("test.integration.docker")
     val testOutputDir = remapPathForDockerHost(

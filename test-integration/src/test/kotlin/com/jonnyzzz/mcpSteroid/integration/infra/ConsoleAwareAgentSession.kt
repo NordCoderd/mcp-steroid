@@ -2,8 +2,6 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
-import com.jonnyzzz.mcpSteroid.filter.OutputFilter
-import com.jonnyzzz.mcpSteroid.filter.filterText
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
@@ -53,27 +51,35 @@ class ConsoleAwareAgentSession(
         ConsoleAwareAgentSession(delegate.registerNpxMcp(npxCommand, mcpName), console, agentName,)
 }
 
+private const val FILTER_BIN = "/opt/agent-output-filter/bin/agent-output-filter"
+
 /**
- * A [ContainerDriver] decorator that tees command output to a file
- * and pumps it to the [ConsoleDriver] with a colored `[agentName]` prefix.
+ * A [ContainerDriver] decorator that tees command output to files in an
+ * `agents/<run-id>/` directory and pumps filtered output to the [ConsoleDriver]
+ * with a colored `[agentName]` prefix.
  *
- * stdout is pumped with cyan prefix; stderr is pumped with red prefix.
- * The tee approach ensures output is both captured in [ProcessResult]
- * for assertions and visible in the console xterm window in real-time.
+ * When [filterType] and [agentsGuestDir] are both set, the in-container filter
+ * pipeline is used:
+ *   agent 2>&1 | tee raw.jsonl | agent-output-filter <type> | awk-tee filtered.log
  *
- * When [outputFilter] is set, the raw NDJSON output is suppressed from
- * the JVM test runner console and filtered text is printed instead,
- * using the same [OutputFilter] instances from the agent-output-filter module.
+ * The filtered output is captured in [ProcessResult.output] for test assertions,
+ * and also pumped to the xterm console via [ConsoleDriver.startFilePump].
+ * The raw NDJSON is preserved in `raw.jsonl` for debugging.
+ *
+ * When [filterType] or [agentsGuestDir] are null, a simple combined-log tee is
+ * used without filtering.
  */
 class ConsolePumpingContainerDriver(
     delegate: ContainerDriver,
     private val console: ConsoleDriver,
     private val agentName: String,
-    private val outputFilter: OutputFilter? = null,
+    private val filterType: String? = null,
+    private val agentsGuestDir: String? = null,
 ) : ContainerDriverDelegate<ConsolePumpingContainerDriver>(delegate) {
     private val counter = AtomicInteger(0)
 
-    override fun createNewDriver(delegate: ContainerDriver) = ConsolePumpingContainerDriver(delegate, console, agentName, outputFilter)
+    override fun createNewDriver(delegate: ContainerDriver) =
+        ConsolePumpingContainerDriver(delegate, console, agentName, filterType, agentsGuestDir)
 
     override fun runInContainer(
         args: List<String>,
@@ -86,20 +92,78 @@ class ConsolePumpingContainerDriver(
 
         val idx = counter.incrementAndGet()
         val slug = agentName.lowercase().replace(" ", "-")
+
+        return if (filterType != null && agentsGuestDir != null) {
+            runWithInContainerFilter(args, workingDir, timeoutSeconds, extraEnvVars, idx, slug, filterType, agentsGuestDir)
+        } else {
+            runWithCombinedLogTee(args, workingDir, timeoutSeconds, extraEnvVars, idx, slug)
+        }
+    }
+
+    private fun runWithInContainerFilter(
+        args: List<String>,
+        workingDir: String?,
+        timeoutSeconds: Long,
+        extraEnvVars: Map<String, String>,
+        idx: Int,
+        slug: String,
+        filterType: String,
+        agentsGuestDir: String,
+    ): ProcessResult {
+        val runId = "$slug-$idx"
+        val runDir = "$agentsGuestDir/$runId"
+        val rawLog = "$runDir/raw.jsonl"
+        val filteredLog = "$runDir/filtered.log"
+
+        // Pump filtered log to xterm console in real-time
+        val pump = console.startFilePump(filteredLog, "[$agentName]", ConsoleDriver.CYAN)
+
+        try {
+            val teeScript = "/tmp/agent-$slug-$idx-tee.sh"
+            val escaped = escapeForBash(args)
+            val scriptContent = buildString {
+                appendLine("#!/bin/bash")
+                appendLine("mkdir -p $runDir")
+                // Pipeline: agent stdout+stderr → tee raw log → filter → tee filtered log to stdout
+                appendLine("$escaped 2>&1 \\")
+                appendLine("  | tee $rawLog \\")
+                appendLine("  | $FILTER_BIN $filterType \\")
+                appendLine("  | awk -v log=$filteredLog '{print; print >> log; fflush(); fflush(log)}'")
+                appendLine("exit \${PIPESTATUS[0]}")
+            }
+            delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
+
+            // quietly=true: suppress Docker driver real-time echo; we print from result.output below
+            val result = delegate.runInContainer(
+                listOf("bash", teeScript), workingDir, timeoutSeconds, extraEnvVars, quietly = true,
+            )
+
+            // Print filtered output to JVM test-runner console
+            for (line in result.output.lineSequence()) {
+                if (line.isNotEmpty()) println("[$agentName] $line")
+            }
+
+            return result
+        } finally {
+            Thread.sleep(500)
+            pump.stop()
+        }
+    }
+
+    private fun runWithCombinedLogTee(
+        args: List<String>,
+        workingDir: String?,
+        timeoutSeconds: Long,
+        extraEnvVars: Map<String, String>,
+        idx: Int,
+        slug: String,
+    ): ProcessResult {
         val combinedLog = "/tmp/agent-$slug-$idx-combined.log"
 
         // Pump raw output to xterm console for real-time visibility
-        val pump = console.startFilePump(
-            combinedLog, "[$agentName]", ConsoleDriver.CYAN,
-        )
+        val pump = console.startFilePump(combinedLog, "[$agentName]", ConsoleDriver.CYAN)
 
         try {
-            // Write a tee-wrapper script that copies each line to BOTH stdout
-            // (captured by docker exec for ProcessResult) and the log file
-            // (tailed by the pump for console display).
-            //
-            // awk with explicit fflush() ensures both stdout and the log file
-            // are flushed after every line, giving real-time streaming.
             val teeScript = "/tmp/agent-$slug-$idx-tee.sh"
             val escaped = escapeForBash(args)
             val scriptContent = buildString {
@@ -109,21 +173,8 @@ class ConsolePumpingContainerDriver(
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 
-            // Suppress raw NDJSON from JVM console when we have an output filter;
-            // filtered text is printed below after the command completes.
-            val suppressRawOutput = outputFilter != null
-            val result = delegate.runInContainer(listOf("bash", teeScript), workingDir, timeoutSeconds, extraEnvVars, quietly = suppressRawOutput)
-
-            if (outputFilter != null) {
-                val filteredText = outputFilter.filterText(result.output)
-                for (line in filteredText.lineSequence()) {
-                    println("[$agentName] $line")
-                }
-            }
-
-            return result
+            return delegate.runInContainer(listOf("bash", teeScript), workingDir, timeoutSeconds, extraEnvVars, quietly = false)
         } finally {
-            // Let pump catch up with remaining output
             Thread.sleep(500)
             pump.stop()
         }
