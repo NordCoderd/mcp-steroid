@@ -391,6 +391,12 @@ object VisionService {
                 ?: throw IllegalStateException("Window not found for window_id: $windowId")
         }
 
+        // If a modal dialog is active, capture it instead of the IDE frame
+        val activeWindow = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow
+        if (activeWindow is java.awt.Dialog && activeWindow.isModal && activeWindow.isVisible) {
+            return activeWindow
+        }
+
         return WindowManager.getInstance().getIdeFrame(project)?.component
             ?: FileEditorManager.getInstance(project).selectedTextEditor?.component
             ?: throw IllegalStateException("No IDE frame or editor component available for screenshot")
