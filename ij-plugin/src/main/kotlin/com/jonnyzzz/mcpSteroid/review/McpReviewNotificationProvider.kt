@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.review
 
+import com.intellij.icons.AllIcons
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditor
@@ -11,7 +12,6 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.EditorNotificationProvider
 import com.intellij.ui.EditorNotifications
-import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import java.util.function.Function
 import javax.swing.JComponent
 
@@ -63,7 +63,7 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
                         project.service<ReviewManager>().approve(file)
                         EditorNotifications.getInstance(project).updateNotifications(file)
                     }
-                }
+                }.setIcon(AllIcons.General.Warning)
             }
 
             createActionLabel("Reject (send edits to LLM)") {
