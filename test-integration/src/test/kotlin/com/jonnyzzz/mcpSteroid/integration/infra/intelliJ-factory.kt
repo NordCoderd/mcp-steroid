@@ -158,6 +158,8 @@ fun IntelliJContainer.Companion.create(
     val infoFile = File(runDir, "session-info.txt")
     infoFile.writeText(buildString {
         appendLine("RUN_DIR=$runDir")
+        appendLine("CONTAINER_ID=${container.containerId}")
+        appendLine("DISPLAY=${xcvb.DISPLAY}")
         appendLine("VIDEO_DASHBOARD=http://localhost:$videoPort/")
         appendLine("VIDEO_STREAM=http://localhost:$videoPort/video.mp4")
         appendLine("MCP_STEROID=$mcpUrl")
