@@ -11,15 +11,27 @@ import com.jonnyzzz.mcpSteroid.testHelper.assertNoMessageInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.MethodSource
-import java.util.stream.Stream
+import org.junit.jupiter.api.Test
 
 class WhatYouSeeTest {
-    @MethodSource("agents")
-    @ParameterizedTest(name = "{0}")
-    fun describeMcp(agentName: String, agent: AiAgentSession) {
+
+    @Test fun `describeMcp claude`() = describeMcp(session.aiAgents.claude)
+    @Test fun `describeMcp codex`() = describeMcp(session.aiAgents.codex)
+    @Test fun `describeMcp gemini`() = describeMcp(session.aiAgents.gemini)
+
+    @Test fun `checkWhatYouSee claude`() = checkWhatYouSee(session.aiAgents.claude)
+    @Test fun `checkWhatYouSee codex`() = checkWhatYouSee(session.aiAgents.codex)
+    @Test fun `checkWhatYouSee gemini`() = checkWhatYouSee(session.aiAgents.gemini)
+
+    @Test fun `executeCodeViaMcp claude`() = executeCodeViaMcp(session.aiAgents.claude)
+    @Test fun `executeCodeViaMcp codex`() = executeCodeViaMcp(session.aiAgents.codex)
+    @Test fun `executeCodeViaMcp gemini`() = executeCodeViaMcp(session.aiAgents.gemini)
+
+    @Test fun `toolPreference claude`() = toolPreference(session.aiAgents.claude)
+    @Test fun `toolPreference codex`() = toolPreference(session.aiAgents.codex)
+    @Test fun `toolPreference gemini`() = toolPreference(session.aiAgents.gemini)
+
+    private fun describeMcp(agent: AiAgentSession) {
         val result = agent.runPrompt(
             "List all MCP tools you have access to. " +
                     "For each tool, print its exact name on a separate line. " +
@@ -36,9 +48,7 @@ class WhatYouSeeTest {
         result.assertOutputContains("take_screenshot")
     }
 
-    @MethodSource("agents")
-    @ParameterizedTest(name = "{0}")
-    fun checkWhatYouSee(agentName: String, agent: AiAgentSession) {
+    private fun checkWhatYouSee(agent: AiAgentSession) {
         agent.runPrompt(
             "Describe the current state of the IntelliJ IDEA IDE. " +
                     "Mention the project name if visible. " +
@@ -50,9 +60,7 @@ class WhatYouSeeTest {
             .assertNoMessageInOutput("NO_IDE_ACCESS")
     }
 
-    @MethodSource("agents")
-    @ParameterizedTest(name = "{0}")
-    fun executeCodeViaMcp(agentName: String, agent: AiAgentSession) {
+    private fun executeCodeViaMcp(agent: AiAgentSession) {
         val result = agent.runPrompt(
             "Use the steroid_execute_code tool to run this Kotlin code: println(\"MCP_STEROID_WORKS\") " +
                     "Show the output of the execution. " +
@@ -74,9 +82,7 @@ class WhatYouSeeTest {
      * Tasks are selected to cover both steroid_execute_code (scripted IDE automation)
      * and dedicated steroid tools (list_projects, list_windows, action_discovery, etc.).
      */
-    @MethodSource("agents")
-    @ParameterizedTest(name = "{0}")
-    fun toolPreference(agentName: String, agent: AiAgentSession) {
+    private fun toolPreference(agent: AiAgentSession) {
         val result = agent.runPrompt(
             TOOL_PREFERENCE_PROMPT,
             timeoutSeconds = 300
@@ -89,7 +95,7 @@ class WhatYouSeeTest {
             .filter { it.startsWith("PREFERRED:") }
             .map { it.substringAfter("PREFERRED:").trim() }
 
-        println("[$agentName] Tool preferences:")
+        println("[${agent.displayName}] Tool preferences:")
         val taskLines = result.output.lines().filter { it.startsWith("TASK:") }
         for (i in preferredLines.indices) {
             val task = taskLines.getOrNull(i) ?: "TASK: ?"
@@ -98,7 +104,7 @@ class WhatYouSeeTest {
 
         // Strict steroid detection: tool name starts with "steroid_"
         val steroidCount = preferredLines.count { it.startsWith("steroid_") }
-        println("[$agentName] Steroid tool count: $steroidCount / ${preferredLines.size}")
+        println("[${agent.displayName}] Steroid tool count: $steroidCount / ${preferredLines.size}")
 
         // Hard assertions
         check(preferredLines.size == TASK_COUNT) {
@@ -153,15 +159,6 @@ class WhatYouSeeTest {
                 consoleTitle = "what-you-see",
             ).waitForProjectReady()
         }
-
-        @JvmStatic
-        fun agents(): Stream<Arguments> = session
-            .aiAgents
-            .aiAgents
-            .entries.stream()
-            .map { (name, driver) ->
-                Arguments.of(name, driver)
-            }
 
         @JvmStatic
         @BeforeAll

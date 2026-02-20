@@ -3,18 +3,15 @@ package com.jonnyzzz.mcpSteroid.integration.arena
 
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
-import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.DynamicTest
+import org.junit.jupiter.api.TestFactory
 import org.junit.jupiter.api.Timeout
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.MethodSource
 import java.util.concurrent.TimeUnit
-import java.util.stream.Stream
 
 /**
  * Integration test that runs dpaia.dev arena test cases.
@@ -40,31 +37,41 @@ import java.util.stream.Stream
  */
 class DpaiaArenaTest {
 
-    @MethodSource("arenaTestCases")
-    @ParameterizedTest(name = "[{0}] {1}")
+    @TestFactory
     @Timeout(value = 30, unit = TimeUnit.MINUTES)
-    fun `arena test case`(agentName: String, testCaseId: String, agent: AiAgentSession, testCase: DpaiaTestCase) {
-        val runner = ArenaTestRunner(
-            container = session.scope,
-            projectGuestDir = ARENA_WORKSPACE,
-        )
+    fun `arena test cases`(): List<DynamicTest> {
+        val selectedCases = selectTestCases()
+        println("[ARENA] Selected ${selectedCases.size} test case(s) for execution")
 
-        val result = runner.runTest(
-            testCase = testCase,
-            agent = agent,
-            timeoutSeconds = 900,
-        )
+        val agents = session.aiAgents.aiAgents
 
-        // Basic assertions: agent ran successfully and used MCP Steroid
-        result.agentResult.assertExitCode(0, message = "arena test ${testCase.instanceId}")
-        result.agentResult.assertOutputContains(
-            "steroid_execute_code",
-            message = "agent must use steroid_execute_code for ${testCase.instanceId}"
-        )
+        return selectedCases.flatMap { testCase ->
+            agents.map { (agentName, agent) ->
+                DynamicTest.dynamicTest("[$agentName] ${testCase.instanceId}") {
+                    val runner = ArenaTestRunner(
+                        container = session.scope,
+                        projectGuestDir = ARENA_WORKSPACE,
+                    )
 
-        println("[ARENA] Test ${testCase.instanceId} completed with agent '$agentName'")
-        println("[ARENA]   Claimed fix: ${result.evaluation.agentClaimedFix}")
-        println("[ARENA]   Summary: ${result.evaluation.agentSummary ?: "(none)"}")
+                    val result = runner.runTest(
+                        testCase = testCase,
+                        agent = agent,
+                        timeoutSeconds = 900,
+                    )
+
+                    // Basic assertions: agent ran successfully and used MCP Steroid
+                    result.agentResult.assertExitCode(0, message = "arena test ${testCase.instanceId}")
+                    result.agentResult.assertOutputContains(
+                        "steroid_execute_code",
+                        message = "agent must use steroid_execute_code for ${testCase.instanceId}"
+                    )
+
+                    println("[ARENA] Test ${testCase.instanceId} completed with agent '$agentName'")
+                    println("[ARENA]   Claimed fix: ${result.evaluation.agentClaimedFix}")
+                    println("[ARENA]   Summary: ${result.evaluation.agentSummary ?: "(none)"}")
+                }
+            }
+        }
     }
 
     companion object {
@@ -97,23 +104,6 @@ class DpaiaArenaTest {
             val cases = DpaiaDatasetLoader.loadFromUrl(DATASET_URL)
             println("[ARENA] Loaded ${cases.size} test cases")
             cases
-        }
-
-        @JvmStatic
-        fun arenaTestCases(): Stream<Arguments> {
-            // Trigger session so agents are initialized
-            session.toString()
-
-            val selectedCases = selectTestCases()
-            println("[ARENA] Selected ${selectedCases.size} test case(s) for execution")
-
-            val agents = session.aiAgents.aiAgents
-
-            return selectedCases.flatMap { testCase ->
-                agents.map { (agentName, agentSession) ->
-                    Arguments.of(agentName, testCase.instanceId, agentSession, testCase)
-                }
-            }.stream()
         }
 
         private fun selectTestCases(): List<DpaiaTestCase> {

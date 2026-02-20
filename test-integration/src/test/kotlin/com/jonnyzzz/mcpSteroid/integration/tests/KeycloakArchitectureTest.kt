@@ -9,12 +9,9 @@ import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
+import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
-import org.junit.jupiter.params.ParameterizedTest
-import org.junit.jupiter.params.provider.Arguments
-import org.junit.jupiter.params.provider.MethodSource
 import java.util.concurrent.TimeUnit
-import java.util.stream.Stream
 
 /**
  * Integration test: architecture investigation of the Keycloak project.
@@ -25,10 +22,34 @@ import java.util.stream.Stream
  */
 class KeycloakArchitectureTest {
 
-    @MethodSource("agents")
-    @ParameterizedTest(name = "{0}")
-    @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `agent investigates authentication flow`(agentName: String, agent: AiAgentSession) {
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates authentication flow claude`() = agentInvestigatesAuthenticationFlow(session.aiAgents.claude)
+
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates authentication flow codex`() = agentInvestigatesAuthenticationFlow(session.aiAgents.codex)
+
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates authentication flow gemini`() = agentInvestigatesAuthenticationFlow(session.aiAgents.gemini)
+
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates module structure claude`() = agentInvestigatesModuleStructure(session.aiAgents.claude)
+
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates module structure codex`() = agentInvestigatesModuleStructure(session.aiAgents.codex)
+
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates module structure gemini`() = agentInvestigatesModuleStructure(session.aiAgents.gemini)
+
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates SPI architecture claude`() = agentInvestigatesSpiArchitecture(session.aiAgents.claude)
+
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates SPI architecture codex`() = agentInvestigatesSpiArchitecture(session.aiAgents.codex)
+
+    @Test @Timeout(value = 15, unit = TimeUnit.MINUTES)
+    fun `agent investigates SPI architecture gemini`() = agentInvestigatesSpiArchitecture(session.aiAgents.gemini)
+
+    private fun agentInvestigatesAuthenticationFlow(agent: AiAgentSession) {
         val prompt = buildString {
             appendLine("Investigate the Keycloak project that is open in IntelliJ IDEA.")
             appendLine()
@@ -74,13 +95,10 @@ class KeycloakArchitectureTest {
             "Agent did not provide specific file paths from the project.\nOutput:\n$combined"
         }
 
-        println("[TEST] Agent '$agentName' successfully investigated the authentication flow")
+        println("[TEST] Agent '${agent.displayName}' successfully investigated the authentication flow")
     }
 
-    @MethodSource("agents")
-    @ParameterizedTest(name = "{0}")
-    @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `agent investigates module structure`(agentName: String, agent: AiAgentSession) {
+    private fun agentInvestigatesModuleStructure(agent: AiAgentSession) {
         val prompt = buildString {
             appendLine("Investigate the module structure of the Keycloak project open in IntelliJ IDEA.")
             appendLine()
@@ -133,13 +151,10 @@ class KeycloakArchitectureTest {
                     "Expected one of: $modulePatterns\nOutput:\n$combined"
         }
 
-        println("[TEST] Agent '$agentName' successfully investigated the module structure")
+        println("[TEST] Agent '${agent.displayName}' successfully investigated the module structure")
     }
 
-    @MethodSource("agents")
-    @ParameterizedTest(name = "{0}")
-    @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `agent investigates SPI architecture`(agentName: String, agent: AiAgentSession) {
+    private fun agentInvestigatesSpiArchitecture(agent: AiAgentSession) {
         val prompt = buildString {
             appendLine("Investigate the SPI (Service Provider Interface) architecture of the Keycloak project open in IntelliJ IDEA.")
             appendLine()
@@ -186,7 +201,7 @@ class KeycloakArchitectureTest {
             "Agent did not provide specific file paths from the project.\nOutput:\n$combined"
         }
 
-        println("[TEST] Agent '$agentName' successfully investigated the SPI architecture")
+        println("[TEST] Agent '${agent.displayName}' successfully investigated the SPI architecture")
     }
 
     private fun assertUsedExecuteCodeEvidence(combined: String) {
@@ -222,15 +237,6 @@ class KeycloakArchitectureTest {
                 project = IntelliJProject.KeycloakProject,
             ).waitForProjectReady()
         }
-
-        @JvmStatic
-        fun agents(): Stream<Arguments> = session
-            .aiAgents
-            .aiAgents
-            .entries.stream()
-            .map { (name, driver) ->
-                Arguments.of(name, driver)
-            }
 
         @JvmStatic
         @BeforeAll
