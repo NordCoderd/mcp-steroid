@@ -12,6 +12,7 @@ import com.intellij.ui.EditorNotificationPanel
 import com.intellij.ui.EditorNotificationProvider
 import com.intellij.ui.EditorNotifications
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+import java.util.MissingResourceException
 import java.util.function.Function
 import javax.swing.JComponent
 
@@ -47,19 +48,19 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
                 EditorNotifications.getInstance(project).updateNotifications(file)
             }
 
-            val registryMode = try { Registry.stringValue(ReviewManager.REVIEW_MODE_KEY) } catch (_: Exception) { "ALWAYS" }
+            val registryMode = try { Registry.stringValue(ReviewManager.REVIEW_MODE_REGISTRY_KEY) } catch (_: MissingResourceException) { "ALWAYS" }
             if (registryMode != "NEVER") {
                 createActionLabel("Always Allow") {
                     val result = Messages.showOkCancelDialog(
                         project,
-                        "This will auto-approve all future code executions for this project without review.\nYou can reset this in the project's .idea folder.",
+                        "This will auto-approve all future code executions for this project without review.\nYou can reset this by editing mcp.steroid.review.always.allow in .idea/workspace.xml.",
                         "Enable Always Allow",
                         "Enable",
                         Messages.getCancelButton(),
                         Messages.getWarningIcon()
                     )
                     if (result == Messages.OK) {
-                        PropertiesComponent.getInstance(project).setValue(ReviewManager.REVIEW_MODE_KEY, "NEVER")
+                        PropertiesComponent.getInstance(project).setValue(ReviewManager.ALWAYS_ALLOW_PROJECT_KEY, true)
                         project.service<ReviewManager>().approve(file)
                         EditorNotifications.getInstance(project).updateNotifications(file)
                     }

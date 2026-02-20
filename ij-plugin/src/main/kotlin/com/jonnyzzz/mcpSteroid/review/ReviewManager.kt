@@ -39,7 +39,8 @@ class ReviewManager(private val project: Project) {
 
     companion object {
         private val REVIEW_EXECUTION_CONTEXT_KEY = Key<PendingReviewContext>("mcp-review-manager-key")
-        const val REVIEW_MODE_KEY = "mcp.steroid.review.mode"
+        const val REVIEW_MODE_REGISTRY_KEY = "mcp.steroid.review.mode"
+        const val ALWAYS_ALLOW_PROJECT_KEY = "mcp.steroid.review.always.allow"
     }
 
     private data class PendingReviewContext(
@@ -62,19 +63,19 @@ class ReviewManager(private val project: Project) {
     ): Boolean = coroutineScope {
         // Check review mode
         val reviewMode = try {
-            Registry.stringValue("mcp.steroid.review.mode")
-        } catch (_: Exception) {
+            Registry.stringValue(REVIEW_MODE_REGISTRY_KEY)
+        } catch (_: MissingResourceException) {
             "ALWAYS"
         }
 
         // Registry NEVER: global auto-approve (admin/test override, strongest)
         if (reviewMode == "NEVER") {
-            log.info("Auto-approving $executionId (registry: mcp.steroid.review.mode=NEVER)")
+            log.info("Auto-approving $executionId (registry: $REVIEW_MODE_REGISTRY_KEY=NEVER)")
             return@coroutineScope true
         }
 
         // Per-project always allow: user clicked "Always Allow" in the review panel
-        if (PropertiesComponent.getInstance(project).getValue(REVIEW_MODE_KEY) == "NEVER") {
+        if (PropertiesComponent.getInstance(project).isTrueValue(ALWAYS_ALLOW_PROJECT_KEY)) {
             log.info("Auto-approving $executionId (project always allow)")
             return@coroutineScope true
         }
