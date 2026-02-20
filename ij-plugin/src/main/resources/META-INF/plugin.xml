@@ -80,6 +80,10 @@
         <editorNotificationProvider
             implementation="com.jonnyzzz.mcpSteroid.review.McpReviewNotificationProvider"/>
 
+        <!-- Per-project settings stored in .idea/mcp-steroid.xml -->
+        <projectService
+            serviceImplementation="com.jonnyzzz.mcpSteroid.review.McpSteroidProjectSettings"/>
+
         <!-- Registry keys for configuration -->
         <registryKey key="mcp.steroid.review.mode" defaultValue="ALWAYS"
             description="Code review mode: ALWAYS (default, requires manual review), NEVER (skip review, auto-approve all executions)"/>

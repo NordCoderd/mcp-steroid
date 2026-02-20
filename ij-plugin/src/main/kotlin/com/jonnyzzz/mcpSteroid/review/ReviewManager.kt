@@ -8,7 +8,6 @@ import com.intellij.openapi.application.writeAction
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
-import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
@@ -40,7 +39,6 @@ class ReviewManager(private val project: Project) {
     companion object {
         private val REVIEW_EXECUTION_CONTEXT_KEY = Key<PendingReviewContext>("mcp-review-manager-key")
         const val REVIEW_MODE_REGISTRY_KEY = "mcp.steroid.review.mode"
-        const val ALWAYS_ALLOW_PROJECT_KEY = "mcp.steroid.review.always.allow"
     }
 
     private data class PendingReviewContext(
@@ -71,7 +69,7 @@ class ReviewManager(private val project: Project) {
         }
 
         // Per-project always allow: user clicked "Always Allow" in the review panel
-        if (PropertiesComponent.getInstance(project).isTrueValue(ALWAYS_ALLOW_PROJECT_KEY)) {
+        if (McpSteroidProjectSettings.getInstance(project).alwaysAllow) {
             log.info("Auto-approving $executionId (project always allow)")
             return@coroutineScope true
         }

@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid.review
 
 import com.intellij.icons.AllIcons
-import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.components.service
 import com.intellij.openapi.fileEditor.FileEditor
 import com.intellij.openapi.project.Project
@@ -42,28 +41,33 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
         return EditorNotificationPanel(editor, EditorNotificationPanel.Status.Warning).apply {
             text = "Review - Edit code to add comments, then Approve or Reject"
 
-            createActionLabel("Approve & Execute") {
-                project.service<ReviewManager>().approve(file)
-                EditorNotifications.getInstance(project).updateNotifications(file)
-            }
-
             val registryMode = Registry.stringValue(ReviewManager.REVIEW_MODE_REGISTRY_KEY)
             if (registryMode != "NEVER") {
                 createActionLabel("Always Allow") {
                     val result = Messages.showOkCancelDialog(
                         project,
-                        "This will auto-approve all future code executions for this project without review.\nYou can reset this by editing mcp.steroid.review.always.allow in .idea/workspace.xml.",
-                        "Enable Always Allow",
-                        "Enable",
+                        """
+                        This will skip code review and auto-approve all future executions for this project.
+
+                        The setting is saved in .idea/mcp-steroid.xml.
+                        To re-enable review, set alwaysAllow to false in that file.
+                        """.trimIndent(),
+                        "Disable Code Review for This Project",
+                        "Disable Review",
                         Messages.getCancelButton(),
                         Messages.getWarningIcon()
                     )
                     if (result == Messages.OK) {
-                        PropertiesComponent.getInstance(project).setValue(ReviewManager.ALWAYS_ALLOW_PROJECT_KEY, true)
+                        McpSteroidProjectSettings.getInstance(project).alwaysAllow = true
                         project.service<ReviewManager>().approve(file)
                         EditorNotifications.getInstance(project).updateNotifications(file)
                     }
                 }.setIcon(AllIcons.General.Warning)
+            }
+
+            createActionLabel("Approve & Execute") {
+                project.service<ReviewManager>().approve(file)
+                EditorNotifications.getInstance(project).updateNotifications(file)
             }
 
             createActionLabel("Reject (send edits to LLM)") {
