@@ -46,14 +46,11 @@ class McpReviewNotificationProvider : EditorNotificationProvider {
                 createActionLabel("Always Approve") {
                     val result = Messages.showOkCancelDialog(
                         project,
-                        "Automatically approve all code blocks that an AI Agent sends to the MCP Steroid plugin to execute. " +
-                        "The code in the editor is the example of what you approve.\n\n" +
-                        "There is no guarantee on what an AI Agent will want to execute. " +
-                        "There is a chance it may harm or gain profit.\n\n" +
-                        "You are going to allow all MCP Steroid calls for the current project. " +
-                        "The consent is stored in .idea/mcp-steroid.xml. " +
-                        "To re-enable review, set alwaysAllow to false in that file.",
-                        "Automatically Approve MCP Steroid",
+                        "Automatically approve all code blocks that an AI Agent sends to execute.\n" +
+                        "The code in the editor is an example of what you approve.\n\n" +
+                        "There is no guarantee on what an AI Agent will want to execute.\n" +
+                        "There is a chance it may harm your system or gain profit.",
+                        "Automatically Approve",
                         "Approve All",
                         "Cancel",
                         Messages.getWarningIcon()

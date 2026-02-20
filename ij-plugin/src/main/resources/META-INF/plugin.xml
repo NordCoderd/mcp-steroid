@@ -76,6 +76,12 @@
         <notificationGroup id="jonnyzzz.mcp.steroid.updates"
                            displayType="BALLOON"/>
 
+        <!-- Per-project settings page under Tools > MCP Steroid -->
+        <projectConfigurable parentId="tools"
+            id="com.jonnyzzz.mcp-steroid.settings"
+            displayName="MCP Steroid"
+            instance="com.jonnyzzz.mcpSteroid.review.McpSteroidProjectConfigurable"/>
+
         <!-- Review panel notification -->
         <editorNotificationProvider
             implementation="com.jonnyzzz.mcpSteroid.review.McpReviewNotificationProvider"/>
