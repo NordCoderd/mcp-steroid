@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
+import com.jonnyzzz.mcpSteroid.filter.filterText
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test

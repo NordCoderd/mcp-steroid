@@ -2,11 +2,11 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.filter.OutputFilter
+import com.jonnyzzz.mcpSteroid.filter.filterText
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
-import com.jonnyzzz.mcpSteroid.testHelper.filterText
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
