@@ -7,6 +7,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.DockerClaudeSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerCodexSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import kotlin.getValue
 
 /**
@@ -76,8 +77,8 @@ class AiAgentDriver(
         }
         container.writeFileInContainer("/tmp/deploy-filter.sh", deployScript, executable = true)
         val result = container.runInContainer(listOf("bash", "/tmp/deploy-filter.sh"), timeoutSeconds = 60)
-        require(result.exitCode == 0) {
-            "agent-output-filter deployment failed (exit ${result.exitCode}):\n${result.output}\n${result.stderr}"
+        result.assertExitCode(0) {
+            "agent-output-filter deployment failed:\n${result.output}\n${result.stderr}"
         }
 
         println("[AiAgentDriver] agent-output-filter deployed to /opt/agent-output-filter")
