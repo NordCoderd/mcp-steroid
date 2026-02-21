@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
 import org.junit.jupiter.api.Assertions.assertNotEquals
@@ -47,7 +48,7 @@ class DockerClaudeProgressTest {
         )
 
         // Verify command succeeded
-        assertTrue(result.exitCode == 0, "Claude command should succeed, exitCode=${result.exitCode}")
+        result.assertExitCode(0) { "Claude command should succeed" }
 
         // Verify raw output contains NDJSON progress events
         assertTrue(
