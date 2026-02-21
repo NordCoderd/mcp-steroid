@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import kotlinx.serialization.json.Json
@@ -28,7 +29,7 @@ class DockerCodexProgressTest {
             timeoutSeconds = 30
         )
 
-        assertTrue(result.exitCode == 0, "Codex command should succeed, exitCode=${result.exitCode}")
+        result.assertExitCode(0) { "Codex command should succeed" }
 
         val events = parseNdjsonEvents(result.rawOutput)
         assertTrue(events.isNotEmpty(), "Raw output should contain NDJSON events")
