@@ -5,10 +5,10 @@ import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
-import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.assertNoErrorsInOutput
-import com.jonnyzzz.mcpSteroid.testHelper.assertNoMessageInOutput
-import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoMessageInOutput
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test

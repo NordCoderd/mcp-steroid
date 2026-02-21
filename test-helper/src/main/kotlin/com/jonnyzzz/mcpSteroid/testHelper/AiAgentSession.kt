@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 
 interface AiAgentSession {
     val displayName: String

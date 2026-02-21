@@ -4,8 +4,8 @@ package com.jonnyzzz.mcpSteroid
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
-import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
 import kotlin.time.Duration.Companion.seconds
 
 /**

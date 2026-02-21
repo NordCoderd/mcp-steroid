@@ -4,6 +4,9 @@ package com.jonnyzzz.mcpSteroid
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import com.jonnyzzz.mcpSteroid.testHelper.*
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
 import java.util.*
 import kotlin.time.Duration.Companion.seconds
 

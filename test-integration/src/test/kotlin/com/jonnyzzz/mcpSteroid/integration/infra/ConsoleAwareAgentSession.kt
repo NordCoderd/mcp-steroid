@@ -3,8 +3,8 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
-import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.ProcessResultValue
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import java.io.File

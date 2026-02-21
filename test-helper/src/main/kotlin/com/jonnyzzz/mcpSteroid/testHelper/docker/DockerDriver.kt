@@ -2,11 +2,11 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.ProcessRunRequest
-import com.jonnyzzz.mcpSteroid.testHelper.ProcessRunner
-import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.runProcess
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
