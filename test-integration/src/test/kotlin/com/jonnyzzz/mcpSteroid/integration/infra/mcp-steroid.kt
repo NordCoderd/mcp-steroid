@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import kotlinx.serialization.json.Json
@@ -72,8 +73,8 @@ class McpSteroidDriver(
             ),
             timeoutSeconds = 10,
         )
-        check(result.exitCode == 0) {
-            "MCP initialize handshake failed (exit ${result.exitCode}): ${result.output}"
+        result.assertExitCode(0) {
+            "MCP initialize handshake failed: ${result.output}"
         }
 
         println("[IDE-AGENT] MCP Steroid is ready in the container at $guestMcpUrl")
@@ -711,9 +712,7 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             timeoutSeconds = timeoutSeconds,
         )
 
-        if (result.exitCode != 0) {
-            error("MCP request failed (exit ${result.exitCode}): ${result.output}")
-        }
+        result.assertExitCode(0) { "MCP request failed: ${result.output}" }
 
         val j = result.output.trim()
         return json.encodeToString(json.parseToJsonElement(j))
