@@ -70,10 +70,8 @@ RUN useradd -m -s /bin/bash agent && \
     chown -R agent:agent /home/agent
 
 # Shared runtime helpers
-COPY run-agent.sh /usr/local/bin/run-agent.sh
 COPY video-server.js /usr/local/bin/video-server.js
 COPY wallpaper.jpg /usr/share/images/mcp-steroid-wallpaper.jpg
-RUN chmod +x /usr/local/bin/run-agent.sh
 
 USER agent
 WORKDIR /home/agent
