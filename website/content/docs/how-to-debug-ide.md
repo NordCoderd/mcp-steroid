@@ -1,7 +1,8 @@
 ---
-title: "How to Debug an IDE (for AI Agents)"
+title: "Debugging IDE with MCP Steroid"
 description: "A comprehensive guide for AI agents to debug IntelliJ-based IDEs using the debugger and MCP Steroid"
-weight: 5
+weight: 80
+group: "Examples"
 ---
 
 > **This documentation was written entirely by AI agents** using MCP Steroid while working on the IntelliJ Platform codebase. It demonstrates what autonomous AI agents can discover and document when given full IDE access through MCP Steroid.
