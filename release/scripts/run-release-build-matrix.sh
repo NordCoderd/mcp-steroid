@@ -40,8 +40,10 @@ product_code_for() {
   case "${product,,}" in
     idea|iiu|intellij|intellijidea|intellijideaultimate) printf 'IIU\n' ;;
     pycharm|pcp|python) printf 'PCP\n' ;;
+    goland|go|golang) printf 'GO\n' ;;
+    webstorm|ws|web) printf 'WS\n' ;;
     *)
-      echo "Unsupported IDE product '$product' for EAP resolution (expected idea or pycharm)." >&2
+      echo "Unsupported IDE product '$product' for EAP resolution (expected idea, pycharm, goland, or webstorm)." >&2
       exit 2
       ;;
   esac
@@ -89,9 +91,13 @@ EAP_VERSION_RESOLVED="$(resolve_eap_build "$EAP_PRODUCT" "$EAP_VERSION")"
 if is_build_number "$EAP_VERSION"; then
   IDEA_EAP_BUILD_RESOLVED="$(resolve_eap_build idea latest)"
   PYCHARM_EAP_BUILD_RESOLVED="$(resolve_eap_build pycharm latest)"
+  GOLAND_EAP_BUILD_RESOLVED="$(resolve_eap_build goland latest)"
+  WEBSTORM_EAP_BUILD_RESOLVED="$(resolve_eap_build webstorm latest)"
 else
   IDEA_EAP_BUILD_RESOLVED="$(resolve_eap_build idea "$EAP_VERSION")"
   PYCHARM_EAP_BUILD_RESOLVED="$(resolve_eap_build pycharm "$EAP_VERSION")"
+  GOLAND_EAP_BUILD_RESOLVED="$(resolve_eap_build goland "$EAP_VERSION")"
+  WEBSTORM_EAP_BUILD_RESOLVED="$(resolve_eap_build webstorm "$EAP_VERSION")"
 fi
 
 select_single_distribution_zip() {
@@ -143,13 +149,17 @@ echo "== Stage 2: EAP build (product=$EAP_PRODUCT request=$EAP_VERSION resolved=
   -Pmcp.platform.version="$EAP_VERSION_RESOLVED" \
   -Pmcp.release.notes.version="$RELEASE_NOTES_VERSION"
 
-echo "== Stage 3: selected integration matrix [IDEA,PyCharm] x [stable,EAP] =="
+echo "== Stage 3: selected integration matrix [IDEA,PyCharm,GoLand,WebStorm] x [stable,EAP] =="
 "${GRADLE_COMMON[@]}" \
   -Pmcp.release.build=true \
   -Ptest.integration.idea.stable.version="$STABLE_VERSION" \
   -Ptest.integration.pycharm.stable.version="$STABLE_VERSION" \
+  -Ptest.integration.goland.stable.version="$STABLE_VERSION" \
+  -Ptest.integration.webstorm.stable.version="$STABLE_VERSION" \
   -Ptest.integration.idea.eap.build="$IDEA_EAP_BUILD_RESOLVED" \
   -Ptest.integration.pycharm.eap.build="$PYCHARM_EAP_BUILD_RESOLVED" \
+  -Ptest.integration.goland.eap.build="$GOLAND_EAP_BUILD_RESOLVED" \
+  -Ptest.integration.webstorm.eap.build="$WEBSTORM_EAP_BUILD_RESOLVED" \
   :test-integration:testReleaseSmokeMatrix
 
 cat > "$OUT_DIR/build-summary.txt" <<EOF
@@ -163,6 +173,8 @@ eap_version_request=$EAP_VERSION
 eap_version_resolved=$EAP_VERSION_RESOLVED
 idea_eap_build_resolved=$IDEA_EAP_BUILD_RESOLVED
 pycharm_eap_build_resolved=$PYCHARM_EAP_BUILD_RESOLVED
+goland_eap_build_resolved=$GOLAND_EAP_BUILD_RESOLVED
+webstorm_eap_build_resolved=$WEBSTORM_EAP_BUILD_RESOLVED
 integration_matrix_task=:test-integration:testReleaseSmokeMatrix
 timestamp_utc=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 EOF
