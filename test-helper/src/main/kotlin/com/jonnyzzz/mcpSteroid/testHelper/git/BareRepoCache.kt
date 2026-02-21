@@ -1,8 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.testHelper.docker
+package com.jonnyzzz.mcpSteroid.testHelper.git
 
 import java.io.File
 import java.time.LocalDate
+import java.util.concurrent.TimeUnit
 
 /**
  * Host-side bare git repository cache.
@@ -19,7 +20,7 @@ import java.time.LocalDate
  * Intended use:
  * 1. Call [ensureRepo] at test setup to warm the cache on the host.
  * 2. Mount the cache root as a read-only Docker volume at `/repo-cache`.
- * 3. Use [GitDriver.cloneFromCachedBare] inside the container for fast local clones.
+ * 3. Use [com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver.cloneFromCachedBare] inside the container for fast local clones.
  */
 object BareRepoCache {
 
@@ -30,7 +31,7 @@ object BareRepoCache {
 
     /**
      * Ensure a bare clone of [repoUrl] exists and is fresh in [cacheDir].
-     * Returns the host [File] pointing to the bare repo directory.
+     * Returns the host [java.io.File] pointing to the bare repo directory.
      *
      * @param repoUrl HTTPS clone URL, e.g. `https://github.com/dpaia/feature-service.git`
      * @param cacheDir root cache directory on the host (created if missing)
@@ -138,7 +139,7 @@ object BareRepoCache {
         if (workDir != null) pb.directory(workDir)
         val process = pb.start()
 
-        val finished = process.waitFor(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)
+        val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
         require(finished) { "git ${args.first()} timed out after ${timeoutSeconds}s" }
 
         val exitCode = process.exitValue()
