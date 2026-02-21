@@ -5,13 +5,15 @@ import com.jonnyzzz.mcpSteroid.integration.infra.*
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import org.junit.jupiter.api.Test
+import java.util.UUID
 
 class XcvbConsoleTest {
 
     @Test
     fun testConsoleLayout() = runWithCloseableStack { lifetime ->
         val dockerFileBase = "ide-agent"
-        val imageName = "$dockerFileBase-test"
+        val uniqueSuffix = UUID.randomUUID().toString().take(8)
+        val imageName = "$dockerFileBase-test-$uniqueSuffix"
         val ideArchive = IdeDistribution.fromSystemProperties().resolveAndDownload()
         val scope = buildIdeImage(dockerFileBase, imageName, ideArchive)
 

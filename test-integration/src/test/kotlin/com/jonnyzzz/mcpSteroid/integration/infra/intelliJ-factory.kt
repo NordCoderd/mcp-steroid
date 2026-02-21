@@ -8,6 +8,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
+import java.util.UUID
 
 //TODO: refactor parameters to a builder object, so we can update easily in the future, add "registerMcpSteroidToAgents" to the builder
 fun IntelliJContainer.Companion.create(
@@ -40,7 +41,10 @@ fun IntelliJContainer.Companion.create(
     }
 
     println("[IDE-AGENT] Run directory: $runDir")
-    val imageName = "$selectedDockerBase-test"
+    // Unique suffix ensures parallel test runs each build their own image and context dir,
+    // preventing races in buildIdeImage when multiple tests start concurrently.
+    val uniqueSuffix = UUID.randomUUID().toString().take(8)
+    val imageName = "$selectedDockerBase-test-$uniqueSuffix"
     val scope = buildIdeImage(selectedDockerBase, imageName, ideArchive)
 
     val containerMountedPath = "/mcp-run-dir"
