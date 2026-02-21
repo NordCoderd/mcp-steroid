@@ -69,13 +69,11 @@ class ArenaTestRunner(
     /**
      * Build the prompt that will be sent to the AI agent.
      *
-     * The prompt includes:
-     * - The problem statement from the dataset
-     * - Information about the build system
-     * - Instructions to use MCP Steroid
-     * - Hints about which tests to focus on
+     * @param withMcp when true, instructs the agent to use [steroid_execute_code] and IntelliJ IDEA;
+     *                when false, instructs the agent to use shell commands (mvn/gradle/bash) only —
+     *                used for the A/B comparison baseline (no IDE tooling).
      */
-    fun buildPrompt(testCase: DpaiaTestCase, projectDir: String): String = buildString {
+    fun buildPrompt(testCase: DpaiaTestCase, projectDir: String, withMcp: Boolean = true): String = buildString {
         appendLine("You are working on a Java Spring project located at: $projectDir")
         appendLine()
         appendLine("## Problem Statement")
@@ -114,12 +112,23 @@ class ArenaTestRunner(
 
         appendLine("## Instructions")
         appendLine()
-        appendLine("1. Open the project at `$projectDir` in IntelliJ IDEA using steroid_execute_code")
-        appendLine("2. Analyze the codebase to understand the problem")
-        appendLine("3. Implement the necessary changes to fix the issue")
-        appendLine("4. Use steroid_execute_code to verify your changes compile")
-        appendLine()
-        appendLine("Use ONLY steroid_execute_code for IDE interactions.")
+        if (withMcp) {
+            appendLine("1. Open the project at `$projectDir` in IntelliJ IDEA using steroid_execute_code")
+            appendLine("2. Analyze the codebase to understand the problem")
+            appendLine("3. Implement the necessary changes to fix the issue")
+            appendLine("4. Use steroid_execute_code to verify your changes compile")
+            appendLine()
+            appendLine("Use ONLY steroid_execute_code for IDE interactions.")
+        } else {
+            appendLine("1. Navigate the project at `$projectDir` using bash/shell commands")
+            appendLine("2. Read source files to understand the problem")
+            appendLine("3. Implement the necessary changes using file editing tools")
+            val buildCmd = if (testCase.buildSystem == "maven") "mvn test" else "./gradlew test"
+            appendLine("4. Verify the fix by running `$buildCmd` in `$projectDir`")
+            appendLine()
+            appendLine("Use shell commands (bash, find, cat, grep) and the build tool to navigate and verify.")
+            appendLine("No IntelliJ IDE tools are available.")
+        }
         appendLine()
         appendLine("When done, output these markers on separate lines:")
         appendLine("ARENA_FIX_APPLIED: yes")
@@ -137,6 +146,7 @@ class ArenaTestRunner(
     fun runTest(
         testCase: DpaiaTestCase,
         agent: AiAgentSession,
+        withMcp: Boolean = true,
         timeoutSeconds: Long = 900,
     ): ArenaTestResult {
         println("[ARENA] ========================================")
@@ -153,7 +163,7 @@ class ArenaTestRunner(
         applyTestPatch(testCase, projectDir)
 
         // Step 3: Build prompt
-        val prompt = buildPrompt(testCase, projectDir)
+        val prompt = buildPrompt(testCase, projectDir, withMcp = withMcp)
         println("[ARENA] Prompt length: ${prompt.length} chars")
 
         // Step 4: Run agent
