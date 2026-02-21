@@ -6,6 +6,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
 import java.io.File
 import java.time.LocalDateTime

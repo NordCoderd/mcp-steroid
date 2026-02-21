@@ -3,12 +3,14 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequestBuilder
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessStreamType
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoMessageInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
+import com.jonnyzzz.mcpSteroid.testHelper.process.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.toList
@@ -25,7 +27,7 @@ class ProcessRunnerTest {
     @TempDir
     lateinit var tempDir: File
 
-    private fun request(vararg command: String, block: ProcessRunRequest.Builder.() -> Unit = {}) =
+    private fun request(vararg command: String, block: ProcessRunRequestBuilder.() -> Unit = {}) =
         ProcessRunRequest.builder()
             .command(*command)
             .description("test")
@@ -299,7 +301,7 @@ class StartedProcessMessagesFlowTest {
     @TempDir
     lateinit var tempDir: File
 
-    private fun request(vararg command: String, block: ProcessRunRequest.Builder.() -> Unit = {}) =
+    private fun request(vararg command: String, block: ProcessRunRequestBuilder.() -> Unit = {}) =
         ProcessRunRequest.builder()
             .command(*command)
             .description("test")
