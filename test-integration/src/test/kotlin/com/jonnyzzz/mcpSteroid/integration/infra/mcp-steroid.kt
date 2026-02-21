@@ -346,6 +346,109 @@ if (configured == null) {
     }
 
     /**
+     * Open README.md (or fallback source file) in the editor and show the Maven/Gradle tool window.
+     *
+     * Helps AI agents orient themselves from the IDE view immediately after project import.
+     * All operations are best-effort — failures are logged but do not propagate.
+     *
+     * @param projectPath Guest project directory path.
+     */
+    fun mcpOpenReadmeAndBuildToolWindow(projectPath: String) {
+        val projectName = try {
+            mcpListProjects().firstOrNull { it.path == projectPath }?.name
+        } catch (e: Exception) {
+            println("[UX-SETUP] Could not list projects: ${e.message}")
+            null
+        }
+        if (projectName == null) {
+            println("[UX-SETUP] Project not found for path $projectPath — skipping UX setup")
+            return
+        }
+
+        val code = """
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.wm.ToolWindowManager
+import com.intellij.ide.projectView.ProjectView
+import com.intellij.openapi.application.EDT
+import kotlinx.coroutines.withContext
+
+// 1. Open README.md (or fallback to first .java/.kt source file)
+val basePath = project.basePath ?: ""
+val readmePath = "${'$'}basePath/README.md"
+val readmeFile = LocalFileSystem.getInstance().findFileByPath(readmePath)
+val fileToOpen = if (readmeFile != null && readmeFile.exists()) {
+    readmeFile
+} else {
+    val baseDir = java.io.File(basePath)
+    val sourceFile = baseDir.walkTopDown()
+        .filter { it.isFile && (it.extension == "java" || it.extension == "kt") }
+        .firstOrNull()
+    if (sourceFile != null) {
+        LocalFileSystem.getInstance().findFileByPath(sourceFile.absolutePath)
+    } else {
+        null
+    }
+}
+
+if (fileToOpen != null) {
+    withContext(Dispatchers.EDT) {
+        FileEditorManager.getInstance(project).openFile(fileToOpen, true)
+        println("[UX-SETUP] Opened file: ${'$'}{fileToOpen.path}")
+    }
+} else {
+    println("[UX-SETUP] No README.md or source file found to open")
+}
+
+// 2. Show Maven or Gradle tool window depending on what build file exists
+val pomFile = java.io.File(basePath, "pom.xml")
+val gradleFile = java.io.File(basePath, "build.gradle")
+val gradleKtsFile = java.io.File(basePath, "build.gradle.kts")
+
+withContext(Dispatchers.EDT) {
+    try {
+        when {
+            pomFile.exists() -> {
+                ToolWindowManager.getInstance(project).getToolWindow("Maven")?.show()
+                println("[UX-SETUP] Maven tool window shown")
+            }
+            gradleFile.exists() || gradleKtsFile.exists() -> {
+                ToolWindowManager.getInstance(project).getToolWindow("Gradle")?.show()
+                println("[UX-SETUP] Gradle tool window shown")
+            }
+            else -> println("[UX-SETUP] No pom.xml or build.gradle found — skipping build tool window")
+        }
+    } catch (e: Exception) {
+        println("[UX-SETUP] Could not show build tool window: ${'$'}{e.message}")
+    }
+}
+
+// 3. Expand project tree root node (best-effort)
+try {
+    withContext(Dispatchers.EDT) {
+        ProjectView.getInstance(project).currentProjectViewPane?.tree?.expandRow(0)
+        println("[UX-SETUP] Project tree root expanded")
+    }
+} catch (e: Exception) {
+    println("[UX-SETUP] Could not expand project tree: ${'$'}{e.message}")
+}
+
+"done"
+""".trimIndent()
+
+        try {
+            mcpExecuteCode(
+                code = code,
+                projectName = projectName,
+                reason = "Open README.md and build tool window for agent orientation",
+                timeout = 30,
+            )
+        } catch (e: Exception) {
+            println("[UX-SETUP] Warning: UX setup failed: ${e.message}")
+        }
+    }
+
+    /**
      * Kill any blocking modal dialogs via steroid_execute_code.
      *
      * IntelliJ 2025.3.3+ shows a "NewUI Onboarding" dialog on first startup that blocks

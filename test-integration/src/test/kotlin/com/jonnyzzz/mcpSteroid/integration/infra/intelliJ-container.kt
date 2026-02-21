@@ -110,6 +110,12 @@ class IntelliJContainer(
         mcpSteroid.mcpSetupJdkAndWaitForImport(guestProjectDir)
         console.writeSuccess("Build tool sync complete")
 
+        // Open README.md (or fallback source file) and show build tool window so agents can orient
+        // themselves from the IDE view immediately.
+        console.writeStep(0, "Opening README.md and build tool window...")
+        mcpSteroid.mcpOpenReadmeAndBuildToolWindow(guestProjectDir)
+        console.writeSuccess("Project UX ready")
+
         return this
     }
 
