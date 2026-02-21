@@ -222,6 +222,113 @@ class McpSteroidDriver(
     }
 
     /**
+     * Set up the project JDK (if not already set) and wait for Maven/Gradle import to complete.
+     *
+     * Finds Eclipse Temurin 21 JDK at known Debian container paths, registers it with
+     * [ProjectJdkTable], and sets it as the project SDK. If the JDK was just set and
+     * a pom.xml exists, triggers a Maven re-sync (the initial import may have failed without JDK).
+     * Finally, suspends via [Observation.awaitConfiguration] until all pending configuration
+     * activities (Maven sync, Gradle import) finish.
+     *
+     * Safe to call when JDK is already configured or when no import is pending — both are no-ops.
+     *
+     * @param projectPath Guest project directory (used to resolve the project name from [mcpListProjects]).
+     */
+    fun mcpSetupJdkAndWaitForImport(projectPath: String) {
+        val projectName = try {
+            mcpListProjects().firstOrNull { it.path == projectPath }?.name
+        } catch (e: Exception) {
+            println("[JDK-SETUP] Could not list projects: ${e.message}")
+            null
+        }
+        if (projectName == null) {
+            println("[JDK-SETUP] Project not found for path $projectPath — skipping JDK setup")
+            return
+        }
+
+        val code = """
+import com.intellij.openapi.projectRoots.JavaSdk
+import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
+import com.intellij.openapi.projectRoots.ex.JavaSdkUtil
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.application.edtWriteAction
+import com.intellij.platform.backend.observation.Observation
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
+
+// 1. Detect and register system JDK if project SDK is unset
+val jdkCandidates = listOf(
+    "/usr/lib/jvm/temurin-21-amd64",
+    "/usr/lib/jvm/java-21-openjdk-amd64",
+    "/usr/lib/jvm/temurin-21",
+    "/usr/lib/jvm/java-21",
+)
+val jdkPath = jdkCandidates.firstOrNull { java.io.File(it, "bin/java").exists() }
+var jdkWasSet = false
+
+val currentSdk = ProjectRootManager.getInstance(project).projectSdk
+if (currentSdk != null) {
+    println("[JDK-SETUP] Project SDK already set: ${'$'}{currentSdk.name}")
+} else if (jdkPath == null) {
+    println("[JDK-SETUP] WARNING: No JDK found at: ${'$'}jdkCandidates")
+} else {
+    println("[JDK-SETUP] No project SDK set — registering ${'$'}jdkPath ...")
+    // SdkConfigurationUtil.createAndAddSDK creates the SDK and adds it to ProjectJdkTable atomically.
+    // JavaSdkUtil.applyJdkToProject sets it as project SDK and also configures the language level.
+    // Both require EDT + write action, which edtWriteAction provides.
+    val sdk = edtWriteAction {
+        SdkConfigurationUtil.createAndAddSDK(jdkPath, JavaSdk.getInstance())
+    }
+    if (sdk != null) {
+        edtWriteAction {
+            JavaSdkUtil.applyJdkToProject(project, sdk)
+        }
+        println("[JDK-SETUP] Project SDK set to ${'$'}{sdk.name} from ${'$'}jdkPath")
+        jdkWasSet = true
+    } else {
+        println("[JDK-SETUP] WARNING: SdkConfigurationUtil.createAndAddSDK returned null for ${'$'}jdkPath")
+    }
+}
+
+// 2. Trigger Maven re-sync if JDK was just registered (first import may have failed without JDK)
+val pomFile = java.io.File(project.basePath ?: "", "pom.xml")
+if (jdkWasSet && pomFile.exists()) {
+    try {
+        println("[JDK-SETUP] Triggering Maven re-sync after JDK setup...")
+        val mavenManager = org.jetbrains.idea.maven.project.MavenProjectsManager.getInstance(project)
+        mavenManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles()
+        delay(2_000L)  // Give Maven time to register its activity before awaiting
+    } catch (e: Exception) {
+        println("[JDK-SETUP] Maven re-sync failed: ${'$'}{e.message}")
+    }
+}
+
+// 3. Wait for all pending configuration (Maven/Gradle sync) to complete
+println("[JDK-SETUP] Waiting for project configuration (Maven/Gradle sync)...")
+val configured = withTimeoutOrNull(8 * 60 * 1000L) {
+    Observation.awaitConfiguration(project) { msg -> println("[CONFIG] ${'$'}msg") }
+}
+if (configured == null) {
+    println("[JDK-SETUP] WARNING: Configuration timed out after 8 minutes")
+} else {
+    println("[JDK-SETUP] Project configuration complete")
+}
+"done"
+""".trimIndent()
+
+        try {
+            mcpExecuteCode(
+                code = code,
+                projectName = projectName,
+                reason = "Setup JDK and wait for Maven/Gradle import",
+                timeout = 600,
+            )
+        } catch (e: Exception) {
+            println("[JDK-SETUP] Warning: JDK/import setup failed: ${e.message}")
+        }
+    }
+
+    /**
      * Kill any blocking modal dialogs via steroid_execute_code.
      *
      * IntelliJ 2025.3.3+ shows a "NewUI Onboarding" dialog on first startup that blocks

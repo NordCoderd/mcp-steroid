@@ -103,6 +103,13 @@ class IntelliJContainer(
             }
         }
         console.writeSuccess("Project import and indexing complete")
+
+        // Set up project JDK (if missing) and wait for Maven/Gradle sync to finish.
+        // No-op when JDK is already set and no import is pending.
+        console.writeStep(0, "Configuring project JDK and waiting for build tool sync...")
+        mcpSteroid.mcpSetupJdkAndWaitForImport(guestProjectDir)
+        console.writeSuccess("Build tool sync complete")
+
         return this
     }
 

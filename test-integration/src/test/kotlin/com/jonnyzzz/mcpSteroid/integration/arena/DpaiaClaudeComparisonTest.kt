@@ -187,8 +187,12 @@ class DpaiaClaudeComparisonTest {
                     timeoutSeconds = 1800,
                     prewarm = if (withMcp) { projectDir ->
                         println("[CLAUDE-CMP] Pre-warming: opening $projectDir in IntelliJ IDEA...")
-                        session.mcpSteroid.mcpOpenProject(projectDir)
+                        // Maven projects must be opened via pom.xml so IntelliJ triggers
+                        // MavenProjectOpenProcessor (rather than treating it as a plain directory).
+                        val projectFile = if (testCase.buildSystem == "maven") "$projectDir/pom.xml" else projectDir
+                        session.mcpSteroid.mcpOpenProject(projectFile)
                         session.mcpSteroid.waitForArenaProjectIndexed(projectDir)
+                        session.mcpSteroid.mcpSetupJdkAndWaitForImport(projectDir)
                         println("[CLAUDE-CMP] Pre-warm complete")
                     } else null,
                 )
