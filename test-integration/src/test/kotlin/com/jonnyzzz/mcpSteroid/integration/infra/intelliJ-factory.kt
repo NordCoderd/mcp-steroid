@@ -128,7 +128,7 @@ fun IntelliJContainer.Companion.create(
     var lastPidRefreshAt = 0L
     var lastWindows = emptyList<WindowInfo>()
     val ijWindowInfo = try {
-        waitForValue(30_000, "Waiting for ${ideProduct.displayName} window") {
+        waitForValue(120_000, "Waiting for ${ideProduct.displayName} window") {
             val now = System.currentTimeMillis()
             if (now - lastPidRefreshAt >= 1_000) {
                 trackedPids = discoverProcessFamilyPids(container, ijProcess.pid)
