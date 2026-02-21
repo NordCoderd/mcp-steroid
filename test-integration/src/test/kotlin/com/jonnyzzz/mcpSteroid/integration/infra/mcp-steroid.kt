@@ -174,6 +174,54 @@ class McpSteroidDriver(
     }
 
     /**
+     * Open a project directory in IntelliJ IDEA via steroid_open_project.
+     * Call this during the pre-warm phase (before the measured agent run).
+     */
+    fun mcpOpenProject(projectPath: String) {
+        val sessionId = mcpInitialize()
+        val request = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", 2)
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_open_project")
+                putJsonObject("arguments") {
+                    put("project_path", projectPath)
+                    put("reason", "Pre-warm: open arena project before measured agent run")
+                    put("trust_project", true)
+                }
+            }
+        }.toString()
+        executeMcpRequest(sessionId, request, timeoutSeconds = 60)
+    }
+
+    /**
+     * Wait for a specific project path to finish indexing.
+     * Poll steroid_list_windows until the project at [projectPath] is initialized and not indexing.
+     * Actively kills blocking dialogs. Timeout: 10 minutes.
+     */
+    fun waitForArenaProjectIndexed(projectPath: String) {
+        var lastDialogKillMs = 0L
+        waitFor(600_000, "Arena project indexing at $projectPath") {
+            val windows = mcpListWindows()
+            val projectWindows = windows.filter { it.projectPath == projectPath }
+            if (projectWindows.isEmpty()) return@waitFor false
+
+            val modalDialogPresent = projectWindows.any { it.modalDialogShowing }
+            if (modalDialogPresent) {
+                val nowMs = System.currentTimeMillis()
+                if (nowMs - lastDialogKillMs > 5_000) {
+                    lastDialogKillMs = nowMs
+                    killStartupDialogs(projectPath)
+                }
+                return@waitFor false
+            }
+
+            projectWindows.any { it.projectInitialized == true && it.indexingInProgress == false }
+        }
+    }
+
+    /**
      * Kill any blocking modal dialogs via steroid_execute_code.
      *
      * IntelliJ 2025.3.3+ shows a "NewUI Onboarding" dialog on first startup that blocks
