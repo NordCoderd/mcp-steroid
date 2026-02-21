@@ -230,6 +230,89 @@ class McpSteroidDriver(
     }
 
     /**
+     * Detect required IDE plugins from project dependencies and install any that are missing.
+     *
+     * Scans `pom.xml` / `build.gradle` for known dependency keywords and maps them to
+     * JetBrains Marketplace plugin IDs. Missing plugins are installed via
+     * [PluginsAdvertiser.installAndEnable], which downloads and dynamically loads them without
+     * requiring an IDE restart (when the plugin supports dynamic loading).
+     *
+     * Call this after initial indexing and before JDK/Maven setup so that Maven re-sync can
+     * already benefit from freshly installed framework support plugins.
+     *
+     * @param projectPath Guest project directory path.
+     */
+    fun mcpInstallRequiredPlugins(projectPath: String) {
+        val projectName = try {
+            mcpListProjects().firstOrNull { it.path == projectPath }?.name
+        } catch (e: Exception) {
+            println("[PLUGIN-INSTALL] Could not list projects: ${e.message}")
+            null
+        }
+        if (projectName == null) {
+            println("[PLUGIN-INSTALL] Project not found for path $projectPath — skipping plugin install")
+            return
+        }
+
+        val code = """
+import com.intellij.openapi.extensions.PluginId
+import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiser
+import java.io.File
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeoutOrNull
+
+// Dependency keyword → Marketplace plugin ID
+val detectionRules = mapOf(
+    "spring-kafka"   to "com.intellij.bigdatatools.kafka",
+    "kafka-clients"  to "com.intellij.bigdatatools.kafka",
+    "kafka-streams"  to "com.intellij.bigdatatools.kafka",
+)
+
+val basePath = project.basePath ?: ""
+val buildContent = sequenceOf("pom.xml", "build.gradle", "build.gradle.kts")
+    .map { File(basePath, it) }
+    .firstOrNull { it.exists() }
+    ?.readText() ?: ""
+
+val toInstall = detectionRules
+    .filter { (keyword, _) -> buildContent.contains(keyword, ignoreCase = true) }
+    .values.toSet()
+    .filter { PluginManagerCore.getPlugin(PluginId.getId(it)) == null }
+
+if (toInstall.isEmpty()) {
+    println("[PLUGIN-INSTALL] All required plugins already installed (or no matching dependencies)")
+} else {
+    println("[PLUGIN-INSTALL] Installing plugins: ${'$'}toInstall")
+    val done = CompletableDeferred<Unit>()
+    PluginsAdvertiser.installAndEnable(
+        project,
+        toInstall.map { PluginId.getId(it) }.toSet(),
+        onSuccess = Runnable { done.complete(Unit) },
+    )
+    val result = withTimeoutOrNull(180_000L) { done.await() }
+    if (result == null) {
+        println("[PLUGIN-INSTALL] WARNING: Installation timed out after 3 minutes")
+    } else {
+        println("[PLUGIN-INSTALL] Installation complete: ${'$'}toInstall")
+    }
+}
+"done"
+""".trimIndent()
+
+        try {
+            mcpExecuteCode(
+                code = code,
+                projectName = projectName,
+                reason = "Install required IDE plugins for project dependencies",
+                timeout = 200,
+            )
+        } catch (e: Exception) {
+            println("[PLUGIN-INSTALL] Warning: plugin installation failed: ${e.message}")
+        }
+    }
+
+    /**
      * Set up the project JDK (if not already set) and wait for Maven/Gradle import to complete.
      *
      * Finds an Eclipse Temurin JDK (21/25/17/11, amd64 or arm64) at known Debian container paths, registers it with

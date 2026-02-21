@@ -104,6 +104,12 @@ class IntelliJContainer(
         }
         console.writeSuccess("Project import and indexing complete")
 
+        // Install required IDE plugins (e.g. Kafka) detected from project dependencies.
+        // Must happen before JDK/Maven setup so Maven re-sync benefits from fresh plugin support.
+        console.writeStep(0, "Installing required IDE plugins...")
+        mcpSteroid.mcpInstallRequiredPlugins(guestProjectDir)
+        console.writeSuccess("Plugin installation complete")
+
         // Set up project JDK (if missing) and wait for Maven/Gradle sync to finish.
         // No-op when JDK is already set and no import is pending.
         console.writeStep(0, "Configuring project JDK and waiting for build tool sync...")
