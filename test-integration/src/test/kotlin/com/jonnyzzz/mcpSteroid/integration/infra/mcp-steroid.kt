@@ -186,13 +186,21 @@ class McpSteroidDriver(
             putJsonObject("params") {
                 put("name", "steroid_open_project")
                 putJsonObject("arguments") {
+                    put("task_id", "prewarm-open-project")
                     put("project_path", projectPath)
                     put("reason", "Pre-warm: open arena project before measured agent run")
                     put("trust_project", true)
                 }
             }
         }.toString()
-        executeMcpRequest(sessionId, request, timeoutSeconds = 60)
+        val response = executeMcpRequest(sessionId, request, timeoutSeconds = 60)
+        val responseJson = json.parseToJsonElement(response).jsonObject
+        val isError = responseJson["result"]?.jsonObject?.get("isError")?.jsonPrimitive?.booleanOrNull == true
+        if (isError) {
+            val errorText = responseJson["result"]?.jsonObject?.get("content")?.jsonArray
+                ?.firstOrNull()?.jsonObject?.get("text")?.jsonPrimitive?.contentOrNull ?: "unknown error"
+            error("steroid_open_project failed: $errorText")
+        }
     }
 
     /**
