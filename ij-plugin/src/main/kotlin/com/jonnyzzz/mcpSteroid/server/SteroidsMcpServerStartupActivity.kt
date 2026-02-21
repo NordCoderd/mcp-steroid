@@ -14,7 +14,8 @@ import com.jonnyzzz.mcpSteroid.updates.UpdateChecker
  */
 class SteroidsMcpServerStartupActivity : ProjectActivity {
     override suspend fun execute(project: Project) {
-        // Accessing the service triggers initialization if not already done
+        // Server is already started by SteroidsMcpServerAppLifecycleListener at IDE startup.
+        // startServerIfNeeded() is idempotent so it's safe to call here too as a fallback.
         val server = SteroidsMcpServer.getInstance()
         server.startServerIfNeeded()
 

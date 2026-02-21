@@ -136,9 +136,15 @@
         <registryKey key="mcp.steroid.kotlinc.home" defaultValue=""
             description="Path to external kotlinc home directory. When set, overrides the bundled kotlinc. Useful when the IDE ships a newer Kotlin version than the plugin bundles."/>
 
-        <!-- Start MCP server when IDE is ready -->
+        <!-- Start MCP server when a project opens (writes URL files, runs analytics) -->
         <postStartupActivity
                 implementation="com.jonnyzzz.mcpSteroid.server.SteroidsMcpServerStartupActivity"/>
     </extensions>
+
+    <!-- Start MCP server at IDE startup, before any project opens -->
+    <applicationListeners>
+        <listener class="com.jonnyzzz.mcpSteroid.server.SteroidsMcpServerAppLifecycleListener"
+                  topic="com.intellij.ide.AppLifecycleListener"/>
+    </applicationListeners>
 
 </idea-plugin>
