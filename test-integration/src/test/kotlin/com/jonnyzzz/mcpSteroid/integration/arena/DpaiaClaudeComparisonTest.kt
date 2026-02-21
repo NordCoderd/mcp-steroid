@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration.arena
 import com.jonnyzzz.mcpSteroid.integration.infra.AiMode
 import com.jonnyzzz.mcpSteroid.integration.infra.IdeTestFolders
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJProject
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.docker.BareRepoCache
@@ -31,9 +32,18 @@ import java.util.concurrent.TimeUnit
 /**
  * Claude-only A/B comparison: "Claude + MCP Steroid" vs "Claude without any IDE tools".
  *
- * Runs every case from [DpaiaCuratedCases.COMPARISON_CASES] twice with Claude:
- * - `[claude+mcp]`: Claude opens the project in IntelliJ IDEA via steroid_execute_code
+ * Runs one DPAIA test case twice with Claude:
+ * - `[claude+mcp]`: Claude uses IntelliJ IDEA via MCP Steroid (project pre-deployed at startup)
  * - `[claude+none]`: Claude uses only bash/grep/mvn/gradle — no IDE tooling
+ *
+ * The MCP container deploys the test project BEFORE IntelliJ starts
+ * (via [IntelliJProject.ProjectFromGitCommitAndPatch]) so no steroid_open_project call is needed.
+ * After IntelliJ starts, [IntelliJContainer.waitForProjectReady] waits for full indexing and JDK setup.
+ *
+ * **Run a specific scenario (required for meaningful MCP comparison):**
+ * ```
+ * -Dclaude.comparison.instanceId=dpaia__empty__maven__springboot3-3
+ * ```
  *
  * Captures per-run metrics:
  * - Wall-clock time (total: git clone + patch + agent run)
@@ -45,20 +55,23 @@ import java.util.concurrent.TimeUnit
  * - `[testOutputDir]/claude-comparison-report.md` — human-readable Markdown report
  * - `[testOutputDir]/claude-comparison-report.json` — machine-readable JSON data
  *
- * **Run all curated cases (default):**
+ * **Run default scenario (dpaia__empty__maven__springboot3-3):**
  * ```
  * ./gradlew :test-integration:test --tests '*DpaiaClaudeComparisonTest*'
  * ```
  *
- * **Override case list:**
+ * **Override case list (deprecated, prefer instanceId for one case):**
  * ```
- * -Dclaude.comparison.cases=dpaia__feature__service-125,dpaia__feature__service-25
+ * -Dclaude.comparison.cases=dpaia__feature__service-125
  * ```
  *
  * **Limit number of cases:**
  * ```
- * -Dclaude.comparison.maxCases=3
+ * -Dclaude.comparison.maxCases=1
  * ```
+ *
+ * To compare multiple scenarios, run this test once per scenario
+ * (e.g. via docs/dpaia-runs/run-all.sh) rather than in a single Docker session.
  */
 class DpaiaClaudeComparisonTest {
 
@@ -120,7 +133,7 @@ class DpaiaClaudeComparisonTest {
         private const val DATASET_URL =
             "https://raw.githubusercontent.com/dpaia/ee-dataset/main/datasets/java-spring-ee-dataset.json"
 
-        /** Guest directory for cloned projects (separate from DpaiaArenaTest and DpaiaComparisonTest). */
+        /** Guest directory for cloned projects (no-MCP case — bash-only, no IntelliJ). */
         private const val ARENA_WORKSPACE = "/home/agent/claude-comparison"
 
         private val results = CopyOnWriteArrayList<RunRecord>()
@@ -131,12 +144,44 @@ class DpaiaClaudeComparisonTest {
         @JvmStatic
         val lifetimeWithoutMcp by lazy { CloseableStackHost() }
 
-        /** Container where Claude is registered with MCP Steroid (HTTP transport). */
+        /**
+         * The single test case that will be pre-deployed before IntelliJ starts.
+         * Resolved once from the system property / default so both [sessionWithMcp] and
+         * [selectTestCases] see the same case.
+         *
+         * Use -Dclaude.comparison.instanceId=<id> to override.
+         */
+        private val setupTestCase: DpaiaTestCase by lazy {
+            val instanceId = System.getProperty("claude.comparison.instanceId")
+            if (!instanceId.isNullOrBlank()) {
+                DpaiaDatasetLoader.findById(dataset, instanceId)
+            } else {
+                selectTestCases().first()
+            }
+        }
+
+        /**
+         * Container where Claude is registered with MCP Steroid (HTTP transport).
+         *
+         * The arena project ([setupTestCase]) is deployed to the IDE's project-home path
+         * BEFORE IntelliJ starts — via [IntelliJProject.ProjectFromGitCommitAndPatch].
+         * [waitForProjectReady] then waits for the project to be fully indexed and JDK configured.
+         * When this lazy completes, the arena project is open and indexed in IntelliJ.
+         *
+         * No steroid_open_project call is needed — the project is already loaded.
+         */
         val sessionWithMcp by lazy {
             IntelliJContainer.create(
                 lifetimeWithMcp,
                 consoleTitle = "claude-cmp-mcp",
                 aiMode = AiMode.AI_MCP,
+                project = IntelliJProject.ProjectFromGitCommitAndPatch(
+                    cloneUrl = setupTestCase.cloneUrl,
+                    repoOwnerAndName = setupTestCase.repo.removeSuffix(".git"),
+                    baseCommit = setupTestCase.baseCommit,
+                    testPatch = setupTestCase.testPatch,
+                    displayName = setupTestCase.instanceId,
+                ),
             ).waitForProjectReady()
         }
 
@@ -158,11 +203,16 @@ class DpaiaClaudeComparisonTest {
         }
 
         private fun selectTestCases(): List<DpaiaTestCase> {
+            // Single scenario mode — preferred: aligns with pre-deployed project in sessionWithMcp.
+            val singleId = System.getProperty("claude.comparison.instanceId")
+            if (!singleId.isNullOrBlank()) {
+                return listOf(DpaiaDatasetLoader.findById(dataset, singleId))
+            }
             val specificIds = System.getProperty("claude.comparison.cases")
             val ids = if (!specificIds.isNullOrBlank()) {
                 specificIds.split(',').map { it.trim() }.filter { it.isNotBlank() }
             } else {
-                DpaiaCuratedCases.COMPARISON_CASES
+                listOf(DpaiaCuratedCases.DEFAULT_SIMPLE)
             }
             val maxCases = System.getProperty("claude.comparison.maxCases")?.toIntOrNull() ?: ids.size
             return ids.take(maxCases).map { id -> DpaiaDatasetLoader.findById(dataset, id) }
@@ -185,25 +235,17 @@ class DpaiaClaudeComparisonTest {
                     agent = session.aiAgents.claude,
                     withMcp = withMcp,
                     timeoutSeconds = 1800,
-                    prewarm = if (withMcp) { projectDir ->
-                        println("[CLAUDE-CMP] Pre-warming: opening $projectDir in IntelliJ IDEA...")
-                        // Maven projects must be opened via pom.xml so IntelliJ triggers
-                        // MavenProjectOpenProcessor (rather than treating it as a plain directory).
-                        val projectFile = if (testCase.buildSystem == "maven") "$projectDir/pom.xml" else projectDir
-                        session.mcpSteroid.mcpOpenProject(projectFile)
-                        session.mcpSteroid.waitForArenaProjectIndexed(projectDir)
-                        session.mcpSteroid.mcpSetupJdkAndWaitForImport(projectDir)
-                        println("[CLAUDE-CMP] Pre-warm complete")
-                    } else null,
+                    // For MCP: the project was pre-deployed before IntelliJ started and is already
+                    // fully indexed (waitForProjectReady() was called in @BeforeAll). Pass the
+                    // pre-deployed path so ArenaTestRunner skips re-cloning.
+                    // For no-MCP: null so ArenaTestRunner clones normally to ARENA_WORKSPACE.
+                    predeployedProjectDir = if (withMcp) session.intellijDriver.getGuestProjectDir() else null,
                 )
                 val totalMs = System.currentTimeMillis() - startMs
                 val tokens = extractTokenUsage(result.agentResult.rawOutput)
 
                 println("[CLAUDE-CMP] Completed: ${testCase.instanceId} [$modeLabel]")
                 println("[CLAUDE-CMP]   Total time:   ${totalMs / 1000}s (agent: ${result.agentDurationMs / 1000}s)")
-                if (withMcp) {
-                    println("[CLAUDE-CMP]   Pre-warm time: ${result.prewarmDurationMs / 1000}s (IDE open + index, not in agent budget)")
-                }
                 println("[CLAUDE-CMP]   Exit code:    ${result.agentResult.exitCode}")
                 println("[CLAUDE-CMP]   Claimed fix:  ${result.evaluation.agentClaimedFix}")
                 println("[CLAUDE-CMP]   Used MCP:     ${result.evaluation.usedMcpSteroid}")

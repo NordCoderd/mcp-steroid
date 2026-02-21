@@ -829,6 +829,173 @@ writeAction {
 }
 ```
 
+### Create Java/Kotlin Source Files (Preferred Pattern)
+
+Use `VfsUtil.createDirectoryIfMissing` + `VfsUtil.saveText` — safer than shell heredocs and atomic.
+
+**⚠️ Import-in-strings pitfall**: The script preprocessor extracts `import foo.Bar;` lines from the top level of your script — including lines inside triple-quoted strings. This causes compilation failures (e.g., `unresolved reference 'jakarta'`) when you embed Java source in a `"""..."""` literal.
+
+**Workaround**: Use `joinToString()` or string concatenation for the Java source content:
+
+```kotlin
+writeAction {
+    // Create package directories
+    val srcDir = VfsUtil.createDirectoryIfMissing(project.baseDir, "src/main/java/com/example/model")
+
+    // Build Java source using joinToString — avoids import-extraction bug
+    val content = listOf(
+        "package com.example.model;",
+        "import" + " jakarta.persistence.Entity;",
+        "import" + " jakarta.persistence.GeneratedValue;",
+        "import" + " jakarta.persistence.GenerationType;",
+        "import" + " jakarta.persistence.Id;",
+        "",
+        "@Entity",
+        "public class Product {",
+        "    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)",
+        "    private Long id;",
+        "    private String name;",
+        "    // getters/setters...",
+        "}"
+    ).joinToString("\n")
+
+    val f = srcDir.findChild("Product.java") ?: srcDir.createChildData(this, "Product.java")
+    VfsUtil.saveText(f, content)
+    println("Created: ${f.path}")
+}
+```
+
+Alternative: use `java.io.File` which is not affected by the preprocessor:
+
+```kotlin
+java.io.File("/path/to/project/src/main/java/com/example/Product.java").also { it.parentFile.mkdirs() }.writeText("""
+    package com.example;
+    import jakarta.persistence.Entity;
+    @Entity public class Product { }
+""".trimIndent())
+// Then refresh the VFS so IntelliJ picks up the new file
+LocalFileSystem.getInstance().refreshAndFindFileByPath("/path/to/project/src/main/java/com/example/Product.java")
+println("File created and VFS refreshed")
+```
+
+---
+
+## Java / Spring Boot Patterns
+
+### Find All @Entity / @Service / @RestController Classes
+
+```kotlin
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.search.searches.AnnotatedElementsSearch
+
+// Find all JPA @Entity classes
+val entityClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass("jakarta.persistence.Entity", allScope())
+        ?: JavaPsiFacade.getInstance(project).findClass("javax.persistence.Entity", allScope())
+}
+if (entityClass != null) {
+    val entities = AnnotatedElementsSearch.searchPsiClasses(entityClass, projectScope()).findAll()
+    println("@Entity classes (${entities.size}):")
+    entities.forEach { println("  ${it.qualifiedName} in ${it.containingFile.virtualFile.path}") }
+}
+
+// Find all Spring @Service classes
+val serviceClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass("org.springframework.stereotype.Service", allScope())
+}
+if (serviceClass != null) {
+    AnnotatedElementsSearch.searchPsiClasses(serviceClass, projectScope()).findAll()
+        .forEach { println("@Service: ${it.qualifiedName}") }
+}
+
+// Find all @RestController classes
+val rcClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass("org.springframework.web.bind.annotation.RestController", allScope())
+}
+if (rcClass != null) {
+    AnnotatedElementsSearch.searchPsiClasses(rcClass, projectScope()).findAll()
+        .forEach { println("@RestController: ${it.qualifiedName}") }
+}
+```
+
+### Check Jakarta vs javax Import Conflicts
+
+```kotlin
+import com.intellij.psi.JavaPsiFacade
+
+// Check which persistence API is available (Jakarta EE 3 vs older javax)
+val hasJakarta = readAction {
+    JavaPsiFacade.getInstance(project).findClass("jakarta.persistence.Entity", allScope()) != null
+}
+val hasJavax = readAction {
+    JavaPsiFacade.getInstance(project).findClass("javax.persistence.Entity", allScope()) != null
+}
+println("Has jakarta.persistence: $hasJakarta")
+println("Has javax.persistence: $hasJavax")
+// Use the correct import prefix in your generated files
+val persistencePrefix = if (hasJakarta) "jakarta" else "javax"
+println("Use: ${persistencePrefix}.persistence.Entity")
+```
+
+### Read pom.xml / Test Files via VFS
+
+```kotlin
+// Read pom.xml
+val pomContent = VfsUtil.loadText(findProjectFile("pom.xml")!!)
+println(pomContent)
+
+// Read a specific test file to understand its assertions before implementing
+val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/ProductTest.java")!!)
+println(testContent)
+```
+
+### Trigger Maven Re-import After pom.xml Changes
+
+```kotlin
+import org.jetbrains.idea.maven.project.MavenProjectsManager
+
+// After editing pom.xml, sync Maven to download new dependencies
+MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()
+println("Maven sync triggered — wait for background indexing before running tests")
+```
+
+### Run a Specific Maven Test Class via IDE
+
+```kotlin
+import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.RunManager
+import com.intellij.execution.executors.DefaultRunExecutor
+import org.jetbrains.idea.maven.execution.MavenRunConfiguration
+import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
+
+val configType = MavenRunConfigurationType.getInstance()
+val factory = configType.configurationFactories.first()
+val runConfig = factory.createTemplateConfiguration(project) as MavenRunConfiguration
+runConfig.runnerParameters.workingDirPath = project.basePath!!
+runConfig.runnerParameters.goals = listOf("test")
+runConfig.runnerParameters.mavenProperties["test"] = "ProductTest"
+val settings = RunManager.getInstance(project).createConfiguration(runConfig, factory)
+RunManager.getInstance(project).addConfiguration(settings)
+RunManager.getInstance(project).selectedConfiguration = settings
+ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
+println("Maven test started")
+```
+
+### Check Compile Errors Without Running Full Build
+
+```kotlin
+// Faster than 'mvn test' — returns IDE inspection results in seconds
+val vf = findProjectFile("src/main/java/com/example/Product.java")!!
+val problems = runInspectionsDirectly(vf)
+if (problems.isEmpty()) {
+    println("No problems found")
+} else {
+    problems.forEach { (id, descs) ->
+        descs.forEach { println("[$id] ${it.descriptionTemplate}") }
+    }
+}
+```
+
 ---
 
 ## Refactoring Operations

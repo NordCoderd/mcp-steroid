@@ -54,11 +54,61 @@ class ExecuteCodeToolHandler : McpRegistrar {
 
              This is a **stateful** API - everything you do changes the IDE state. The IntelliJ IDE is running exclusively for you. Use it aggressively instead of manual file operations.
 
+             **⚡ Bypasses Agent Sandbox**: Scripts run inside IntelliJ's JVM — unrestricted filesystem access. Use steroid_execute_code to read/write project files INSTEAD of agent-side file tools (those are sandboxed to /home/agent and cannot access /mcp-run-dir/ or the project). Do NOT use shell heredocs for multi-line file creation — use VFS APIs below.
+
              **Quick Start:**
              - Your code is a suspend function body (never use runBlocking)
              - Use readAction { } for PSI/VFS reads, writeAction { } for modifications
              - waitForSmartMode() runs automatically before your script
              - Available: project, println(), printJson(), printException(), progress()
+
+             **Read a project file:**
+             ```kotlin
+             val text = VfsUtil.loadText(findProjectFile("src/main/resources/application.properties")!!)
+             println(text)
+             ```
+
+             **Create/write a Java or Kotlin source file:**
+             ```kotlin
+             writeAction {
+                 val dir = VfsUtil.createDirectoryIfMissing(project.baseDir, "src/main/java/com/example/model")
+                 val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")
+                 // Use joinToString() or File.writeText() — NOT a triple-quoted string with 'import' at line start
+                 // (the preprocessor extracts import-like lines from triple-quoted strings as Kotlin imports)
+                 VfsUtil.saveText(f, listOf(
+                     "package com.example.model;",
+                     "import" + " jakarta.persistence.Entity;",
+                     "import" + " jakarta.persistence.Id;",
+                     "@Entity public class Product { @Id private Long id; }"
+                 ).joinToString("\n"))
+             }
+             println("File created")
+             ```
+
+             **⚠️ Import-in-strings pitfall**: Never put `import foo.Bar;` at the start of a line inside a triple-quoted Kotlin string. The script preprocessor extracts those lines as Kotlin imports, causing compile errors. Use `"import" + " foo.Bar;"` or `joinToString` to build the content, or use `java.io.File(path).writeText(content)` as an alternative.
+
+             **Spring Boot / Maven patterns:**
+             ```kotlin
+             // Find all @Entity classes in the project
+             import com.intellij.psi.search.searches.AnnotatedElementsSearch
+             val entityAnnotation = readAction {
+                 JavaPsiFacade.getInstance(project).findClass("jakarta.persistence.Entity", allScope())
+             }
+             AnnotatedElementsSearch.searchPsiClasses(entityAnnotation!!, projectScope()).findAll()
+                 .forEach { println(it.qualifiedName) }
+             ```
+             ```kotlin
+             // Trigger Maven re-import after editing pom.xml
+             import org.jetbrains.idea.maven.project.MavenProjectsManager
+             MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()
+             println("Maven sync triggered")
+             ```
+             ```kotlin
+             // Check for compile errors in a Java file (faster than running mvn test)
+             val vf = findProjectFile("src/main/java/com/example/Product.java")!!
+             val problems = runInspectionsDirectly(vf)
+             problems.forEach { (id, descs) -> descs.forEach { println("[" + id + "] " + it.descriptionTemplate) } }
+             ```
 
              **Common Operations:**
              - Code navigation: Find usages, go to definition, symbol search
