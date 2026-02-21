@@ -66,19 +66,19 @@ class ProcessRunnerTest {
     @Test
     fun `runProcess returns exit code zero on success`() {
         val result = runner.runProcess(request("true"))
-        assertEquals(0, result.exitCode)
+        result.assertExitCode(0) { "runProcess should return 0 for 'true'" }
     }
 
     @Test
     fun `runProcess returns non-zero exit code on failure`() {
         val result = runner.runProcess(request("false"))
-        assertEquals(1, result.exitCode)
+        result.assertExitCode(1) { "runProcess should return 1 for 'false'" }
     }
 
     @Test
     fun `runProcess returns specific exit code`() {
         val result = runner.runProcess(request("bash", "-c", "exit 42"))
-        assertEquals(42, result.exitCode)
+        result.assertExitCode(42) { "runProcess should return 42 for 'exit 42'" }
     }
 
     @Test
@@ -113,7 +113,7 @@ class ProcessRunnerTest {
         val result = runner.runProcess(request("sleep", "60") {
             timeoutSeconds(1)
         })
-        assertEquals(-1, result.exitCode)
+        result.assertExitCode(-1) { "runProcess should return -1 on timeout" }
         assertTrue(result.stderr.contains("Timeout"), "stderr should mention timeout, got: ${result.stderr}")
     }
 
@@ -144,7 +144,7 @@ class ProcessRunnerTest {
             quietly()
         })
         assertTrue(result.output.contains("quiet-output"), "quietly mode should still capture output")
-        assertEquals(0, result.exitCode)
+        result.assertExitCode(0) { "quietly mode should not affect exit code" }
     }
 
     // --- working directory ---
@@ -286,7 +286,7 @@ class ProcessRunRequestBuilderTest {
             .description("test")
             .workingDir(tempDir)
             .runProcess(runner)
-        assertEquals(0, result.exitCode)
+        result.assertExitCode(0) { "builder extension runProcess should succeed" }
         assertTrue(result.output.contains("ext-test"), "output should contain ext-test, got: ${result.output}")
     }
 }
