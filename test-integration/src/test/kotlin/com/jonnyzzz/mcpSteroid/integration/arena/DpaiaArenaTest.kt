@@ -8,6 +8,8 @@ import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.assertOutputContains
 import com.jonnyzzz.mcpSteroid.testHelper.docker.BareRepoCache
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.DynamicTest
@@ -22,8 +24,10 @@ import java.util.concurrent.TimeUnit
  * 1. Clones a repository from the dpaia dataset inside the Docker container
  * 2. Checks out the specified base commit
  * 3. Applies the test patch (failing tests that define expected behavior)
- * 4. Asks an AI agent to fix the code via MCP Steroid
- * 5. Evaluates whether the agent engaged meaningfully
+ * 4. Pre-warms IntelliJ: opens the project via MCP Steroid and waits for indexing
+ * 5. Asks an AI agent to fix the code via MCP Steroid (project already open and indexed)
+ * 6. Evaluates whether the agent engaged meaningfully
+ * 7. Writes a run summary JSON for the improvement pipeline (docs/dpaia-runs/)
  *
  * The dataset is downloaded from:
  * https://github.com/dpaia/ee-dataset/blob/main/datasets/java-spring-ee-dataset.json
@@ -40,7 +44,7 @@ import java.util.concurrent.TimeUnit
 class DpaiaArenaTest {
 
     @TestFactory
-    @Timeout(value = 30, unit = TimeUnit.MINUTES)
+    @Timeout(value = 60, unit = TimeUnit.MINUTES)
     fun `arena test cases`(): List<DynamicTest> {
         val selectedCases = selectTestCases()
         println("[ARENA] Selected ${selectedCases.size} test case(s) for execution")
@@ -59,7 +63,20 @@ class DpaiaArenaTest {
                         testCase = testCase,
                         agent = agent,
                         timeoutSeconds = 1800,
+                        prewarm = { projectDir ->
+                            // Open the cloned project in IntelliJ and wait for full indexing.
+                            // This runs BEFORE the agent timer starts so IDE setup time is
+                            // excluded from the agent's 30-minute budget.
+                            println("[ARENA] Pre-warming: opening $projectDir in IntelliJ IDEA...")
+                            session.mcpSteroid.mcpOpenProject(projectDir)
+                            session.mcpSteroid.waitForArenaProjectIndexed(projectDir)
+                            println("[ARENA] Pre-warm complete: $projectDir")
+                        },
                     )
+
+                    // Write run summary BEFORE assertions so the improvement pipeline
+                    // always gets data even when the test fails (e.g. agent didn't use MCP).
+                    writeRunSummary(testCase, agentName, result)
 
                     // Basic assertions: agent ran successfully and used MCP Steroid
                     result.agentResult.assertExitCode(0, message = "arena test ${testCase.instanceId}")
@@ -127,6 +144,41 @@ class DpaiaArenaTest {
             val maxCases = System.getProperty("arena.test.maxCases")?.toIntOrNull() ?: 1
 
             return filtered.take(maxCases)
+        }
+
+        /**
+         * Write a run summary JSON for the improvement pipeline (docs/dpaia-runs/).
+         *
+         * Path: [IdeTestFolders.testOutputDir]/dpaia-arena-run-{instanceId}.json
+         *
+         * The shell pipeline (run-one.sh) reads this to locate the arena run directory and
+         * metrics without searching through the build directory tree.
+         *
+         * Called BEFORE assertions so data is always captured even on test failure.
+         */
+        private fun writeRunSummary(testCase: DpaiaTestCase, agentName: String, result: ArenaTestResult) {
+            val combined = result.agentResult.output + "\n" + result.agentResult.stderr
+            val execCodeCalls = combined.lines().count { "steroid_execute_code" in it.lowercase() }
+
+            val summary = buildJsonObject {
+                put("instance_id", testCase.instanceId)
+                put("agent", agentName)
+                put("run_dir", session.runDirInContainer.absolutePath)
+                put("exit_code", result.agentResult.exitCode ?: -1)
+                put("agent_claimed_fix", result.evaluation.agentClaimedFix)
+                put("used_mcp_steroid", result.evaluation.usedMcpSteroid)
+                put("exec_code_calls", execCodeCalls)
+                put("agent_duration_ms", result.agentDurationMs)
+                put("prewarm_duration_ms", result.prewarmDurationMs)
+                put("agent_summary", result.evaluation.agentSummary ?: "")
+                put("timestamp", java.time.Instant.now().toString())
+            }
+
+            val summaryFile = IdeTestFolders.testOutputDir.resolve("dpaia-arena-run-${testCase.instanceId}.json")
+            summaryFile.parentFile.mkdirs()
+            summaryFile.writeText(summary.toString())
+            println("[ARENA] Run summary written to: ${summaryFile.absolutePath}")
+            println("[ARENA] Run dir (for improvement pipeline): ${session.runDirInContainer.absolutePath}")
         }
 
         @JvmStatic
