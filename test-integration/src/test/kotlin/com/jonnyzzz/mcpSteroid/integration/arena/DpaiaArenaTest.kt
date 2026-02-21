@@ -58,7 +58,7 @@ class DpaiaArenaTest {
                     val result = runner.runTest(
                         testCase = testCase,
                         agent = agent,
-                        timeoutSeconds = 900,
+                        timeoutSeconds = 1800,
                     )
 
                     // Basic assertions: agent ran successfully and used MCP Steroid

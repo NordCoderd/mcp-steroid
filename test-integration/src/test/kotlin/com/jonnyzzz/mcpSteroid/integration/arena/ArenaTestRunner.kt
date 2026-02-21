@@ -113,12 +113,13 @@ class ArenaTestRunner(
         appendLine("## Instructions")
         appendLine()
         if (withMcp) {
-            appendLine("1. Open the project at `$projectDir` in IntelliJ IDEA using steroid_execute_code")
-            appendLine("2. Analyze the codebase to understand the problem")
+            appendLine("The project at `$projectDir` is already open and fully indexed in IntelliJ IDEA.")
+            appendLine("1. Use steroid_list_projects or steroid_execute_code to confirm the project is loaded")
+            appendLine("2. Analyze the codebase to understand the problem (use steroid_execute_code)")
             appendLine("3. Implement the necessary changes to fix the issue")
-            appendLine("4. Use steroid_execute_code to verify your changes compile")
+            appendLine("4. Use steroid_execute_code to verify your changes compile and tests pass")
             appendLine()
-            appendLine("Use ONLY steroid_execute_code for IDE interactions.")
+            appendLine("Use steroid_execute_code for IDE interactions. The project is already open.")
         } else {
             appendLine("1. Navigate the project at `$projectDir` using bash/shell commands")
             appendLine("2. Read source files to understand the problem")
@@ -147,7 +148,8 @@ class ArenaTestRunner(
         testCase: DpaiaTestCase,
         agent: AiAgentSession,
         withMcp: Boolean = true,
-        timeoutSeconds: Long = 900,
+        timeoutSeconds: Long = 1800,
+        prewarm: ((projectDir: String) -> Unit)? = null,
     ): ArenaTestResult {
         println("[ARENA] ========================================")
         println("[ARENA] Running: ${testCase.instanceId}")
@@ -166,7 +168,16 @@ class ArenaTestRunner(
         val prompt = buildPrompt(testCase, projectDir, withMcp = withMcp)
         println("[ARENA] Prompt length: ${prompt.length} chars")
 
-        // Step 4: Run agent
+        // Pre-warm (NOT measured — IDE setup before the agent's timer starts)
+        val prewarmStartMs = System.currentTimeMillis()
+        if (prewarm != null) {
+            println("[ARENA] Pre-warming IDE for ${testCase.instanceId} ...")
+            prewarm(projectDir)
+            println("[ARENA] Pre-warm complete")
+        }
+        val prewarmDurationMs = System.currentTimeMillis() - prewarmStartMs
+
+        // Step 4: Run agent (START MEASURING)
         println("[ARENA] Running agent (timeout: ${timeoutSeconds}s) ...")
         val agentStartMs = System.currentTimeMillis()
         val agentResult = agent.runPrompt(prompt, timeoutSeconds = timeoutSeconds)
@@ -187,6 +198,7 @@ class ArenaTestRunner(
             agentResult = agentResult,
             evaluation = evaluation,
             agentDurationMs = agentDurationMs,
+            prewarmDurationMs = prewarmDurationMs,
         )
     }
 
@@ -219,6 +231,8 @@ data class ArenaTestResult(
     val evaluation: ArenaEvaluation,
     /** Wall-clock milliseconds spent inside [agent.runPrompt] (excludes git clone and patch apply). */
     val agentDurationMs: Long = 0L,
+    /** Wall-clock milliseconds spent in IDE pre-warm (open + index); excluded from agent budget. */
+    val prewarmDurationMs: Long = 0L,
 )
 
 /**

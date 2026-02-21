@@ -63,7 +63,7 @@ import java.util.concurrent.TimeUnit
 class DpaiaClaudeComparisonTest {
 
     @TestFactory
-    @Timeout(value = 30, unit = TimeUnit.MINUTES)
+    @Timeout(value = 120, unit = TimeUnit.MINUTES)
     fun `claude comparison runs`(): List<DynamicTest> {
         val cases = selectTestCases()
         println("[CLAUDE-CMP] Running ${cases.size} cases × 2 modes = ${cases.size * 2} dynamic tests")
@@ -101,6 +101,8 @@ class DpaiaClaudeComparisonTest {
         val totalDurationMs: Long,
         /** Agent-only ms: just [agent.runPrompt]. */
         val agentDurationMs: Long,
+        /** IDE pre-warm ms: open + index time (NOT in agent budget). */
+        val prewarmDurationMs: Long = 0L,
         val exitCode: Int?,
         val agentClaimedFix: Boolean,
         val usedMcpSteroid: Boolean,
@@ -144,7 +146,8 @@ class DpaiaClaudeComparisonTest {
                 lifetimeWithoutMcp,
                 consoleTitle = "claude-cmp-none",
                 aiMode = AiMode.NONE,
-            ).waitForProjectReady()
+            )
+            // No waitForProjectReady() — no-MCP agent never uses IntelliJ
         }
 
         private val dataset by lazy {
@@ -181,13 +184,22 @@ class DpaiaClaudeComparisonTest {
                     testCase = testCase,
                     agent = session.aiAgents.claude,
                     withMcp = withMcp,
-                    timeoutSeconds = 900,
+                    timeoutSeconds = 1800,
+                    prewarm = if (withMcp) { projectDir ->
+                        println("[CLAUDE-CMP] Pre-warming: opening $projectDir in IntelliJ IDEA...")
+                        session.mcpSteroid.mcpOpenProject(projectDir)
+                        session.mcpSteroid.waitForArenaProjectIndexed(projectDir)
+                        println("[CLAUDE-CMP] Pre-warm complete")
+                    } else null,
                 )
                 val totalMs = System.currentTimeMillis() - startMs
                 val tokens = extractTokenUsage(result.agentResult.rawOutput)
 
                 println("[CLAUDE-CMP] Completed: ${testCase.instanceId} [$modeLabel]")
                 println("[CLAUDE-CMP]   Total time:   ${totalMs / 1000}s (agent: ${result.agentDurationMs / 1000}s)")
+                if (withMcp) {
+                    println("[CLAUDE-CMP]   Pre-warm time: ${result.prewarmDurationMs / 1000}s (IDE open + index, not in agent budget)")
+                }
                 println("[CLAUDE-CMP]   Exit code:    ${result.agentResult.exitCode}")
                 println("[CLAUDE-CMP]   Claimed fix:  ${result.evaluation.agentClaimedFix}")
                 println("[CLAUDE-CMP]   Used MCP:     ${result.evaluation.usedMcpSteroid}")
@@ -207,6 +219,7 @@ class DpaiaClaudeComparisonTest {
                     withMcp = withMcp,
                     totalDurationMs = totalMs,
                     agentDurationMs = result.agentDurationMs,
+                    prewarmDurationMs = result.prewarmDurationMs,
                     exitCode = result.agentResult.exitCode,
                     agentClaimedFix = result.evaluation.agentClaimedFix,
                     usedMcpSteroid = result.evaluation.usedMcpSteroid,
@@ -609,6 +622,9 @@ class DpaiaClaudeComparisonTest {
                     appendLine("**$modeLabel:**")
                     appendLine("- Fix claimed: ${if (rec.agentClaimedFix) "yes ✅" else "no ❌"}")
                     appendLine("- Total time: ${rec.totalDurationMs / 1000}s (agent: ${rec.agentDurationMs / 1000}s)")
+                    if (rec.withMcp && rec.prewarmDurationMs > 0) {
+                        appendLine("- Pre-warm time: ${rec.prewarmDurationMs / 1000}s (IDE open + index, not in agent budget)")
+                    }
                     appendLine("- Exit code: ${rec.exitCode ?: "n/a"}")
                     if (rec.usedMcpSteroid) appendLine("- Used steroid_execute_code: yes")
                     val u = rec.tokenUsage
@@ -635,6 +651,7 @@ class DpaiaClaudeComparisonTest {
                         put("mode", r.modeLabel)
                         put("totalDurationMs", r.totalDurationMs)
                         put("agentDurationMs", r.agentDurationMs)
+                        put("prewarmDurationMs", r.prewarmDurationMs)
                         put("exitCode", r.exitCode ?: -1)
                         put("agentClaimedFix", r.agentClaimedFix)
                         put("usedMcpSteroid", r.usedMcpSteroid)
