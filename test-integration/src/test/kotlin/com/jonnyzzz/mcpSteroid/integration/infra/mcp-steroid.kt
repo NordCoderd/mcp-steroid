@@ -259,8 +259,6 @@ import com.intellij.openapi.extensions.PluginId
 import com.intellij.ide.plugins.PluginManagerCore
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiser
 import java.io.File
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.withTimeoutOrNull
 
 // Dependency keyword → Marketplace plugin ID
 val detectionRules = mapOf(
@@ -284,18 +282,16 @@ if (toInstall.isEmpty()) {
     println("[PLUGIN-INSTALL] All required plugins already installed (or no matching dependencies)")
 } else {
     println("[PLUGIN-INSTALL] Installing plugins: ${'$'}toInstall")
-    val done = CompletableDeferred<Unit>()
     PluginsAdvertiser.installAndEnable(
         project,
         toInstall.map { PluginId.getId(it) }.toSet(),
-        onSuccess = Runnable { done.complete(Unit) },
+        onSuccess = Runnable { println("[PLUGIN-INSTALL] installAndEnable callback fired") },
     )
-    val result = withTimeoutOrNull(180_000L) { done.await() }
-    if (result == null) {
-        println("[PLUGIN-INSTALL] WARNING: Installation timed out after 3 minutes")
-    } else {
-        println("[PLUGIN-INSTALL] Installation complete: ${'$'}toInstall")
-    }
+    // Plugin installation triggers re-indexing (dumb mode). Wait for smart mode —
+    // this is the canonical way to wait for all IDE background work to complete.
+    println("[PLUGIN-INSTALL] Waiting for smart mode after plugin installation...")
+    waitForSmartMode()
+    println("[PLUGIN-INSTALL] Smart mode reached — plugins ready: ${'$'}toInstall")
 }
 "done"
 """.trimIndent()
