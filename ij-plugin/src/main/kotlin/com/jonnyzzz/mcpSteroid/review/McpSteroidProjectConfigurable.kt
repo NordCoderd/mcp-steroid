@@ -8,13 +8,9 @@ import com.intellij.openapi.options.BoundConfigurable
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.util.registry.Registry
-import com.intellij.ui.components.JBScrollBar
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBTextField
-import com.intellij.ui.components.fields.ExpandableSupport
-import com.intellij.ui.components.fields.ExtendableTextComponent
-import com.intellij.ui.components.fields.ExtendableTextField
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.TopGap
@@ -23,6 +19,7 @@ import com.intellij.ui.dsl.builder.panel
 import com.jonnyzzz.mcpSteroid.aiAgents.McpConnectionInfo
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import java.awt.datatransfer.StringSelection
+import javax.swing.JButton
 
 class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigurable("MCP Steroid") {
 
@@ -35,7 +32,8 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
             // 1. Server URL
             if (info != null) {
                 row("Server URL:") {
-                    cell(copyableTextField(info.serverUrl)).align(AlignX.FILL)
+                    cell(JBTextField(info.serverUrl).apply { isEditable = false }).align(AlignX.FILL)
+                    cell(copyIconButton(info.serverUrl))
                 }
             }
 
@@ -73,56 +71,42 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
                 group("Quick Start") {
                     for ((name, command) in info.commands) {
                         row("$name:") {
-                            cell(copyableTextField(command)).align(AlignX.FILL)
+                            cell(JBTextField(command).apply { isEditable = false }).align(AlignX.FILL)
+                            cell(copyIconButton(command))
                         }
                     }
 
-                    // Cursor/JSON Config — one level deep inside Quick Start
+                    // Cursor/JSON Config
                     group("Cursor / JSON Config") {
                         val json = info.jsonConfig.trim()
-                        val scrollPane = copyableTextArea(json, rows = 10)
                         row {
-                            cell(scrollPane).align(Align.FILL)
+                            val textArea = JBTextArea(json).apply {
+                                isEditable = false
+                                rows = 10
+                            }
+                            cell(JBScrollPane(textArea)).align(Align.FILL)
                         }.topGap(TopGap.NONE)
+                        row {
+                            button("Copy JSON Config") {
+                                CopyPasteManager.getInstance().setContents(StringSelection(json))
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    private fun copyableTextField(content: String): ExtendableTextField =
-        ExtendableTextField().apply {
-            text = content
-            isEditable = false
-            // Force background painting even for non-editable fields so the copy icon
-            // appears visually INSIDE the field border rather than floating beside it.
-            putClientProperty(JBTextField.IS_FORCE_INNER_BACKGROUND_PAINT, true)
-            addExtension(ExtendableTextComponent.Extension.create(
-                AllIcons.General.InlineCopy,
-                AllIcons.General.InlineCopyHover,
-                "Copy to clipboard"
-            ) {
+    private fun copyIconButton(content: String): JButton =
+        JButton(AllIcons.General.InlineCopy).apply {
+            toolTipText = "Copy to clipboard"
+            isBorderPainted = false
+            isContentAreaFilled = false
+            isFocusPainted = false
+            addActionListener {
                 CopyPasteManager.getInstance().setContents(StringSelection(content))
-            })
+            }
         }
-
-    private fun copyableTextArea(content: String, rows: Int): JBScrollPane {
-        val copyExt = ExtendableTextComponent.Extension.create(
-            AllIcons.General.InlineCopy,
-            AllIcons.General.InlineCopyHover,
-            "Copy to clipboard"
-        ) {
-            CopyPasteManager.getInstance().setContents(StringSelection(content))
-        }
-        val textArea = JBTextArea(content).apply {
-            isEditable = false
-            this.rows = rows
-        }
-        val scrollPane = JBScrollPane(textArea)
-        scrollPane.verticalScrollBarPolicy = JBScrollPane.VERTICAL_SCROLLBAR_ALWAYS
-        scrollPane.verticalScrollBar.add(JBScrollBar.LEADING, ExpandableSupport.createLabel(copyExt))
-        return scrollPane
-    }
 
     private fun loadConnectionInfo(): McpConnectionInfo? {
         val server = ApplicationManager.getApplication().getService(SteroidsMcpServer::class.java)
