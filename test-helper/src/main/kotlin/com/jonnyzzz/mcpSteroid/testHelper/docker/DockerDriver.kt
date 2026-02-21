@@ -88,9 +88,7 @@ class DockerDriver(
                     .build()
             )
 
-            if (result.exitCode != 0) {
-                throw IllegalStateException("Failed to build Docker image. Exit code: ${result.exitCode}\n${result.stderr}")
-            }
+            result.assertExitCode(0) { "Failed to build Docker image.\n${result.stderr}" }
 
             val imageId = iidFile.readText().trim()
             require(imageId.startsWith("sha256:")) { "Unexpected image ID format from --iidfile: $imageId" }
@@ -367,9 +365,7 @@ class DockerDriver(
             detach = true,
         )
 
-        if (result.exitCode != 0) {
-            error("Failed to start detached process '$name': ${result.stderr}")
-        }
+        result.assertExitCode(0) { "Failed to start detached process '$name': ${result.stderr}" }
 
         println("[$logPrefix] Detached process '$name' started, stdout/stderr at $logDir")
         return DetachedContainerProcess(name = name, logDir = logDir)
