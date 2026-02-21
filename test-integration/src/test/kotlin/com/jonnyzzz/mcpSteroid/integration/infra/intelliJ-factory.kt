@@ -159,6 +159,16 @@ fun IntelliJContainer.Companion.create(
 
     windowsDriver.updateLayout(ijWindowInfo, windowsLayout.layoutIntelliJWindow())
 
+    // Re-layout the console window now that fluxbox is fully settled (decorations applied).
+    // The first updateLayout call in createConsoleDriver races with fluxbox applying the
+    // apps file {NONE} decorations — by this point IntelliJ is up, so fluxbox has had
+    // 30+ seconds to settle and the console position is corrected.
+    val consoleWindow = windowsDriver.listWindows()
+        .firstOrNull { it.title.contains(realConsoleTitle, ignoreCase = true) }
+    if (consoleWindow != null) {
+        windowsDriver.updateLayout(consoleWindow, windowsLayout.layoutStatusConsoleWindow())
+    }
+
     // Wait for MCP server readiness
     val mcpSteroidDriver = McpSteroidDriver(container, ijDriver)
     console.writeInfo("Waiting for MCP Steroid server...")

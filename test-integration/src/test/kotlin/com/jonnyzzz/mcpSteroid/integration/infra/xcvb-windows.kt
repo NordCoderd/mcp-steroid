@@ -32,6 +32,15 @@ class XcvbWindowDriver(
             "background: fullscreen\nbackground.pixmap: /usr/share/images/mcp-steroid-wallpaper.jpg\n",
         )
 
+        // Disable the fluxbox toolbar (the task bar at the bottom of the screen).
+        // Without this, fluxbox reserves ~20px at the top and ~20px at the bottom,
+        // reporting a reduced _NET_WORKAREA and visually cutting the windows.
+        // We want windows to cover the full 3840×2160 display.
+        driver.writeFileInContainer(
+            "/home/agent/.fluxbox/init",
+            "session.screen0.toolbar.visible: false\n",
+        )
+
         // Remove WM title bars for IntelliJ IDEA and xterm windows.
         // Without a WM title bar, _NET_FRAME_EXTENTS=(0,0,0,0) and IntelliJ's new UI
         // (Islands theme) positions its integrated title bar at y=0 instead of y=-20,
@@ -102,26 +111,19 @@ class XcvbWindowDriver(
     fun getDisplayArea(): WindowRect = wholeScreen
 
     /**
-     * Query the usable screen area from the window manager.
-     * Uses `xprop` to read the `_NET_WORKAREA` property from the X root window,
-     * which excludes taskbars, panels, and other reserved areas.
+     * Return the usable screen area for window layout.
      *
-     * Falls back to the full display size if the property is not available.
+     * The fluxbox toolbar is disabled (session.screen0.toolbar.visible: false in
+     * ~/.fluxbox/init), so the work area equals the full display. We return the
+     * known display dimensions with a 2px inset on all sides — this leaves a visible
+     * border around both windows so screenshots can confirm correct edge alignment.
      */
-    fun getWorkArea(): WindowRect {
-        val result = driver.runInContainer(
-            listOf("xprop", "-root", "_NET_WORKAREA"),
-            timeoutSeconds = 5,
-        ).assertExitCode(0)
-
-        // Output format: _NET_WORKAREA(CARDINAL) = 0, 0, 3840, 2140
-        val match = Regex("""(\d+),\s*(\d+),\s*(\d+),\s*(\d+)""")
-            .find(result.output)
-            ?: error("Failed to find the work area")
-
-        val (x, y, w, h) = match.destructured
-        return WindowRect(x.toInt(), y.toInt(), w.toInt(), h.toInt())
-    }
+    fun getWorkArea(): WindowRect = WindowRect(
+        x = wholeScreen.x + 2,
+        y = wholeScreen.y + 2,
+        width = wholeScreen.width - 4,
+        height = wholeScreen.height - 4,
+    )
 
 
     fun updateLayout(window: WindowInfo, rect: WindowRect) {
