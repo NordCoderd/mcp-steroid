@@ -137,12 +137,19 @@ class ArenaTestRunner(
     }
 
     /**
-     * Run a complete arena test: clone, patch, prompt agent, collect result.
+     * Run a complete arena test: clone (unless pre-deployed), patch, prompt agent, collect result.
      *
      * @param testCase The test case to run
      * @param agent The AI agent session to use
      * @param timeoutSeconds Maximum time for the agent to work
-     * @return The arena test result with agent output and evaluation
+     * @param prewarm Optional lambda to run before the agent timer (excluded from agent budget).
+     *                Use when pre-warming is needed AFTER container creation (legacy approach).
+     *                When [predeployedProjectDir] is set, the project is already indexed by
+     *                [waitForProjectReady] so no prewarm is needed.
+     * @param predeployedProjectDir Guest path of a project already deployed and indexed in the IDE.
+     *                              When set, skips clone + patch (done by IntelliJProject.deploy()).
+     *                              The project was deployed via [IntelliJProject.ProjectFromGitCommitAndPatch]
+     *                              and indexed by [IntelliJContainer.waitForProjectReady].
      */
     fun runTest(
         testCase: DpaiaTestCase,
@@ -150,6 +157,7 @@ class ArenaTestRunner(
         withMcp: Boolean = true,
         timeoutSeconds: Long = 1800,
         prewarm: ((projectDir: String) -> Unit)? = null,
+        predeployedProjectDir: String? = null,
     ): ArenaTestResult {
         println("[ARENA] ========================================")
         println("[ARENA] Running: ${testCase.instanceId}")
@@ -158,11 +166,15 @@ class ArenaTestRunner(
         println("[ARENA] Build: ${testCase.buildSystem}")
         println("[ARENA] ========================================")
 
-        // Step 1: Clone and checkout
-        val projectDir = cloneAndCheckout(testCase)
-
-        // Step 2: Apply test patch (failing tests)
-        applyTestPatch(testCase, projectDir)
+        // Step 1+2: Clone and patch, unless the project was pre-deployed before IntelliJ started.
+        val projectDir: String
+        if (predeployedProjectDir != null) {
+            println("[ARENA] Using pre-deployed project at $predeployedProjectDir (skipping clone+patch)")
+            projectDir = predeployedProjectDir
+        } else {
+            projectDir = cloneAndCheckout(testCase)
+            applyTestPatch(testCase, projectDir)
+        }
 
         // Step 3: Build prompt
         val prompt = buildPrompt(testCase, projectDir, withMcp = withMcp)

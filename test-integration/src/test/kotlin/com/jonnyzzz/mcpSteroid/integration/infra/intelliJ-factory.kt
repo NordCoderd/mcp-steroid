@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
+import com.jonnyzzz.mcpSteroid.testHelper.docker.BareRepoCache
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
@@ -101,6 +102,18 @@ fun IntelliJContainer.Companion.create(
     console.writeInfo("Deploying MCP Steroid plugin...")
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
 
+
+    // Warm the bare repo cache on the host before deploying, so the container can clone
+    // from /repo-cache (fast, local) instead of hitting the remote (slow, network).
+    val repoUrlForCache = selectedProject.getRepoUrlForCache()
+    if (repoUrlForCache != null && repoCacheDir != null) {
+        println("[IDE-AGENT] Warming bare repo cache for $repoUrlForCache ...")
+        try {
+            BareRepoCache.ensureRepo(repoUrlForCache, repoCacheDir)
+        } catch (e: Exception) {
+            println("[IDE-AGENT] WARNING: Failed to warm repo cache for $repoUrlForCache: ${e.message}")
+        }
+    }
 
     val ijProjectDriver = IntelliJProjectDriver(lifetime, container, ijDriver, console)
     ijProjectDriver.deployProject(selectedProject)

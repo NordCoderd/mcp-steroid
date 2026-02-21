@@ -9,8 +9,9 @@ import kotlin.io.path.exists
 private const val BASE_DOCKER_CONTEXT = "ide-base"
 private const val BASE_IMAGE_NAME = "mcp-steroid-ide-base-test"
 
-// JVM-level guard: the shared base image is built once; its ID is stored so
-// derived images can reference it by content-addressable hash rather than name.
+// JVM-level guard: the shared base image is built once per JVM; its name is cached
+// so derived images can reference it. The synchronized block ensures single-build
+// semantics; unique suffixes on derived image names prevent parallel-test collisions.
 @Volatile private var baseImageId: String? = null
 private val baseImageLock = Any()
 
@@ -51,13 +52,16 @@ private fun buildSharedBaseImage(): String {
         baseImageId?.let { return it }  // double-checked locking
         val baseContext = prepareContext("docker-$BASE_DOCKER_CONTEXT", BASE_DOCKER_CONTEXT)
         val baseScope = DockerDriver(baseContext, "IDE-AGENT")
-        val id = baseScope.buildDockerImage(
+        baseScope.buildDockerImage(
             imageName = BASE_IMAGE_NAME,
             dockerfilePath = File(baseContext, "Dockerfile"),
             timeoutSeconds = 900,
         )
-        baseImageId = id
-        return id
+        // Use the image name (not SHA256 hash) so Docker BuildKit can resolve it as
+        // a local image. BuildKit 29+ can't resolve bare sha256: hashes locally and
+        // tries to pull them from Docker Hub, which fails.
+        baseImageId = BASE_IMAGE_NAME
+        return BASE_IMAGE_NAME
     }
 }
 
