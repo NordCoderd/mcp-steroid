@@ -32,6 +32,22 @@ class XcvbWindowDriver(
             "background: fullscreen\nbackground.pixmap: /usr/share/images/mcp-steroid-wallpaper.jpg\n",
         )
 
+        // Remove WM title bars for IntelliJ IDEA and xterm windows.
+        // Without a WM title bar, _NET_FRAME_EXTENTS=(0,0,0,0) and IntelliJ's new UI
+        // (Islands theme) positions its integrated title bar at y=0 instead of y=-20,
+        // making the toolbar fully visible. xterm has no need for a WM title bar either.
+        driver.writeFileInContainer(
+            "/home/agent/.fluxbox/apps",
+            buildString {
+                appendLine("[app] (name=jetbrains-idea)")
+                appendLine("  [Decorations]  {NONE}")
+                appendLine("[end]")
+                appendLine("[app] (name=xterm)")
+                appendLine("  [Decorations]  {NONE}")
+                appendLine("[end]")
+            },
+        )
+
         println("[xcvb] Starting fluxbox...")
         val proc = driver.runInContainerDetached(
             listOf("fluxbox"),

@@ -43,7 +43,7 @@ class HorizontalLayoutManager(
             x = workArea.x,
             y = workArea.y,
             width = workArea.width * 2 / 3 - 2,
-            height = workArea.height,
+            height = windowHeight(workArea),
         )
     }
 
@@ -53,9 +53,20 @@ class HorizontalLayoutManager(
             x = workArea.x + workArea.width - consoleWidth,
             y = workArea.y,
             width = consoleWidth - 2,
-            height = workArea.height,
+            height = windowHeight(workArea),
         )
     }
+
+    /**
+     * Compute safe window height that fits within the physical display.
+     *
+     * With fluxbox configured to use no WM decorations ({NONE} in apps file),
+     * xdotool windowsize sets the CLIENT height directly (no title bar overhead).
+     * The work area height is already safe to use; we cap at displayHeight - 4
+     * as a small safety margin for bottom pixel borders.
+     */
+    private fun windowHeight(workArea: WindowRect): Int =
+        workArea.height.coerceAtMost(displayHeight - 4)
 }
 
 class WindowLayoutManager(
