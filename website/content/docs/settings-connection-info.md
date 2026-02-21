@@ -1,8 +1,7 @@
 ---
-title: "Connect your AI Agents"
+title: "MCP Connection Settings"
 description: "How to find and copy your MCP server connection details from the IntelliJ Settings page"
-weight: 50
-group: "Reference"
+weight: 2
 ---
 
 > **Available from 0.89.0.** Earlier versions only show connection info while a project is open.

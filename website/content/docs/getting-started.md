@@ -1,8 +1,7 @@
 ---
 title: "Getting Started"
 description: "Install and set up MCP Steroid with your AI agent"
-weight: 10
-group: "Getting Started"
+weight: 1
 ---
 
 ## What is MCP Steroid?

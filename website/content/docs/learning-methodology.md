@@ -1,8 +1,7 @@
 ---
-title: "Reinforced Learning Approach"
+title: "Learning Methodology"
 description: "How MCP Steroid improves agent reliability with reproducible experiments"
-weight: 40
-group: "Vision"
+weight: 4
 aliases:
   - /learning-methodology/
 ---
