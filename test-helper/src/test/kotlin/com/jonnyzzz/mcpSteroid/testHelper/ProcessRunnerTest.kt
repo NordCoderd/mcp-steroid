@@ -28,26 +28,6 @@ class ProcessRunnerTest {
             .apply(block)
             .build()
 
-    // --- startProcess ---
-
-    @Test
-    fun `startProcess returns a valid PID`() {
-        val started = runner.startProcess(request("echo", "hello"))
-        assertNotNull(started.pid)
-        assertFalse(started.pid.pid.isBlank())
-    }
-
-    @Test
-    fun `startProcess runs the process asynchronously`() {
-        // start a long-running process and verify it is alive
-        val started = runner.startProcess(request("sleep", "10"))
-        assertNotNull(started.pid)
-
-        // clean up - kill via PID
-        val pid = started.pid.pid.toLong()
-        ProcessHandle.of(pid).ifPresent { it.destroyForcibly() }
-    }
-
     // --- runProcess basic ---
 
     @Test

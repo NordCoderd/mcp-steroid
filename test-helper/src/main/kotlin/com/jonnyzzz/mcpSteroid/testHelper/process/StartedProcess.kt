@@ -14,6 +14,5 @@ data class ProcessStreamLine(
     val line: String,
 )
 
-interface StartedProcess {
-    val pid: PID
+interface StartedProcess : ProcessResult {
 }

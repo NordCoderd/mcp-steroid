@@ -50,21 +50,10 @@ class ProcessRunner(
 
         val completed = process.waitFor(request.timeoutSeconds, TimeUnit.SECONDS)
 
-        fun builder(type: ProcessStreamType) = object {
-            override fun toString(): String {
-                return processInfo.messagesChannel
-                    .filter { it.type == type }
-                    .joinToString { it.line }
-            }
-        }
-
-        val outputBuilder = builder(ProcessStreamType.STDOUT)
-        val errorBuilder = builder(ProcessStreamType.STDERR)
-
         if (!completed) {
             process.destroyForcibly()
             println("[$logPrefix] Timed out after ${request.timeoutSeconds}s")
-            return ProcessResultValue(-1, outputBuilder.toString(), "Timeout\n$errorBuilder")
+            return ProcessResultValue(-1, processInfo.output, "Timeout\n${processInfo.stderr}")
         }
 
         processInfo.thread.forEach {
@@ -75,7 +64,7 @@ class ProcessRunner(
 
         val exitCode = process.exitValue()
         println("[$logPrefix] Exit code: $exitCode")
-        return ProcessResultValue(exitCode, outputBuilder.toString(), errorBuilder.toString())
+        return ProcessResultValue(exitCode, processInfo.output, processInfo.stderr)
     }
 
     fun startProcess(request: ProcessRunRequest): StartedProcess = startProcessImpl(request)
@@ -97,7 +86,6 @@ class ProcessRunner(
 
         val process = processBuilder.start()
 
-        val pid = process.PID()
         val messagesChannel = Collections.synchronizedList(mutableListOf<ProcessStreamLine>())
 
         fun readOutput(stream: InputStream, prefix: String, type: ProcessStreamType) {
@@ -159,6 +147,25 @@ class ProcessRunner(
         val messagesChannel: List<ProcessStreamLine>,
         val thread: List<Thread>,
     ) : StartedProcess {
-        override val pid: PID get() = process.PID()
+        val pid: PID get() = process.PID()
+
+        override val exitCode: Int?
+            get() = runCatching { process.exitValue() } .getOrNull()
+
+        private fun builder(type: ProcessStreamType) : String {
+            return messagesChannel
+                .filter { it.type == type }
+                .joinToString { it.line }
+        }
+
+        override val output: String
+            get() = builder(ProcessStreamType.STDOUT)
+
+        override val stderr: String
+            get() = builder(ProcessStreamType.STDERR)
+
+        override fun toString(): String {
+            return "StartedProcessImpl(pid=$pid, exitCode=$exitCode, output='$output', stderr='$stderr')"
+        }
     }
 }
