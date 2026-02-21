@@ -154,6 +154,23 @@ class ProcessRunnerTest {
     }
 
     @Test
+    fun `runProcess joins multi-line output with newline not comma-space`() {
+        val result = runner.runProcess(request("bash", "-c", "echo line1; echo line2; echo line3"))
+        // Lines must be newline-separated, not joined with ", " (the joinToString default separator)
+        val lines = result.output.lines().filter { it.isNotBlank() }
+        assertEquals(listOf("line1", "line2", "line3"), lines,
+            "multi-line output must be newline-joined, got: ${result.output.replace("\n", "\\n")}")
+    }
+
+    @Test
+    fun `runProcess joins multi-line stderr with newline not comma-space`() {
+        val result = runner.runProcess(request("bash", "-c", "echo a >&2; echo b >&2; echo c >&2"))
+        val lines = result.stderr.lines().filter { it.isNotBlank() }
+        assertEquals(listOf("a", "b", "c"), lines,
+            "multi-line stderr must be newline-joined, got: ${result.stderr.replace("\n", "\\n")}")
+    }
+
+    @Test
     fun `runProcess captures both stdout and stderr from same process`() {
         val result = runner.runProcess(request("bash", "-c", "echo out-text; echo err-text >&2"))
         assertTrue(result.output.contains("out-text"), "stdout should contain out-text, got: ${result.output}")
