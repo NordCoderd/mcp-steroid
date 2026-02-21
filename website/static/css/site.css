@@ -913,6 +913,18 @@ h1 {
 .docs-sidebar li {
     margin-bottom: 0.5rem;
 }
+.sidebar-group {
+    margin-bottom: 1.25rem;
+}
+.sidebar-group-label {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--color-quaternary);
+    margin-bottom: 0.25rem;
+    padding-left: 1rem;
+}
 .docs-sidebar a {
     color: var(--color-tertiary);
     text-decoration: none;

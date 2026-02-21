@@ -17,17 +17,27 @@
 <div class="docs-layout">
 <aside class="docs-sidebar">
     <h3>Documentation</h3>
-    <ul>
-        {{ $currentPage := . }}
-        {{ $docs := site.GetPage "section" "docs" }}
-        {{ range $docs.Pages.ByWeight }}
-        <li>
-            <a href="{{ .RelPermalink }}"{{ if eq .RelPermalink $currentPage.RelPermalink }} class="active"{{ end }}>
-                {{ .Title }}
-            </a>
-        </li>
-        {{ end }}
-    </ul>
+    {{ $currentPage := . }}
+    {{ $docs := site.GetPage "section" "docs" }}
+    {{ $groups := slice "Getting Started" "Vision" "Reference" "Examples" }}
+    {{ range $groups }}
+    {{ $groupName := . }}
+    {{ $groupPages := where $docs.Pages "Params.group" $groupName }}
+    {{ if $groupPages }}
+    <div class="sidebar-group">
+        <span class="sidebar-group-label">{{ $groupName }}</span>
+        <ul>
+            {{ range $groupPages.ByWeight }}
+            <li>
+                <a href="{{ .RelPermalink }}"{{ if eq .RelPermalink $currentPage.RelPermalink }} class="active"{{ end }}>
+                    {{ .Title }}
+                </a>
+            </li>
+            {{ end }}
+        </ul>
+    </div>
+    {{ end }}
+    {{ end }}
 </aside>
 
 <article class="docs-content">

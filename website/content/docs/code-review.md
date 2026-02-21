@@ -1,7 +1,8 @@
 ---
-title: "Code Review"
+title: "Review AI Code Execution"
 description: "How MCP Steroid lets you review, approve, and reject AI-generated code before it runs"
-weight: 4
+weight: 70
+group: "Reference"
 ---
 
 > **Available from 0.89.0.** Earlier versions did not include the always-on server or per-project review settings in Settings.
