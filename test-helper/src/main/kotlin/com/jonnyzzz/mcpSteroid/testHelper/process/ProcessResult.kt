@@ -8,19 +8,6 @@ interface ProcessResult {
     val exitCode: Int?
     val stdout: String
     val stderr: String
-
-
-    //TODO: this look like a bug, not correct approach
-    /**
-     * Raw unprocessed output from the process.
-     *
-     * For agents that post-process output (e.g. Claude's stream-json mode),
-     * [stdout] contains the extracted final text for assertions, while
-     * [rawOutput] preserves the full original output (e.g. NDJSON events).
-     *
-     * For agents without post-processing, [rawOutput] equals [stdout].
-     */
-    val rawOutput: String get() = stdout
 }
 
 fun ProcessResult.assertOutputContains(vararg expectedOutput: String, message: String = "") = apply {

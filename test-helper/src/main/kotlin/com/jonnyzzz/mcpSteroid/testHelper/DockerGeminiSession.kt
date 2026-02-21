@@ -95,11 +95,13 @@ class DockerGeminiSession(
         } else {
             effectiveResult.exitCode ?: -1
         }
+
+        //TODO: looks like the case for specific interface to return the JSON output VS the processed output
+        //TODO: should be a common interface all AI Agents implement
         return ProcessResultValue(
             exitCode = effectiveExitCode,
             stdout = resultText,
             stderr = effectiveResult.stderr,
-            rawOutput = rawOutput,
         )
     }
 

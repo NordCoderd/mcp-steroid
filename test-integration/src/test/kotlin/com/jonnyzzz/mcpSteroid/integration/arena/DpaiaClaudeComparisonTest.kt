@@ -242,7 +242,7 @@ class DpaiaClaudeComparisonTest {
                     predeployedProjectDir = if (withMcp) session.intellijDriver.getGuestProjectDir() else null,
                 )
                 val totalMs = System.currentTimeMillis() - startMs
-                val tokens = extractTokenUsage(result.agentResult.rawOutput)
+                val tokens = extractTokenUsage(result.agentResult.stdout)
 
                 println("[CLAUDE-CMP] Completed: ${testCase.instanceId} [$modeLabel]")
                 println("[CLAUDE-CMP]   Total time:   ${totalMs / 1000}s (agent: ${result.agentDurationMs / 1000}s)")

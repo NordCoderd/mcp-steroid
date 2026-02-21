@@ -31,7 +31,7 @@ class DockerCodexProgressTest {
 
         result.assertExitCode(0) { "Codex command should succeed" }
 
-        val events = parseNdjsonEvents(result.rawOutput)
+        val events = parseNdjsonEvents(result.stdout)
         assertTrue(events.isNotEmpty(), "Raw output should contain NDJSON events")
         assertTrue(events.size > 1, "Expected multiple NDJSON events, found ${events.size}")
 
@@ -40,7 +40,7 @@ class DockerCodexProgressTest {
         assertTrue(eventTypes.contains("item.completed"), "Raw output should contain item.completed events: $eventTypes")
 
         assertNotEquals(
-            result.rawOutput.trim(),
+            result.stdout.trim(),
             result.stdout.trim(),
             "Processed output should not be identical to raw NDJSON"
         )

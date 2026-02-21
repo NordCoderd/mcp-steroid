@@ -90,7 +90,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
 
         val combinedOutput = buildString {
             appendLine(result.stdout)
-            appendLine(result.rawOutput)
+            appendLine(result.stdout)
             appendLine(result.stderr)
         }
         assertTrue(
@@ -373,7 +373,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
 
         val combinedOutput = buildString {
             appendLine(result.stdout)
-            appendLine(result.rawOutput)
+            appendLine(result.stdout)
             appendLine(result.stderr)
         }
 

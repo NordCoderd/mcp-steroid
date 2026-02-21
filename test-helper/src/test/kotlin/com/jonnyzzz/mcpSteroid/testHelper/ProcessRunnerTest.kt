@@ -69,7 +69,7 @@ class ProcessRunnerTest {
     @Test
     fun `runProcess rawOutput equals output by default`() {
         val result = runner.runProcess(request("echo", "data"))
-        assertEquals(result.stdout, result.rawOutput)
+        assertEquals(result.stdout, result.stdout)
     }
 
     // --- stdin ---

@@ -100,7 +100,6 @@ class DockerCodexSession(
             exitCode = rawResult.exitCode ?: -1,
             stdout = resultText,
             stderr = rawResult.stderr,
-            rawOutput = rawResult.stdout,
         )
     }
 

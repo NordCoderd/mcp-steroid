@@ -90,7 +90,7 @@ class DockerGeminiSessionTest {
         assertTrue(runner.commands[1].contains("false"))
         assertTrue(result.stdout.contains("pong"), "Expected 'pong' in: ${result.stdout}")
         assertTrue(result.stdout.contains("[done]"), "Expected '[done]' in: ${result.stdout}")
-        assertEquals(secondRaw, result.rawOutput)
+        assertEquals(secondRaw, result.stdout)
     }
 
     private class RecordingRunner(vararg results: ProcessResult) : ContainerDriver {

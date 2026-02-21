@@ -34,7 +34,7 @@ class DockerGeminiProgressTest {
 
         result.assertExitCode(0) { "Gemini command should succeed" }
 
-        val events = parseNdjsonEvents(result.rawOutput)
+        val events = parseNdjsonEvents(result.stdout)
         assertTrue(events.isNotEmpty(), "Raw output should contain stream-json NDJSON events")
         assertTrue(events.size > 1, "Expected multiple stream-json events, found ${events.size}")
 
@@ -44,7 +44,7 @@ class DockerGeminiProgressTest {
         assertTrue(eventTypes.contains("result"), "Raw output should contain result events: $eventTypes")
 
         assertNotEquals(
-            result.rawOutput.trim(),
+            result.stdout.trim(),
             result.stdout.trim(),
             "Processed output should not be identical to raw NDJSON"
         )

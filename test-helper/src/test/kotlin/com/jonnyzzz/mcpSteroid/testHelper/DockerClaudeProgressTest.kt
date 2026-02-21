@@ -52,13 +52,13 @@ class DockerClaudeProgressTest {
 
         // Verify raw output contains NDJSON progress events
         assertTrue(
-            result.rawOutput.contains("\"type\""),
+            result.stdout.contains("\"type\""),
             "Raw output should contain NDJSON events with 'type' field"
         )
 
         // Verify tool_use events are present in raw output
         // Claude stream-json emits events like {"type":"content_block_start","content_block":{"type":"tool_use",...}}
-        val hasToolUse = result.rawOutput.contains("tool_use")
+        val hasToolUse = result.stdout.contains("tool_use")
         assertTrue(
             hasToolUse,
             "Raw output should contain tool_use events showing tool calls in progress"
@@ -66,7 +66,7 @@ class DockerClaudeProgressTest {
 
         // Verify we get actual progress events, not just the final result
         // The raw output should have multiple JSON lines (NDJSON)
-        val jsonLineCount = result.rawOutput.lines().count { line ->
+        val jsonLineCount = result.stdout.lines().count { line ->
             line.trim().startsWith("{") && line.trim().endsWith("}")
         }
         assertTrue(
@@ -76,7 +76,7 @@ class DockerClaudeProgressTest {
 
         // Verify the processed output is meaningful (not just raw NDJSON)
         assertNotEquals(
-            result.rawOutput,
+            result.stdout,
             result.stdout,
             "Processed output should be extracted from NDJSON, not identical to raw output"
         )
