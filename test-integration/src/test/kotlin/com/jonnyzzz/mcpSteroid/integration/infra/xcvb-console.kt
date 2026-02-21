@@ -183,7 +183,17 @@ class XcvbConsoleDriver(
         }
 
         val consoleWindowId = waitForValue(30_000, "Wait for console Window") {
-            windowDriver.listWindows().firstOrNull { it.pid == consoleProcess.pid }
+            val windows = windowDriver.listWindows()
+            val byPid = windows.firstOrNull { it.pid != null && it.pid == consoleProcess.pid }
+            if (byPid != null) return@waitForValue byPid
+            // Fallback: match by title (WM_NAME), since some xterm builds/configs
+            // do not expose _NET_WM_PID via xdotool getwindowpid.
+            val byTitle = windows.firstOrNull { it.title.trimEnd() == title }
+            if (byTitle != null) {
+                val xtermPid = try { consoleProcess.pid } catch (_: Exception) { -1L }
+                println("[xcvb] Console window matched by title '$title' (pid-file=$xtermPid, window.pid=${byTitle.pid})")
+            }
+            byTitle
         }
 
         windowDriver.updateLayout(consoleWindowId, layoutRect)
