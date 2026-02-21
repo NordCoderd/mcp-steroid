@@ -3,8 +3,10 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.ProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessRunner
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.runProcess
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -24,11 +26,23 @@ class DockerDriver(
     }
 
     fun withSecretPattern(secretPattern: String): DockerDriver {
-        return DockerDriver(workDir, logPrefix, (secretPatterns + secretPattern).distinct(), environmentVariables, guestWorkDir)
+        return DockerDriver(
+            workDir,
+            logPrefix,
+            (secretPatterns + secretPattern).distinct(),
+            environmentVariables,
+            guestWorkDir
+        )
     }
 
     fun withEnv(key: String, value: String): DockerDriver {
-        return DockerDriver(workDir, logPrefix, secretPatterns, (environmentVariables + (key to value)).toSortedMap(), guestWorkDir)
+        return DockerDriver(
+            workDir,
+            logPrefix,
+            secretPatterns,
+            (environmentVariables + (key to value)).toSortedMap(),
+            guestWorkDir
+        )
     }
 
     val processRunner get() = ProcessRunner(logPrefix, secretPatterns.toList())
@@ -66,10 +80,12 @@ class DockerDriver(
             }
 
             val result = processRunner.runProcess(
-                command,
-                description = "Build Docker image $imageName",
-                workingDir = dockerfilePath.parentFile,
-                timeoutSeconds = timeoutSeconds,
+                ProcessRunRequest.builder()
+                    .command(command)
+                    .description(description = "Build Docker image $imageName")
+                    .workingDir(workingDir = dockerfilePath.parentFile)
+                    .timeoutSeconds(timeoutSeconds = timeoutSeconds)
+                    .build()
             )
 
             if (result.exitCode != 0) {
@@ -122,15 +138,17 @@ class DockerDriver(
             addAll(cmd)
         }
 
-        val result = processRunner.runProcess(
-            command,
-            description = "Start container from $imageName",
-            workingDir = workDir,
-            timeoutSeconds = 30,
-        )
+        val result = ProcessRunRequest.builder()
+                .command(command)
+                .description("Start container from $imageName")
+                .workingDir(workDir)
+                .runProcess(processRunner)
+            .assertExitCode(0) {
+                "Failed to start Docker container: $stderr"
+            }
 
         val containerId = result.output.trim()
-        if (result.exitCode != 0 || containerId.isEmpty()) {
+        if (containerId.isEmpty()) {
             throw IllegalStateException("Failed to start Docker container: ${result.stderr}")
         }
 
@@ -150,15 +168,15 @@ class DockerDriver(
      * Docker output format: "0.0.0.0:52134" or "[::]:52134"
      */
     fun queryMappedPort(containerId: String, containerPort: Int): Int {
-        val result = processRunner.runProcess(
-            listOf("docker", "port", containerId, "$containerPort/tcp"),
-            description = "Query host port for $containerPort",
-            workingDir = workDir,
-            timeoutSeconds = 5,
-        )
-        if (result.exitCode != 0) {
-            error("Failed to query mapped port for $containerPort: ${result.stderr}")
-        }
+        val result = ProcessRunRequest.builder()
+            .command("docker", "port", containerId, "$containerPort/tcp")
+            .description("Query host port for $containerPort")
+            .workingDir(workDir)
+            .timeoutSeconds(5)
+            .quietly()
+            .runProcess(processRunner)
+            .assertExitCode(0) { "Failed to query mapped port for $containerPort: $stderr" }
+
         // Parse "0.0.0.0:52134" or "[::]:52134" — take the last colon-separated part
         return result.output.trim().lines().first().substringAfterLast(':').toIntOrNull()
             ?: error("Failed to parse host port from: ${result.output}")
@@ -169,14 +187,20 @@ class DockerDriver(
      * Returns null when inspect output does not contain an address.
      */
     fun queryContainerIp(containerId: String): String? {
-        val result = processRunner.runProcess(
-            listOf("docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}", containerId),
-            description = "Query container IP",
-            workingDir = workDir,
-            timeoutSeconds = 5,
-            quietly = true,
-        )
-        if (result.exitCode != 0) return null
+        val result = ProcessRunRequest.builder()
+            .command(
+                "docker",
+                "inspect",
+                "-f",
+                "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}",
+                containerId
+            )
+            .description("Query container IP")
+            .workingDir(workDir)
+            .timeoutSeconds(5)
+            .quietly()
+            .runProcess(processRunner)
+            .assertExitCode(0) { "Failed to query container IP: $stderr" }
 
         return result.output
             .trim()
@@ -185,19 +209,20 @@ class DockerDriver(
     }
 
     fun killContainer(containerId: String) {
-        processRunner.runProcess(
-            listOf("docker", "kill", containerId),
-            description = "kill container",
-            workingDir = workDir,
-            timeoutSeconds = 10,
-        )
+        ProcessRunRequest.builder()
+            .command("docker", "kill", containerId)
+            .description("kill container")
+            .workingDir(workDir)
+            .timeoutSeconds(10)
+            .runProcess(processRunner)
 
-        processRunner.runProcess(
-            listOf("docker", "rm", "-f", containerId),
-            description = "Remove container",
-            workingDir = workDir,
-            timeoutSeconds = 5,
-        )
+        ProcessRunRequest.builder()
+            .command("docker", "rm", "-f", containerId)
+            .description("Remove container")
+            .workingDir(workingDir = workDir)
+            .timeoutSeconds(timeoutSeconds = 5)
+            .quietly(true)
+            .runProcess(processRunner)
 
         println("[$logPrefix] Container removed successfully")
     }
@@ -208,12 +233,14 @@ class DockerDriver(
         containerPath: String,
     ) {
         require(localPath.exists()) { "Local path does not exist: $localPath" }
-        processRunner.runProcess(
-            listOf("docker", "cp", localPath.absolutePath, "$containerId:$containerPath"),
-            description = "Copy ${localPath.name} to container:$containerPath",
-            workingDir = workDir,
-            timeoutSeconds = 30L,
-        ).assertExitCode(0)
+        ProcessRunRequest.builder()
+            .command("docker", "cp", localPath.absolutePath, "$containerId:$containerPath")
+            .description("Copy ${localPath.name} to container:$containerPath")
+            .workingDir(workDir)
+            .timeoutSeconds(30L)
+            .quietly()
+            .runProcess(processRunner)
+            .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
     }
 
     fun copyFromContainer(
@@ -222,12 +249,14 @@ class DockerDriver(
         localPath: File,
     ) {
         localPath.parentFile?.mkdirs()
-        processRunner.runProcess(
-            listOf("docker", "cp", "$containerId:$containerPath", localPath.absolutePath),
-            description = "Copy container:$containerPath to ${localPath.name}",
-            workingDir = workDir,
-            timeoutSeconds = 30L,
-        ).assertExitCode(0)
+        ProcessRunRequest.builder()
+            .command("docker", "cp", "$containerId:$containerPath", localPath.absolutePath)
+            .description("Copy container:$containerPath to ${localPath.name}")
+            .workingDir(workDir)
+            .timeoutSeconds(30L)
+            .quietly()
+            .runProcess(processRunner)
+            .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
     }
 
     fun writeFileInContainer(
@@ -239,7 +268,12 @@ class DockerDriver(
         // Ensure parent directory exists
         val parentDir = containerPath.substringBeforeLast('/')
         if (parentDir.isNotEmpty()) {
-            runInContainer(containerId, listOf("mkdir", "-p", parentDir), timeoutSeconds = 5, quietly = true).assertExitCode(0)
+            runInContainer(
+                containerId,
+                listOf("mkdir", "-p", parentDir),
+                timeoutSeconds = 5,
+                quietly = true
+            ).assertExitCode(0)
         }
 
         runInContainer(
@@ -250,7 +284,12 @@ class DockerDriver(
         ).assertExitCode(0)
 
         if (executable) {
-            runInContainer(containerId, listOf("chmod", "+x", containerPath), timeoutSeconds = 5, quietly = true).assertExitCode(0)
+            runInContainer(
+                containerId,
+                listOf("chmod", "+x", containerPath),
+                timeoutSeconds = 5,
+                quietly = true
+            ).assertExitCode(0)
         }
     }
 
@@ -283,13 +322,13 @@ class DockerDriver(
             add(shellCommand)
         }
 
-        return processRunner.runProcess(
-            command,
-            description = "In container: ${args.joinToString(" ")}",
-            workingDir = workDir,
-            timeoutSeconds = timeoutSeconds,
-            quietly = quietly,
-        )
+        return ProcessRunRequest.builder()
+            .command(command)
+            .description("In container: ${args.joinToString(" ")}")
+            .workingDir(workDir)
+            .timeoutSeconds(timeoutSeconds)
+            .quietly(quietly)
+            .runProcess(processRunner)
     }
 
     fun runInContainerDetached(

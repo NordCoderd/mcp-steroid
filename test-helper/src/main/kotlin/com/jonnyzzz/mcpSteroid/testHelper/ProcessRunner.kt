@@ -47,6 +47,12 @@ fun ProcessResult.assertExitCode(expectedExitCode: Int, message: String = "") = 
     }
 }
 
+fun ProcessResult.assertExitCode(expectedExitCode: Int, message: ProcessResult.() -> String) = apply {
+    check(exitCode == expectedExitCode) {
+        "Process ${message()} exit code is $exitCode != $expectedExitCode\n$this"
+    }
+}
+
 fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
     val combined = output + "\n" + stderr
 
@@ -95,7 +101,7 @@ data class ProcessRunRequest(
     val workingDir: File,
     val timeoutSeconds: Long = 30,
     val quietly: Boolean = false,
-    val stdin: InputStream = ByteArrayInputStream(ByteArray(0)),
+    val stdin: InputStream,
 ) {
     open class Builder {
         protected var command: List<String>? = null
@@ -106,11 +112,21 @@ data class ProcessRunRequest(
         protected var stdin: InputStream = ByteArrayInputStream(ByteArray(0))
 
         open fun command(command: List<String>) = apply { this.command = command }
+        open fun command(builder: MutableList<String>.() -> Unit) = command(buildList(builder))
+        open fun command(vararg command: String) = command(command.toList())
+
         open fun description(description: String) = apply { this.description = description }
+
         open fun workingDir(workingDir: File) = apply { this.workingDir = workingDir }
+
         open fun timeoutSeconds(timeoutSeconds: Long) = apply { this.timeoutSeconds = timeoutSeconds }
+
         open fun quietly(quietly: Boolean) = apply { this.quietly = quietly }
+        open fun quietly() = quietly(true)
+
         open fun stdin(stdin: InputStream) = apply { this.stdin = stdin }
+        open fun stdin(stdin: ByteArray) = stdin(stdin.inputStream())
+        open fun stdin(stdin: String) = stdin(stdin.toByteArray())
 
         open fun build(): ProcessRunRequest {
             return ProcessRunRequest(
@@ -128,6 +144,9 @@ data class ProcessRunRequest(
         fun builder() = Builder()
     }
 }
+
+fun ProcessRunRequest.Builder.runProcess(processRunner: ProcessRunner) = build().runProcess(processRunner)
+fun ProcessRunRequest.runProcess(runner: ProcessRunner) = runner.runProcess(this)
 
 /**
  * Utility for running processes with consistent logging.
@@ -236,34 +255,5 @@ class ProcessRunner(
         val exitCode = process.exitValue()
         println("[$logPrefix] Exit code: $exitCode")
         return ProcessResultValue(exitCode, outputBuilder.toString(), errorBuilder.toString())
-    }
-
-    /**
-     * Run a process and log all output with prefixes.
-     * This is a convenience adapter for the primary runProcess method.
-     * Secrets are filtered from log output but preserved in returned ProcessResult.
-     *
-     * @param command The command to run as a list of arguments
-     * @param description A short description of what this command does (for logging)
-     * @param workingDir Working directory for the process
-     * @param timeoutSeconds Maximum time to wait for the process to complete
-     */
-    fun runProcess(
-        command: List<String>,
-        description: String,
-        workingDir: File,
-        timeoutSeconds: Long = 30,
-        quietly: Boolean = false,
-    ): ProcessResult {
-        return runProcess(
-            ProcessRunRequest(
-                command = command,
-                description = description,
-                workingDir = workingDir,
-                timeoutSeconds = timeoutSeconds,
-                quietly = quietly,
-                stdin = ByteArrayInputStream(ByteArray(0)),
-            )
-        )
     }
 }

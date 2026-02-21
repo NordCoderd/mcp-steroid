@@ -2,8 +2,12 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
+import com.jonnyzzz.mcpSteroid.testHelper.ProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.ProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
+import com.jonnyzzz.mcpSteroid.testHelper.runProcess
+import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
@@ -58,33 +62,35 @@ class DockerReaperTest {
         DockerReaper.registerContainer(containerId, workDir)
 
         // Verify container is running
-        val beforeResult = processRunner.runProcess(
-            listOf("docker", "ps", "-q", "--filter", "id=$containerId"),
-            description = "Check container before cleanup",
-            workingDir = workDir,
-            timeoutSeconds = 5
-        )
+        val beforeResult = ProcessRunRequest.builder()
+                .command("docker", "ps", "-q", "--filter", "id=$containerId")
+                .description("Check container before cleanup")
+                .workingDir(workDir)
+                .timeoutSeconds(5)
+                .quietly()
+                .runProcess(processRunner)
+
         assertTrue(beforeResult.output.trim().isNotEmpty(), "Container should be running")
 
         // Close lifetime (normal cleanup)
         lifetime.closeAllStacks()
 
         // Verify container is gone
-        val afterResult = processRunner.runProcess(
-            listOf("docker", "ps", "-aq", "--filter", "id=$containerId"),
-            description = "Check container after cleanup",
-            workingDir = workDir,
-            timeoutSeconds = 5
-        )
+        val afterResult = ProcessRunRequest.builder()
+            .command("docker", "ps", "-aq", "--filter", "id=$containerId")
+            .description("Check container after cleanup")
+            .workingDir(workDir)
+            .timeoutSeconds(5)
+            .quietly()
+            .runProcess(processRunner)
+
         assertTrue(afterResult.output.trim().isEmpty(), "Container should be removed")
         println("Container $containerId cleaned up successfully via CloseableStack")
     }
 
     @Test
     fun `test reaper starts and registers session`() {
-        val lifetime = CloseableStackHost()
-
-        try {
+        runWithCloseableStack { lifetime ->
             // Start reaper and a test container
             DockerReaper.start(workDir)
 
@@ -98,24 +104,23 @@ class DockerReaperTest {
             DockerReaper.registerContainer(containerId, workDir)
 
             // Verify reaper container is running
-            val reaperResult = processRunner.runProcess(
-                listOf(
+            val reaperResult = ProcessRunRequest.builder()
+                .command(
                     "docker", "ps",
                     "--filter", "ancestor=mcp-steroid-reaper",
                     "--format", "{{.ID}}"
-                ),
-                description = "Check reaper container",
-                workingDir = workDir,
-                timeoutSeconds = 5
-            )
+                )
+                .description("Check reaper container")
+                .workingDir(workDir)
+                .timeoutSeconds(5)
+                .quietly()
+                .runProcess(processRunner)
+                .assertExitCode(0) { "Failed to check reaper: $stderr" }
 
-            assertTrue(reaperResult.exitCode == 0, "Failed to check reaper: ${reaperResult.stderr}")
             assertTrue(reaperResult.output.trim().isNotEmpty(), "Reaper container should be running")
 
             println("Reaper is running: ${reaperResult.output.trim()}")
             println("Test container registered: $containerId")
-        } finally {
-            lifetime.closeAllStacks()
         }
     }
 }
