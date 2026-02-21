@@ -12,7 +12,6 @@ data class ProcessResultValue(
     override val exitCode: Int,
     override val stdout: String,
     override val stderr: String,
-    override val rawOutput: String = stdout,
 ) : ProcessResult
 
 
