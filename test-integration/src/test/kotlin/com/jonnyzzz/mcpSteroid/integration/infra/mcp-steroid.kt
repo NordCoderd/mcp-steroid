@@ -224,7 +224,7 @@ class McpSteroidDriver(
     /**
      * Set up the project JDK (if not already set) and wait for Maven/Gradle import to complete.
      *
-     * Finds Eclipse Temurin 21 JDK at known Debian container paths, registers it with
+     * Finds an Eclipse Temurin JDK (21/25/17/11, amd64 or arm64) at known Debian container paths, registers it with
      * [ProjectJdkTable], and sets it as the project SDK. If the JDK was just set and
      * a pom.xml exists, triggers a Maven re-sync (the initial import may have failed without JDK).
      * Finally, suspends via [Observation.awaitConfiguration] until all pending configuration
@@ -257,9 +257,18 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 // 1. Detect and register system JDK if project SDK is unset
+// Covers Eclipse Temurin 21/25/17/11/8 installed via Adoptium APT, on both amd64 and arm64.
 val jdkCandidates = listOf(
     "/usr/lib/jvm/temurin-21-amd64",
+    "/usr/lib/jvm/temurin-21-arm64",
+    "/usr/lib/jvm/temurin-25-amd64",
+    "/usr/lib/jvm/temurin-25-arm64",
+    "/usr/lib/jvm/temurin-17-amd64",
+    "/usr/lib/jvm/temurin-17-arm64",
+    "/usr/lib/jvm/temurin-11-amd64",
+    "/usr/lib/jvm/temurin-11-arm64",
     "/usr/lib/jvm/java-21-openjdk-amd64",
+    "/usr/lib/jvm/java-21-openjdk-arm64",
     "/usr/lib/jvm/temurin-21",
     "/usr/lib/jvm/java-21",
 )
