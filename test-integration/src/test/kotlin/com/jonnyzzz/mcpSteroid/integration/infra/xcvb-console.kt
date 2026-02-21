@@ -182,7 +182,7 @@ class XcvbConsoleDriver(
             consoleProcess.kill()
         }
 
-        val consoleWindowId = waitForValue(5_000, "Wait for console Window") {
+        val consoleWindowId = waitForValue(30_000, "Wait for console Window") {
             windowDriver.listWindows().firstOrNull { it.pid == consoleProcess.pid }
         }
 
