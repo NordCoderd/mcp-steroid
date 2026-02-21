@@ -73,6 +73,14 @@ class DebuggerDemoTest {
     @Timeout(value = 20, unit = TimeUnit.MINUTES)
     fun `codex debugs failing unit test via debugger`() = runUnitTestDebugDemo(AiAgentDriver::codex)
 
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    fun `claude debugs JonnyzzzDebugTest via debugger`() = runJonnyzzzDebugDemo(AiAgentDriver::claude)
+
+    @Test
+    @Timeout(value = 20, unit = TimeUnit.MINUTES)
+    fun `codex debugs JonnyzzzDebugTest via debugger`() = runJonnyzzzDebugDemo(AiAgentDriver::codex)
+
     private fun runDebuggerDemo(agentName: KProperty1<AiAgentDriver, AiAgentSession>) {
         val session = IntelliJContainer.create(
             lifetime, "ide-agent",
@@ -252,13 +260,13 @@ class DebuggerDemoTest {
         // - "Result: value" patterns
         // - Variable names followed by values
         val evaluationPatterns = listOf(
-            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId)\s*=\s*\S+"""),
+            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId|items)\s*=\s*\S+"""),
             Regex("""(?i)evaluating:"""),
             Regex("""(?i)result:\s*\S+"""),
             Regex("""(?i)after step:"""),
             Regex("""(?i)value:\s*\S+"""),
-            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId)\.toString\(\)"""),
-            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId)\.(size|city|street|zip|displayName|email|first|last)"""),
+            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId|items)\.toString\(\)"""),
+            Regex("""(?i)\b(players|address|total|scores|registry|formatted|userId|items)\.(size|city|street|zip|displayName|email|first|last|name|status)"""),
         )
         val hasEvalEvidence = evaluationPatterns.any { it.containsMatchIn(combined) }
         if (hasEvalEvidence) {
@@ -450,6 +458,125 @@ class DebuggerDemoTest {
         console.writeHeader("PASSED")
 
         println("[TEST] Agent '$agentName' successfully debugged the failing unit test")
+    }
+
+    /**
+     * Asks the agent to find [JonnyzzzDebugTest] (a failing JUnit test in the test-project),
+     * run it through the IntelliJ debugger, set a breakpoint inside [filterActive()], and
+     * identify why the assertion fails.
+     *
+     * The bug: [filterActive] uses `!=` instead of `==` when filtering by status,
+     * so it returns inactive items instead of active ones. The agent must discover
+     * this via debugger evidence rather than by just reading the source code.
+     */
+    private fun runJonnyzzzDebugDemo(agentName: KProperty1<AiAgentDriver, AiAgentSession>) {
+        val session = IntelliJContainer.create(
+            lifetime, "ide-agent",
+            consoleTitle = "JonnyzzzDebugTest with ${agentName.name.titleCase()}",
+        ).waitForProjectReady()
+        val console = session.console
+
+        val agent = session.aiAgents.run { agentName(this) }
+        console.writeStep(1, "Building prompt for $agentName")
+
+        val prompt = buildString {
+            appendLine("# Task: Debug a failing JUnit test to find the bug")
+            appendLine()
+            appendLine("You MUST use the IntelliJ debugger to investigate why the test fails.")
+            appendLine("Do NOT just read source code and guess -- the test validates debugger evidence.")
+            appendLine()
+            appendLine("## Instructions")
+            appendLine()
+            appendLine("1. Find `JonnyzzzDebugTest.kt` in the project — it is a JUnit test class")
+            appendLine("2. Find the corresponding `DemoFilterService.kt` source file that the test is exercising")
+            appendLine("3. Use the debugger to run the failing test and set a breakpoint inside the `filterActive()` function")
+            appendLine("4. Step through the code and observe the filter condition and which items pass through")
+            appendLine("5. Identify why the test assertion fails based on debugger evidence")
+            appendLine()
+            appendLine("Read `mcp-steroid://skill/debugger-skill` to learn how to use the debugger APIs.")
+            appendLine("It links to individual resources with complete, copy-paste-ready code for each step.")
+            appendLine()
+            appendLine("IMPORTANT: You must debug the JUnit test (JonnyzzzDebugTest), not run any main() function.")
+            appendLine("Use `RunManager` + `JUnitConfiguration` or `steroid_execute_code` to trigger test debugging.")
+            appendLine()
+            appendLine("## Required Output")
+            appendLine()
+            appendLine("Print these markers on separate lines:")
+            appendLine("BUG_FOUND: yes")
+            appendLine("BUG_LINE: <the exact buggy source line containing the filter condition>")
+            appendLine("ROOT_CAUSE: <must explain that the filter uses != instead of == for status comparison, causing inactive items to be returned instead of active ones>")
+            appendLine("DEBUGGER_EVIDENCE: <items values and filter results observed during test execution>")
+            appendLine()
+            appendLine("Also print BEFORE_VALUE and AFTER_VALUE markers when evaluating variables")
+            appendLine("before and after the suspected buggy line executes.")
+            appendLine()
+            appendLine("## Rules")
+            appendLine()
+            appendLine("- You MUST use the debugger (set breakpoints inside filterActive(), evaluate variables)")
+            appendLine("- The debugging must occur in the context of running JonnyzzzDebugTest, not main()")
+            appendLine("- Do NOT use screenshots or UI input tools")
+            appendLine("- Read MCP debugger resources for API patterns -- do not invent API calls")
+        }
+
+        console.writeStep(2, "Running agent prompt")
+
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val output = result.output
+        val combined = result.rawOutput + "\n" + result.stderr
+
+        console.writeStep(3, "Validating agent output")
+
+        val hasFinalMarkers = hasAnyMarkerLine(output, "BUG_FOUND", "Bug found") &&
+                hasAnyMarkerLine(output, "ROOT_CAUSE", "Root cause")
+        if (result.exitCode != 0 && !hasFinalMarkers) {
+            console.writeError("Agent exited with code ${result.exitCode}")
+            result.assertExitCode(0, message = "JonnyzzzDebugTest demo")
+        }
+        console.writeInfo("Agent exited with code ${result.exitCode ?: "?"}")
+
+        console.writeInfo("Checking: steroid_execute_code usage evidence")
+        assertUsedExecuteCodeEvidence(combined)
+        console.writeSuccess("execute_code evidence found")
+
+        console.writeInfo("Checking: BUG_LINE marker")
+        val bugLine = findMarkerValue(output, "BUG_LINE", "Buggy line", "Bug line")
+        check(bugLine != null) {
+            "Agent did not output required marker 'BUG_LINE:' (or equivalent).\nOutput:\n$combined"
+        }
+        check(
+            bugLine.contains("!=", ignoreCase = false) ||
+            bugLine.contains("status", ignoreCase = true)
+        ) {
+            "BUG_LINE must mention the != condition or status field.\nActual: $bugLine\nOutput:\n$combined"
+        }
+        console.writeSuccess("BUG_LINE: $bugLine")
+
+        result.assertOutputContains("filterActive", message = "agent must mention filterActive")
+
+        console.writeInfo("Checking: ROOT_CAUSE marker")
+        assertRootCauseQuality(
+            combined, output,
+            ignoredReturnPatterns = listOf(
+                "!=", "not equal", "inverted", "wrong condition", "incorrect condition",
+                "opposite", "negated", "reversed condition",
+            ),
+            returnsNewListPatterns = listOf(
+                "inactive", "wrong items", "returns inactive", "instead of active",
+                "active items", "should be ==", "should be equals",
+            ),
+            explanation = "ROOT_CAUSE must explain that the filter uses != instead of == for status comparison, " +
+                    "causing inactive items to be returned instead of active ones."
+        )
+        console.writeSuccess("ROOT_CAUSE quality validated")
+
+        console.writeInfo("Checking: debugger evidence (suspension + evaluation)")
+        assertDebuggerEvidence(combined, console)
+        console.writeSuccess("Debugger evidence validated")
+
+        console.writeSuccess("Agent '$agentName' identified the inverted filter bug")
+        console.writeHeader("PASSED")
+
+        println("[TEST] Agent '$agentName' successfully debugged JonnyzzzDebugTest")
     }
 
     private fun runStringFormatDemo(agentName: KProperty1<AiAgentDriver, AiAgentSession>) {
