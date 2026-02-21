@@ -20,18 +20,29 @@
 </div>
 
 {{ $docs := site.GetPage "section" "docs" }}
-{{ $all := $docs.Pages.ByWeight }}
+{{ $groups := slice "Getting Started" "Vision" "Reference" "Examples" }}
 
-<div class="docs-grid">
-    {{ range $all }}
-    <a href="{{ .RelPermalink }}" class="doc-card">
-        <h2>{{ .Title }}</h2>
-        {{ $desc := .Description | plainify }}
-        {{ if not $desc }}{{ $desc = .Summary | plainify }}{{ end }}
-        {{ if not $desc }}{{ $desc = .Plain | truncate 160 }}{{ end }}
-        <p>{{ $desc }}</p>
-        <span class="arrow">Read more &rarr;</span>
-    </a>
+<div class="docs-groups">
+    {{ range $groups }}
+    {{ $groupName := . }}
+    {{ $groupPages := where $docs.Pages "Params.group" $groupName }}
+    {{ if $groupPages }}
+    <div class="docs-group-section">
+        <h2 class="docs-group-heading">{{ $groupName }}</h2>
+        <div class="docs-grid">
+            {{ range $groupPages.ByWeight }}
+            <a href="{{ .RelPermalink }}" class="doc-card">
+                <h3>{{ .Title }}</h3>
+                {{ $desc := .Description | plainify }}
+                {{ if not $desc }}{{ $desc = .Summary | plainify }}{{ end }}
+                {{ if not $desc }}{{ $desc = .Plain | truncate 160 }}{{ end }}
+                <p>{{ $desc }}</p>
+                <span class="arrow">Read more &rarr;</span>
+            </a>
+            {{ end }}
+        </div>
+    </div>
+    {{ end }}
     {{ end }}
 </div>
 {{ end }}

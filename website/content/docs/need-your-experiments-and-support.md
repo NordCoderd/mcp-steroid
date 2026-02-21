@@ -1,7 +1,8 @@
 ---
-title: "Need Your Experiments and Support"
+title: "Support the Project"
 description: "Share reproducible scenarios to help improve MCP Steroid on real repositories"
-weight: 99
+weight: 20
+group: "Getting Started"
 aliases:
   - /need-your-experiments-and-support/
 ---
