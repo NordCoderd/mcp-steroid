@@ -28,8 +28,23 @@ class CodeButcher {
 
         val importLines = mutableListOf<String>()
         val otherLines = mutableListOf<String>()
+        // Track whether we're inside a triple-quoted string so that `import` lines
+        // embedded in string literals (e.g. Java source written as Kotlin raw strings)
+        // are NOT extracted as top-level Kotlin imports.
+        var tripleQuoteCount = 0
         for (line in code.lineSequence()) {
-            if (line.trim().trimStart(';').trim().startsWith("import ")) {
+            val inTripleQuotedString = tripleQuoteCount % 2 != 0
+            // Count """ occurrences in this line to track nesting for subsequent lines.
+            var idx = 0
+            while (idx <= line.length - 3) {
+                if (line[idx] == '"' && line[idx + 1] == '"' && line[idx + 2] == '"') {
+                    tripleQuoteCount++
+                    idx += 3
+                } else {
+                    idx++
+                }
+            }
+            if (!inTripleQuotedString && line.trim().trimStart(';').trim().startsWith("import ")) {
                 importLines.add(line)
             } else {
                 otherLines.add(line)
