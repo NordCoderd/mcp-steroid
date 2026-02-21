@@ -5,6 +5,7 @@ import java.io.InputStream
 import java.util.Collections
 import java.util.concurrent.TimeUnit
 
+//TODO: hide this class
 data class ProcessResultValue(
     override val exitCode: Int,
     override val output: String,

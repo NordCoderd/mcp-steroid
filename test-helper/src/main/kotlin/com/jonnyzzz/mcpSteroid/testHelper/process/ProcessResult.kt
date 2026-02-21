@@ -9,6 +9,8 @@ interface ProcessResult {
     val output: String
     val stderr: String
 
+
+    //TODO: this look like a bug, not correct approach
     /**
      * Raw unprocessed output from the process.
      *
