@@ -117,12 +117,14 @@ class XcvbWindowDriver(
      * ~/.fluxbox/init), so the work area equals the full display. We return the
      * known display dimensions with a 2px inset on all sides — this leaves a visible
      * border around both windows so screenshots can confirm correct edge alignment.
+     * An extra 100px is subtracted from the bottom so the IntelliJ status bar
+     * remains visible and is not cut off at the screen edge.
      */
     fun getWorkArea(): WindowRect = WindowRect(
         x = wholeScreen.x + 2,
         y = wholeScreen.y + 2,
         width = wholeScreen.width - 4,
-        height = wholeScreen.height - 4,
+        height = wholeScreen.height - 104,
     )
 
 
