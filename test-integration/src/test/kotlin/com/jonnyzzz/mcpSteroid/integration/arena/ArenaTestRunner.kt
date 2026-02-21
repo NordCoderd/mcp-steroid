@@ -168,7 +168,9 @@ class ArenaTestRunner(
 
         // Step 4: Run agent
         println("[ARENA] Running agent (timeout: ${timeoutSeconds}s) ...")
+        val agentStartMs = System.currentTimeMillis()
         val agentResult = agent.runPrompt(prompt, timeoutSeconds = timeoutSeconds)
+        val agentDurationMs = System.currentTimeMillis() - agentStartMs
 
         // Step 5: Evaluate
         val evaluation = evaluate(testCase, agentResult)
@@ -184,6 +186,7 @@ class ArenaTestRunner(
             testCase = testCase,
             agentResult = agentResult,
             evaluation = evaluation,
+            agentDurationMs = agentDurationMs,
         )
     }
 
@@ -214,6 +217,8 @@ data class ArenaTestResult(
     val testCase: DpaiaTestCase,
     val agentResult: ProcessResult,
     val evaluation: ArenaEvaluation,
+    /** Wall-clock milliseconds spent inside [agent.runPrompt] (excludes git clone and patch apply). */
+    val agentDurationMs: Long = 0L,
 )
 
 /**
