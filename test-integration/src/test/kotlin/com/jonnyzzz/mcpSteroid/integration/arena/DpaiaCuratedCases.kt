@@ -22,43 +22,55 @@ object DpaiaCuratedCases {
     const val DEFAULT_SIMPLE = "dpaia__empty__maven__springboot3-3"
 
     /**
-     * Curated shortlist for evaluation runs (complex cases, good for comparison testing).
+     * Curated shortlist for evaluation runs.
      *
-     * | instanceId                         | Repo                        | Focus                              | Complexity  |
-     * |------------------------------------|-----------------------------|------------------------------------|-------------|
-     * | dpaia__feature__service-51         | feature-service             | RabbitMQ integration + dedup       | Very High   |
-     * | dpaia__spring__boot__microshop-1   | spring-boot-microshop       | RestTemplate→WebClient migration   | Very High   |
-     * | dpaia__spring__petclinic__rest-23  | spring-petclinic-rest       | Password policy validation         | Very High   |
-     * | dpaia__feature__service-25         | feature-service             | JPA parent-child + circular dep    | High        |
-     * | dpaia__feature__service-122        | feature-service             | Notification system entity + API   | High        |
-     * | dpaia__spring__petclinic-36        | spring-petclinic            | Add email field across DB schemas  | High        |
-     * | dpaia__spring__petclinic__rest-14  | spring-petclinic-rest       | Update API base path /api → /api/v1| Medium      |
-     * | dpaia__spring__boot__microshop-24  | spring-boot-microshop       | Add rating field with DTOs         | Medium      |
+     * Selection criteria: large patch (complex multi-file change), multi-layer
+     * (entity + service + controller + migration), and scenarios where IDE tools
+     * (Find Usages, compile feedback, run tests) provide measurable advantage.
+     *
+     * Dataset: https://raw.githubusercontent.com/dpaia/ee-dataset/main/datasets/java-spring-ee-dataset.json
+     * (154 cases across 11 repos as of 2026-02-21)
+     *
+     * | instanceId                              | Repo                  | Patch  | Why MCP helps                                   |
+     * |-----------------------------------------|-----------------------|--------|--------------------------------------------------|
+     * | dpaia__feature__service-125             | feature-service       | 44 KB  | Cross-layer queries + status machine; PSI nav    |
+     * | dpaia__feature__service-122             | feature-service       | 31 KB  | Full notification subsystem; pattern reuse       |
+     * | dpaia__empty__maven__springboot3-1      | empty-maven-springboot| 28 KB  | JWT from scratch; Spring Security API resolution |
+     * | dpaia__feature__service-25              | feature-service       | 17 KB  | Self-referential JPA; circular dep detection     |
+     * | dpaia__feature__service-22              | feature-service       | 15 KB  | FeatureReactionController; IDE Find Usages       |
+     * | dpaia__empty__maven__springboot3-3      | empty-maven-springboot| 15 KB  | Product entity; jakarta vs javax validation      |
+     * | dpaia__feature__service-21              | feature-service       | 13 KB  | Comments/replies; multi-controller consistency   |
+     * | dpaia__spring__petclinic__rest-23       | spring-petclinic-rest | —      | Password policy; IDE per-class test isolation    |
+     * | dpaia__spring__petclinic__rest-14       | spring-petclinic-rest | —      | 575 failing tests; IDE compile check             |
+     * | dpaia__spring__boot__microshop-1        | spring-boot-microshop | —      | WebClient migration; IDE Find Usages             |
      */
     val COMPARISON_CASES: List<String> = listOf(
-        "dpaia__feature__service-51",
-        "dpaia__spring__boot__microshop-1",
-        "dpaia__spring__petclinic__rest-23",
-        "dpaia__feature__service-25",
+        "dpaia__feature__service-125",
         "dpaia__feature__service-122",
-        "dpaia__spring__petclinic-36",
+        "dpaia__empty__maven__springboot3-1",
+        "dpaia__feature__service-25",
+        "dpaia__feature__service-22",
+        "dpaia__empty__maven__springboot3-3",
+        "dpaia__feature__service-21",
+        "dpaia__spring__petclinic__rest-23",
         "dpaia__spring__petclinic__rest-14",
-        "dpaia__spring__boot__microshop-24",
+        "dpaia__spring__boot__microshop-1",
     )
 
     /**
-     * Primary cases for the A/B comparison: "agent with MCP Steroid" vs "agent without MCP Steroid".
+     * Primary 4 cases for the A/B comparison: "agent with MCP Steroid" vs "agent without".
      *
-     * Chosen because IDE navigation / compile feedback / test-runner makes a real difference:
-     * - spring-petclinic-rest-14: 575 failing tests; IDE compile check prevents missed edits
-     * - spring-petclinic-rest-23: Security validation; IDE can run per-class to isolate failures
-     * - feature-service-25: JPA entity with circular dependency; IDE detects at compile time
-     * - spring-boot-microshop-1: WebClient migration; IDE Find Usages finds all RestTemplate calls
+     * Chosen because IDE tooling (navigation, compile feedback, test runner) gives the clearest
+     * measurable advantage:
+     * - feature-service-125: 44 KB patch; JPQL + status machine spanning entities/services/controllers
+     * - empty-maven-springboot3-1: JWT auth from scratch; Spring Security API versioning traps
+     * - feature-service-25: self-referential JPA hierarchy; circular dependency caught at compile time
+     * - spring-petclinic-rest-14: 575 failing tests; IDE highlights every missed edit immediately
      */
     val PRIMARY_COMPARISON_CASES: List<String> = listOf(
-        "dpaia__spring__petclinic__rest-14",
-        "dpaia__spring__petclinic__rest-23",
+        "dpaia__feature__service-125",
+        "dpaia__empty__maven__springboot3-1",
         "dpaia__feature__service-25",
-        "dpaia__spring__boot__microshop-1",
+        "dpaia__spring__petclinic__rest-14",
     )
 }

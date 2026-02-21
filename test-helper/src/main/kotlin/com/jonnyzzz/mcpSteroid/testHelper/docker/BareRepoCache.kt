@@ -80,7 +80,7 @@ object BareRepoCache {
     /**
      * Warm the cache for all known DPAIA repos.
      *
-     * Clones or updates all 10 repos from the dpaia GitHub organisation so subsequent
+     * Clones or updates all repos from the dpaia GitHub organisation so subsequent
      * container runs can clone from the local bare cache instead of hitting GitHub.
      */
     fun warmDpaiaRepos(cacheDir: File) {
@@ -95,6 +95,7 @@ object BareRepoCache {
             "https://github.com/dpaia/spring-petclinic-microservices.git",
             "https://github.com/dpaia/empty-maven-springboot3.git",
             "https://github.com/dpaia/Stirling-PDF.git",
+            "https://github.com/dpaia/spring-llm-chat.git",
         )
 
         println("[BareRepoCache] Warming ${dpaiaRepos.size} DPAIA repos in $cacheDir ...")
@@ -106,6 +107,29 @@ object BareRepoCache {
             }
         }
         println("[BareRepoCache] DPAIA repo warm-up complete")
+    }
+
+    /**
+     * Warm the cache for large remote-git project repos used by integration tests.
+     *
+     * These are not DPAIA arena repos but large external repos cloned by test scenarios
+     * (e.g. [KeycloakArchitectureTest]). Caching them avoids multi-GB GitHub clones on
+     * every test run.
+     */
+    fun warmLargeProjectRepos(cacheDir: File) {
+        val largeRepos = listOf(
+            "https://github.com/keycloak/keycloak.git",
+        )
+
+        println("[BareRepoCache] Warming ${largeRepos.size} large project repo(s) in $cacheDir ...")
+        for (repoUrl in largeRepos) {
+            try {
+                ensureRepo(repoUrl, cacheDir)
+            } catch (e: Exception) {
+                println("[BareRepoCache] WARNING: Failed to cache $repoUrl: ${e.message}")
+            }
+        }
+        println("[BareRepoCache] Large project repo warm-up complete")
     }
 
     private fun runGit(args: List<String>, workDir: File?, timeoutSeconds: Long) {

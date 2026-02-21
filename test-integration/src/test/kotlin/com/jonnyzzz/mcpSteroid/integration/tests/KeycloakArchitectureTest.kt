@@ -1,12 +1,14 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.tests
 
+import com.jonnyzzz.mcpSteroid.integration.infra.IdeTestFolders
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJProject
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.docker.BareRepoCache
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.BeforeAll
 import org.junit.jupiter.api.Test
@@ -243,6 +245,12 @@ class KeycloakArchitectureTest {
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
+            // Warm the Keycloak bare repo cache on the host before the container starts
+            // so the container can clone from /repo-cache instead of hitting GitHub.
+            val cacheDir = IdeTestFolders.repoCacheDirOrNull
+            if (cacheDir != null) {
+                BareRepoCache.warmLargeProjectRepos(cacheDir)
+            }
             // Trigger session creation: clone repo, start IDE, wait for MCP readiness
             session.toString()
         }

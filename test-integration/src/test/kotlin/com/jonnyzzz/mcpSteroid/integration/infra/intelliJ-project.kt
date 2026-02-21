@@ -27,8 +27,21 @@ sealed class IntelliJProject{
 
     open class ProjectFromRemoteGit protected constructor(val repoUrl: String) : IntelliJProject() {
         override fun IntelliJProjectDriver.deploy() {
-            GitDriver(container)
-                .clone(repoUrl, ijDriver.getGuestProjectDir())
+            val git = GitDriver(container)
+            val guestProjectDir = ijDriver.getGuestProjectDir()
+
+            // Derive owner/repo from URL (e.g. "keycloak/keycloak") for the cache path.
+            val ownerAndRepo = repoUrl
+                .removePrefix("https://github.com/")
+                .trimEnd('/')
+                .removeSuffix(".git")
+
+            // Use the bare repo cache when it is mounted at /repo-cache inside the container.
+            val clonedFromCache = git.cloneFromCachedBare(ownerAndRepo, guestProjectDir)
+            if (!clonedFromCache) {
+                console.writeInfo("Cache miss for $ownerAndRepo — cloning from $repoUrl ...")
+                git.clone(repoUrl, guestProjectDir)
+            }
         }
     }
 }
