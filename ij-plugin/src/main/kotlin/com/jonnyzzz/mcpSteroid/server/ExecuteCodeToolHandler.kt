@@ -109,6 +109,44 @@ class ExecuteCodeToolHandler : McpRegistrar {
              val problems = runInspectionsDirectly(vf)
              problems.forEach { (id, descs) -> descs.forEach { println("[" + id + "] " + it.descriptionTemplate) } }
              ```
+             ```kotlin
+             // ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed
+             val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-q")
+                 .directory(java.io.File(project.basePath!!))
+                 .redirectErrorStream(true).start()
+             println(process.inputStream.bufferedReader().readText())
+             process.waitFor()
+             ```
+             ```kotlin
+             // Run a specific JUnit test class via IntelliJ runner (correct API — common pitfall below)
+             import com.intellij.execution.junit.JUnitConfiguration
+             import com.intellij.execution.junit.JUnitConfigurationType
+             import com.intellij.execution.RunManager
+             import com.intellij.execution.ProgramRunnerUtil
+             import com.intellij.execution.executors.DefaultRunExecutor
+             val factory = JUnitConfigurationType.getInstance().configurationFactories.first()
+             val config = factory.createConfiguration("Run test", project) as JUnitConfiguration
+             val data = config.persistentData               // typed as JUnitConfiguration.Data
+             data.TEST_CLASS = "com.example.MyTest"
+             data.TEST_OBJECT = JUnitConfiguration.TEST_CLASS  // ← constant, NOT string "class"
+             config.setWorkingDirectory(project.basePath!!)
+             val settings = RunManager.getInstance(project).createConfiguration(config, factory)
+             RunManager.getInstance(project).addConfiguration(settings)
+             ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
+             println("Test run started")
+             // ⚠️ Pitfall: `data.TEST_OBJECT = "class"` → compile error "unresolved reference 'TEST_CLASS'"
+             // Always use the constant: JUnitConfiguration.TEST_CLASS
+             ```
+             ```kotlin
+             // Check if a Java class already exists before creating it (prevent duplicate files)
+             val existing = readAction {
+                 com.intellij.psi.JavaPsiFacade.getInstance(project).findClass(
+                     "com.example.MyClass",
+                     com.intellij.psi.search.GlobalSearchScope.projectScope(project)
+                 )
+             }
+             println(if (existing == null) "NOT_FOUND: safe to create" else "EXISTS: " + existing.containingFile.virtualFile.path)
+             ```
 
              **Common Operations:**
              - Code navigation: Find usages, go to definition, symbol search

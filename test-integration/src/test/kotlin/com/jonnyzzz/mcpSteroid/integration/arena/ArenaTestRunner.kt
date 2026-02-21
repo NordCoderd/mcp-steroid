@@ -84,7 +84,7 @@ class ArenaTestRunner(
         appendLine()
         appendLine("- Build system: ${testCase.buildSystem}")
         if (testCase.buildSystem == "maven") {
-            appendLine("- Use `mvn` commands for building and testing")
+            appendLine("- Use `./mvnw` commands for building and testing (system `mvn` is not installed)")
         } else {
             appendLine("- Use `./gradlew` commands for building and testing")
         }
@@ -114,6 +114,16 @@ class ArenaTestRunner(
         appendLine()
         if (withMcp) {
             appendLine("The project at `$projectDir` is already open and fully indexed in IntelliJ IDEA.")
+            appendLine()
+            appendLine("**⚠️ Environment constraints (read BEFORE running any tests):**")
+            appendLine("- **Docker is NOT available.** Tests using `@Testcontainers` or requiring a running database")
+            appendLine("  will fail at Spring context load with: 'Could not find a valid Docker environment'.")
+            appendLine("  → If integration tests fail at startup, that is the reason. Do NOT try to fix Docker.")
+            appendLine("  → Instead: run unit tests (no Spring context) + `runInspectionsDirectly` + `mvnw test-compile`.")
+            appendLine("- **Use `./mvnw` (Maven wrapper), not `mvn`** — the system `mvn` is not installed.")
+            appendLine("  → Always: `ProcessBuilder(\"./mvnw\", \"test\", \"-Dtest=MyUnitTest\", \"-q\")`")
+            appendLine("- If integration tests fail, document it in ARENA_SUMMARY and verify unit tests instead.")
+            appendLine()
             appendLine("1. Call `steroid_list_projects` to confirm project name")
             appendLine("2. **Read the failing test files first** — use steroid_execute_code to print the full source of")
             appendLine("   each failing test. Extract expected method signatures, field names, and annotations.")
@@ -164,7 +174,7 @@ class ArenaTestRunner(
             appendLine("1. Navigate the project at `$projectDir` using bash/shell commands")
             appendLine("2. Read source files to understand the problem")
             appendLine("3. Implement the necessary changes using file editing tools")
-            val buildCmd = if (testCase.buildSystem == "maven") "mvn test" else "./gradlew test"
+            val buildCmd = if (testCase.buildSystem == "maven") "./mvnw test" else "./gradlew test"
             appendLine("4. Verify the fix by running `$buildCmd` in `$projectDir`")
             appendLine()
             appendLine("Use shell commands (bash, find, cat, grep) and the build tool to navigate and verify.")

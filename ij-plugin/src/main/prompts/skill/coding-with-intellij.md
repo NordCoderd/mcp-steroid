@@ -918,6 +918,26 @@ if (rcClass != null) {
 }
 ```
 
+### Check if a Class Already Exists (prevent duplicate file creation)
+
+```kotlin
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.search.GlobalSearchScope
+
+val existing = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.example.MyClass",
+        GlobalSearchScope.projectScope(project)
+    )
+}
+if (existing != null) {
+    println("EXISTS: " + existing.containingFile.virtualFile.path)
+} else {
+    println("NOT_FOUND: safe to create")
+    // ... create the file
+}
+```
+
 ### Check Jakarta vs javax Import Conflicts
 
 ```kotlin
@@ -957,6 +977,40 @@ import org.jetbrains.idea.maven.project.MavenProjectsManager
 // After editing pom.xml, sync Maven to download new dependencies
 MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()
 println("Maven sync triggered — wait for background indexing before running tests")
+```
+
+### Run Unit Tests via Maven Wrapper (simplest, preferred in arena)
+
+```kotlin
+// ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed in arena environments
+val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-q")
+    .directory(java.io.File(project.basePath!!))
+    .redirectErrorStream(true).start()
+println(process.inputStream.bufferedReader().readText())
+process.waitFor()
+```
+
+### Run a Specific JUnit Test Class via IntelliJ Runner
+
+```kotlin
+import com.intellij.execution.junit.JUnitConfiguration
+import com.intellij.execution.junit.JUnitConfigurationType
+import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.RunManager
+import com.intellij.execution.executors.DefaultRunExecutor
+
+val factory = JUnitConfigurationType.getInstance().configurationFactories.first()
+val config = factory.createConfiguration("Run test", project) as JUnitConfiguration
+val data = config.persistentData               // typed as JUnitConfiguration.Data
+data.TEST_CLASS = "com.example.MyValidatorTest"
+data.TEST_OBJECT = JUnitConfiguration.TEST_CLASS  // ← must use constant, NOT string "class"
+config.setWorkingDirectory(project.basePath!!)
+val settings = RunManager.getInstance(project).createConfiguration(config, factory)
+RunManager.getInstance(project).addConfiguration(settings)
+ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
+println("Test run started")
+// ⚠️ Pitfall: writing data.TEST_OBJECT = "class" → compile error "unresolved reference 'TEST_CLASS'"
+// Always use the constant: JUnitConfiguration.TEST_CLASS
 ```
 
 ### Run a Specific Maven Test Class via IDE
