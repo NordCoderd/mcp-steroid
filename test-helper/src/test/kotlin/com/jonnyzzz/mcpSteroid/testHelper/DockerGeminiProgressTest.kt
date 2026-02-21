@@ -60,9 +60,8 @@ class DockerGeminiProgressTest {
         stack.registerCleanupAction { workDir.deleteRecursively() }
 
         val driver = DockerDriver(workDir, "GEMINI-PROGRESS")
-        val imageName = "gemini-cli-progress-test"
-        driver.buildDockerImage(
-            imageName = imageName,
+        val imageId = driver.buildDockerImage(
+            imageName = "gemini-cli-progress-test",
             dockerfilePath = dockerfile,
             timeoutSeconds = 600
         )
@@ -70,7 +69,7 @@ class DockerGeminiProgressTest {
         val container = startContainerDriver(
             lifetime = stack,
             scope = driver,
-            imageName = imageName,
+            imageName = imageId,
             autoRemove = true
         )
         return DockerGeminiSession.create(container)

@@ -33,25 +33,56 @@ class DockerDriver(
 
     val processRunner get() = ProcessRunner(logPrefix, secretPatterns.toList())
 
+    /**
+     * Build a Docker image and return its content-addressable image ID (sha256:...).
+     *
+     * The image is also tagged with [imageName] for human readability (`docker images`),
+     * but callers should use the returned image ID for [startContainer] to avoid
+     * naming collisions in concurrent test runs.
+     *
+     * @param buildArgs Extra `--build-arg KEY=VALUE` entries (e.g. `BASE_IMAGE` for derived images)
+     * @return The image ID in `sha256:<hex>` format
+     */
     fun buildDockerImage(
         imageName: String,
         dockerfilePath: File,
-        timeoutSeconds: Long
-    ) {
+        timeoutSeconds: Long,
+        buildArgs: Map<String, String> = emptyMap(),
+    ): String {
         require(dockerfilePath.exists() && dockerfilePath.isFile) { "File does not exist: $dockerfilePath" }
 
         val nowDate = DateTimeFormatter.ISO_DATE.format(LocalDateTime.now())
-        val result = processRunner.runProcess(
-            listOf("docker", "build", "-t", imageName, "--build-arg", "CACHE_BUST=$nowDate", "."),
-            description = "Build Docker image $imageName",
-            workingDir = dockerfilePath.parentFile,
-            timeoutSeconds = timeoutSeconds,
-        )
+        val iidFile = kotlin.io.path.createTempFile("docker-iid", ".txt").toFile()
+        try {
+            val command = buildList {
+                add("docker"); add("build")
+                add("-t"); add(imageName)
+                add("--iidfile"); add(iidFile.absolutePath)
+                add("--build-arg"); add("CACHE_BUST=$nowDate")
+                for ((k, v) in buildArgs) {
+                    add("--build-arg"); add("$k=$v")
+                }
+                add(".")
+            }
 
-        if (result.exitCode != 0) {
-            throw IllegalStateException("Failed to build Docker image. Exit code: ${result.exitCode}\n${result.stderr}")
+            val result = processRunner.runProcess(
+                command,
+                description = "Build Docker image $imageName",
+                workingDir = dockerfilePath.parentFile,
+                timeoutSeconds = timeoutSeconds,
+            )
+
+            if (result.exitCode != 0) {
+                throw IllegalStateException("Failed to build Docker image. Exit code: ${result.exitCode}\n${result.stderr}")
+            }
+
+            val imageId = iidFile.readText().trim()
+            require(imageId.startsWith("sha256:")) { "Unexpected image ID format from --iidfile: $imageId" }
+            println("[$logPrefix] Docker image built: $imageName ($imageId)")
+            return imageId
+        } finally {
+            iidFile.delete()
         }
-        println("[$logPrefix] Docker image built successfully")
     }
 
     fun startContainer(

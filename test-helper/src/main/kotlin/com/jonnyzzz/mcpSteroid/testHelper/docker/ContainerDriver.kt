@@ -80,13 +80,13 @@ fun ContainerDriver.Companion.startDockerSession(
     val scope = DockerDriver(workDir, logPrefix, secretPatterns)
     val imageName = "$dockerFileBase-test"
 
-    scope.buildDockerImage(
+    val imageId = scope.buildDockerImage(
         imageName = imageName,
         dockerfilePath,
         timeoutSeconds = 600
     )
 
-    return startContainerDriver(lifetime, scope, imageName)
+    return startContainerDriver(lifetime, scope, imageId)
 }
 
 fun startContainerDriver(

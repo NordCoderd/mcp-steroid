@@ -64,7 +64,7 @@ object DockerReaper {
             val reaperDockerfile = projectHome.resolve("test-helper/src/main/docker/reaper/Dockerfile")
             require(reaperDockerfile.isFile) { "Reaper Dockerfile must exist: $reaperDockerfile" }
 
-            driver.buildDockerImage(
+            val reaperImageId = driver.buildDockerImage(
                 IMAGE_NAME,
                 reaperDockerfile,
                 120
@@ -79,7 +79,7 @@ object DockerReaper {
             val containerDriver = startContainerDriver(
                 lifetime = runningLifetime,
                 scope = driver,
-                imageName = IMAGE_NAME,
+                imageName = reaperImageId,
                 volumes = listOf(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock")),
                 ports = listOf(port8080),
                 autoRemove = true,

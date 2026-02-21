@@ -55,9 +55,8 @@ class DockerCodexProgressTest {
         stack.registerCleanupAction { workDir.deleteRecursively() }
 
         val driver = DockerDriver(workDir, "CODEX-PROGRESS")
-        val imageName = "codex-cli-progress-test"
-        driver.buildDockerImage(
-            imageName = imageName,
+        val imageId = driver.buildDockerImage(
+            imageName = "codex-cli-progress-test",
             dockerfilePath = dockerfile,
             timeoutSeconds = 600
         )
@@ -65,7 +64,7 @@ class DockerCodexProgressTest {
         val container = startContainerDriver(
             lifetime = stack,
             scope = driver,
-            imageName = imageName,
+            imageName = imageId,
             autoRemove = true
         )
         return DockerCodexSession.create(container)

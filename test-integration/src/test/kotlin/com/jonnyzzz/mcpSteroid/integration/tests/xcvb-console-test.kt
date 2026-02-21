@@ -15,10 +15,10 @@ class XcvbConsoleTest {
         val uniqueSuffix = UUID.randomUUID().toString().take(8)
         val imageName = "$dockerFileBase-test-$uniqueSuffix"
         val ideArchive = IdeDistribution.fromSystemProperties().resolveAndDownload()
-        val scope = buildIdeImage(dockerFileBase, imageName, ideArchive)
+        val (scope, imageId) = buildIdeImage(dockerFileBase, imageName, ideArchive)
 
         var container = startContainerDriver(
-            lifetime, scope, imageName,
+            lifetime, scope, imageId,
             extraEnvVars = emptyMap(),
             ports = listOf(
                 XcvbVideoDriver.VIDEO_STREAMING_PORT

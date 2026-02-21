@@ -1,4 +1,5 @@
-FROM mcp-steroid-ide-base-test
+ARG BASE_IMAGE=mcp-steroid-ide-base-test
+FROM ${BASE_IMAGE}
 
 USER root
 

@@ -9,49 +9,55 @@ import kotlin.io.path.exists
 private const val BASE_DOCKER_CONTEXT = "ide-base"
 private const val BASE_IMAGE_NAME = "mcp-steroid-ide-base-test"
 
-// JVM-level guard: the shared base image content never changes within a test run,
-// so build it only once regardless of how many parallel test containers are started.
-@Volatile private var baseImageBuilt = false
+// JVM-level guard: the shared base image is built once; its ID is stored so
+// derived images can reference it by content-addressable hash rather than name.
+@Volatile private var baseImageId: String? = null
 private val baseImageLock = Any()
 
 /**
- * Builds the IDE Docker image for [dockerFileBase] and returns a [DockerDriver]
- * scoped to its build context.
+ * Builds the IDE Docker image for [dockerFileBase] and returns the [DockerDriver]
+ * scoped to its build context together with the image ID (sha256:...).
  *
  * The build context directory is derived from [imageName], so parallel calls
  * with different image names (which include a unique suffix from the caller)
- * each get their own isolated context directory — no races, no `deleteRecursively`
- * stomping on a concurrent build.
+ * each get their own isolated context directory — no races.
+ *
+ * The derived image is built with `--build-arg BASE_IMAGE=<sha256>` so it
+ * references the exact base image built in this JVM run, preventing collisions
+ * when multiple test processes build the base image concurrently.
+ *
+ * @return Pair of [DockerDriver] and image ID (`sha256:...`) for the new image
  */
-fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): DockerDriver {
-    buildSharedBaseImage()
+fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): Pair<DockerDriver, String> {
+    val resolvedBaseImageId = buildSharedBaseImage()
     // Derive a per-build context dir from the full image name.
     // Since imageName already carries a unique suffix (e.g. "ide-agent-test-a1b2c3d4"),
     // this guarantees each concurrent build gets its own isolated directory.
     val contextDir = prepareContext("docker-$imageName", BASE_DOCKER_CONTEXT, dockerFileBase)
     linkIdeArchive(contextDir, ideArchive)
     val scope = DockerDriver(contextDir, "IDE-AGENT")
-    scope.buildDockerImage(
+    val imageId = scope.buildDockerImage(
         imageName = imageName,
         dockerfilePath = File(contextDir, "Dockerfile"),
         timeoutSeconds = 900,
+        buildArgs = mapOf("BASE_IMAGE" to resolvedBaseImageId),
     )
-
-    return scope
+    return scope to imageId
 }
 
-private fun buildSharedBaseImage() {
-    if (baseImageBuilt) return  // fast path — no locking needed after first build
+private fun buildSharedBaseImage(): String {
+    baseImageId?.let { return it }  // fast path — no locking needed after first build
     synchronized(baseImageLock) {
-        if (baseImageBuilt) return  // double-checked locking
+        baseImageId?.let { return it }  // double-checked locking
         val baseContext = prepareContext("docker-$BASE_DOCKER_CONTEXT", BASE_DOCKER_CONTEXT)
         val baseScope = DockerDriver(baseContext, "IDE-AGENT")
-        baseScope.buildDockerImage(
+        val id = baseScope.buildDockerImage(
             imageName = BASE_IMAGE_NAME,
             dockerfilePath = File(baseContext, "Dockerfile"),
             timeoutSeconds = 900,
         )
-        baseImageBuilt = true
+        baseImageId = id
+        return id
     }
 }
 

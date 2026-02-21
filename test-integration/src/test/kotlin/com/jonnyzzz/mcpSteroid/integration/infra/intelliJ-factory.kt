@@ -45,7 +45,7 @@ fun IntelliJContainer.Companion.create(
     // preventing races in buildIdeImage when multiple tests start concurrently.
     val uniqueSuffix = UUID.randomUUID().toString().take(8)
     val imageName = "$selectedDockerBase-test-$uniqueSuffix"
-    val scope = buildIdeImage(selectedDockerBase, imageName, ideArchive)
+    val (scope, imageId) = buildIdeImage(selectedDockerBase, imageName, ideArchive)
 
     val containerMountedPath = "/mcp-run-dir"
 
@@ -55,7 +55,7 @@ fun IntelliJContainer.Companion.create(
     }
 
     var container = startContainerDriver(
-        lifetime, scope, imageName,
+        lifetime, scope, imageId,
         extraEnvVars = emptyMap(),
         volumes = volumes,
         ports = listOf(
