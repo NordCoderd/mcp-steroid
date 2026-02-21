@@ -45,11 +45,11 @@ class DockerGeminiProgressTest {
 
         assertNotEquals(
             result.rawOutput.trim(),
-            result.output.trim(),
+            result.stdout.trim(),
             "Processed output should not be identical to raw NDJSON"
         )
-        assertTrue(result.output.contains(">> "), "Processed output should contain start progress markers")
-        assertTrue(result.output.contains("<< "), "Processed output should contain completion progress markers")
+        assertTrue(result.stdout.contains(">> "), "Processed output should contain start progress markers")
+        assertTrue(result.stdout.contains("<< "), "Processed output should contain completion progress markers")
     }
 
     private fun createLightweightGeminiSession(stack: CloseableStack): DockerGeminiSession {

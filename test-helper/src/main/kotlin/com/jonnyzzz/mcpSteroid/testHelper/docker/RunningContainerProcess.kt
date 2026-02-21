@@ -26,7 +26,7 @@ class RunningContainerProcess(
     override val exitCode: Int?
         get() = readExitCode()
 
-    override val output: String
+    override val stdout: String
         get() = readStdOut()
 
     override val stderr: String
@@ -56,7 +56,7 @@ class RunningContainerProcess(
             listOf("cat", stdoutPath),
             timeoutSeconds = timeoutSeconds,
         )
-        return result.output
+        return result.stdout
     }
 
     /** Read current stderr content from the container. */
@@ -65,7 +65,7 @@ class RunningContainerProcess(
             listOf("cat", stderrPath),
             timeoutSeconds = timeoutSeconds,
         )
-        return result.output
+        return result.stdout
     }
 
     val pid: Long by lazy {
@@ -73,7 +73,7 @@ class RunningContainerProcess(
             listOf("cat", pidPath),
             timeoutSeconds = 5L,
         ).assertExitCode(0)
-        result.output.trim().toLong()
+        result.stdout.trim().toLong()
     }
 
     /**
@@ -86,7 +86,7 @@ class RunningContainerProcess(
             timeoutSeconds = timeoutSeconds,
         )
         if (result.exitCode != 0) return null
-        return result.output.trim().toIntOrNull()
+        return result.stdout.trim().toIntOrNull()
     }
 
     /** Kill the background process if it is still running. */

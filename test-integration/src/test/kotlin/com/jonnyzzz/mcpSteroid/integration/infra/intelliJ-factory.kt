@@ -266,7 +266,7 @@ private fun discoverProcessFamilyPids(container: ContainerDriver, rootPid: Long)
     if (processMap.exitCode != 0) return setOf(rootPid)
 
     val childrenByParent = mutableMapOf<Long, MutableList<Long>>()
-    processMap.output.lineSequence().forEach { line ->
+    processMap.stdout.lineSequence().forEach { line ->
         val parts = line.trim().split(Regex("\\s+"))
         if (parts.size != 2) return@forEach
         val pid = parts[0].toLongOrNull() ?: return@forEach

@@ -128,7 +128,7 @@ class DebuggerDemoTest {
         console.writeStep(2, "Running agent prompt")
 
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
-        val output = result.output
+        val output = result.stdout
         // Use rawOutput for evidence checks: Claude's stream-json mode puts
         // execution IDs in NDJSON tool_result events, not in the final extracted text.
         val combined = result.rawOutput + "\n" + result.stderr
@@ -397,7 +397,7 @@ class DebuggerDemoTest {
         console.writeStep(2, "Running agent prompt")
 
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
-        val output = result.output
+        val output = result.stdout
         val combined = result.rawOutput + "\n" + result.stderr
 
         console.writeStep(3, "Validating agent output")
@@ -521,7 +521,7 @@ class DebuggerDemoTest {
         console.writeStep(2, "Running agent prompt")
 
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
-        val output = result.output
+        val output = result.stdout
         val combined = result.rawOutput + "\n" + result.stderr
 
         console.writeStep(3, "Validating agent output")
@@ -626,7 +626,7 @@ class DebuggerDemoTest {
         console.writeStep(2, "Running agent prompt")
 
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
-        val output = result.output
+        val output = result.stdout
         val combined = result.rawOutput + "\n" + result.stderr
 
         console.writeStep(3, "Validating agent output")
@@ -750,7 +750,7 @@ class DebuggerDemoTest {
         console.writeStep(2, "Running agent prompt")
 
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
-        val output = result.output
+        val output = result.stdout
         val combined = result.rawOutput + "\n" + result.stderr
 
         console.writeStep(3, "Validating agent output")
@@ -846,7 +846,7 @@ class DebuggerDemoTest {
         console.writeStep(2, "Running agent prompt")
 
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
-        val output = result.output
+        val output = result.stdout
         val combined = result.rawOutput + "\n" + result.stderr
 
         console.writeStep(3, "Validating agent output")

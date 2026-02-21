@@ -71,7 +71,7 @@ class KeycloakArchitectureTest {
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
         result.assertExitCode(0, message = "authentication flow investigation")
 
-        val combined = result.output + "\n" + result.stderr
+        val combined = result.stdout + "\n" + result.stderr
 
         // Agent must show evidence of MCP Steroid execute_code usage
         assertUsedExecuteCodeEvidence(combined)
@@ -121,7 +121,7 @@ class KeycloakArchitectureTest {
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
         result.assertExitCode(0, message = "module structure investigation")
 
-        val combined = result.output + "\n" + result.stderr
+        val combined = result.stdout + "\n" + result.stderr
 
         // Agent must show evidence of MCP Steroid execute_code usage
         assertUsedExecuteCodeEvidence(combined)
@@ -178,7 +178,7 @@ class KeycloakArchitectureTest {
         val result = agent.runPrompt(prompt, timeoutSeconds = 600)
         result.assertExitCode(0, message = "SPI architecture investigation")
 
-        val combined = result.output + "\n" + result.stderr
+        val combined = result.stdout + "\n" + result.stderr
 
         // Agent must show evidence of MCP Steroid execute_code usage
         assertUsedExecuteCodeEvidence(combined)

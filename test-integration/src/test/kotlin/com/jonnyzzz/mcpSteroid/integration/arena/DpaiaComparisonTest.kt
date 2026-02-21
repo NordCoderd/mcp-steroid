@@ -110,7 +110,7 @@ class DpaiaComparisonTest {
         // A pass requires the agent to have at minimum attempted a fix
         check(result.evaluation.agentExitedSuccessfully || result.evaluation.agentClaimedFix) {
             "Agent [$agentName, $modeLabel] neither exited successfully nor claimed a fix " +
-                    "for ${testCase.instanceId}.\nOutput:\n${result.agentResult.output}"
+                    "for ${testCase.instanceId}.\nOutput:\n${result.agentResult.stdout}"
         }
     }
 

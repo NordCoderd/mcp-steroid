@@ -86,7 +86,7 @@ class DockerGeminiSession(
             effectiveResult = runPromptOnce(prompt, timeoutSeconds)
         }
 
-        val rawOutput = effectiveResult.output
+        val rawOutput = effectiveResult.stdout
         val resultText = outputFilter.filterText(rawOutput)
         // Gemini CLI sometimes exits with 137 (SIGKILL) even after completing successfully.
         // Treat this as success when the raw NDJSON confirms a successful result was produced.
@@ -97,7 +97,7 @@ class DockerGeminiSession(
         }
         return ProcessResultValue(
             exitCode = effectiveExitCode,
-            output = resultText,
+            stdout = resultText,
             stderr = effectiveResult.stderr,
             rawOutput = rawOutput,
         )
@@ -134,7 +134,7 @@ class DockerGeminiSession(
 
     private fun shouldRetryTransientApiError(result: ProcessResult): Boolean {
         if (result.exitCode == 0) return false
-        val combined = (result.output + "\n" + result.stderr).lowercase(Locale.US)
+        val combined = (result.stdout + "\n" + result.stderr).lowercase(Locale.US)
         return combined.contains("api error: terminated") ||
                 combined.contains("error when talking to gemini api") ||
                 combined.contains("und_err_socket") ||
@@ -143,7 +143,7 @@ class DockerGeminiSession(
 
     private fun shouldRetryWithModernSandboxFlag(result: ProcessResult): Boolean {
         if (result.exitCode == 0) return false
-        val combined = (result.output + "\n" + result.stderr).lowercase(Locale.US)
+        val combined = (result.stdout + "\n" + result.stderr).lowercase(Locale.US)
         return combined.contains("unknown arguments: sandbox-mode") ||
                 combined.contains("unknown arguments: sandboxmode")
     }

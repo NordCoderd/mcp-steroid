@@ -178,7 +178,7 @@ class DpaiaArenaTest {
          * Called BEFORE assertions so data is always captured even on test failure.
          */
         private fun writeRunSummary(testCase: DpaiaTestCase, agentName: String, result: ArenaTestResult) {
-            val combined = result.agentResult.output + "\n" + result.agentResult.stderr
+            val combined = result.agentResult.stdout + "\n" + result.agentResult.stderr
             val execCodeCalls = combined.lines().count { "steroid_execute_code" in it.lowercase() }
 
             val summary = buildJsonObject {

@@ -66,7 +66,7 @@ private const val FILTER_BIN = "/opt/agent-output-filter/bin/agent-output-filter
  *
  * The pipeline is:  `agent 2>&1 | tee raw.jsonl | agent-output-filter <type> > filtered.log`
  *
- * [ProcessResult.output] returns the raw NDJSON so test assertions are backward-compatible.
+ * [ProcessResult.stdout] returns the raw NDJSON so test assertions are backward-compatible.
  * The filtered log is pumped to the xterm console via [ConsoleDriver.startFilePump].
  *
  * The agents dir is volume-mounted, so log files are directly accessible on the host
@@ -155,10 +155,10 @@ class ConsolePumpingContainerDriver(
 
             // Return raw NDJSON in result.output for backward-compatible test assertions.
             // Falls back to whatever docker captured (empty, since quietly=true) if not readable.
-            val rawOutput = if (hostRawLog.exists()) hostRawLog.readText() else result.output
+            val rawOutput = if (hostRawLog.exists()) hostRawLog.readText() else result.stdout
             return ProcessResultValue(
                 exitCode = result.exitCode ?: -1,
-                output = rawOutput,
+                stdout = rawOutput,
                 stderr = result.stderr,
             )
         } finally {

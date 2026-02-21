@@ -145,7 +145,7 @@ class DockerDriver(
                 "Failed to start Docker container: $stderr"
             }
 
-        val containerId = result.output.trim()
+        val containerId = result.stdout.trim()
         if (containerId.isEmpty()) {
             throw IllegalStateException("Failed to start Docker container: ${result.stderr}")
         }
@@ -176,8 +176,8 @@ class DockerDriver(
             .assertExitCode(0) { "Failed to query mapped port for $containerPort: $stderr" }
 
         // Parse "0.0.0.0:52134" or "[::]:52134" — take the last colon-separated part
-        return result.output.trim().lines().first().substringAfterLast(':').toIntOrNull()
-            ?: error("Failed to parse host port from: ${result.output}")
+        return result.stdout.trim().lines().first().substringAfterLast(':').toIntOrNull()
+            ?: error("Failed to parse host port from: ${result.stdout}")
     }
 
     /**
@@ -200,7 +200,7 @@ class DockerDriver(
             .runProcess(processRunner)
             .assertExitCode(0) { "Failed to query container IP: $stderr" }
 
-        return result.output
+        return result.stdout
             .trim()
             .split(Regex("\\s+"))
             .firstOrNull { it.isNotBlank() }

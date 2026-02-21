@@ -89,7 +89,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             .assertNoErrorsInOutput(message = "prompt")
 
         val combinedOutput = buildString {
-            appendLine(result.output)
+            appendLine(result.stdout)
             appendLine(result.rawOutput)
             appendLine(result.stderr)
         }
@@ -106,7 +106,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             combinedOutput.contains(project.basePath.toString())
         )
 
-        val output = result.output
+        val output = result.stdout
         val marker = "PROJECTS:"
         val markerIndex = output.indexOf(marker)
         check(markerIndex >= 0) {
@@ -372,7 +372,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             .assertExitCode(0, "prompt")
 
         val combinedOutput = buildString {
-            appendLine(result.output)
+            appendLine(result.stdout)
             appendLine(result.rawOutput)
             appendLine(result.stderr)
         }

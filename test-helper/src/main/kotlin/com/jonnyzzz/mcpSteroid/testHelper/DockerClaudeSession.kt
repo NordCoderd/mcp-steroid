@@ -101,12 +101,12 @@ class DockerClaudeSession(
             timeoutSeconds = timeoutSeconds
         )
 
-        val resultText = outputFilter.filterText(rawResult.output)
+        val resultText = outputFilter.filterText(rawResult.stdout)
         return ProcessResultValue(
             exitCode = rawResult.exitCode ?: -1,
-            output = resultText,
+            stdout = resultText,
             stderr = rawResult.stderr,
-            rawOutput = rawResult.output,
+            rawOutput = rawResult.stdout,
         )
     }
 

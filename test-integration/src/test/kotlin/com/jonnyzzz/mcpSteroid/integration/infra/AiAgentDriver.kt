@@ -78,7 +78,7 @@ class AiAgentDriver(
         container.writeFileInContainer("/tmp/deploy-filter.sh", deployScript, executable = true)
         val result = container.runInContainer(listOf("bash", "/tmp/deploy-filter.sh"), timeoutSeconds = 60)
         result.assertExitCode(0) {
-            "agent-output-filter deployment failed:\n${result.output}\n${result.stderr}"
+            "agent-output-filter deployment failed:\n${result.stdout}\n${result.stderr}"
         }
 
         println("[AiAgentDriver] agent-output-filter deployed to /opt/agent-output-filter")

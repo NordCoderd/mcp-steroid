@@ -38,8 +38,8 @@ class ProcessRunnerTest {
     @Test
     fun `runProcess captures stdout`() {
         val result = runner.runProcess(request("echo", "hello world"))
-        assertNotNull(result.output)
-        assertTrue(result.output.contains("hello world"), "stdout should contain 'hello world', got: ${result.output}")
+        assertNotNull(result.stdout)
+        assertTrue(result.stdout.contains("hello world"), "stdout should contain 'hello world', got: ${result.stdout}")
     }
 
     @Test
@@ -69,7 +69,7 @@ class ProcessRunnerTest {
     @Test
     fun `runProcess rawOutput equals output by default`() {
         val result = runner.runProcess(request("echo", "data"))
-        assertEquals(result.output, result.rawOutput)
+        assertEquals(result.stdout, result.rawOutput)
     }
 
     // --- stdin ---
@@ -79,7 +79,7 @@ class ProcessRunnerTest {
         val result = runner.runProcess(request("cat") {
             stdin("hello from stdin")
         })
-        assertTrue(result.output.contains("hello from stdin"), "process should read stdin, got: ${result.output}")
+        assertTrue(result.stdout.contains("hello from stdin"), "process should read stdin, got: ${result.stdout}")
     }
 
     @Test
@@ -88,7 +88,7 @@ class ProcessRunnerTest {
         val result = runner.runProcess(request("cat") {
             stdin(bytes)
         })
-        assertTrue(result.output.contains("byte-content"), "process should read byte array stdin, got: ${result.output}")
+        assertTrue(result.stdout.contains("byte-content"), "process should read byte array stdin, got: ${result.stdout}")
     }
 
     // --- timeout ---
@@ -110,7 +110,7 @@ class ProcessRunnerTest {
         val secretRunner = ProcessRunner("TEST", secretPatterns = listOf(secret))
         val result = secretRunner.runProcess(request("echo", secret))
         // The actual output should preserve the secret (secrets filtered only in logs, not result)
-        assertTrue(result.output.contains(secret), "result output should preserve the secret, got: ${result.output}")
+        assertTrue(result.stdout.contains(secret), "result output should preserve the secret, got: ${result.stdout}")
     }
 
     @Test
@@ -118,7 +118,7 @@ class ProcessRunnerTest {
         val secretRunner = ProcessRunner("TEST", secretPatterns = listOf("", "  ", "actual-secret"))
         val result = secretRunner.runProcess(request("echo", "no actual-secret here"))
         // blank patterns should not cause issues, only "actual-secret" is redacted in logs
-        assertTrue(result.output.contains("actual-secret"), "result output should preserve the secret")
+        assertTrue(result.stdout.contains("actual-secret"), "result output should preserve the secret")
     }
 
     // --- quietly mode ---
@@ -128,7 +128,7 @@ class ProcessRunnerTest {
         val result = runner.runProcess(request("echo", "quiet-output") {
             quietly()
         })
-        assertTrue(result.output.contains("quiet-output"), "quietly mode should still capture output")
+        assertTrue(result.stdout.contains("quiet-output"), "quietly mode should still capture output")
         result.assertExitCode(0) { "quietly mode should not affect exit code" }
     }
 
@@ -138,8 +138,8 @@ class ProcessRunnerTest {
     fun `process runs in the specified working directory`() {
         val result = runner.runProcess(request("pwd"))
         assertTrue(
-            result.output.contains(tempDir.canonicalPath) || result.output.contains(tempDir.absolutePath),
-            "process should run in tempDir, got: ${result.output}"
+            result.stdout.contains(tempDir.canonicalPath) || result.stdout.contains(tempDir.absolutePath),
+            "process should run in tempDir, got: ${result.stdout}"
         )
     }
 
@@ -148,18 +148,18 @@ class ProcessRunnerTest {
     @Test
     fun `runProcess captures multi-line output`() {
         val result = runner.runProcess(request("bash", "-c", "echo line1; echo line2; echo line3"))
-        assertTrue(result.output.contains("line1"), "should contain line1")
-        assertTrue(result.output.contains("line2"), "should contain line2")
-        assertTrue(result.output.contains("line3"), "should contain line3")
+        assertTrue(result.stdout.contains("line1"), "should contain line1")
+        assertTrue(result.stdout.contains("line2"), "should contain line2")
+        assertTrue(result.stdout.contains("line3"), "should contain line3")
     }
 
     @Test
     fun `runProcess joins multi-line output with newline not comma-space`() {
         val result = runner.runProcess(request("bash", "-c", "echo line1; echo line2; echo line3"))
         // Lines must be newline-separated, not joined with ", " (the joinToString default separator)
-        val lines = result.output.lines().filter { it.isNotBlank() }
+        val lines = result.stdout.lines().filter { it.isNotBlank() }
         assertEquals(listOf("line1", "line2", "line3"), lines,
-            "multi-line output must be newline-joined, got: ${result.output.replace("\n", "\\n")}")
+            "multi-line output must be newline-joined, got: ${result.stdout.replace("\n", "\\n")}")
     }
 
     @Test
@@ -173,7 +173,7 @@ class ProcessRunnerTest {
     @Test
     fun `runProcess captures both stdout and stderr from same process`() {
         val result = runner.runProcess(request("bash", "-c", "echo out-text; echo err-text >&2"))
-        assertTrue(result.output.contains("out-text"), "stdout should contain out-text, got: ${result.output}")
+        assertTrue(result.stdout.contains("out-text"), "stdout should contain out-text, got: ${result.stdout}")
         assertTrue(result.stderr.contains("err-text"), "stderr should contain err-text, got: ${result.stderr}")
     }
 }
@@ -289,7 +289,7 @@ class ProcessRunRequestBuilderTest {
             .workingDir(tempDir)
             .runProcess(runner)
         result.assertExitCode(0) { "builder extension runProcess should succeed" }
-        assertTrue(result.output.contains("ext-test"), "output should contain ext-test, got: ${result.output}")
+        assertTrue(result.stdout.contains("ext-test"), "output should contain ext-test, got: ${result.stdout}")
     }
 }
 

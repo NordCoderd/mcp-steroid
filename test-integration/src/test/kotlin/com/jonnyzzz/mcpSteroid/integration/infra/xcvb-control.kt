@@ -20,7 +20,7 @@ class XcvbInputDriver(
                 timeoutSeconds = 10,
             )
             .assertExitCode(0, "[xcvb] xdotool ${args.joinToString(" ")} failed")
-            .output.trim()
+            .stdout.trim()
     }
 
     private fun getMouseLocationOrNull(): MouseLocation? {
@@ -32,7 +32,7 @@ class XcvbInputDriver(
 
         var x: Int? = null
         var y: Int? = null
-        for (line in result.output.lineSequence()) {
+        for (line in result.stdout.lineSequence()) {
             val separator = line.indexOf('=')
             if (separator < 0) continue
 
@@ -62,7 +62,7 @@ class XcvbInputDriver(
                 timeoutSeconds = 5,
             )
             .assertExitCode(0, "[xcvb] clipboardPaste failed")
-            .output.trim()
+            .stdout.trim()
     }
 
     /** Move the mouse cursor to the given display coordinates. */

@@ -65,7 +65,7 @@ class DockerGeminiSessionTest {
     fun retriesWithModernSandboxFlagWhenLegacyFlagIsRejected() {
         val first = ProcessResultValue(
             exitCode = 1,
-            output = "",
+            stdout = "",
             stderr = "Unknown arguments: sandbox-mode, sandboxMode"
         )
         val secondRaw = """
@@ -74,7 +74,7 @@ class DockerGeminiSessionTest {
         """.trimIndent()
         val second = ProcessResultValue(
             exitCode = 0,
-            output = secondRaw,
+            stdout = secondRaw,
             stderr = ""
         )
 
@@ -88,8 +88,8 @@ class DockerGeminiSessionTest {
         assertTrue(runner.commands[0].contains("none"))
         assertTrue(runner.commands[1].contains("--sandbox"))
         assertTrue(runner.commands[1].contains("false"))
-        assertTrue(result.output.contains("pong"), "Expected 'pong' in: ${result.output}")
-        assertTrue(result.output.contains("[done]"), "Expected '[done]' in: ${result.output}")
+        assertTrue(result.stdout.contains("pong"), "Expected 'pong' in: ${result.stdout}")
+        assertTrue(result.stdout.contains("[done]"), "Expected '[done]' in: ${result.stdout}")
         assertEquals(secondRaw, result.rawOutput)
     }
 

@@ -3,7 +3,6 @@ package com.jonnyzzz.mcpSteroid.testHelper.process
 
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.yield
 import java.io.InputStream
 import java.util.Collections
 import java.util.concurrent.TimeUnit
@@ -11,9 +10,9 @@ import java.util.concurrent.TimeUnit
 //TODO: hide this class
 data class ProcessResultValue(
     override val exitCode: Int,
-    override val output: String,
+    override val stdout: String,
     override val stderr: String,
-    override val rawOutput: String = output,
+    override val rawOutput: String = stdout,
 ) : ProcessResult
 
 
@@ -56,7 +55,7 @@ class ProcessRunner(
         if (!completed) {
             process.destroyForcibly()
             println("[$logPrefix] Timed out after ${request.timeoutSeconds}s")
-            return ProcessResultValue(-1, processInfo.output, "Timeout\n${processInfo.stderr}")
+            return ProcessResultValue(-1, processInfo.stdout, "Timeout\n${processInfo.stderr}")
         }
 
         processInfo.thread.forEach {
@@ -67,7 +66,7 @@ class ProcessRunner(
 
         val exitCode = process.exitValue()
         println("[$logPrefix] Exit code: $exitCode")
-        return ProcessResultValue(exitCode, processInfo.output, processInfo.stderr)
+        return ProcessResultValue(exitCode, processInfo.stdout, processInfo.stderr)
     }
 
     fun startProcess(request: ProcessRunRequest): StartedProcess = startProcessImpl(request)
@@ -178,14 +177,14 @@ class ProcessRunner(
                 .joinToString(separator = "\n") { it.line }
         }
 
-        override val output: String
+        override val stdout: String
             get() = builder(ProcessStreamType.STDOUT)
 
         override val stderr: String
             get() = builder(ProcessStreamType.STDERR)
 
         override fun toString(): String {
-            return "StartedProcessImpl(pid=$pid, exitCode=$exitCode, output='$output', stderr='$stderr')"
+            return "StartedProcessImpl(pid=$pid, exitCode=$exitCode, output='$stdout', stderr='$stderr')"
         }
     }
 }

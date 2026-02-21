@@ -77,20 +77,20 @@ class DockerClaudeProgressTest {
         // Verify the processed output is meaningful (not just raw NDJSON)
         assertNotEquals(
             result.rawOutput,
-            result.output,
+            result.stdout,
             "Processed output should be extracted from NDJSON, not identical to raw output"
         )
 
         // Verify we get some text output (the actual answer)
         assertTrue(
-            result.output.isNotBlank(),
+            result.stdout.isNotBlank(),
             "Processed output should contain the final answer text"
         )
 
         println("✓ Claude progress test passed")
         println("  - Raw output had $jsonLineCount NDJSON events")
         println("  - Tool use events detected: $hasToolUse")
-        println("  - Processed output length: ${result.output.length} chars")
+        println("  - Processed output length: ${result.stdout.length} chars")
     }
 
     @Test

@@ -91,12 +91,12 @@ class WhatYouSeeTest {
             .assertNoErrorsInOutput("toolPreference must have no errors")
 
         // Parse preferred tools from output
-        val preferredLines = result.output.lines()
+        val preferredLines = result.stdout.lines()
             .filter { it.startsWith("PREFERRED:") }
             .map { it.substringAfter("PREFERRED:").trim() }
 
         println("[${agent.displayName}] Tool preferences:")
-        val taskLines = result.output.lines().filter { it.startsWith("TASK:") }
+        val taskLines = result.stdout.lines().filter { it.startsWith("TASK:") }
         for (i in preferredLines.indices) {
             val task = taskLines.getOrNull(i) ?: "TASK: ?"
             println("  $task -> ${preferredLines[i]}")
@@ -108,10 +108,10 @@ class WhatYouSeeTest {
 
         // Hard assertions
         check(preferredLines.size == TASK_COUNT) {
-            "Expected $TASK_COUNT PREFERRED: lines but got ${preferredLines.size}. Output:\n${result.output}"
+            "Expected $TASK_COUNT PREFERRED: lines but got ${preferredLines.size}. Output:\n${result.stdout}"
         }
         check(steroidCount >= MIN_STEROID_COUNT) {
-            "Only $steroidCount/$TASK_COUNT tasks preferred steroid tools (minimum: $MIN_STEROID_COUNT). Output:\n${result.output}"
+            "Only $steroidCount/$TASK_COUNT tasks preferred steroid tools (minimum: $MIN_STEROID_COUNT). Output:\n${result.stdout}"
         }
         result.assertOutputContains("STEROID_COUNT:", message = "Agent must output summary count")
     }

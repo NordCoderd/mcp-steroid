@@ -6,7 +6,7 @@ package com.jonnyzzz.mcpSteroid.testHelper.process
  */
 interface ProcessResult {
     val exitCode: Int?
-    val output: String
+    val stdout: String
     val stderr: String
 
 
@@ -15,17 +15,17 @@ interface ProcessResult {
      * Raw unprocessed output from the process.
      *
      * For agents that post-process output (e.g. Claude's stream-json mode),
-     * [output] contains the extracted final text for assertions, while
+     * [stdout] contains the extracted final text for assertions, while
      * [rawOutput] preserves the full original output (e.g. NDJSON events).
      *
-     * For agents without post-processing, [rawOutput] equals [output].
+     * For agents without post-processing, [rawOutput] equals [stdout].
      */
-    val rawOutput: String get() = output
+    val rawOutput: String get() = stdout
 }
 
 fun ProcessResult.assertOutputContains(vararg expectedOutput: String, message: String = "") = apply {
     for (s in expectedOutput) {
-        check(output.contains(s) || stderr.contains(s)) {
+        check(stdout.contains(s) || stderr.contains(s)) {
             "Process $message output must contain $s\n$this"
         }
     }
@@ -44,7 +44,7 @@ fun ProcessResult.assertExitCode(expectedExitCode: Int, message: ProcessResult.(
 }
 
 fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
-    val combined = output + "\n" + stderr
+    val combined = stdout + "\n" + stderr
 
     // Check for explicit ERROR patterns (case-insensitive)
     val errorPatterns = listOf(
@@ -65,7 +65,7 @@ fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
 }
 
 fun ProcessResult.assertNoMessageInOutput(messageRegex: String) = apply {
-    val combined = output + "\n" + stderr
+    val combined = stdout + "\n" + stderr
 
     // Check for explicit ERROR patterns (case-insensitive)
     val errorPatterns = listOf(

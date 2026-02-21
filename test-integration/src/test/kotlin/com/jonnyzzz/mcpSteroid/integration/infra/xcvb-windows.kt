@@ -90,7 +90,7 @@ class XcvbWindowDriver(
         )
         if (result.exitCode != 0) return emptyList()
 
-        return result.output.lineSequence()
+        return result.stdout.lineSequence()
             .filter { it.isNotBlank() }
             .mapNotNull { line ->
                 val parts = line.split('|', limit = 7)

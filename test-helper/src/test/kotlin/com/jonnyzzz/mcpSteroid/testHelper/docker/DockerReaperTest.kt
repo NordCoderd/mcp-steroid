@@ -70,7 +70,7 @@ class DockerReaperTest {
                 .quietly()
                 .runProcess(processRunner)
 
-        assertTrue(beforeResult.output.trim().isNotEmpty(), "Container should be running")
+        assertTrue(beforeResult.stdout.trim().isNotEmpty(), "Container should be running")
 
         // Close lifetime (normal cleanup)
         lifetime.closeAllStacks()
@@ -84,7 +84,7 @@ class DockerReaperTest {
             .quietly()
             .runProcess(processRunner)
 
-        assertTrue(afterResult.output.trim().isEmpty(), "Container should be removed")
+        assertTrue(afterResult.stdout.trim().isEmpty(), "Container should be removed")
         println("Container $containerId cleaned up successfully via CloseableStack")
     }
 
@@ -117,9 +117,9 @@ class DockerReaperTest {
                 .runProcess(processRunner)
                 .assertExitCode(0) { "Failed to check reaper: $stderr" }
 
-            assertTrue(reaperResult.output.trim().isNotEmpty(), "Reaper container should be running")
+            assertTrue(reaperResult.stdout.trim().isNotEmpty(), "Reaper container should be running")
 
-            println("Reaper is running: ${reaperResult.output.trim()}")
+            println("Reaper is running: ${reaperResult.stdout.trim()}")
             println("Test container registered: $containerId")
         }
     }

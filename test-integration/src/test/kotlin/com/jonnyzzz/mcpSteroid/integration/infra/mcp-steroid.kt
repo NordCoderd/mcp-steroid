@@ -74,7 +74,7 @@ class McpSteroidDriver(
             timeoutSeconds = 10,
         )
         result.assertExitCode(0) {
-            "MCP initialize handshake failed: ${result.output}"
+            "MCP initialize handshake failed: ${result.stdout}"
         }
 
         println("[IDE-AGENT] MCP Steroid is ready in the container at $guestMcpUrl")
@@ -648,7 +648,7 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
 
         return ProcessResultValue(
             exitCode = if (isError) 1 else 0,
-            output = messages,
+            stdout = messages,
             stderr = "",
         )
     }
@@ -712,9 +712,9 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             timeoutSeconds = timeoutSeconds,
         )
 
-        result.assertExitCode(0) { "MCP request failed: ${result.output}" }
+        result.assertExitCode(0) { "MCP request failed: ${result.stdout}" }
 
-        val j = result.output.trim()
+        val j = result.stdout.trim()
         return json.encodeToString(json.parseToJsonElement(j))
     }
 

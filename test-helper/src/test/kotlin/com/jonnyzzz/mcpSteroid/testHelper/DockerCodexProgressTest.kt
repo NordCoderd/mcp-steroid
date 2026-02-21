@@ -41,10 +41,10 @@ class DockerCodexProgressTest {
 
         assertNotEquals(
             result.rawOutput.trim(),
-            result.output.trim(),
+            result.stdout.trim(),
             "Processed output should not be identical to raw NDJSON"
         )
-        assertTrue(result.output.contains(">> "), "Processed output should contain progress markers")
+        assertTrue(result.stdout.contains(">> "), "Processed output should contain progress markers")
     }
 
     private fun createLightweightCodexSession(stack: CloseableStack): DockerCodexSession {

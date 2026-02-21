@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid.integration.tests
 
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
-import com.jonnyzzz.mcpSteroid.integration.infra.McpSteroidDriver
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.integration.infra.shellEscape
 import com.jonnyzzz.mcpSteroid.testHelper.prepareNpxProxyForUrl
@@ -12,7 +11,6 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
@@ -91,10 +89,10 @@ class NpxToolVisibilityTest {
         )
 
         println("[NPX-VISIBILITY] Exit code: ${result.exitCode}")
-        println("[NPX-VISIBILITY] Output (${result.output.length} chars):\n${result.output}")
+        println("[NPX-VISIBILITY] Output (${result.stdout.length} chars):\n${result.stdout}")
 
         // 4. Parse NDJSON output — each line is a JSON-RPC response
-        val responses = result.output.lineSequence()
+        val responses = result.stdout.lineSequence()
             .map { it.trim() }
             .filter { it.startsWith("{") }
             .mapNotNull { line ->
@@ -106,7 +104,7 @@ class NpxToolVisibilityTest {
             }
             .toList()
 
-        assertTrue(responses.isNotEmpty(), "NPX proxy should produce JSON-RPC responses, got: ${result.output}")
+        assertTrue(responses.isNotEmpty(), "NPX proxy should produce JSON-RPC responses, got: ${result.stdout}")
 
         // Find the tools/list response (id=2)
         val toolsResponse = responses.find { obj ->

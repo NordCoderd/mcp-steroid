@@ -268,7 +268,7 @@ class ArenaTestRunner(
      * Evaluate the agent's response against the test case expectations.
      */
     private fun evaluate(testCase: DpaiaTestCase, result: ProcessResult): ArenaEvaluation {
-        val combined = result.output + "\n" + result.stderr
+        val combined = result.stdout + "\n" + result.stderr
 
         return ArenaEvaluation(
             agentExitedSuccessfully = result.exitCode == 0,
