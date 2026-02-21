@@ -131,13 +131,17 @@ class XcvbWindowDriver(
     fun updateLayout(window: WindowInfo, rect: WindowRect) {
         val windowId = window.id
 
+        // Note: --sync is intentionally omitted. It makes xdotool wait for the window
+        // to acknowledge the resize via WM size hints, but xterm does not use size hints,
+        // causing a 5-second timeout. Without --sync the operation fires and returns
+        // immediately, which is sufficient for our layout purposes.
         driver.runInContainer(
-            listOf("xdotool", "windowsize", "--sync", windowId, rect.width.toString(), rect.height.toString()),
+            listOf("xdotool", "windowsize", windowId, rect.width.toString(), rect.height.toString()),
             timeoutSeconds = 5,
         ).assertExitCode(0)
 
         driver.runInContainer(
-            listOf("xdotool", "windowmove", "--sync", windowId, rect.x.toString(), rect.y.toString()),
+            listOf("xdotool", "windowmove", windowId, rect.x.toString(), rect.y.toString()),
             timeoutSeconds = 5,
         ).assertExitCode(0)
 
