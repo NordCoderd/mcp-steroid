@@ -10,7 +10,8 @@ import com.intellij.openapi.ui.DialogPanel
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.ui.components.JBTextArea
-import com.intellij.ui.components.JBTextField
+import com.intellij.ui.components.fields.ExtendableTextComponent
+import com.intellij.ui.components.fields.ExtendableTextField
 import com.intellij.ui.dsl.builder.Align
 import com.intellij.ui.dsl.builder.AlignX
 import com.intellij.ui.dsl.builder.TopGap
@@ -19,7 +20,9 @@ import com.intellij.ui.dsl.builder.panel
 import com.jonnyzzz.mcpSteroid.aiAgents.McpConnectionInfo
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
 import java.awt.datatransfer.StringSelection
-import javax.swing.JButton
+import javax.swing.text.AbstractDocument
+import javax.swing.text.AttributeSet
+import javax.swing.text.DocumentFilter
 
 class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigurable("MCP Steroid") {
 
@@ -32,8 +35,7 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
             // 1. Server URL
             if (info != null) {
                 row("Server URL:") {
-                    cell(JBTextField(info.serverUrl).apply { isEditable = false }).align(AlignX.FILL)
-                    cell(copyIconButton(info.serverUrl))
+                    cell(copyableTextField(info.serverUrl)).align(AlignX.FILL)
                 }
             }
 
@@ -71,18 +73,17 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
                 group("Quick Start") {
                     for ((name, command) in info.commands) {
                         row("$name:") {
-                            cell(JBTextField(command).apply { isEditable = false }).align(AlignX.FILL)
-                            cell(copyIconButton(command))
+                            cell(copyableTextField(command)).align(AlignX.FILL)
                         }
                     }
 
-                    // Cursor/JSON Config
-                    group("Cursor / JSON Config") {
+                    // JSON Config
+                    group("JSON Config") {
                         val json = info.jsonConfig.trim()
                         row {
                             val textArea = JBTextArea(json).apply {
                                 isEditable = false
-                                rows = 10
+                                rows = 6
                             }
                             cell(JBScrollPane(textArea)).align(Align.FILL)
                         }.topGap(TopGap.NONE)
@@ -97,15 +98,24 @@ class McpSteroidProjectConfigurable(private val project: Project) : BoundConfigu
         }
     }
 
-    private fun copyIconButton(content: String): JButton =
-        JButton(AllIcons.General.InlineCopy).apply {
-            toolTipText = "Copy to clipboard"
-            isBorderPainted = false
-            isContentAreaFilled = false
-            isFocusPainted = false
-            addActionListener {
-                CopyPasteManager.getInstance().setContents(StringSelection(content))
+    private fun copyableTextField(content: String): ExtendableTextField =
+        ExtendableTextField().apply {
+            text = content
+            // Keep isEditable=true so the background paints normally and the copy icon
+            // appears visually INSIDE the field border (same as Terminal env vars fields).
+            // DocumentFilter silently blocks any edits by the user.
+            (document as? AbstractDocument)?.documentFilter = object : DocumentFilter() {
+                override fun insertString(fb: FilterBypass, offset: Int, string: String?, attr: AttributeSet?) {}
+                override fun remove(fb: FilterBypass, offset: Int, length: Int) {}
+                override fun replace(fb: FilterBypass, offset: Int, length: Int, text: String?, attrs: AttributeSet?) {}
             }
+            addExtension(ExtendableTextComponent.Extension.create(
+                AllIcons.General.InlineCopy,
+                AllIcons.General.InlineCopyHover,
+                "Copy to clipboard"
+            ) {
+                CopyPasteManager.getInstance().setContents(StringSelection(content))
+            })
         }
 
     private fun loadConnectionInfo(): McpConnectionInfo? {
