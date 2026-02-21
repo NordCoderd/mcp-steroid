@@ -49,18 +49,6 @@ interface ContainerDriver : ContainerProcessRunner {
     companion object
 }
 
-interface ContainerProcessRunner {
-    fun runInContainer(
-        args: List<String>,
-        workingDir: String? = null,
-        timeoutSeconds: Long = 30,
-        extraEnvVars: Map<String, String> = emptyMap(),
-        quietly: Boolean = false,
-    ): ProcessResult
-
-    fun withSecretPattern(secretPattern: String): ContainerProcessRunner
-}
-
 fun ContainerDriver.Companion.startDockerSession(
     lifetime: CloseableStack,
     dockerFileBase: String, //aka codex-cli
