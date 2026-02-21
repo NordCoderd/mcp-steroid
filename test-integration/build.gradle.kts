@@ -50,7 +50,12 @@ kotlin {
     jvmToolchain(21)
 }
 
-tasks.test {
+/**
+ * Applies shared configuration to any integration test task:
+ * classpath, logging, timeout, artifact dependencies, and common system properties.
+ * Additional task-specific system properties are set in each task's own doFirst block.
+ */
+fun Test.configureIntegrationTest() {
     useJUnitPlatform()
     testClassesDirs = sourceSets["test"].output.classesDirs
     classpath = sourceSets["test"].runtimeClasspath
@@ -59,8 +64,10 @@ tasks.test {
 
     dependsOn(pluginZip, agentOutputFilterDist, npxPackageDist)
     doFirst {
-        delete(layout.buildDirectory.dir("test-results/test/binary"))
-        val testOutDir = layout.buildDirectory.dir("test-logs/test").get().asFile.also { it.mkdirs() }
+        delete(layout.buildDirectory.dir("test-results/${this@configureIntegrationTest.name}/binary"))
+        val testOutDir = layout.buildDirectory
+            .dir("test-logs/${this@configureIntegrationTest.name}").get().asFile
+            .also { it.mkdirs() }
 
         val resolvedPluginZip = pluginZip.singleFile
         require(resolvedPluginZip.isFile) { "Plugin ZIP not found: ${resolvedPluginZip.absolutePath}" }
@@ -87,5 +94,55 @@ tasks.test {
             "test.integration.repo.cache.dir",
             layout.buildDirectory.dir("repo-cache").get().asFile.absolutePath,
         )
+    }
+}
+
+tasks.test {
+    configureIntegrationTest()
+}
+
+/**
+ * Release smoke matrix: [IDEA, PyCharm, GoLand, WebStorm] × [stable, EAP].
+ *
+ * Runs a curated set of integration tests that validate plugin compatibility
+ * across IDE products and versions. Invoked by run-release-build-matrix.sh.
+ *
+ * Accepts Gradle properties forwarded by the script:
+ *   -Ptest.integration.idea.stable.version=2025.3.1
+ *   -Ptest.integration.pycharm.stable.version=2025.3.1
+ *   -Ptest.integration.goland.stable.version=2025.3.1
+ *   -Ptest.integration.webstorm.stable.version=2025.3.1
+ *   -Ptest.integration.idea.eap.build=253.12345.678
+ *   -Ptest.integration.pycharm.eap.build=253.12345.678
+ *   -Ptest.integration.goland.eap.build=253.12345.678
+ *   -Ptest.integration.webstorm.eap.build=253.12345.678
+ *
+ * These are forwarded as system properties so tests can select specific builds
+ * via IdeDistribution when version-pinned distribution support is implemented.
+ */
+val testReleaseSmokeMatrix by tasks.registering(Test::class) {
+    description = "Release smoke matrix: [IDEA, PyCharm, GoLand, WebStorm] × [stable, EAP]"
+    group = "verification"
+
+    configureIntegrationTest()
+
+    filter {
+        includeTestsMatching("*DialogKillerIntegrationTest*")
+        includeTestsMatching("*IntelliJContainerTest*")
+        includeTestsMatching("*InfrastructureTest*")
+        includeTestsMatching("*WhatYouSeeTest*")
+        includeTestsMatching("*PyCharmContainerIntegrationTest*")
+        includeTestsMatching("*PyCharmMcpExecutionIntegrationTest*")
+    }
+
+    doFirst {
+        // Forward per-product version overrides from Gradle properties to system properties.
+        // Tests that support pinned distributions can read these to select the right IDE build.
+        listOf("idea", "pycharm", "goland", "webstorm").forEach { product ->
+            findProperty("test.integration.$product.stable.version")
+                ?.let { systemProperty("test.integration.$product.stable.version", it.toString()) }
+            findProperty("test.integration.$product.eap.build")
+                ?.let { systemProperty("test.integration.$product.eap.build", it.toString()) }
+        }
     }
 }
