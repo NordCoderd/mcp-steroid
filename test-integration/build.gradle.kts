@@ -146,3 +146,37 @@ val testReleaseSmokeMatrix by tasks.registering(Test::class) {
         }
     }
 }
+
+/**
+ * Creates a named smoke test task for a specific IDE product and channel.
+ *
+ * Sets test.integration.ide.product and test.integration.ide.channel system properties
+ * so IdeDistribution.fromSystemProperties() selects the right IDE.
+ *
+ * Usage examples:
+ *   ./gradlew :test-integration:testReleaseSmokeIdea --tests '*EapSmokeTest*'
+ *   ./gradlew :test-integration:testReleaseSmokeGoLandEap --tests '*EapSmokeTest*'
+ */
+fun registerSmokeTask(taskName: String, product: String, channel: String) {
+    tasks.register(taskName, Test::class) {
+        description = "Smoke test for $product ($channel)"
+        group = "verification"
+        configureIntegrationTest()
+        doFirst {
+            systemProperty("test.integration.ide.product", product)
+            systemProperty("test.integration.ide.channel", channel)
+            // Forward optional version pin from Gradle property (e.g. -Ptest.integration.goland.eap.build=...)
+            val versionPropKey = if (channel == "eap") "test.integration.$product.eap.build"
+                                 else "test.integration.$product.stable.version"
+            findProperty(versionPropKey)
+                ?.let { systemProperty(versionPropKey, it.toString()) }
+        }
+    }
+}
+
+registerSmokeTask("testReleaseSmokeIdea",        product = "idea",     channel = "stable")
+registerSmokeTask("testReleaseSmokeIdeaEap",     product = "idea",     channel = "eap")
+registerSmokeTask("testReleaseSmokeGoLand",      product = "goland",   channel = "stable")
+registerSmokeTask("testReleaseSmokeGoLandEap",   product = "goland",   channel = "eap")
+registerSmokeTask("testReleaseSmokeWebStorm",    product = "webstorm", channel = "stable")
+registerSmokeTask("testReleaseSmokeWebStormEap", product = "webstorm", channel = "eap")
