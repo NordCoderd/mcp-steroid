@@ -1,6 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.process
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.yield
 import java.io.InputStream
 import java.util.Collections
 import java.util.concurrent.TimeUnit
@@ -149,13 +152,30 @@ class ProcessRunner(
     ) : StartedProcess {
         val pid: PID get() = process.PID()
 
+        override fun destroyForcibly() {
+            process.destroyForcibly()
+        }
+
         override val exitCode: Int?
             get() = runCatching { process.exitValue() } .getOrNull()
+
+        override val messagesFlow: Flow<ProcessStreamLine>
+            get() = flow {
+                var visited = 0
+                while (process.isAlive) {
+                    messagesChannel.toList().drop(visited).forEach {
+                        visited++
+                        emit(it)
+                    }
+                    //this is heavily inefficient
+                    Thread.sleep(100)
+                }
+            }
 
         private fun builder(type: ProcessStreamType) : String {
             return messagesChannel
                 .filter { it.type == type }
-                .joinToString { it.line }
+                .joinToString(separator = "\n") { it.line }
         }
 
         override val output: String
