@@ -175,3 +175,13 @@ Because the agent is running code inside the IDE's runtime — not reading files
 | Understand a class hierarchy | Read individual files | Traverse the full type hierarchy |
 | Run a test | Launch subprocess | Execute in IDE, get live results |
 | Inspect visual state | Not possible | Screenshot with component tree |
+
+---
+
+## Any plugin. Any API. Any team.
+
+The code execution model does more than reduce tool count — it dramatically cuts token usage. A single `steroid_execute_code` call can express an operation that would otherwise require dozens of back-and-forth tool calls, keeping the agent's context window focused on the actual task.
+
+More importantly, the approach scales to the full IntelliJ plugin ecosystem. `steroid_execute_code` can call any Java or Kotlin API available inside the running IDE — including APIs from **enterprise plugins** that MCP Steroid has never heard of. If your team ships an internal IntelliJ plugin with a custom project model, a proprietary build system, or domain-specific inspections, an AI agent can use those APIs directly. No custom MCP server required, no wrappers to maintain.
+
+We are actively looking for success stories — teams using MCP Steroid to automate real workflows, reduce toil, or unlock AI-driven developer experience at scale. If your team has a story to share, [join the conversation on Slack](https://join.slack.com/t/mcp-steroid/shared_invite/zt-3p3oq91kx-BXJng8GSXveqncFVYWUcpQ) or [open an issue on GitHub](https://github.com/jonnyzzz/mcp-steroid/issues).
