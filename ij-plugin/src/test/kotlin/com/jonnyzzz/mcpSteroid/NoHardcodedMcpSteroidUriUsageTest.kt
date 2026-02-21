@@ -10,16 +10,23 @@ import java.util.stream.Collectors
 class NoHardcodedMcpSteroidUriUsageTest : BasePlatformTestCase() {
     fun testNoHardcodedMcpSteroidUriInKotlinSources() {
         val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory()
-        val forbiddenLiteral = "mcp-steroid" + "://"
+        val forbiddenLiteral = "mcp-steroid://"
+        // Scope: ij-plugin only — test-integration and test-helper are intentionally excluded.
         val sourceRoots = listOf(
-            "src/main/kotlin",
-            "src/test/kotlin",
+            "ij-plugin/src/main/kotlin",
+            "ij-plugin/src/test/kotlin",
         ).map(projectHome::resolve)
+
+        // Exclude this file itself so it can use the literal without self-evasion tricks.
+        val selfPath = projectHome
+            .resolve("ij-plugin/src/test/kotlin/com/jonnyzzz/mcpSteroid/NoHardcodedMcpSteroidUriUsageTest.kt")
+            .normalize()
 
         val matches = mutableListOf<String>()
         for (root in sourceRoots) {
             if (!Files.isDirectory(root)) continue
             for (file in collectKotlinFiles(root)) {
+                if (file.normalize() == selfPath) continue
                 val lines = Files.readAllLines(file)
                 lines.forEachIndexed { index, line ->
                     if (line.contains(forbiddenLiteral)) {
