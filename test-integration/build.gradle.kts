@@ -62,6 +62,17 @@ fun Test.configureIntegrationTest() {
     testLogging { showStandardStreams = true }
     systemProperty("junit.jupiter.execution.timeout.default", "15m")
 
+    // Forward claude.comparison.* system properties from the Gradle JVM to the test JVM.
+    // This allows: ./gradlew :test-integration:test -Dclaude.comparison.maxCases=1
+    System.getProperties()
+        .filterKeys { it.toString().startsWith("claude.comparison.") }
+        .forEach { (key, value) -> systemProperty(key.toString(), value.toString()) }
+
+    // Forward arena.test.* system properties (used by DpaiaArenaTest).
+    System.getProperties()
+        .filterKeys { it.toString().startsWith("arena.test.") }
+        .forEach { (key, value) -> systemProperty(key.toString(), value.toString()) }
+
     dependsOn(pluginZip, agentOutputFilterDist, npxPackageDist)
     doFirst {
         delete(layout.buildDirectory.dir("test-results/${this@configureIntegrationTest.name}/binary"))
