@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.InputStream
+import java.util.Collections
 import java.util.concurrent.TimeUnit
 
 /**
@@ -148,6 +149,25 @@ data class ProcessRunRequest(
 fun ProcessRunRequest.Builder.runProcess(processRunner: ProcessRunner) = build().runProcess(processRunner)
 fun ProcessRunRequest.runProcess(runner: ProcessRunner) = runner.runProcess(this)
 
+data class PID(val pid: String)
+
+fun Process.PID() = PID(this.pid().toString())
+
+enum class ProcessStreamType {
+    STDOUT, STDERR, INFO
+}
+
+data class ProcessStreamLine(
+    val type: ProcessStreamType,
+    val line: String,
+)
+
+interface StartedProcess {
+    val pid: PID
+
+}
+
+
 /**
  * Utility for running processes with consistent logging.
  * All output is logged to stdout with prefixes for easy debugging.
@@ -171,17 +191,57 @@ class ProcessRunner(
     }
 
     /**
-     * Run a process using the request configuration.
+     * Run a process using the request configuration and waits for it to complete
      * This is the primary method for running processes.
      * Secrets are filtered from log output but preserved in returned ProcessResult.
      *
      * @param request The process run request with all configuration
      */
     fun runProcess(request: ProcessRunRequest): ProcessResult {
+        val processInfo = startProcessImpl(request)
+
+        val process = processInfo.process
+
+        val completed = process.waitFor(request.timeoutSeconds, TimeUnit.SECONDS)
+
+        fun builder(type: ProcessStreamType) = object {
+            override fun toString(): String {
+                return processInfo.messagesChannel
+                    .filter { it.type == type }
+                    .joinToString { it.line }
+            }
+        }
+
+        val outputBuilder = builder(ProcessStreamType.STDOUT)
+        val errorBuilder = builder(ProcessStreamType.STDERR)
+
+        if (!completed) {
+            process.destroyForcibly()
+            println("[$logPrefix] Timed out after ${request.timeoutSeconds}s")
+            return ProcessResultValue(-1, outputBuilder.toString(), "Timeout\n$errorBuilder")
+        }
+
+        processInfo.thread.forEach {
+            it.join(1000)
+            it.interrupt()
+            it.join()
+        }
+
+        val exitCode = process.exitValue()
+        println("[$logPrefix] Exit code: $exitCode")
+        return ProcessResultValue(exitCode, outputBuilder.toString(), errorBuilder.toString())
+    }
+
+    fun startProcess(request: ProcessRunRequest): StartedProcess = startProcessImpl(request)
+
+    private fun startProcessImpl(request: ProcessRunRequest): StartedProcessImpl {
         // Filter secrets from command line and description for logging
-        val filteredCommand = request.command.map { filterSecrets(it) }
-        val filteredDescription = filterSecrets(request.description)
-        println("[$logPrefix] $filteredDescription")
+        run {
+            val filteredCommand = request.command.map { filterSecrets(it) }
+            val filteredDescription = filterSecrets(request.description)
+            println("[$logPrefix] $filteredDescription")
+            println("[$logPrefix] $filteredCommand")
+        }
 
         val processBuilder = ProcessBuilder(request.command)
         processBuilder.directory(request.workingDir)
@@ -191,7 +251,10 @@ class ProcessRunner(
 
         val process = processBuilder.start()
 
-        fun readOutput(stream: InputStream, prefix: String, target: StringBuilder) {
+        val pid = process.PID()
+        val messagesChannel = Collections.synchronizedList(mutableListOf<ProcessStreamLine>())
+
+        fun readOutput(stream: InputStream, prefix: String, type: ProcessStreamType) {
             try {
                 stream.reader().use { reader ->
                     while (process.isAlive) {
@@ -201,7 +264,7 @@ class ProcessRunner(
                             if (!request.quietly) {
                                 println("[$prefix] $filterSecrets")
                             }
-                            target.appendLine(filterSecrets)
+                            messagesChannel.add(ProcessStreamLine(type, line))
                         }
                     }
                 }
@@ -209,9 +272,6 @@ class ProcessRunner(
                 // Ignore stream read errors
             }
         }
-
-        val outputBuilder = StringBuilder()
-        val errorBuilder = StringBuilder()
 
         // Thread for copying stdin to the process
         val stdinThread = Thread {
@@ -224,36 +284,35 @@ class ProcessRunner(
             } catch (e: Exception) {
                 if (!request.quietly) {
                     println("[$logPrefix] stdin copy error: ${e.message}")
+                    messagesChannel.add(ProcessStreamLine(ProcessStreamType.INFO, "Failed to send STDIN: ${e.message}\n" + e.stackTraceToString()))
                 }
             }
         }
 
         val outputThread = Thread {
-            readOutput(process.inputStream, "$logPrefix OUT", outputBuilder)
+            readOutput(process.inputStream, "$logPrefix OUT", ProcessStreamType.STDOUT)
         }
 
         val errorThread = Thread {
-            readOutput(process.errorStream, "$logPrefix ERR", errorBuilder)
+            readOutput(process.errorStream, "$logPrefix ERR", ProcessStreamType.STDERR)
         }
 
         stdinThread.start()
         outputThread.start()
         errorThread.start()
 
-        val completed = process.waitFor(request.timeoutSeconds, TimeUnit.SECONDS)
+        return StartedProcessImpl(
+            process,
+            messagesChannel,
+            listOf(stdinThread, outputThread, errorThread)
+        )
+    }
 
-        if (!completed) {
-            process.destroyForcibly()
-            println("[$logPrefix] Timed out after ${request.timeoutSeconds}s")
-            return ProcessResultValue(-1, outputBuilder.toString(), "Timeout\n$errorBuilder")
-        }
-
-        stdinThread.join(1000)
-        outputThread.join(1000)
-        errorThread.join(1000)
-
-        val exitCode = process.exitValue()
-        println("[$logPrefix] Exit code: $exitCode")
-        return ProcessResultValue(exitCode, outputBuilder.toString(), errorBuilder.toString())
+    private data class StartedProcessImpl(
+        val process: Process,
+        val messagesChannel: List<ProcessStreamLine>,
+        val thread: List<Thread>,
+    ) : StartedProcess {
+        override val pid: PID get() = process.PID()
     }
 }
