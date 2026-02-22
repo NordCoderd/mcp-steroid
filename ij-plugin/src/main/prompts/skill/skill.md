@@ -243,6 +243,8 @@ val file = readAction { PsiManager.getInstance(project).findFile(vf) }
 
 ### 3. Read/Write Actions for PSI/VFS
 
+> **⚠️ THREADING RULE — NEVER SKIP**: Any PSI access (JavaPsiFacade, PsiShortNamesCache, PsiManager.findFile, module roots, annotations, etc.) **MUST** be inside `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately — they are NOT silently ignored. This is the most common cause of first-attempt runtime errors.
+
 **Built-in helpers (no imports needed):**
 ```kotlin
 // Reading PSI/VFS/indices - use built-in readAction

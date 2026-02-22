@@ -62,12 +62,26 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - waitForSmartMode() runs automatically before your script
              - Available: project, println(), printJson(), printException(), progress()
 
+             **⚠️ THREADING RULE — NEVER SKIP**: Any PSI access (JavaPsiFacade, PsiShortNamesCache, PsiManager.findFile, module roots, annotations, etc.) **MUST** be wrapped in `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately at runtime — they are not silently ignored. This is the most common first-attempt error.
+
+             **⚠️ writeAction { } is NOT a coroutine scope**: Calling `readAction { }` or ANY suspend function inside `writeAction { }` throws `suspension functions can only be called within coroutine body`. ALWAYS read first (outside), then write (inside):
+             ```kotlin
+             val vf = findProjectFile("src/main/java/com/example/Foo.java")!!
+             val content = VfsUtil.loadText(vf)               // read OUTSIDE writeAction
+             val updated = content.replace("\"api\"", "\"/api/v1\"")
+             writeAction { VfsUtil.saveText(vf, updated) }    // write INSIDE — no suspend calls allowed
+             // After bulk VFS edits, flush to disk before running git/shell subprocesses:
+             LocalFileSystem.getInstance().refresh(false)     // ensures git diff sees the changes
+             ```
+             Or use `edtWriteAction { }` (a suspend wrapper) if you need suspend calls inside the write block.
+
              **⚡ First-call readiness probe (verify IDE + MCP connectivity before heavy ops):**
              ```kotlin
              println("IDE ready: ${'$'}{project.name}")
              println("Base path: ${'$'}{project.basePath}")
              println("Smart mode: ${'$'}{!com.intellij.openapi.project.DumbService.isDumb(project)}")
              ```
+             > **Once smart mode is confirmed, do NOT re-probe before each subsequent operation.** Combine the readiness check with your first real action to save round-trips (~20s each). Only re-probe if you triggered a Maven import or other index-invalidating step.
 
              **Read a project file:**
              ```kotlin
@@ -84,6 +98,8 @@ class ExecuteCodeToolHandler : McpRegistrar {
                  val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")
                  // Use joinToString() or File.writeText() — NOT a triple-quoted string with 'import' at line start
                  // (the preprocessor extracts import-like lines from triple-quoted strings as Kotlin imports)
+                 // ⚠️ VfsUtil.saveText() REPLACES THE ENTIRE FILE — for adding a single method to an existing
+                 // class, use PSI writeCommandAction + factory.createMethodFromText() instead (see guide).
                  VfsUtil.saveText(f, listOf(
                      "package com.example.model;",
                      "import" + " jakarta.persistence.Entity;",
@@ -95,6 +111,51 @@ class ExecuteCodeToolHandler : McpRegistrar {
              ```
 
              **⚠️ Import-in-strings pitfall**: Never put `import foo.Bar;` at the start of a line inside a triple-quoted Kotlin string. The script preprocessor extracts those lines as Kotlin imports, causing compile errors. Use `"import" + " foo.Bar;"` or `joinToString` to build the content, or use `java.io.File(path).writeText(content)` as an alternative.
+
+             **Find a file by name (PREFERRED over ProcessBuilder("find") or shell):**
+             ```kotlin
+             import com.intellij.psi.search.FilenameIndex
+             // Find by exact filename — O(1) IDE index lookup, respects project scope
+             val matches = readAction {
+                 FilenameIndex.getVirtualFilesByName("UserServiceImpl.java", GlobalSearchScope.projectScope(project))
+             }
+             matches.forEach { println(it.path) }
+             // Find by extension + path filter:
+             val filtered = readAction {
+                 FilenameIndex.getAllFilesByExt(project, "java", GlobalSearchScope.projectScope(project))
+                     .filter { it.path.contains("user", ignoreCase = true) }
+             }
+             filtered.forEach { println(it.path) }
+             ```
+             **Search for text across project files (PREFERRED over ProcessBuilder("grep") or ProcessBuilder("rg")):**
+             ```kotlin
+             // Find all Java files containing a literal string — uses IDE index, no regex pitfalls
+             import com.intellij.psi.search.PsiSearchHelper
+             val scope = GlobalSearchScope.projectScope(project)
+             val matchingFiles = mutableListOf<String>()
+             readAction {
+                 PsiSearchHelper.getInstance(project).processAllFilesWithWord("/api/", scope, { psiFile ->
+                     matchingFiles.add(psiFile.virtualFile.path)
+                     true  // continue searching
+                 }, true)
+             }
+             matchingFiles.forEach { println(it) }
+             // For broader substring search, filter by content after getting candidates:
+             val containing = readAction {
+                 FilenameIndex.getAllFilesByExt(project, "java", scope)
+                     .filter { vf -> VfsUtil.loadText(vf).contains("/api/v1") }
+             }
+             containing.forEach { println(it.path) }
+             ```
+
+             **Check pending VCS changes (PREFERRED over ProcessBuilder("git", "diff")):**
+             ```kotlin
+             val changes = readAction {
+                 com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
+                     .allChanges.mapNotNull { it.virtualFile?.path }
+             }
+             println(if (changes.isEmpty()) "Clean slate" else "Modified:\n" + changes.joinToString("\n"))
+             ```
 
              **Spring Boot / Maven patterns:**
              ```kotlin
@@ -131,12 +192,24 @@ class ExecuteCodeToolHandler : McpRegistrar {
              problems.forEach { (id, descs) -> descs.forEach { println("[" + id + "] " + it.descriptionTemplate) } }
              ```
              ```kotlin
+             // ⚠️ FALLBACK ONLY — prefer the JUnit/Maven IDE runner shown below when possible.
+             // Use ./mvnw as a last resort (e.g. when IDE runner is unavailable or timing out).
              // ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed
-             val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-q")
+             // ⚠️ CRITICAL: Spring Boot test output routinely exceeds 200k chars (startup logs + Flyway
+             //    migration output + Testcontainers + stack traces). NEVER print untruncated output —
+             //    it causes MCP token limit errors. Always use takeLast() to capture only what matters:
+             val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-Dspotless.check.skip=true", "-q")
                  .directory(java.io.File(project.basePath!!))
                  .redirectErrorStream(true).start()
-             println(process.inputStream.bufferedReader().readText())
-             process.waitFor()
+             val lines = process.inputStream.bufferedReader().readLines()
+             val exitCode = process.waitFor()
+             println("Exit: ${'$'}exitCode | total output lines: ${'$'}{lines.size}")
+             // ⚠️ Capture BOTH ends: Spring context / Testcontainers failures appear at the START;
+             // Maven BUILD FAILURE summary appears at the END. takeLast alone misses early errors.
+             println("--- First 30 lines (Spring context / Testcontainers errors appear here) ---")
+             println(lines.take(30).joinToString("\n"))
+             println("--- Last 30 lines (Maven BUILD FAILURE summary appears here) ---")
+             println(lines.takeLast(30).joinToString("\n"))
              ```
              ```kotlin
              // Run a specific JUnit test class via IntelliJ runner (correct API — common pitfall below)
@@ -219,8 +292,23 @@ class ExecuteCodeToolHandler : McpRegistrar {
                  .forEach { println(it) }
              ```
 
+             **Workflow: After creating/modifying files — verify compile BEFORE running tests:**
+             ```kotlin
+             // Fast compile check (seconds) — run this BEFORE ./mvnw to catch errors early:
+             val vf = findProjectFile("src/main/java/com/example/NewClass.java")!!
+             val problems = runInspectionsDirectly(vf)
+             if (problems.isEmpty()) println("OK: no compile errors")
+             else problems.forEach { (id, descs) -> descs.forEach { println("[${'$'}id] ${'$'}{it.descriptionTemplate}") } }
+             ```
+             **⚠️ Scope limitation**: `runInspectionsDirectly` is **file-scoped** — it only checks the single
+             file you pass. It does NOT catch compile errors in other files that reference the changed
+             signatures. After modifying a widely-used class (DTO, command, entity), also check dependent
+             files, or run `./mvnw test-compile -q` (with takeLast() truncation) for project-wide verification.
+
              **Verification gate**: Run FAIL_TO_PASS tests before marking work complete.
-             `./mvnw test -Dtest=ClassName -Dspotless.check.skip=true` — compile success alone is NOT sufficient.
+             `./mvnw test -Dtest=ClassName -Dspotless.check.skip=true` (Maven) or `./gradlew :module:test --tests "com.example.ClassName" --no-daemon` (Gradle) — compile success alone is NOT sufficient.
+
+             **⚠️ Deprecation warnings ≠ errors**: Compiler output like `warning: 'getVirtualFilesByName(...)' is deprecated` is non-fatal — the script succeeded. Only retry on explicit `ERROR` responses with no `execution_id`. Do NOT retry a successful execution because of deprecation warnings.
 
              **Common Operations:**
              - Code navigation: Find usages, go to definition, symbol search
@@ -259,7 +347,9 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - steroid_action_discovery — discover quick-fixes, intentions, and actions at a file location
              - steroid_take_screenshot / steroid_input — visual UI inspection and interaction
 
-             💡 Call steroid_execute_feedback after execution to rate success
+             **Avoiding duplicate submissions**: If the tool response contains an `execution_id`, the call succeeded — do **not** resubmit the same code. Identical consecutive calls waste turns and produce no different result. Only retry if the response contains an explicit `ERROR` with no `execution_id`.
+
+             **REQUIRED WORKFLOW**: After each significant execution or upon task completion, call `steroid_execute_feedback` with the `execution_id` and a `success_rating`. This is **mandatory**, not optional — it tracks what patterns work and improves future suggestions.
          """.trim().lines().joinToString("\n") { it.trim() }
     }
 

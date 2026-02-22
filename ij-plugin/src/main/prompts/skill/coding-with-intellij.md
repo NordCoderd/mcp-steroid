@@ -257,6 +257,8 @@ Disposer.register(execDisposable, myResource)
 
 ## Threading and Read/Write Actions
 
+> **⚠️ THREADING RULE — NEVER SKIP**: Any PSI access (JavaPsiFacade, PsiShortNamesCache, PsiManager.findFile, module roots, annotations, etc.) **MUST** be wrapped in `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately at runtime — they are not silently ignored. This is the most common first-attempt error when writing IntelliJ scripts.
+
 ### IntelliJ Threading Model
 
 IntelliJ Platform has strict threading rules:
@@ -297,6 +299,29 @@ WriteCommandAction.runWriteCommandAction(project) {
     document.insertString(0, "// Added comment\n")
 }
 ```
+
+**⚠️ writeAction { } is NOT a coroutine scope**: Calling `readAction { }`, `VfsUtil.saveText()`, or ANY suspend function inside `writeAction { }` throws:
+```
+suspension functions can only be called within coroutine body
+```
+This error appears at **runtime** (not at compile time), so it's easy to miss. The fix is simple — always **read first, write second**:
+
+```kotlin
+// ✗ WRONG — readAction inside writeAction causes runtime error
+writeAction {
+    val text = readAction { VfsUtil.loadText(vf) }  // ERROR: suspend function in non-coroutine
+    VfsUtil.saveText(vf, text.replace(...))
+}
+
+// ✓ CORRECT — read outside, write inside
+val text = VfsUtil.loadText(vf)           // read OUTSIDE writeAction (VfsUtil.loadText is NOT suspend)
+val updated = text.replace("\"api\"", "\"/api/v1\"")
+writeAction { VfsUtil.saveText(vf, updated) }   // write INSIDE — no suspend calls allowed here
+```
+
+**Note**: `VfsUtil.loadText(vf)` is a regular function (not suspend) — it's safe to call outside any action. `VfsUtil.saveText(vf, text)` is also a regular function but requires a write lock, so it must go inside `writeAction { }`.
+
+If you genuinely need suspend calls inside a write block, use `edtWriteAction { }` instead of `writeAction { }` — it is a suspend function that acquires the write lock.
 
 ### Smart Read Actions (Recommended)
 
@@ -833,6 +858,8 @@ writeAction {
 
 Use `VfsUtil.createDirectoryIfMissing` + `VfsUtil.saveText` — safer than shell heredocs and atomic.
 
+**⚠️ AVOID range-based VFS writes**: Never use hardcoded byte ranges when writing files (e.g., `setBinaryContent(bytes, 0, 2000)` when the file may be shorter). This causes `StringIndexOutOfBoundsException` when the range exceeds file length. Always use `VfsUtil.saveText(file, content)` for full-file replacement — it atomically replaces the entire content regardless of existing file size.
+
 **⚠️ Import-in-strings pitfall**: The script preprocessor extracts `import foo.Bar;` lines from the top level of your script — including lines inside triple-quoted strings. This causes compilation failures (e.g., `unresolved reference 'jakarta'`) when you embed Java source in a `"""..."""` literal.
 
 **Workaround**: Use `joinToString()` or string concatenation for the Java source content:
@@ -883,6 +910,24 @@ println("File created and VFS refreshed")
 ---
 
 ## Java / Spring Boot Patterns
+
+> **Step 0 — Do This FIRST Before Creating Any Migration File**
+>
+> Always determine the next available Flyway migration version number before writing `V{N}__*.sql`.
+> Creating `V5__` when `V5__` already exists breaks Flyway on startup (checksum conflict).
+>
+> ```kotlin
+> val migDir = findProjectFile("src/main/resources/db/migration")!!
+> val nextVersion = readAction {
+>     migDir.children.map { it.name }
+>         .mapNotNull { Regex("""V(\d+)__""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+>         .maxOrNull()?.plus(1) ?: 1
+> }
+> println("Existing migrations:")
+> readAction { migDir.children.map { it.name }.sorted() }.forEach { println("  $it") }
+> println("NEXT_MIGRATION_VERSION=V$nextVersion")
+> // Use this output as the prefix for your new migration file name
+> ```
 
 ### Find All @Entity / @Service / @RestController Classes
 
@@ -1090,6 +1135,84 @@ readAction { migDir.children.map { it.name }.sorted() }.forEach { println("  $it
 println("Next version: V$nextVersion")
 ```
 
+### Find Java/Kotlin Files via IDE Index (PREFERRED over shell find)
+
+**Always prefer the IDE index over `ProcessBuilder("find", ...)`.** The IDE index respects source roots, handles not-yet-flushed writes, and stays consistent with PSI. Shell `find` bypasses indexing and may return stale or out-of-scope results.
+
+```kotlin
+// PREFERRED: IDE index — respects source roots, project scope
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
+
+val javaFiles = readAction {
+    FilenameIndex.getAllFilesByExt(project, "java", GlobalSearchScope.projectScope(project))
+}
+println("Java files: ${javaFiles.size}")
+javaFiles.forEach { vf -> println(vf.path) }
+
+// Same for Kotlin:
+val ktFiles = readAction {
+    FilenameIndex.getAllFilesByExt(project, "kt", GlobalSearchScope.projectScope(project))
+}
+ktFiles.forEach { println(it.path) }
+
+// Find a file by EXACT filename (fastest path — O(1) index lookup by name, no iteration)
+val byName = readAction {
+    FilenameIndex.getVirtualFilesByName("UserServiceImpl.java", GlobalSearchScope.projectScope(project))
+}
+byName.forEach { println(it.path) }
+
+// Or by name + path substring filter (when multiple files have the same name):
+val filtered = readAction {
+    FilenameIndex.getAllFilesByExt(project, "java", GlobalSearchScope.projectScope(project))
+        .filter { it.path.contains("user", ignoreCase = true) }
+}
+filtered.forEach { println(it.path) }
+
+// AVOID: ProcessBuilder("find", "/mcp-run-dir/src", "-name", "*.java", "-type", "f")
+// ↑ Bypasses IDE indexing — may miss newly-created files or include out-of-scope files
+```
+
+### Search for Text Across Project Files (PREFERRED Over shell grep/rg)
+
+**Always prefer the IDE search API over `ProcessBuilder("grep", ...)` or `ProcessBuilder("rg", ...)`.**
+Shell grep bypasses the IDE's PSI and may silently fail on regex escaping (`\/` is invalid in ripgrep).
+`PsiSearchHelper` uses the same index as "Find in Files" — it's fast and always correct.
+
+```kotlin
+import com.intellij.psi.search.PsiSearchHelper
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.openapi.vfs.VfsUtil
+
+// Option A: Find all files containing a specific word (word-boundary search)
+// Use this for plain identifiers, class names, annotation names, etc.
+val scope = GlobalSearchScope.projectScope(project)
+val matchingFiles = mutableListOf<String>()
+readAction {
+    PsiSearchHelper.getInstance(project).processAllFilesWithWord("api", scope, { psiFile ->
+        // Further filter if needed (e.g., only files that contain "/api/")
+        if (psiFile.text.contains("/api/")) matchingFiles.add(psiFile.virtualFile.path)
+        true  // return true to continue searching; false to stop early
+    }, true)
+}
+matchingFiles.forEach { println(it) }
+
+// Option B: Content filter over IDE-indexed files (for arbitrary substrings / URLs / paths)
+// Faster than shell grep because it operates on the IDE's already-indexed file list
+val filesWithPath = readAction {
+    FilenameIndex.getAllFilesByExt(project, "java", GlobalSearchScope.projectScope(project))
+        .filter { vf -> VfsUtil.loadText(vf).contains("/api/") }
+}
+filesWithPath.forEach { println(it.path) }
+
+// Option C: Search in YAML/XML/properties files (no word boundary needed)
+val yamlFiles = readAction {
+    FilenameIndex.getAllFilesByExt(project, "yml", GlobalSearchScope.projectScope(project))
+        .filter { vf -> VfsUtil.loadText(vf).contains("/api/") }
+}
+yamlFiles.forEach { println(it.path + ": " + VfsUtil.loadText(it).lines().filter { l -> l.contains("/api/") }.joinToString("; ")) }
+```
+
 ### Batch Project Exploration (One Script Instead of Many Calls)
 
 Explore the full project structure and read multiple relevant files in a single execution — avoid making 5+ separate calls to understand the codebase:
@@ -1123,6 +1246,49 @@ for (path in filesToRead) {
 }
 ```
 
+### Semantic Code Navigation — Extract Structural Info Without Reading Full Files
+
+**Prefer PSI-based structural queries over reading entire file contents.** When you need to know
+"what methods does FeatureService have?" or "what fields does CommentDto have?", a single PSI call
+answers that question in one round-trip — no need to read 5-6 full files one by one.
+
+```kotlin
+// Get all methods and fields of a Java class WITHOUT reading the full file text
+val cls = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.sivalabs.ft.features.domain.FeatureService",
+        GlobalSearchScope.projectScope(project)
+    )
+}
+if (cls != null) {
+    println("=== ${cls.qualifiedName} ===")
+    println("Methods:")
+    cls.methods.forEach { m ->
+        val params = m.parameterList.parameters.joinToString { "${it.name}: ${it.type.presentableText}" }
+        println("  ${m.name}($params): ${m.returnType?.presentableText}")
+    }
+    println("Fields:")
+    cls.fields.forEach { f -> println("  ${f.name}: ${f.type.presentableText}") }
+} else println("Class not found")
+```
+
+```kotlin
+// Inspect multiple related classes in ONE script to understand codebase structure
+val classesToInspect = listOf(
+    "com.example.features.domain.FeatureRepository",
+    "com.example.features.domain.CommentDto",
+    "com.example.features.api.FeatureController"
+)
+for (fqn in classesToInspect) {
+    val c = readAction { JavaPsiFacade.getInstance(project).findClass(fqn, projectScope()) }
+    if (c == null) { println("NOT FOUND: $fqn"); continue }
+    println("\n=== $fqn ===")
+    c.methods.forEach { m -> println("  ${m.name}(${m.parameterList.parameters.size} params)") }
+}
+```
+
+This replaces 6 separate `VfsUtil.loadText()` calls with 1 PSI-based structural query.
+
 ### Verify Project Package Structure Before Creating Files
 
 **CRITICAL**: Always verify the actual package hierarchy via the IDE project model before creating new source files.
@@ -1154,6 +1320,72 @@ This prevents the common error of creating `com.example.microservices.api.Foo` w
 actually uses `com.example.api.Foo` — a package mismatch that passes internal tests (JSON field matching)
 but fails integration validation (class path matching).
 
+### Check Pending VCS Changes (Prefer Over `git diff` Shell Calls)
+
+**PREFERRED over `ProcessBuilder("git", "diff", "HEAD", "--name-only")`** — avoids blocking the script executor thread and works correctly even inside IDE-managed VFS.
+
+```kotlin
+// Check which files have pending (uncommitted) changes
+val changes = readAction {
+    com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
+        .allChanges.mapNotNull { it.virtualFile?.path }
+}
+println(if (changes.isEmpty()) "Clean slate — no pending changes" else "Modified files:\n" + changes.joinToString("\n"))
+```
+
+Use this at the start of arena tasks to detect whether a previous agent slot already modified files — avoids overwriting work done by a parallel agent.
+
+**⚠️ VFS → Git sync lag**: After bulk `writeAction { VfsUtil.saveText(...) }` edits, git-based tools (subprocess `git diff`, `ProcessBuilder("git", ...)`) may see stale content because VFS changes haven't been flushed to disk yet. Always call `LocalFileSystem.getInstance().refresh(false)` (synchronous) after bulk VFS edits, BEFORE running any git subprocess or checking git diff:
+
+```kotlin
+// Apply bulk changes
+writeAction {
+    files.forEach { (vf, content) -> VfsUtil.saveText(vf, content) }
+}
+// Flush VFS to disk — ensures git diff / shell tools see the updates
+LocalFileSystem.getInstance().refresh(false)
+
+// Now git-based checks are accurate:
+val result = ProcessBuilder("git", "diff", "--name-only")
+    .directory(java.io.File(project.basePath!!)).start()
+println(result.inputStream.bufferedReader().readText())
+```
+
+### Add a Method to an Existing Java Class via PSI (Safer Than VfsUtil.saveText for Partial Updates)
+
+**`VfsUtil.saveText()` replaces the ENTIRE file** — if you only need to add one method, use PSI surgery instead. This avoids overwriting code you haven't read and reduces the risk of accidentally losing other methods.
+
+```kotlin
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.openapi.command.WriteCommandAction
+
+// Find the class to modify
+val psiClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "org.springframework.samples.petclinic.service.UserServiceImpl",
+        GlobalSearchScope.projectScope(project)
+    )
+}
+if (psiClass != null) {
+    val factory = JavaPsiFacade.getElementFactory(project)
+    // Build method text using concatenation — avoid 'import ...' at line-start in triple-quoted strings
+    val methodText = "private void validatePassword(String password) {\n" +
+        "    if (password == null || password.isEmpty()) {\n" +
+        "        throw new IllegalArgumentException(\"Password must not be empty\");\n" +
+        "    }\n" +
+        "}"
+    val newMethod = readAction { factory.createMethodFromText(methodText, psiClass) }
+    WriteCommandAction.runWriteCommandAction(project) {
+        psiClass.add(newMethod)
+    }
+    println("Method added to ${psiClass.qualifiedName}")
+    // Run inspection to verify syntax
+    val vf = psiClass.containingFile.virtualFile
+    val problems = runInspectionsDirectly(vf)
+    if (problems.isEmpty()) println("No compile errors") else problems.forEach { (id, ds) -> ds.forEach { println("[$id] ${it.descriptionTemplate}") } }
+} else println("Class not found — check the FQN")
+```
+
 ### Trigger Maven Re-import After pom.xml Changes
 
 ```kotlin
@@ -1164,16 +1396,115 @@ MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailab
 println("Maven sync triggered — wait for background indexing before running tests")
 ```
 
-### Run Unit Tests via Maven Wrapper (simplest, preferred in arena)
+### IDE-Native Project Build Verification (ProjectTaskManager)
+
+**Preferred over `./mvnw test-compile`** — compiles through IntelliJ's build system, gives structured results, and avoids spawning a child Maven process. Use when you want to verify project-wide compilation without running any tests.
 
 ```kotlin
+import com.intellij.task.ProjectTaskManager
+import com.intellij.openapi.module.ModuleManager
+import kotlinx.coroutines.future.await
+
+val modules = ModuleManager.getInstance(project).modules
+val result = ProjectTaskManager.getInstance(project).build(modules).await()
+println("Build errors: ${result.hasErrors()}")
+println("Build aborted: ${result.isAborted}")
+// result.hasErrors() == false means project-wide compile passed
+```
+
+> **Note**: `ProjectTaskManager.build()` compiles *all* modules. For a quick single-file check, use
+> `runInspectionsDirectly(vf)` first (seconds), then fall back to this for cross-file verification.
+
+### Run Unit Tests via Maven Wrapper (FALLBACK ONLY — prefer IDE runner below)
+
+**Use this only when the IDE runner is unavailable or timing out.** The JUnit/Maven IDE runner below is preferred: it gives structured results, navigable errors, and IDE-integrated output. Use `./mvnw` as a fallback of last resort.
+
+> **⚠️ CRITICAL — Output Truncation Required**: Spring Boot integration test output routinely exceeds
+> **200k characters** (Spring context startup ~100 lines, Flyway migration logs, Testcontainers Docker
+> pull logs, full stack traces). Printing the full output causes MCP token limit errors.
+> **Always use `takeLast()` to read only the relevant tail**:
+
+```kotlin
+// ⚠️ FALLBACK ONLY — use the JUnit or Maven IDE runner below when possible
 // ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed in arena environments
-val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-q")
+// ⚠️ NEVER print process.inputStream.bufferedReader().readText() — Spring Boot output can be 200k+ chars
+val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-Dspotless.check.skip=true", "-q")
     .directory(java.io.File(project.basePath!!))
     .redirectErrorStream(true).start()
-println(process.inputStream.bufferedReader().readText())
-process.waitFor()
+val lines = process.inputStream.bufferedReader().readLines()
+val exitCode = process.waitFor()
+println("Exit: $exitCode | total output lines: ${lines.size}")
+// ⚠️ Capture BOTH ends: Spring context / Testcontainers errors appear at the START of output;
+// Maven BUILD FAILURE summary appears at the END. Using takeLast alone loses early failures.
+println("--- First 30 lines (Spring context / Testcontainers errors appear here) ---")
+println(lines.take(30).joinToString("\n"))
+println("--- Last 30 lines (Maven BUILD FAILURE summary appears here) ---")
+println(lines.takeLast(30).joinToString("\n"))
 ```
+
+Similarly for `test-compile` (project-wide dependency check, faster than full test run):
+```kotlin
+val process = ProcessBuilder("./mvnw", "test-compile", "-Dspotless.check.skip=true", "-q")
+    .directory(java.io.File(project.basePath!!))
+    .redirectErrorStream(true).start()
+val lines = process.inputStream.bufferedReader().readLines()
+val exitCode = process.waitFor()
+println("Compile exit: $exitCode | lines: ${lines.size}")
+// Compile errors may appear anywhere — capture both ends for full context
+println(lines.take(20).joinToString("\n"))
+println("---")
+println(lines.takeLast(20).joinToString("\n"))
+```
+
+> **⚠️ Deprecation warnings are non-fatal**: Output like `warning: 'getVirtualFilesByName(String, GlobalSearchScope)' is deprecated` does not indicate failure — the script ran successfully. Do NOT retry just because of deprecation warnings; only retry on actual `ERROR` responses.
+
+### Run Gradle Tests via ProcessBuilder (for Gradle / multi-module projects)
+
+For **Gradle** projects, use `./gradlew` with `--tests` for targeted test class execution.
+
+> **⚠️ CRITICAL — Output Truncation Required**: Same as Maven — Gradle integration test output can be 200k+ chars. **Always use `takeLast()` and `take()` to capture both ends.**
+
+```kotlin
+// Run a specific test class in a specific Gradle submodule
+val proc = ProcessBuilder("./gradlew", ":product-service:test",
+    "--tests", "com.example.product.ProductServiceTest",
+    "--no-daemon", "-q")
+    .directory(java.io.File(project.basePath!!))
+    .redirectErrorStream(true).start()
+val lines = proc.inputStream.bufferedReader().readLines()
+val exit = proc.waitFor()
+println("Exit: $exit | total lines: ${lines.size}")
+// ⚠️ Capture BOTH ends: Spring context / startup errors appear at the START;
+// Gradle BUILD FAILED summary with test counts appears at the END.
+println("--- First 30 lines (Spring context / Testcontainers errors appear here) ---")
+println(lines.take(30).joinToString("\n"))
+println("--- Last 30 lines (Gradle BUILD FAILED summary appears here) ---")
+println(lines.takeLast(30).joinToString("\n"))
+```
+
+```kotlin
+// Run ALL tests in a module (when no specific class is needed):
+val proc = ProcessBuilder("./gradlew", ":product-service:test", "--no-daemon", "-q")
+    .directory(java.io.File(project.basePath!!))
+    .redirectErrorStream(true).start()
+val lines = proc.inputStream.bufferedReader().readLines()
+val exit = proc.waitFor()
+println("Exit: $exit | lines: ${lines.size}")
+println(lines.take(30).joinToString("\n"))
+println("---")
+println(lines.takeLast(30).joinToString("\n"))
+```
+
+**Gradle vs Maven cheat sheet:**
+
+| Action | Maven | Gradle |
+|--------|-------|--------|
+| Run one test class | `-Dtest=SimpleClassName` | `--tests "com.example.FullyQualifiedClassName"` |
+| Run one test method | `-Dtest=ClassName#method` | `--tests "com.example.ClassName.method"` |
+| Target a module | `-pl product-service` | `:product-service:test` |
+| Skip spotless | `-Dspotless.check.skip=true` | (not needed usually) |
+| No daemon | n/a | `--no-daemon` |
+| Quiet output | `-q` | `-q` |
 
 ### Run a Specific JUnit Test Class via IntelliJ Runner
 
@@ -1222,15 +1553,37 @@ println("Maven test started")
 
 ### Check Compile Errors Without Running Full Build
 
+**Always run this BEFORE `./mvnw test`** — it catches errors in seconds, not minutes. If this reports errors, fix them before running the Maven test command.
+
+> **⚠️ Scope limitation**: `runInspectionsDirectly` is **file-scoped** — it only analyzes the single
+> file you pass. It does NOT catch compile errors in OTHER files that reference your changed signatures.
+> After modifying a widely-used class (DTO, command, entity, record), also check the key dependent files
+> (service, controller, mapper, test), or run `./mvnw test-compile -q` (with takeLast() truncation) for
+> project-wide verification.
+
 ```kotlin
 // Faster than 'mvn test' — returns IDE inspection results in seconds
+// Run this after creating/modifying files, BEFORE running ./mvnw test
 val vf = findProjectFile("src/main/java/com/example/Product.java")!!
 val problems = runInspectionsDirectly(vf)
 if (problems.isEmpty()) {
-    println("No problems found")
+    println("No problems found — safe to run tests")
 } else {
     problems.forEach { (id, descs) ->
         descs.forEach { println("[$id] ${it.descriptionTemplate}") }
+    }
+    println("Fix the above errors before running tests")
+}
+// Also check key dependent files to catch cross-file breakage:
+for (depPath in listOf(
+    "src/main/java/com/example/service/ProductService.java",
+    "src/main/java/com/example/api/ProductController.java"
+)) {
+    val depVf = findProjectFile(depPath) ?: continue
+    val depProblems = runInspectionsDirectly(depVf)
+    if (depProblems.isNotEmpty()) {
+        println("Problems in $depPath:")
+        depProblems.forEach { (id, descs) -> descs.forEach { println("  [$id] ${it.descriptionTemplate}") } }
     }
 }
 ```
