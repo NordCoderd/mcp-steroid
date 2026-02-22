@@ -4,16 +4,24 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 
 interface ContainerProcessRunner {
+
+    fun runInContainer(request: ContainerProcessRunRequest): ProcessResult = TODO("")
+
     fun runInContainer(
         args: List<String>,
         workingDir: String? = null,
         timeoutSeconds: Long = 30,
         extraEnvVars: Map<String, String> = emptyMap(),
         quietly: Boolean = false,
-    ): ProcessResult
+    ): ProcessResult = runInContainer(
+        ContainerProcessRunRequest
+            .builder()
+            .command(args)
+            .workingDirInContainer(workingDir)
+            .timeoutSeconds(timeoutSeconds)
+            .quietly(quietly)
+            .build()
+    )
 
     fun withSecretPattern(secretPattern: String): ContainerProcessRunner
 }
-
-
-private class ___Make_IntelliJ_show_the_file_name
