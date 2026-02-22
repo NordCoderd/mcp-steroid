@@ -57,15 +57,14 @@ class DockerCodexProgressTest {
 
         val driver = DockerDriver(workDir, "CODEX-PROGRESS")
         val imageId = driver.buildDockerImage(
-            imageName = "codex-cli-progress-test",
             dockerfilePath = dockerfile,
-            timeoutSeconds = 600
+            timeoutSeconds = 600,
         )
 
         val container = startContainerDriver(
             lifetime = stack,
             scope = driver,
-            imageName = imageId,
+            imageId = imageId,
             autoRemove = true
         )
         return DockerCodexSession.create(container)

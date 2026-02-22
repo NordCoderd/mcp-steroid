@@ -62,15 +62,14 @@ class DockerGeminiProgressTest {
 
         val driver = DockerDriver(workDir, "GEMINI-PROGRESS")
         val imageId = driver.buildDockerImage(
-            imageName = "gemini-cli-progress-test",
             dockerfilePath = dockerfile,
-            timeoutSeconds = 600
+            timeoutSeconds = 600,
         )
 
         val container = startContainerDriver(
             lifetime = stack,
             scope = driver,
-            imageName = imageId,
+            imageId = imageId,
             autoRemove = true
         )
         return DockerGeminiSession.create(container)
