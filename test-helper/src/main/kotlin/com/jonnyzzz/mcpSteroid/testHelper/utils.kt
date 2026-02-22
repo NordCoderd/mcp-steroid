@@ -11,3 +11,14 @@ internal fun createTempDirectory(prefix: String): File {
 
 
 fun String.titleCase() = replaceFirstChar { it.titlecase() }
+
+
+fun escapeShellArgs(args: List<String>): String =
+    args.joinToString(" ") { arg ->
+        if (arg.contains(" ") || arg.contains("\"") || arg.contains("\n") || arg.contains("'")) {
+            "'" + arg.replace("'", "'\\''") + "'"
+        } else {
+            arg
+        }
+    }
+

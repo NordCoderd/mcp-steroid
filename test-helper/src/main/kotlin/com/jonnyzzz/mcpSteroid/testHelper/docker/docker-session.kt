@@ -3,8 +3,15 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
+import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.builder
+import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
 import java.io.File
+import java.time.LocalDateTime.now
+import java.time.format.DateTimeFormatter
 
 fun ContainerDriver.Companion.startDockerSession(
     lifetime: CloseableStack,
@@ -96,7 +103,35 @@ private class ContainerDriverImpl(
         workingDir: String?,
         extraEnvVars: Map<String, String>
     ): RunningContainerProcess {
-        val info = scope.runInContainerDetached(containerId, args, workingDir, extraEnvVars)
+        val timestamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").format(now())
+        val name = args.first().substringAfterLast("/")
+        val logDir = "/tmp/run-$timestamp-$name"
+        // Build the wrapper script that runs the real command,
+        // captures its PID, and redirects output to files
+        val innerCommand = escapeShellArgs(args)
+        val wrapperScript = buildString {
+            this.appendLine("#!/bin/bash")
+            this.appendLine("$innerCommand >$logDir/stdout.log 2>$logDir/stderr.log &")
+            this.appendLine("_PID=\$!")
+            this.appendLine("echo \$_PID > $logDir/pid")
+            this.appendLine("wait \$_PID")
+            this.appendLine("echo \$? > $logDir/exitcode")
+        }
+        // Write the wrapper script into the container
+        val scriptPath = "$logDir/run.sh"
+        writeFileInContainer(scriptPath, wrapperScript, executable = true)
+        // Run the wrapper script detached
+        val result = scope.runInContainer(
+            containerId,
+            listOf("bash", scriptPath),
+            workingDir = workingDir,
+            timeoutSeconds = 10,
+            extraEnvVars = extraEnvVars,
+            detach = true,
+        )
+        result.assertExitCode(0) { "Failed to start detached process '$name': ${result.stderr}" }
+        println("[${scope.logPrefix}] Detached process '$name' started, stdout/stderr at $logDir")
+        val info = DetachedContainerProcess(name = name, logDir = logDir)
         return RunningContainerProcess(this, info.name, info.logDir)
     }
 
@@ -105,15 +140,55 @@ private class ContainerDriverImpl(
         content: String,
         executable: Boolean
     ) {
-        scope.writeFileInContainer(containerId, containerPath, content, executable)
+        // Ensure parent directory exists
+        val parentDir = containerPath.substringBeforeLast('/')
+        if (parentDir.isNotEmpty()) {
+            scope.runInContainer(
+                containerId,
+                listOf("mkdir", "-p", parentDir),
+                timeoutSeconds = 5,
+                quietly = true
+            ).assertExitCode(0)
+        }
+        scope.runInContainer(
+            containerId,
+            listOf("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF"),
+            timeoutSeconds = 5,
+            quietly = true,
+        ).assertExitCode(0)
+
+        if (executable) {
+            scope.runInContainer(
+                containerId,
+                listOf("chmod", "+x", containerPath),
+                timeoutSeconds = 5,
+                quietly = true
+            ).assertExitCode(0)
+        }
     }
 
     override fun copyFromContainer(containerPath: String, localPath: File) {
-        scope.copyFromContainer(containerId, containerPath, localPath)
+        localPath.parentFile?.mkdirs()
+        ProcessRunRequest.builder()
+            .command("docker", "cp", "$containerId:$containerPath", localPath.absolutePath)
+            .description("Copy container:$containerPath to ${localPath.name}")
+            .workingDir(scope.workDir)
+            .timeoutSeconds(30L)
+            .quietly()
+            .runProcess(scope.processRunner)
+            .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
     }
 
     override fun copyToContainer(localPath: File, containerPath: String) {
-        scope.copyToContainer(containerId, localPath, containerPath)
+        require(localPath.exists()) { "Local path does not exist: $localPath" }
+        ProcessRunRequest.builder()
+            .command("docker", "cp", localPath.absolutePath, "$containerId:$containerPath")
+            .description("Copy ${localPath.name} to container:$containerPath")
+            .workingDir(scope.workDir)
+            .timeoutSeconds(30L)
+            .quietly()
+            .runProcess(scope.processRunner)
+            .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
     }
 
     override fun mapGuestPathToHostPath(path: String): File {

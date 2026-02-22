@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
+import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
@@ -226,72 +227,6 @@ class DockerDriver(
         println("[$logPrefix] Container removed successfully")
     }
 
-    fun copyToContainer(
-        containerId: String,
-        localPath: File,
-        containerPath: String,
-    ) {
-        require(localPath.exists()) { "Local path does not exist: $localPath" }
-        ProcessRunRequest.builder()
-            .command("docker", "cp", localPath.absolutePath, "$containerId:$containerPath")
-            .description("Copy ${localPath.name} to container:$containerPath")
-            .workingDir(workDir)
-            .timeoutSeconds(30L)
-            .quietly()
-            .runProcess(processRunner)
-            .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
-    }
-
-    fun copyFromContainer(
-        containerId: String,
-        containerPath: String,
-        localPath: File,
-    ) {
-        localPath.parentFile?.mkdirs()
-        ProcessRunRequest.builder()
-            .command("docker", "cp", "$containerId:$containerPath", localPath.absolutePath)
-            .description("Copy container:$containerPath to ${localPath.name}")
-            .workingDir(workDir)
-            .timeoutSeconds(30L)
-            .quietly()
-            .runProcess(processRunner)
-            .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
-    }
-
-    fun writeFileInContainer(
-        containerId: String,
-        containerPath: String,
-        content: String,
-        executable: Boolean = false,
-    ) {
-        // Ensure parent directory exists
-        val parentDir = containerPath.substringBeforeLast('/')
-        if (parentDir.isNotEmpty()) {
-            runInContainer(
-                containerId,
-                listOf("mkdir", "-p", parentDir),
-                timeoutSeconds = 5,
-                quietly = true
-            ).assertExitCode(0)
-        }
-
-        runInContainer(
-            containerId,
-            listOf("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF"),
-            timeoutSeconds = 5,
-            quietly = true,
-        ).assertExitCode(0)
-
-        if (executable) {
-            runInContainer(
-                containerId,
-                listOf("chmod", "+x", containerPath),
-                timeoutSeconds = 5,
-                quietly = true
-            ).assertExitCode(0)
-        }
-    }
-
     fun runInContainer(
         containerId: String,
         args: List<String>,
@@ -346,55 +281,5 @@ class DockerDriver(
             .runProcess(processRunner)
     }
 
-    fun runInContainerDetached(
-        containerId: String,
-        args: List<String>,
-        workingDir: String? = null,
-        extraEnvVars: Map<String, String> = emptyMap(),
-    ): DetachedContainerProcess {
-        val timestamp = ofPattern("yyyyMMdd-HHmmss-SSS").format(LocalDateTime.now())
-        val name = args.first().substringAfterLast("/")
-        val logDir = "/tmp/run-$timestamp-$name"
-
-        // Build the wrapper script that runs the real command,
-        // captures its PID, and redirects output to files
-        val innerCommand = escapeShellArgs(args)
-        val wrapperScript = buildString {
-            appendLine("#!/bin/bash")
-            appendLine("$innerCommand >$logDir/stdout.log 2>$logDir/stderr.log &")
-            appendLine("_PID=\$!")
-            appendLine("echo \$_PID > $logDir/pid")
-            appendLine("wait \$_PID")
-            appendLine("echo \$? > $logDir/exitcode")
-        }
-
-        // Write the wrapper script into the container
-        val scriptPath = "$logDir/run.sh"
-        writeFileInContainer(containerId, scriptPath, wrapperScript, executable = true)
-
-        // Run the wrapper script detached
-        val result = runInContainer(
-            containerId,
-            listOf("bash", scriptPath),
-            workingDir = workingDir,
-            timeoutSeconds = 10,
-            extraEnvVars = extraEnvVars,
-            detach = true,
-        )
-
-        result.assertExitCode(0) { "Failed to start detached process '$name': ${result.stderr}" }
-
-        println("[$logPrefix] Detached process '$name' started, stdout/stderr at $logDir")
-        return DetachedContainerProcess(name = name, logDir = logDir)
-    }
-
-    private fun escapeShellArgs(args: List<String>): String =
-        args.joinToString(" ") { arg ->
-            if (arg.contains(" ") || arg.contains("\"") || arg.contains("\n") || arg.contains("'")) {
-                "'" + arg.replace("'", "'\\''") + "'"
-            } else {
-                arg
-            }
-        }
 }
 
