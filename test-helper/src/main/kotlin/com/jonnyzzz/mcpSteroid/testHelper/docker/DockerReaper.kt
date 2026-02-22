@@ -67,6 +67,7 @@ object DockerReaper {
                 reaperDockerfile,
                 120,
             )
+            driver.tagDockerImage(reaperImageId, "mcp-steroid-reaper")
 
             // Start the reaper container using ContainerDriver infrastructure.
             // startContainerDriver calls back into registerContainer()
