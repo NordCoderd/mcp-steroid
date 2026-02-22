@@ -4,7 +4,6 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
 import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.builder
@@ -94,9 +93,17 @@ private class ContainerDriverImpl(
         timeoutSeconds: Long,
         extraEnvVars: Map<String, String>,
         quietly: Boolean,
-    ): ProcessResult {
-        return scope.runInContainer(containerId, args.toList(), workingDir, timeoutSeconds, extraEnvVars, quietly = quietly)
-    }
+    ) = DockerProcessRunRequest.builder()
+            .containerId(containerId)
+            .command(args)
+            .description("In container: ${args.joinToString(" ")}")
+            .timeoutSeconds(timeoutSeconds)
+            .quietly(quietly)
+            .workingDirInContainer(workingDir)
+            .extraEnv(extraEnvVars)
+            .detach(false)
+            .build()
+            .runInContainer(scope)
 
     override fun runInContainerDetached(
         args: List<String>,
@@ -121,15 +128,19 @@ private class ContainerDriverImpl(
         val scriptPath = "$logDir/run.sh"
         writeFileInContainer(scriptPath, wrapperScript, executable = true)
         // Run the wrapper script detached
-        val result = scope.runInContainer(
-            containerId,
-            listOf("bash", scriptPath),
-            workingDir = workingDir,
-            timeoutSeconds = 10,
-            extraEnvVars = extraEnvVars,
-            detach = true,
-        )
-        result.assertExitCode(0) { "Failed to start detached process '$name': ${result.stderr}" }
+
+        DockerProcessRunRequest.builder()
+            .containerId(containerId)
+            .command("bash", scriptPath)
+            .description("In detached $innerCommand")
+            .timeoutSeconds(10)
+            .quietly()
+            .workingDirInContainer(workingDir)
+            .extraEnv(extraEnvVars)
+            .detach(true)
+            .runInContainer(scope)
+            .assertExitCode(0) { "Failed to start detached process '$name': $stderr" }
+
         println("[${scope.logPrefix}] Detached process '$name' started, stdout/stderr at $logDir")
         val info = DetachedContainerProcess(name = name, logDir = logDir)
         return RunningContainerProcess(this, info.name, info.logDir)
@@ -142,28 +153,36 @@ private class ContainerDriverImpl(
     ) {
         // Ensure parent directory exists
         val parentDir = containerPath.substringBeforeLast('/')
+
         if (parentDir.isNotEmpty()) {
-            scope.runInContainer(
-                containerId,
-                listOf("mkdir", "-p", parentDir),
-                timeoutSeconds = 5,
-                quietly = true
-            ).assertExitCode(0)
+            DockerProcessRunRequest.builder()
+                .containerId(containerId)
+                .command("mkdir", "-p", parentDir)
+                .description("mkdir $parentDir")
+                .timeoutSeconds(5)
+                .quietly()
+                .runInContainer(scope)
+            .assertExitCode(0)
         }
-        scope.runInContainer(
-            containerId,
-            listOf("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF"),
-            timeoutSeconds = 5,
-            quietly = true,
-        ).assertExitCode(0)
+
+        DockerProcessRunRequest.builder()
+            .containerId(containerId)
+            .command("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
+            .description("Write content to $containerPath: $content")
+            .timeoutSeconds(5)
+            .quietly()
+            .runInContainer(scope)
+            .assertExitCode(0)
 
         if (executable) {
-            scope.runInContainer(
-                containerId,
-                listOf("chmod", "+x", containerPath),
-                timeoutSeconds = 5,
-                quietly = true
-            ).assertExitCode(0)
+            DockerProcessRunRequest.builder()
+                .containerId(containerId)
+                .command(listOf("chmod", "+x", containerPath))
+                .description("chmod +x $containerPath")
+                .timeoutSeconds(5)
+                .quietly()
+                .runInContainer(scope)
+                .assertExitCode(0)
         }
     }
 

@@ -150,6 +150,7 @@ class ConsolePumpingContainerDriver(
                 .command("bash", teeScript)
                 .workingDirInContainer(workingDir)
                 .timeoutSeconds(timeoutSeconds)
+                .description("Run agent [$slug-$idx] with in-container filter")
                 .quietly()
                 .runInContainer(delegate)
 
@@ -203,6 +204,7 @@ class ConsolePumpingContainerDriver(
                 .workingDirInContainer(workingDir)
                 .timeoutSeconds(timeoutSeconds)
                 .extraEnv(extraEnvVars)
+                .description("Run agent [$slug-$idx] with combined log tee")
                 .quietly(false)
                 .runInContainer(delegate)
         } finally {

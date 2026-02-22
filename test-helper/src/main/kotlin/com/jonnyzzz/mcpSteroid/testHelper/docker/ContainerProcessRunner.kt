@@ -28,6 +28,7 @@ interface ContainerProcessRunner {
             .workingDirInContainer(workingDir)
             .timeoutSeconds(timeoutSeconds)
             .quietly(quietly)
+            .description(args.joinToString(" ").take(80))
             .runInContainer(this)
 
     fun withSecretPattern(secretPattern: String): ContainerProcessRunner

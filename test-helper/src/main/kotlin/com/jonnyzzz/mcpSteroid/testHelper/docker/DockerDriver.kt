@@ -15,6 +15,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeFormatter.ofPattern
 import kotlin.collections.component1
 import kotlin.collections.component2
+import kotlin.io.path.createTempFile
 
 class DockerDriver(
     val workDir: File,
@@ -65,32 +66,36 @@ class DockerDriver(
         timeoutSeconds: Long,
         buildArgs: Map<String, String> = emptyMap(),
     ): String {
-        require(dockerfilePath.exists() && dockerfilePath.isFile) { "File does not exist: $dockerfilePath" }
+        require(dockerfilePath.exists() && dockerfilePath.isFile) {
+            "File does not exist: $dockerfilePath"
+        }
 
         val nowDate = DateTimeFormatter.ISO_DATE.format(LocalDateTime.now())
-        val iidFile = kotlin.io.path.createTempFile("docker-iid", ".txt").toFile()
+        val iidFile = createTempFile("docker-iid", ".txt").toFile()
         try {
             val command = buildList {
                 add("docker"); add("build")
                 add("-t"); add(imageName)
-                add("--iidfile"); add(iidFile.absolutePath)
-                add("--build-arg"); add("CACHE_BUST=$nowDate")
-                for ((k, v) in buildArgs) {
-                    add("--build-arg"); add("$k=$v")
+
+                @Suppress("SpellCheckingInspection")
+                add("--iidfile")
+                add(iidFile.absolutePath)
+
+                for ((k, v) in buildArgs + ("CACHE_BUST" to nowDate)) {
+                    add("--build-arg")
+                    add("$k=$v")
                 }
+
                 add(".")
             }
 
-            val result = processRunner.runProcess(
-                ProcessRunRequest.builder()
+            ProcessRunRequest.builder()
                     .command(command)
-                    .description(description = "Build Docker image $imageName")
-                    .workingDir(workingDir = dockerfilePath.parentFile)
-                    .timeoutSeconds(timeoutSeconds = timeoutSeconds)
-                    .build()
-            )
-
-            result.assertExitCode(0) { "Failed to build Docker image.\n${result.stderr}" }
+                    .description("Build Docker image $imageName")
+                    .workingDir(dockerfilePath.parentFile)
+                    .timeoutSeconds(timeoutSeconds)
+                    .runProcess(processRunner)
+                    .assertExitCode(0) { "Failed to build Docker image.\n$stderr" }
 
             val imageId = iidFile.readText().trim()
             require(imageId.startsWith("sha256:")) { "Unexpected image ID format from --iidfile: $imageId" }
@@ -225,28 +230,6 @@ class DockerDriver(
             .runProcess(processRunner)
 
         println("[$logPrefix] Container removed successfully")
-    }
-
-    fun runInContainer(
-        containerId: String,
-        args: List<String>,
-        workingDir: String? = null,
-        timeoutSeconds: Long,
-        extraEnvVars: Map<String, String> = emptyMap(),
-        detach: Boolean = false,
-        quietly: Boolean = false,
-    ): ProcessResult {
-        val request = DockerProcessRunRequest.builder()
-            .containerId(containerId)
-            .command(args)
-            .description("In container: ${args.joinToString(" ")}")
-            .timeoutSeconds(timeoutSeconds)
-            .quietly(quietly)
-            .workingDirInContainer(workingDir)
-            .extraEnv(extraEnvVars)
-            .detach(detach)
-            .build()
-        return runInContainer(request)
     }
 
     fun runInContainer(
