@@ -128,7 +128,10 @@ fun IntelliJContainer.Companion.create(
     var lastPidRefreshAt = 0L
     var lastWindows = emptyList<WindowInfo>()
     val ijWindowInfo = try {
-        waitForValue(600_000, "Waiting for ${ideProduct.displayName} window") {
+        // 60s is safe: X11 frame appears before most startup work completes; the only
+        // confirmed long blocker (AIPromoWindowAdvisor, 480s) is suppressed by our 4-layer fix.
+        // Research confirmed no other pre-frame blocking network calls in the startup path.
+        waitForValue(60_000, "Waiting for ${ideProduct.displayName} window") {
             val now = System.currentTimeMillis()
             if (now - lastPidRefreshAt >= 1_000) {
                 trackedPids = discoverProcessFamilyPids(container, ijProcess.pid)

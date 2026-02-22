@@ -148,12 +148,14 @@ class IntelliJDriver(
             appendLine("-Dide.newUsersOnboarding=false")
             appendLine("-Dnosplash=true")
             appendLine()
-            appendLine("# Suppress telemetry and update checks")
+            appendLine("# Suppress telemetry, update checks, and async network startup activities")
             appendLine("-Didea.suppress.statistics.report=true")
             appendLine("-Didea.local.statistics.without.report=true")
             appendLine("-Dfeature.usage.event.log.send.on.ide.close=false")
             appendLine("-Dide.enable.notification.trace.data.sharing=false")
             appendLine("-Didea.updates.url=http://127.0.0.1")
+            appendLine("-Dide.no.platform.update=true")
+            appendLine("-Dide.browser.disabled=true")
             appendLine()
         }
 
