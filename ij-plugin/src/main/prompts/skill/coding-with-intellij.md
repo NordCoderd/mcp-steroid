@@ -858,11 +858,53 @@ writeAction {
 
 Use `VfsUtil.createDirectoryIfMissing` + `VfsUtil.saveText` — safer than shell heredocs and atomic.
 
+**⚠️ ALL VFS mutation ops need writeAction**: `createDirectoryIfMissing()`, `createChildData()`, `createChildFile()`, `createChildDirectory()`, `delete()`, `rename()`, `move()`, and `saveText()` ALL require writeAction. Put the ENTIRE create-directory-and-write sequence inside a SINGLE writeAction block:
+
+```kotlin
+// ✓ CORRECT — everything that creates or modifies files goes INSIDE writeAction:
+writeAction {
+    val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+    val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example/model")  // ← writeAction required
+    val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")   // ← writeAction required
+    VfsUtil.saveText(f, content)                                                          // ← writeAction required
+}
+// ✗ WRONG:
+// val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/...")  // OUTSIDE writeAction → throws!
+// writeAction { VfsUtil.saveText(f, content) }                           // only saveText inside = WRONG
+```
+
 **⚠️ AVOID range-based VFS writes**: Never use hardcoded byte ranges when writing files (e.g., `setBinaryContent(bytes, 0, 2000)` when the file may be shorter). This causes `StringIndexOutOfBoundsException` when the range exceeds file length. Always use `VfsUtil.saveText(file, content)` for full-file replacement — it atomically replaces the entire content regardless of existing file size.
 
 **⚠️ Import-in-strings pitfall**: The script preprocessor extracts `import foo.Bar;` lines from the top level of your script — including lines inside triple-quoted strings. This causes compilation failures (e.g., `unresolved reference 'jakarta'`) when you embed Java source in a `"""..."""` literal.
 
-**Workaround**: Use `joinToString()` or string concatenation for the Java source content:
+**⚠️ Char-literal pitfall in string-assembled Java**: When building Java source via Kotlin `joinToString()`, char literals like `'\''` cause silent escaping errors. The Kotlin string `"'\\''"` produces Java text `'\''` which is a Java syntax error (empty char literal followed by spurious `'`). For Java code containing char literals (e.g., `toString()` with `', '` separators), prefer `java.io.File.writeText()` with triple-quoted raw strings, or use `PsiFileFactory.createFileFromText()`:
+
+```kotlin
+// ✓ SAFE: Use java.io.File for Java source with char literals — not affected by import extraction
+java.io.File("${project.basePath}/src/main/java/com/example/model/Product.java")
+    .also { it.parentFile.mkdirs() }
+    .writeText("""
+        package com.example.model;
+        import jakarta.persistence.Entity;
+        import jakarta.persistence.Id;
+        @Entity
+        public class Product {
+            @Id private Long id;
+            private String name;
+            @Override public String toString() {
+                return "Product{id=" + id + ", name='" + name + '\'' + "}";
+            }
+        }
+    """.trimIndent())
+LocalFileSystem.getInstance().refreshAndFindFileByPath("${project.basePath}/src/main/java/com/example/model/Product.java")
+println("Created Product.java")
+// Verify the write succeeded:
+val vf = findProjectFile("src/main/java/com/example/model/Product.java")!!
+check(VfsUtil.loadText(vf).contains("class Product")) { "Write failed or file is empty" }
+println("Verified: Product.java written correctly")
+```
+
+**Workaround for joinToString**: Use `joinToString()` or string concatenation for the Java source content:
 
 ```kotlin
 writeAction {
@@ -1420,54 +1462,108 @@ println("Build aborted: ${result.isAborted}")
 **Always prefer this over `./mvnw test` or `./gradlew test`.** Running tests through the IDE
 runner is equivalent to clicking the green ▶ button next to a test class or method. Benefits:
 
-- **No 200k-char truncation problem** — pass/fail from exit code; no stdout parsing needed
+- **No 200k-char truncation problem** — pass/fail from `isPassed()` on the SMTestProxy root
 - **Structured results** in the IDE Test Results window — individual failures navigable
-- **Faster** — reuses JVM, no Maven/Gradle startup overhead for subsequent runs
+- **Works for any build system** — Maven, Gradle, or plain JUnit
+
+> ⚠️ **CRITICAL**: `JUnitConfiguration` (from `com.intellij.execution.junit`) is for **standalone
+> JUnit tests** that do NOT need Maven/Gradle. For Maven or Gradle projects use the APIs below —
+> otherwise dependencies won't be resolved and the test will fail to compile.
+
+#### Maven projects — `MavenRunConfigurationType.runConfiguration()`
 
 ```kotlin
-import com.intellij.execution.junit.JUnitConfiguration
-import com.intellij.execution.junit.JUnitConfigurationType
-import com.intellij.execution.runners.ExecutionEnvironmentBuilder
-import com.intellij.execution.executors.DefaultRunExecutor
-import com.intellij.execution.process.ProcessAdapter
-import com.intellij.execution.process.ProcessEvent
-import com.intellij.execution.RunManager
+import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
+import org.jetbrains.idea.maven.execution.MavenRunnerParameters
+import org.jetbrains.idea.maven.execution.MavenRunnerSettings
+import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
+import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-// Configure — set TEST_CLASS to the fully-qualified test class name
-val factory = JUnitConfigurationType.getInstance().configurationFactories.first()
-val config = factory.createConfiguration("Run MyTest", project) as JUnitConfiguration
-config.persistentData.TEST_CLASS = "com.example.MyTest"
-config.persistentData.TEST_OBJECT = JUnitConfiguration.TEST_CLASS  // run whole class
-// To run a single method instead: set TEST_OBJECT = JUnitConfiguration.TEST_METHOD
-//   and config.persistentData.METHOD_NAME = "myTestMethod"
-config.setWorkingDirectory(project.basePath!!)
-val settings = RunManager.getInstance(project).let { rm ->
-    rm.createConfiguration(config, factory).also { rm.addConfiguration(it) }
-}
-
-// Launch and wait for completion (equivalent to clicking ▶ Run)
 val latch = CountDownLatch(1)
-var exitCode = -1
-val env = ExecutionEnvironmentBuilder.create(DefaultRunExecutor.getRunExecutorInstance(), settings).build()
-withContext(Dispatchers.EDT) {
-    env.runner.execute(env) { descriptor ->
-        descriptor.processHandler?.addProcessListener(object : ProcessAdapter() {
-            override fun processTerminated(event: ProcessEvent) {
-                exitCode = event.exitCode
-                latch.countDown()
-            }
-        })
+var passed = false
+
+// Subscribe BEFORE launching so we don't miss the event
+val connection = project.messageBus.connect()
+connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
+    override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) {
+        passed = testsRoot.isPassed()
+        val failed = testsRoot.getAllTests().count { it.isDefect }
+        println("Tests finished — passed=$passed failures=$failed")
+        connection.disconnect()
+        latch.countDown()
     }
-}
+    override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
+    override fun onTestFailed(test: SMTestProxy) { println("FAILED: ${test.name}") }
+})
+
+// Launch via Maven IDE runner (runs through Maven lifecycle, resolves deps)
+MavenRunConfigurationType.runConfiguration(
+    project,
+    MavenRunnerParameters(
+        /* isPomExecution= */ true,
+        /* workingDirPath= */ project.basePath!!,
+        /* pomFileName= */ "pom.xml",
+        /* goals= */ listOf("test", "-Dtest=com.example.MyTest", "-Dspotless.check.skip=true"),
+        /* profiles= */ emptyList()
+    ),
+    /* executor= */ null,
+    /* pomFile= */ null,
+) { /* descriptor callback — optional, latch above handles completion */ }
+
 latch.await(10, TimeUnit.MINUTES)
-println("Exit: $exitCode")   // 0 = all tests passed, non-zero = failures or errors
-// No output parsing needed — the exit code tells you everything.
-// View detailed results in the IDE Test Results tool window.
+println("Result: passed=$passed")
 ```
 
-**IDE-native shortcut — run from PSI class (closest to clicking ▶ in the gutter):**
+#### Gradle projects — `GradleRunConfiguration.setRunAsTest(true)`
+
+```kotlin
+import org.jetbrains.plugins.gradle.service.execution.GradleExternalTaskConfigurationType
+import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration
+import com.intellij.execution.RunManager
+import com.intellij.execution.runners.ProgramRunnerUtil
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
+import com.intellij.execution.testframework.sm.runner.SMTestProxy
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+val latch = CountDownLatch(1)
+var passed = false
+
+val connection = project.messageBus.connect()
+connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
+    override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) {
+        passed = testsRoot.isPassed()
+        println("Tests finished — passed=$passed")
+        connection.disconnect()
+        latch.countDown()
+    }
+    override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
+    override fun onTestFailed(test: SMTestProxy) { println("FAILED: ${test.name}") }
+})
+
+val configurationType = GradleExternalTaskConfigurationType.getInstance()
+val factory = configurationType.configurationFactories[0]
+val config = GradleRunConfiguration(project, factory, "Run MyTest")
+config.settings.externalProjectPath = project.basePath!!
+config.settings.taskNames = listOf(":test")
+config.settings.scriptParameters = "--tests \"com.example.MyTest\""
+config.setRunAsTest(true)  // CRITICAL: enables test console / SMTestProxy wiring
+
+val runManager = RunManager.getInstance(project)
+val settings = runManager.createConfiguration(config, factory)
+runManager.addConfiguration(settings)
+ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
+
+latch.await(10, TimeUnit.MINUTES)
+println("Result: passed=$passed")
+```
+
+#### Auto-detect runner via ConfigurationContext (simplest, works for any build system)
+
+This is exactly what the green ▶ gutter button does:
 
 ```kotlin
 import com.intellij.execution.actions.ConfigurationContext
@@ -1481,17 +1577,17 @@ val psiClass = readAction {
 } ?: error("Class not found")
 
 val settings = readAction {
-    val ctx = ConfigurationContext.getFromContext(
+    ConfigurationContext.getFromContext(
         SimpleDataContext.builder()
             .add(CommonDataKeys.PROJECT, project)
             .add(CommonDataKeys.PSI_ELEMENT, psiClass)
             .build()
-    )
-    ctx.configuration
+    ).configuration
 } ?: error("No run configuration produced for this class")
 
+// Auto-selects Maven/Gradle/JUnit runner based on project structure
 ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
-println("Test started — check IDE Test Results window or attach ProcessAdapter for exit code")
+println("Test started — check IDE Test Results window")
 ```
 
 ---
@@ -1587,7 +1683,11 @@ println(lines.takeLast(30).joinToString("\n"))
 | No daemon | n/a | `--no-daemon` |
 | Quiet output | `-q` | `-q` |
 
-### Run a Specific JUnit Test Class via IntelliJ Runner
+### Run a Specific JUnit Test Class via IntelliJ Runner (non-Maven/Gradle only)
+
+> ⚠️ **Only use `JUnitConfiguration` for projects that do NOT use Maven or Gradle** (e.g. pure
+> IntelliJ module projects). For Maven/Gradle projects use `MavenRunConfigurationType` or
+> `GradleRunConfiguration` from the ★ PREFERRED ★ section above.
 
 ```kotlin
 import com.intellij.execution.junit.JUnitConfiguration
@@ -1610,89 +1710,40 @@ println("Test run started")
 // Always use the constant: JUnitConfiguration.TEST_CLASS
 ```
 
-### Get Structured Test Results via SMTestProxy (No Output Parsing)
+### Get Per-Test Breakdown via SMTestProxy
 
-After launching a test run via the IDE runner, use `SMTestProxy` to check pass/fail counts
-without parsing raw Maven/Gradle output. This avoids the 200k-char truncation problem entirely.
+`SMTRunnerEventsListener.TEST_STATUS` works for all runners (Maven, Gradle, JUnit). Subscribe
+before launching the test. Use `testsRoot.isPassed()` for overall pass/fail:
 
 ```kotlin
-import com.intellij.execution.junit.JUnitConfiguration
-import com.intellij.execution.junit.JUnitConfigurationType
-import com.intellij.execution.RunManager
-import com.intellij.execution.executors.DefaultRunExecutor
-import com.intellij.execution.process.ProcessAdapter
-import com.intellij.execution.process.ProcessEvent
-import com.intellij.execution.runners.ExecutionEnvironmentBuilder
-import com.intellij.openapi.util.Key
-import com.jetbrains.python.testing.smrunner.SMTestProxy
 import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
-import com.intellij.execution.testframework.sm.runner.SMTestProxy as SMTestProxyRoot
+import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
-// Run test and wait for structured results
 val latch = CountDownLatch(1)
-var passedCount = 0
-var failedCount = 0
-var errorCount = 0
-var testFinished = false
 
-val factory = JUnitConfigurationType.getInstance().configurationFactories.first()
-val config = factory.createConfiguration("Run test", project) as JUnitConfiguration
-config.persistentData.TEST_CLASS = "com.example.MyValidatorTest"
-config.persistentData.TEST_OBJECT = JUnitConfiguration.TEST_CLASS
-config.setWorkingDirectory(project.basePath!!)
-val settings = RunManager.getInstance(project).createConfiguration(config, factory)
-RunManager.getInstance(project).addConfiguration(settings)
-
-val env = ExecutionEnvironmentBuilder.create(DefaultRunExecutor.getRunExecutorInstance(), settings).build()
+// Subscribe BEFORE launching (don't miss the event)
 val connection = project.messageBus.connect()
-connection.subscribe(SMTRunnerEventsListener.TEST_STATUS) { proxy ->
-    if (proxy is SMTestProxyRoot.SMRootTestProxy && proxy.isDefect) {
-        failedCount++
+connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
+    override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) {
+        val passed = testsRoot.isPassed()
+        val hasErrors = testsRoot.hasErrors()
+        val allTests = testsRoot.getAllTests()
+        val failCount = allTests.count { it.isDefect }
+        println("Done — passed=$passed errors=$hasErrors failures=$failCount")
+        allTests.filter { it.isDefect }.forEach { println("  FAILED: ${it.name}") }
+        connection.disconnect()
+        latch.countDown()
     }
-}
+    override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
+    override fun onTestFailed(test: SMTestProxy) {}
+})
 
-withContext(Dispatchers.EDT) {
-    env.runner.execute(env) { descriptor ->
-        descriptor.processHandler?.addProcessListener(object : ProcessAdapter() {
-            override fun processTerminated(event: ProcessEvent) {
-                testFinished = true
-                latch.countDown()
-            }
-        })
-    }
-}
-latch.await(5, TimeUnit.MINUTES)
-connection.disconnect()
-println("Test finished: $testFinished")
-println("RESULT: passed=$passedCount failed=$failedCount error=$errorCount")
-```
+// Then launch via MavenRunConfigurationType or GradleRunConfiguration (see ★ PREFERRED ★ above)
+// ... launch code here ...
 
-> **When to use SMTestProxy**: Use it when you need per-test breakdown (which specific methods
-> passed/failed) after an IDE runner launch. For simple pass/fail you only need the exit code
-> from the `ProcessAdapter.processTerminated` callback shown in the ★ PREFERRED ★ section above.
-
-### Run a Specific Maven Test Class via IDE
-
-```kotlin
-import com.intellij.execution.ProgramRunnerUtil
-import com.intellij.execution.RunManager
-import com.intellij.execution.executors.DefaultRunExecutor
-import org.jetbrains.idea.maven.execution.MavenRunConfiguration
-import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
-
-val configType = MavenRunConfigurationType.getInstance()
-val factory = configType.configurationFactories.first()
-val runConfig = factory.createTemplateConfiguration(project) as MavenRunConfiguration
-runConfig.runnerParameters.workingDirPath = project.basePath!!
-runConfig.runnerParameters.goals = listOf("test")
-runConfig.runnerParameters.mavenProperties["test"] = "ProductTest"
-val settings = RunManager.getInstance(project).createConfiguration(runConfig, factory)
-RunManager.getInstance(project).addConfiguration(settings)
-RunManager.getInstance(project).selectedConfiguration = settings
-ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
-println("Maven test started")
+latch.await(10, TimeUnit.MINUTES)
 ```
 
 ### Check Compile Errors Without Running Full Build
