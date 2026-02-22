@@ -214,6 +214,12 @@ delay(1000)         // coroutine delay - works directly
 ```
 **NEVER use `runBlocking`** - it causes deadlocks.
 
+**NEVER re-probe `waitForSmartMode()` before every operation.** Once the first call completes
+(which happens automatically before your script starts), smart mode is confirmed for the duration
+of your task. Calling it again before each subsequent `steroid_execute_code` adds ~20s of
+unnecessary overhead per re-probe. Only call `waitForSmartMode()` again if you explicitly
+trigger re-indexing mid-script.
+
 ### 2. Imports Are Optional
 
 Default imports are provided automatically. Add imports only when you need APIs outside the defaults.

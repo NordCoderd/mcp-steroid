@@ -1529,6 +1529,70 @@ println("Test run started")
 // Always use the constant: JUnitConfiguration.TEST_CLASS
 ```
 
+### Get Structured Test Results via SMTestProxy (No Output Parsing)
+
+After launching a test run via the IDE runner, use `SMTestProxy` to check pass/fail counts
+without parsing raw Maven/Gradle output. This avoids the 200k-char truncation problem entirely.
+
+```kotlin
+import com.intellij.execution.junit.JUnitConfiguration
+import com.intellij.execution.junit.JUnitConfigurationType
+import com.intellij.execution.RunManager
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.runners.ExecutionEnvironmentBuilder
+import com.intellij.openapi.util.Key
+import com.jetbrains.python.testing.smrunner.SMTestProxy
+import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
+import com.intellij.execution.testframework.sm.runner.SMTestProxy as SMTestProxyRoot
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+// Run test and wait for structured results
+val latch = CountDownLatch(1)
+var passedCount = 0
+var failedCount = 0
+var errorCount = 0
+var testFinished = false
+
+val factory = JUnitConfigurationType.getInstance().configurationFactories.first()
+val config = factory.createConfiguration("Run test", project) as JUnitConfiguration
+config.persistentData.TEST_CLASS = "com.example.MyValidatorTest"
+config.persistentData.TEST_OBJECT = JUnitConfiguration.TEST_CLASS
+config.setWorkingDirectory(project.basePath!!)
+val settings = RunManager.getInstance(project).createConfiguration(config, factory)
+RunManager.getInstance(project).addConfiguration(settings)
+
+val env = ExecutionEnvironmentBuilder.create(DefaultRunExecutor.getRunExecutorInstance(), settings).build()
+val connection = project.messageBus.connect()
+connection.subscribe(SMTRunnerEventsListener.TEST_STATUS) { proxy ->
+    if (proxy is SMTestProxyRoot.SMRootTestProxy && proxy.isDefect) {
+        failedCount++
+    }
+}
+
+withContext(Dispatchers.EDT) {
+    env.runner.execute(env) { descriptor ->
+        descriptor.processHandler?.addProcessListener(object : ProcessAdapter() {
+            override fun processTerminated(event: ProcessEvent) {
+                testFinished = true
+                latch.countDown()
+            }
+        })
+    }
+}
+latch.await(5, TimeUnit.MINUTES)
+connection.disconnect()
+println("Test finished: $testFinished")
+println("RESULT: passed=$passedCount failed=$failedCount error=$errorCount")
+```
+
+> **Note**: The SMTestProxy API can be complex to set up correctly. For arena scenarios, the
+> simpler approach is to use `./mvnw test-compile -q` for compile checking (fast, ~5s), then
+> `./mvnw test -Dtest=ClassName -q` with `take(30) + takeLast(30)` for the actual test run.
+> The `ProjectTaskManager.build()` approach (above) is the most reliable for compile-only checks.
+
 ### Run a Specific Maven Test Class via IDE
 
 ```kotlin
