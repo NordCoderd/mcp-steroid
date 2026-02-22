@@ -51,17 +51,29 @@ class DockerDriver(
     val processRunner get() = ProcessRunner(logPrefix, secretPatterns.toList())
 
     /**
-     * Build a Docker image and return its content-addressable image ID (sha256:...).
+     * Tag an existing Docker image with a new name.
      *
-     * The image is also tagged with [imageName] for human readability (`docker images`),
-     * but callers should use the returned image ID for [startContainer] to avoid
-     * naming collisions in concurrent test runs.
+     * @param imageId Source image reference (e.g. `sha256:<hex>` or existing tag)
+     * @param tag Target tag (e.g. `mcp-steroid-ide-base-test:latest`)
+     */
+    fun tagDockerImage(imageId: String, tag: String) {
+        ProcessRunRequest.builder()
+            .command("docker", "tag", imageId, tag)
+            .description("Tag Docker image as $tag")
+            .workingDir(workDir)
+            .timeoutSeconds(30)
+            .runProcess(processRunner)
+            .assertExitCode(0) { "Failed to tag Docker image $imageId as $tag: $stderr" }
+        println("[$logPrefix] Tagged image $imageId → $tag")
+    }
+
+    /**
+     * Build a Docker image and return its content-addressable image ID (sha256:...).
      *
      * @param buildArgs Extra `--build-arg KEY=VALUE` entries (e.g. `BASE_IMAGE` for derived images)
      * @return The image ID in `sha256:<hex>` format
      */
     fun buildDockerImage(
-        imageName: String,
         dockerfilePath: File,
         timeoutSeconds: Long,
         buildArgs: Map<String, String> = emptyMap(),
@@ -74,8 +86,8 @@ class DockerDriver(
         val iidFile = createTempFile("docker-iid", ".txt").toFile()
         try {
             val command = buildList {
-                add("docker"); add("build")
-                add("-t"); add(imageName)
+                add("docker")
+                add("build")
 
                 @Suppress("SpellCheckingInspection")
                 add("--iidfile")
@@ -91,7 +103,7 @@ class DockerDriver(
 
             ProcessRunRequest.builder()
                     .command(command)
-                    .description("Build Docker image $imageName")
+                    .description("Build Docker image $dockerfilePath")
                     .workingDir(dockerfilePath.parentFile)
                     .timeoutSeconds(timeoutSeconds)
                     .runProcess(processRunner)
@@ -99,8 +111,8 @@ class DockerDriver(
 
             val imageId = iidFile.readText().trim()
             require(imageId.startsWith("sha256:")) { "Unexpected image ID format from --iidfile: $imageId" }
-            println("[$logPrefix] Docker image built: $imageName ($imageId)")
-            return imageId
+            println("[$logPrefix] Docker image built $imageId")
+            return imageId.removePrefix("sha256:").trim()
         } finally {
             iidFile.delete()
         }
@@ -144,10 +156,10 @@ class DockerDriver(
         }
 
         val result = ProcessRunRequest.builder()
-                .command(command)
-                .description("Start container from $imageName")
-                .workingDir(workDir)
-                .runProcess(processRunner)
+            .command(command)
+            .description("Start container from $imageName")
+            .workingDir(workDir)
+            .runProcess(processRunner)
             .assertExitCode(0) {
                 "Failed to start Docker container: $stderr"
             }
@@ -219,6 +231,7 @@ class DockerDriver(
             .description("kill container")
             .workingDir(workDir)
             .timeoutSeconds(10)
+            .quietly()
             .runProcess(processRunner)
 
         ProcessRunRequest.builder()
@@ -226,7 +239,7 @@ class DockerDriver(
             .description("Remove container")
             .workingDir(workingDir = workDir)
             .timeoutSeconds(timeoutSeconds = 5)
-            .quietly(true)
+            .quietly()
             .runProcess(processRunner)
 
         println("[$logPrefix] Container removed successfully")

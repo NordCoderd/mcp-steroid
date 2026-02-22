@@ -116,11 +116,19 @@ class AiAgentDriver(
     }
 
     val aiAgents: Map<String, AiAgentSession> by lazy {
-        mapOf(
-            "claude" to claude,
-            "codex" to codex,
-            "gemini" to gemini,
-        )
+        buildMap {
+            fun tryAdd(name: String, init: () -> AiAgentSession) {
+                try {
+                    put(name, init())
+                } catch (e: Exception) {
+                    System.err.println("[AiAgentDriver] WARNING: $name registration failed: ${e.message} — excluding from run")
+                    System.err.println("[AiAgentDriver] WARNING: Remaining agents will still run")
+                }
+            }
+            tryAdd("claude") { claude }
+            tryAdd("codex") { codex }
+            tryAdd("gemini") { gemini }
+        }
     }
 
     val claude by lazy {

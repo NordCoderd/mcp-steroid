@@ -202,6 +202,30 @@ class DpaiaArenaTest {
             println("[ARENA] Run dir (for improvement pipeline): ${session.runDirInContainer.absolutePath}")
         }
 
+        /**
+         * Write an infra-failure summary JSON so the improvement pipeline can detect
+         * infrastructure failures without parsing raw log text.
+         *
+         * Called from [beforeAll] on session init failure. Does NOT throw — logs any
+         * write error without masking the original exception.
+         */
+        private fun writeInfraFailureSummary(instanceId: String, e: Exception) {
+            val summary = buildJsonObject {
+                put("instance_id", instanceId)
+                put("infra_failure", true)
+                put("infra_failure_message", e.message ?: "unknown")
+                put("timestamp", java.time.Instant.now().toString())
+            }
+            try {
+                val summaryFile = IdeTestFolders.testOutputDir.resolve("dpaia-arena-run-$instanceId.json")
+                summaryFile.parentFile.mkdirs()
+                summaryFile.writeText(summary.toString())
+                println("[ARENA] Infra failure summary written to: ${summaryFile.absolutePath}")
+            } catch (_: Exception) {
+                // Don't mask the original exception
+            }
+        }
+
         @JvmStatic
         @BeforeAll
         fun beforeAll() {
@@ -215,6 +239,9 @@ class DpaiaArenaTest {
                 // from agent behavior failures (agent ran but didn't use MCP).
                 System.err.println("[ARENA] INFRA_FAILURE: session initialization failed")
                 System.err.println("[ARENA] INFRA_FAILURE cause: ${e.message}")
+                // Write a structured JSON artifact so Phase 3/4 analysis can detect infra-only
+                // failures without parsing raw log text (avoids misleading "0 MCP calls" verdicts).
+                writeInfraFailureSummary(setupTestCase.instanceId, e)
                 throw e
             }
         }

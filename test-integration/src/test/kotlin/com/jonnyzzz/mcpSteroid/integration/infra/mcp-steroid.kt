@@ -257,7 +257,6 @@ class McpSteroidDriver(
         val code = """
 import com.intellij.openapi.extensions.PluginId
 import com.intellij.ide.plugins.PluginManagerCore
-import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiser
 import java.io.File
 
 // Dependency keyword → Marketplace plugin ID
@@ -282,16 +281,33 @@ if (toInstall.isEmpty()) {
     println("[PLUGIN-INSTALL] All required plugins already installed (or no matching dependencies)")
 } else {
     println("[PLUGIN-INSTALL] Installing plugins: ${'$'}toInstall")
-    PluginsAdvertiser.installAndEnable(
-        project,
-        toInstall.map { PluginId.getId(it) }.toSet(),
-        onSuccess = Runnable { println("[PLUGIN-INSTALL] installAndEnable callback fired") },
-    )
-    // Plugin installation triggers re-indexing (dumb mode). Wait for smart mode —
-    // this is the canonical way to wait for all IDE background work to complete.
-    println("[PLUGIN-INSTALL] Waiting for smart mode after plugin installation...")
-    waitForSmartMode()
-    println("[PLUGIN-INSTALL] Smart mode reached — plugins ready: ${'$'}toInstall")
+    // Use reflection to avoid compile error on IDE builds where PluginsAdvertiser was removed/moved.
+    // In IU-253+ the class may not exist; we skip dynamic install gracefully in that case.
+    val advertiserClass = try {
+        Class.forName("com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginsAdvertiser")
+    } catch (e: ClassNotFoundException) {
+        null
+    }
+    if (advertiserClass == null) {
+        println("[PLUGIN-INSTALL] PluginsAdvertiser not available in this IDE build — skipping dynamic install")
+    } else {
+        val installMethod = advertiserClass.declaredMethods
+            .firstOrNull { it.name == "installAndEnable" }
+        if (installMethod == null) {
+            println("[PLUGIN-INSTALL] installAndEnable method not found — skipping dynamic install")
+        } else {
+            installMethod.invoke(
+                null, project,
+                toInstall.map { PluginId.getId(it) }.toSet(),
+                Runnable { println("[PLUGIN-INSTALL] installAndEnable callback fired") },
+            )
+            // Plugin installation triggers re-indexing (dumb mode). Wait for smart mode —
+            // this is the canonical way to wait for all IDE background work to complete.
+            println("[PLUGIN-INSTALL] Waiting for smart mode after plugin installation...")
+            waitForSmartMode()
+            println("[PLUGIN-INSTALL] Smart mode reached — plugins ready: ${'$'}toInstall")
+        }
+    }
 }
 "done"
 """.trimIndent()
@@ -345,7 +361,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 // 1. Detect and register system JDK if project SDK is unset
 // Covers Eclipse Temurin 21/25/17/11/8 installed via Adoptium APT, on both amd64 and arm64.
-val jdkCandidates = listOf(
+// Also covers standard Debian/Ubuntu openjdk paths and the JAVA_HOME environment variable.
+val jdkCandidates = listOfNotNull(
+    System.getenv("JAVA_HOME"),           // Check JAVA_HOME first (most reliable)
     "/usr/lib/jvm/temurin-21-amd64",
     "/usr/lib/jvm/temurin-21-arm64",
     "/usr/lib/jvm/temurin-25-amd64",
@@ -356,8 +374,11 @@ val jdkCandidates = listOf(
     "/usr/lib/jvm/temurin-11-arm64",
     "/usr/lib/jvm/java-21-openjdk-amd64",
     "/usr/lib/jvm/java-21-openjdk-arm64",
+    "/usr/lib/jvm/java-17-openjdk-amd64",
+    "/usr/lib/jvm/java-17-openjdk-arm64",
     "/usr/lib/jvm/temurin-21",
-    "/usr/lib/jvm/java-21",
+    "/usr/lib/jvm/java-21",               // Standard Debian/Ubuntu apt install openjdk-21-jdk
+    "/usr/lib/jvm/java-17",
 )
 val jdkPath = jdkCandidates.firstOrNull { java.io.File(it, "bin/java").exists() }
 var jdkWasSet = false

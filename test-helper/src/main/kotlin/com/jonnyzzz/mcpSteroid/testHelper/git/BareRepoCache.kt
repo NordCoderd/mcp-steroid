@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
  * Intended use:
  * 1. Call [ensureRepo] at test setup to warm the cache on the host.
  * 2. Mount the cache root as a read-only Docker volume at `/repo-cache`.
- * 3. Use [com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver.cloneFromCachedBare] inside the container for fast local clones.
+ * 3. Use [GitDriver.cloneFromCachedBare] inside the container for fast local clones.
  */
 object BareRepoCache {
 

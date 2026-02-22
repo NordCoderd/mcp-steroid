@@ -62,6 +62,13 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - waitForSmartMode() runs automatically before your script
              - Available: project, println(), printJson(), printException(), progress()
 
+             **⚡ First-call readiness probe (verify IDE + MCP connectivity before heavy ops):**
+             ```kotlin
+             println("IDE ready: ${'$'}{project.name}")
+             println("Base path: ${'$'}{project.basePath}")
+             println("Smart mode: ${'$'}{!com.intellij.openapi.project.DumbService.isDumb(project)}")
+             ```
+
              **Read a project file:**
              ```kotlin
              val text = VfsUtil.loadText(findProjectFile("src/main/resources/application.properties")!!)
@@ -71,7 +78,9 @@ class ExecuteCodeToolHandler : McpRegistrar {
              **Create/write a Java or Kotlin source file:**
              ```kotlin
              writeAction {
-                 val dir = VfsUtil.createDirectoryIfMissing(project.baseDir, "src/main/java/com/example/model")
+                 // DEPRECATED: project.baseDir — use LocalFileSystem instead:
+                 val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+                 val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example/model")
                  val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")
                  // Use joinToString() or File.writeText() — NOT a triple-quoted string with 'import' at line start
                  // (the preprocessor extracts import-like lines from triple-quoted strings as Kotlin imports)
@@ -88,6 +97,18 @@ class ExecuteCodeToolHandler : McpRegistrar {
              **⚠️ Import-in-strings pitfall**: Never put `import foo.Bar;` at the start of a line inside a triple-quoted Kotlin string. The script preprocessor extracts those lines as Kotlin imports, causing compile errors. Use `"import" + " foo.Bar;"` or `joinToString` to build the content, or use `java.io.File(path).writeText(content)` as an alternative.
 
              **Spring Boot / Maven patterns:**
+             ```kotlin
+             // ⚠️ ALWAYS verify package structure BEFORE creating new files (do NOT guess from directory names)
+             // Step 1: List all content source roots to understand the module layout
+             import com.intellij.openapi.roots.ProjectRootManager
+             ProjectRootManager.getInstance(project).contentSourceRoots.forEach { println(it.path) }
+             // Step 2: Check if the target package actually exists in the project model
+             val pkg = readAction { JavaPsiFacade.getInstance(project).findPackage("shop.api.core") }
+             println("shop.api.core exists: ${'$'}{pkg != null}")
+             // If the package doesn't exist, list top-level packages to find the real one:
+             val topPkg = readAction { JavaPsiFacade.getInstance(project).findPackage("") }
+             topPkg?.subPackages?.forEach { println(it.qualifiedName) }
+             ```
              ```kotlin
              // Find all @Entity classes in the project
              import com.intellij.psi.search.searches.AnnotatedElementsSearch

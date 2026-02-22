@@ -4,7 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration.arena
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver
+import com.jonnyzzz.mcpSteroid.testHelper.git.GitDriver
 
 /**
  * Manages the execution of a dpaia arena test case inside a Docker container
@@ -125,7 +125,13 @@ class ArenaTestRunner(
             appendLine("  → `ProcessBuilder(\"./mvnw\", \"test\", \"-Dtest=ClassName\", \"-Dspotless.check.skip=true\", \"-q\")`")
             appendLine("- Compile success (`test-compile`) is NOT the same as test pass. Always run the actual tests.")
             appendLine()
-            appendLine("1. Call `steroid_list_projects` to confirm project name")
+            appendLine("1. Call `steroid_list_projects` to confirm the project name, then run this readiness probe:")
+            appendLine("   ```kotlin")
+            appendLine("   println(\"IDE ready: \${project.name}\")")
+            appendLine("   println(\"Base path: \${project.basePath}\")")
+            appendLine("   println(\"Smart mode: \${!com.intellij.openapi.project.DumbService.isDumb(project)}\")")
+            appendLine("   ```")
+            appendLine("   If this fails, stop and report the error — all subsequent steps depend on IDE connectivity.")
             appendLine("2. **Read the failing test files first** — use steroid_execute_code to print the full source of")
             appendLine("   each failing test. Extract expected method signatures, field names, and annotations.")
             appendLine("   Implement from the test expectations, not from guesses.")
@@ -139,6 +145,19 @@ class ArenaTestRunner(
             appendLine("   - When adding new fields to existing command/DTO classes: use ReferencesSearch to find ALL")
             appendLine("     constructor call sites FIRST — update every call site or the compiler will fail")
             appendLine("     Example: `ReferencesSearch.search(cmdClass, projectScope()).findAll()`")
+            appendLine("   - **CRITICAL — Verify package structure via PSI before creating ANY file**:")
+            appendLine("     Do NOT guess the Java package from directory names — use the IDE project model:")
+            appendLine("     ```kotlin")
+            appendLine("     // List all content source roots (reveals module layout and true package roots)")
+            appendLine("     import com.intellij.openapi.roots.ProjectRootManager")
+            appendLine("     ProjectRootManager.getInstance(project).contentSourceRoots.forEach { println(it.path) }")
+            appendLine("     // Check if target package actually exists:")
+            appendLine("     val pkg = readAction { JavaPsiFacade.getInstance(project).findPackage(\"com.example.api\") }")
+            appendLine("     println(\"package exists: \${pkg != null}\")")
+            appendLine("     // If null, list top-level packages to find the real root:")
+            appendLine("     readAction { JavaPsiFacade.getInstance(project).findPackage(\"\") }")
+            appendLine("         ?.subPackages?.forEach { println(it.qualifiedName) }")
+            appendLine("     ```")
             appendLine("3. Analyze the existing codebase to understand what already exists")
             appendLine("4. Implement the necessary changes to fix the issue")
             appendLine("5. Use steroid_execute_code to verify your changes compile (runInspectionsDirectly) and")
@@ -154,7 +173,9 @@ class ArenaTestRunner(
             appendLine("**File creation via VFS (use this instead of shell):**")
             appendLine("```kotlin")
             appendLine("writeAction {")
-            appendLine("    val dir = VfsUtil.createDirectoryIfMissing(project.baseDir, \"src/main/java/com/example/model\")")
+            appendLine("    // DEPRECATED: project.baseDir — use LocalFileSystem instead:")
+            appendLine("    val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!")
+            appendLine("    val dir = VfsUtil.createDirectoryIfMissing(root, \"src/main/java/com/example/model\")")
             appendLine("    val f = dir.findChild(\"Product.java\") ?: dir.createChildData(this, \"Product.java\")")
             appendLine("    // Build content with joinToString — never put 'import ...' at line start in a triple-quoted string")
             appendLine("    VfsUtil.saveText(f, listOf(")

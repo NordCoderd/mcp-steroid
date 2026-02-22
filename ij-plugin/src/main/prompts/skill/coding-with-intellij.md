@@ -840,7 +840,9 @@ Use `VfsUtil.createDirectoryIfMissing` + `VfsUtil.saveText` — safer than shell
 ```kotlin
 writeAction {
     // Create package directories
-    val srcDir = VfsUtil.createDirectoryIfMissing(project.baseDir, "src/main/java/com/example/model")
+    // DEPRECATED: project.baseDir — use LocalFileSystem instead:
+    val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+    val srcDir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example/model")
 
     // Build Java source using joinToString — avoids import-extraction bug
     val content = listOf(
@@ -1120,6 +1122,37 @@ for (path in filesToRead) {
     println(VfsUtil.loadText(vf))
 }
 ```
+
+### Verify Project Package Structure Before Creating Files
+
+**CRITICAL**: Always verify the actual package hierarchy via the IDE project model before creating new source files.
+Directory names alone are NOT reliable — module source roots may start at a different depth than you expect.
+Getting this wrong means your files are in the wrong package (tests pass locally but fail arena validation).
+
+```kotlin
+import com.intellij.openapi.roots.ProjectRootManager
+
+// Step 1: List all content source roots (shows exactly where packages start)
+ProjectRootManager.getInstance(project).contentSourceRoots.forEach { root ->
+    println("Source root: ${root.path}")
+}
+
+// Step 2: Check if a target package exists in the project model
+val pkg = readAction { JavaPsiFacade.getInstance(project).findPackage("com.example.api") }
+println("com.example.api exists: ${pkg != null}")
+
+// Step 3: If the package is null, list top-level packages to find the correct root
+val rootPkg = readAction { JavaPsiFacade.getInstance(project).findPackage("") }
+rootPkg?.subPackages?.forEach { println("top-level package: ${it.qualifiedName}") }
+
+// Step 4: Navigate the package hierarchy to find correct sub-packages
+val apiPkg = readAction { JavaPsiFacade.getInstance(project).findPackage("com.example") }
+apiPkg?.subPackages?.forEach { println("  sub-package: ${it.qualifiedName}") }
+```
+
+This prevents the common error of creating `com.example.microservices.api.Foo` when the project
+actually uses `com.example.api.Foo` — a package mismatch that passes internal tests (JSON field matching)
+but fails integration validation (class path matching).
 
 ### Trigger Maven Re-import After pom.xml Changes
 

@@ -7,7 +7,6 @@ import java.nio.file.Files.createLink
 import kotlin.io.path.exists
 
 private const val BASE_DOCKER_CONTEXT = "ide-base"
-private const val BASE_IMAGE_NAME = "mcp-steroid-ide-base-test"
 
 // JVM-level guard: the shared base image is built once per JVM; its name is cached
 // so derived images can reference it. The synchronized block ensures single-build
@@ -38,7 +37,6 @@ fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): 
     linkIdeArchive(contextDir, ideArchive)
     val scope = DockerDriver(contextDir, "IDE-AGENT")
     val imageId = scope.buildDockerImage(
-        imageName = imageName,
         dockerfilePath = File(contextDir, "Dockerfile"),
         timeoutSeconds = 900,
         buildArgs = mapOf("BASE_IMAGE" to resolvedBaseImageId),
@@ -52,16 +50,17 @@ private fun buildSharedBaseImage(): String {
         baseImageId?.let { return it }  // double-checked locking
         val baseContext = prepareContext("docker-$BASE_DOCKER_CONTEXT", BASE_DOCKER_CONTEXT)
         val baseScope = DockerDriver(baseContext, "IDE-AGENT")
-        baseScope.buildDockerImage(
-            imageName = BASE_IMAGE_NAME,
+        val rawImageId = baseScope.buildDockerImage(
             dockerfilePath = File(baseContext, "Dockerfile"),
             timeoutSeconds = 900,
         )
-        // Use the image name (not SHA256 hash) so Docker BuildKit can resolve it as
-        // a local image. BuildKit 29+ can't resolve bare sha256: hashes locally and
-        // tries to pull them from Docker Hub, which fails.
-        baseImageId = BASE_IMAGE_NAME
-        return BASE_IMAGE_NAME
+        // Tag the base image with a stable named tag so derived images can reference it
+        // via a named reference in their FROM statement. Docker 26+ BuildKit rejects bare
+        // SHA256 hex strings in FROM instructions — only named tags are accepted.
+        val tagName = "mcp-steroid-ide-base-test:latest"
+        baseScope.tagDockerImage("sha256:$rawImageId", tagName)
+        baseImageId = tagName
+        return tagName
     }
 }
 

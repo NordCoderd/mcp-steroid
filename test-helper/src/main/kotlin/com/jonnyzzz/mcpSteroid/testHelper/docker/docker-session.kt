@@ -29,12 +29,10 @@ fun ContainerDriver.Companion.startDockerSession(
     }
 
     val scope = DockerDriver(workDir, logPrefix, secretPatterns)
-    val imageName = "$dockerFileBase-test"
 
     val imageId = scope.buildDockerImage(
-        imageName = imageName,
         dockerfilePath,
-        timeoutSeconds = 600
+        timeoutSeconds = 600,
     )
 
     return startContainerDriver(lifetime, scope, imageId)
@@ -43,13 +41,13 @@ fun ContainerDriver.Companion.startDockerSession(
 fun startContainerDriver(
     lifetime: CloseableStack,
     scope: DockerDriver,
-    imageName: String,
+    imageId: String,
     extraEnvVars: Map<String, String> = emptyMap(),
     volumes: List<ContainerVolume> = listOf(),
     ports: List<ContainerPort> = listOf(),
     autoRemove: Boolean = false,
 ): ContainerDriver {
-    val containerId = scope.startContainer(lifetime, imageName, extraEnvVars, volumes, ports, autoRemove = autoRemove)
+    val containerId = scope.startContainer(lifetime, imageId, extraEnvVars, volumes, ports, autoRemove = autoRemove)
 
     // Register with reaper for cleanup on crash/SIGKILL
     DockerReaper.registerContainer(containerId, scope.workDir)
@@ -61,7 +59,7 @@ fun startContainerDriver(
         println("[${scope.logPrefix}] Port mappings: ${hostPorts.entries.joinToString { "${it.key} -> ${it.value}" }}")
     }
 
-    return ContainerDriverImpl(scope, containerId, imageName, volumes, hostPorts)
+    return ContainerDriverImpl(scope, containerId, imageId, volumes, hostPorts)
 }
 
 private class ContainerDriverImpl(

@@ -150,6 +150,7 @@ class ConsolePumpingContainerDriver(
                 .command("bash", teeScript)
                 .workingDirInContainer(workingDir)
                 .timeoutSeconds(timeoutSeconds)
+                .extraEnv(extraEnvVars)
                 .description("Run agent [$slug-$idx] with in-container filter")
                 .quietly()
                 .runInContainer(delegate)

@@ -98,7 +98,7 @@ object IdeTestFolders {
      * Host-side bare git repository cache directory, or null if not configured.
      * Set via `test.integration.repo.cache.dir` system property.
      * When non-null, it is mounted read-only at `/repo-cache` inside containers so
-     * [com.jonnyzzz.mcpSteroid.testHelper.docker.GitDriver.cloneFromCachedBare] can be used.
+     * [com.jonnyzzz.mcpSteroid.testHelper.git.GitDriver.cloneFromCachedBare] can be used.
      */
     val repoCacheDirOrNull: File? = System.getProperty("test.integration.repo.cache.dir")
         ?.let { File(it).also { dir -> dir.mkdirs() } }

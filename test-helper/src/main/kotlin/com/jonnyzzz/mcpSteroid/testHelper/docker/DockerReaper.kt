@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicBoolean
  * All background work runs on [Dispatchers.IO] (daemon threads).
  */
 object DockerReaper {
-    private const val IMAGE_NAME = "mcp-steroid-reaper"
 
     private val started = AtomicBoolean(false)
     private val containerChannel = Channel<String>(128)
@@ -65,9 +64,8 @@ object DockerReaper {
             require(reaperDockerfile.isFile) { "Reaper Dockerfile must exist: $reaperDockerfile" }
 
             val reaperImageId = driver.buildDockerImage(
-                IMAGE_NAME,
                 reaperDockerfile,
-                120
+                120,
             )
 
             // Start the reaper container using ContainerDriver infrastructure.
@@ -79,7 +77,7 @@ object DockerReaper {
             val containerDriver = startContainerDriver(
                 lifetime = runningLifetime,
                 scope = driver,
-                imageName = reaperImageId,
+                imageId = reaperImageId,
                 volumes = listOf(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock")),
                 ports = listOf(port8080),
                 autoRemove = true,
