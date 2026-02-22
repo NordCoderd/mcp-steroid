@@ -1415,9 +1415,90 @@ println("Build aborted: ${result.isAborted}")
 > **Note**: `ProjectTaskManager.build()` compiles *all* modules. For a quick single-file check, use
 > `runInspectionsDirectly(vf)` first (seconds), then fall back to this for cross-file verification.
 
-### Run Unit Tests via Maven Wrapper (FALLBACK ONLY — prefer IDE runner below)
+### Run Tests via IntelliJ IDE Runner ★ PREFERRED ★
 
-**Use this only when the IDE runner is unavailable or timing out.** The JUnit/Maven IDE runner below is preferred: it gives structured results, navigable errors, and IDE-integrated output. Use `./mvnw` as a fallback of last resort.
+**Always prefer this over `./mvnw test` or `./gradlew test`.** Running tests through the IDE
+runner is equivalent to clicking the green ▶ button next to a test class or method. Benefits:
+
+- **No 200k-char truncation problem** — pass/fail from exit code; no stdout parsing needed
+- **Structured results** in the IDE Test Results window — individual failures navigable
+- **Faster** — reuses JVM, no Maven/Gradle startup overhead for subsequent runs
+
+```kotlin
+import com.intellij.execution.junit.JUnitConfiguration
+import com.intellij.execution.junit.JUnitConfigurationType
+import com.intellij.execution.runners.ExecutionEnvironmentBuilder
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.process.ProcessAdapter
+import com.intellij.execution.process.ProcessEvent
+import com.intellij.execution.RunManager
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+
+// Configure — set TEST_CLASS to the fully-qualified test class name
+val factory = JUnitConfigurationType.getInstance().configurationFactories.first()
+val config = factory.createConfiguration("Run MyTest", project) as JUnitConfiguration
+config.persistentData.TEST_CLASS = "com.example.MyTest"
+config.persistentData.TEST_OBJECT = JUnitConfiguration.TEST_CLASS  // run whole class
+// To run a single method instead: set TEST_OBJECT = JUnitConfiguration.TEST_METHOD
+//   and config.persistentData.METHOD_NAME = "myTestMethod"
+config.setWorkingDirectory(project.basePath!!)
+val settings = RunManager.getInstance(project).let { rm ->
+    rm.createConfiguration(config, factory).also { rm.addConfiguration(it) }
+}
+
+// Launch and wait for completion (equivalent to clicking ▶ Run)
+val latch = CountDownLatch(1)
+var exitCode = -1
+val env = ExecutionEnvironmentBuilder.create(DefaultRunExecutor.getRunExecutorInstance(), settings).build()
+withContext(Dispatchers.EDT) {
+    env.runner.execute(env) { descriptor ->
+        descriptor.processHandler?.addProcessListener(object : ProcessAdapter() {
+            override fun processTerminated(event: ProcessEvent) {
+                exitCode = event.exitCode
+                latch.countDown()
+            }
+        })
+    }
+}
+latch.await(10, TimeUnit.MINUTES)
+println("Exit: $exitCode")   // 0 = all tests passed, non-zero = failures or errors
+// No output parsing needed — the exit code tells you everything.
+// View detailed results in the IDE Test Results tool window.
+```
+
+**IDE-native shortcut — run from PSI class (closest to clicking ▶ in the gutter):**
+
+```kotlin
+import com.intellij.execution.actions.ConfigurationContext
+import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.openapi.actionSystem.SimpleDataContext
+import com.intellij.openapi.actionSystem.CommonDataKeys
+
+val psiClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass("com.example.MyTest", projectScope())
+} ?: error("Class not found")
+
+val settings = readAction {
+    val ctx = ConfigurationContext.getFromContext(
+        SimpleDataContext.builder()
+            .add(CommonDataKeys.PROJECT, project)
+            .add(CommonDataKeys.PSI_ELEMENT, psiClass)
+            .build()
+    )
+    ctx.configuration
+} ?: error("No run configuration produced for this class")
+
+ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
+println("Test started — check IDE Test Results window or attach ProcessAdapter for exit code")
+```
+
+---
+
+### Run Unit Tests via Maven Wrapper (FALLBACK ONLY)
+
+**Use `./mvnw` only when the IDE runner cannot be used** (e.g. the test requires a full Maven lifecycle or specific Maven plugins). The IDE runner above is always preferred.
 
 > **⚠️ CRITICAL — Output Truncation Required**: Spring Boot integration test output routinely exceeds
 > **200k characters** (Spring context startup ~100 lines, Flyway migration logs, Testcontainers Docker
@@ -1588,10 +1669,9 @@ println("Test finished: $testFinished")
 println("RESULT: passed=$passedCount failed=$failedCount error=$errorCount")
 ```
 
-> **Note**: The SMTestProxy API can be complex to set up correctly. For arena scenarios, the
-> simpler approach is to use `./mvnw test-compile -q` for compile checking (fast, ~5s), then
-> `./mvnw test -Dtest=ClassName -q` with `take(30) + takeLast(30)` for the actual test run.
-> The `ProjectTaskManager.build()` approach (above) is the most reliable for compile-only checks.
+> **When to use SMTestProxy**: Use it when you need per-test breakdown (which specific methods
+> passed/failed) after an IDE runner launch. For simple pass/fail you only need the exit code
+> from the `ProcessAdapter.processTerminated` callback shown in the ★ PREFERRED ★ section above.
 
 ### Run a Specific Maven Test Class via IDE
 

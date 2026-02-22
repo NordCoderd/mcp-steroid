@@ -343,6 +343,21 @@ val file = requireNotNull(findProjectFile("src/main/App.kt")) { "File not found"
 val problems = runInspectionsDirectly(file)
 ```
 
+## Running Tests
+
+**Always prefer the IntelliJ IDE runner over `./mvnw test` or `./gradlew test`.**
+The IDE runner is the equivalent of clicking the green ▶ button next to a test class. It:
+- Returns a simple exit code (0 = all passed) — no 200k output to parse
+- Shows structured per-test results in the IDE Test Results window
+- Reuses the running JVM — faster than spawning a new Maven/Gradle process
+
+See `mcp-steroid://skill/coding-with-intellij` → **"Run Tests via IntelliJ IDE Runner ★ PREFERRED ★"**
+for the complete pattern (JUnitConfiguration + ExecutionEnvironmentBuilder + CountDownLatch).
+
+Only fall back to `./mvnw test` / `./gradlew test` when the IDE runner cannot be used (e.g., tests
+require a full Maven lifecycle). Even then, **never print the full output** — always `take(30) +
+takeLast(30)` to avoid MCP token limit errors.
+
 ## Common Patterns
 
 ### Get Project Info
