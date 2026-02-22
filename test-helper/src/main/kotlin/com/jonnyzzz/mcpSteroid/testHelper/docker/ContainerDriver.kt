@@ -10,6 +10,7 @@ import java.io.File
  * and running commands.
  */
 interface ContainerDriver : ContainerProcessRunner {
+    //TODO: leaky abstraction
     val containerId: String
 
     fun mapGuestPathToHostPath(path: String) : File
@@ -50,6 +51,7 @@ fun ContainerDriver.mkdirs(guestPath: String): ProcessResult {
     return ContainerProcessRunRequest
         .builder()
         .command("mkdir", "-p", guestPath)
+        .description("Create directory $guestPath in the container")
         .quietly()
         .runInContainer(this)
 }

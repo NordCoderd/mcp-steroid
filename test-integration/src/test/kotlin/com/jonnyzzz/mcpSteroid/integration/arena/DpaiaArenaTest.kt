@@ -207,7 +207,16 @@ class DpaiaArenaTest {
         fun beforeAll() {
             // Repo cache warming is handled automatically by IntelliJContainer.create()
             // based on the project's getRepoUrlForCache(). No explicit call needed here.
-            session.toString()
+            try {
+                session.toString()
+            } catch (e: Exception) {
+                // Log a structured message so the failure pipeline can detect infrastructure
+                // failures (container crash, display startup, IDE never appeared) separately
+                // from agent behavior failures (agent ran but didn't use MCP).
+                System.err.println("[ARENA] INFRA_FAILURE: session initialization failed")
+                System.err.println("[ARENA] INFRA_FAILURE cause: ${e.message}")
+                throw e
+            }
         }
 
         @JvmStatic

@@ -86,7 +86,7 @@ class AiAgentDriver(
             .command(listOf("bash", "/tmp/deploy-filter.sh"))
             .workingDirInContainer(null)
             .timeoutSeconds(timeoutSeconds = 60)
-            .quietly(false)
+            .description("Deploying agent output-filter")
             .runInContainer(container)
             .assertExitCode(0) {
                 "agent-output-filter deployment failed:\n$stdout\n$stderr"

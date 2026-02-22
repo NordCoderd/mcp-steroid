@@ -301,21 +301,37 @@ class DockerDriver(
         detach: Boolean = false,
         quietly: Boolean = false,
     ): ProcessResult {
-        val shellCommand = escapeShellArgs(args)
+        val request = DockerProcessRunRequest.builder()
+            .containerId(containerId)
+            .command(args)
+            .description("In container: ${args.joinToString(" ")}")
+            .timeoutSeconds(timeoutSeconds)
+            .quietly(quietly)
+            .workingDirInContainer(workingDir)
+            .extraEnv(extraEnvVars)
+            .detach(detach)
+            .build()
+        return runInContainer(request)
+    }
+
+    fun runInContainer(
+        request: DockerProcessRunRequest
+    ): ProcessResult {
+        val shellCommand = escapeShellArgs(request.command)
 
         val command = buildList {
             add("docker")
             add("exec")
-            if (detach) add("--detach")
-            (environmentVariables + extraEnvVars).forEach { (key, value) ->
+            if (request.detach) add("--detach")
+            (environmentVariables + request.extraEnvVars).forEach { (key, value) ->
                 add("-e")
                 add("$key=$value")
             }
-            if (workingDir != null) {
+            request.workingDirInContainer?.let {
                 add("-w")
-                add(workingDir)
+                add(it)
             }
-            add(containerId)
+            add(request.containerId)
             add("bash")
             add("-c")
             add(shellCommand)
@@ -323,10 +339,10 @@ class DockerDriver(
 
         return ProcessRunRequest.builder()
             .command(command)
-            .description("In container: ${args.joinToString(" ")}")
+            .description(request.description)
             .workingDir(workDir)
-            .timeoutSeconds(timeoutSeconds)
-            .quietly(quietly)
+            .timeoutSeconds(request.timeoutSeconds)
+            .quietly(request.quietly)
             .runProcess(processRunner)
     }
 
@@ -382,7 +398,3 @@ class DockerDriver(
         }
 }
 
-data class DetachedContainerProcess(
-    val name: String,
-    val logDir: String,
-)

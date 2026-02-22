@@ -5,7 +5,15 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 
 interface ContainerProcessRunner {
 
-    fun runInContainer(request: ContainerProcessRunRequest): ProcessResult = TODO("")
+    fun runInContainer(request: ContainerProcessRunRequest): ProcessResult {
+        return runInContainer(
+            request.command,
+            request.workingDirInContainer,
+            request.timeoutSeconds,
+            request.extraEnvVars,
+            request.quietly
+        )
+    }
 
     fun runInContainer(
         args: List<String>,

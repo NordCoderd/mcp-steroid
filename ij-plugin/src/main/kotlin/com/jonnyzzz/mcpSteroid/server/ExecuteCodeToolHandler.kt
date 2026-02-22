@@ -166,6 +166,31 @@ class ExecuteCodeToolHandler : McpRegistrar {
              println("NEXT_MIGRATION=V" + nextVersion)
              ```
              ```kotlin
+             // Find all usages of a class (call sites, constructor invocations)
+             // CRITICAL when adding new fields to command/DTO objects — find every call site first
+             // so you can update all constructors before running the compiler
+             import com.intellij.psi.search.searches.ReferencesSearch
+             val cmdClass = readAction {
+                 JavaPsiFacade.getInstance(project).findClass("com.example.CreateReleaseCommand", projectScope())
+             }
+             if (cmdClass != null) {
+                 ReferencesSearch.search(cmdClass, projectScope()).findAll().forEach { ref ->
+                     val file = ref.element.containingFile.virtualFile.path.substringAfterLast('/')
+                     println("${'$'}file → " + ref.element.parent.text.take(100))
+                 }
+             } else println("class not found")
+             ```
+             ```kotlin
+             // Find @Repository methods with @Query annotations (understand existing DB patterns)
+             val repo = readAction {
+                 JavaPsiFacade.getInstance(project).findClass("com.example.ReleaseRepository", projectScope())
+             }
+             repo?.methods?.forEach { m ->
+                 val q = m.annotations.firstOrNull { it.qualifiedName?.endsWith("Query") == true }
+                 if (q != null) println("@Query ${'$'}{m.name}: " + (q.findAttributeValue("value")?.text ?: ""))
+             }
+             ```
+             ```kotlin
              // Targeted file read — extract only assertions/endpoints to avoid context bloat
              val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/MyTest.java")!!)
              testContent.lines()

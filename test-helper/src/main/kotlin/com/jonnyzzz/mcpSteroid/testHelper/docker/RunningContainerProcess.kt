@@ -11,6 +11,7 @@ import kotlin.sequences.forEach
  * Use [readStdOut], [readStderr] to fetch content via `docker exec`.
  * Use [kill] to terminate the process if it is still running.
  */
+//TODO: Seemps like the [StartedProcess]
 class RunningContainerProcess(
     private val driver: ContainerDriver,
     /** Name/label for this background process */

@@ -957,6 +957,80 @@ val persistencePrefix = if (hasJakarta) "jakarta" else "javax"
 println("Use: ${persistencePrefix}.persistence.Entity")
 ```
 
+### Find All Usages of a Class (Call Sites / Constructor Invocations)
+
+**CRITICAL**: When adding a new field to a command/DTO/entity class, always find all call sites
+*before* writing any code. Missing even one call site causes a compile error.
+
+```kotlin
+import com.intellij.psi.search.searches.ReferencesSearch
+
+// Find every place that constructs or references CreateReleaseCommand
+val cmdClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.example.CreateReleaseCommand",
+        GlobalSearchScope.projectScope(project)
+    )
+}
+if (cmdClass != null) {
+    val refs = ReferencesSearch.search(cmdClass, projectScope()).findAll()
+    println("Found ${refs.size} usages:")
+    refs.forEach { ref ->
+        val file = ref.element.containingFile.virtualFile.path.substringAfterLast('/')
+        val snippet = ref.element.parent.text.take(100)
+        println("  $file → $snippet")
+    }
+} else println("Class not found")
+```
+
+### Find @Repository Methods with @Query Annotations
+
+Inspect existing DB query patterns before adding new queries:
+
+```kotlin
+val repo = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.example.ReleaseRepository",
+        GlobalSearchScope.projectScope(project)
+    )
+}
+repo?.methods?.forEach { method ->
+    val queryAnnotation = method.annotations.firstOrNull {
+        it.qualifiedName == "org.springframework.data.jpa.repository.Query" ||
+        it.qualifiedName?.endsWith(".Query") == true
+    }
+    if (queryAnnotation != null) {
+        val value = queryAnnotation.findAttributeValue("value")?.text ?: "<no value>"
+        val nativeQ = queryAnnotation.findAttributeValue("nativeQuery")?.text ?: "false"
+        println("@Query(nativeQuery=$nativeQ) ${method.name}: $value")
+    } else {
+        println("derived-query: ${method.name}")
+    }
+}
+```
+
+### Inspect JPA Entity Fields (Parent-Child Relationships)
+
+Understand existing JPA mappings before adding `@ManyToOne` / `@OneToMany` relationships:
+
+```kotlin
+val entityClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.example.Release",
+        GlobalSearchScope.projectScope(project)
+    )
+}
+entityClass?.fields?.forEach { field ->
+    val jpaAnnotations = field.annotations.filter { ann ->
+        listOf("Id", "Column", "ManyToOne", "OneToMany", "ManyToMany", "OneToOne", "JoinColumn")
+            .any { ann.qualifiedName?.endsWith(it) == true }
+    }
+    if (jpaAnnotations.isNotEmpty()) {
+        println("${field.name}: ${field.type.presentableText} → ${jpaAnnotations.map { it.qualifiedName?.substringAfterLast('.') }}")
+    }
+}
+```
+
 ### Read pom.xml / Test Files via VFS
 
 ```kotlin

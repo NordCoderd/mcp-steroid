@@ -6,16 +6,26 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequestBuilderBase
 
 open class ContainerProcessRunRequest(
     parent: ProcessRunRequestBase,
+    val detach: Boolean,
     val workingDirInContainer: String?,
     //TODO: push it up to generic process, allow removal
     val extraEnvVars: Map<String, String>,
 ) : ProcessRunRequestBase(parent) {
+
+    constructor(parent: ContainerProcessRunRequest) : this(
+        parent,
+        detach = parent.detach,
+        workingDirInContainer = parent.workingDirInContainer,
+        extraEnvVars = parent.extraEnvVars.toMap(),
+    )
+
     companion object
 }
 
 fun ContainerProcessRunRequest.Companion.builder() = ContainerProcessRunRequestBuilder()
 
 open class ContainerProcessRunRequestBuilder<R : ContainerProcessRunRequestBuilder<R>> : ProcessRunRequestBuilderBase<R>() {
+    var detach: Boolean = false
     var workingDirInContainer: String? = null
     var extraEnvVars: Map<String, String> = mutableMapOf()
 
@@ -24,8 +34,11 @@ open class ContainerProcessRunRequestBuilder<R : ContainerProcessRunRequestBuild
     open fun extraEnv(env: Map<String, String>) = apply { this.extraEnvVars = env }
     open fun extraEnv(key: String, value: String) = apply { this.extraEnvVars += key to value }
 
+    open fun detached() = detach(true)
+    open fun detach(detach: Boolean) = apply { this.detach = detach }
+
     override fun build(): ContainerProcessRunRequest {
         val parent = super.build()
-        return ContainerProcessRunRequest(parent, workingDirInContainer, extraEnvVars)
+        return ContainerProcessRunRequest(parent, detach, workingDirInContainer, extraEnvVars)
     }
 }
