@@ -49,6 +49,7 @@ class IntelliJDriver(
         writeTrustedPaths()
         writeStartupProperties()
         writeEarlyAccessRegistry()
+        writeAiPromoState()
         generateVmOptions()
 
         println("[IDE-AGENT] Starting ${ideProduct.displayName}...")
@@ -129,6 +130,14 @@ class IntelliJDriver(
             appendLine("-Dmcp.steroid.idea.description.enabled=false")
             appendLine("-Dmcp.steroid.storage.path=$steroidGuestDir")
 
+            appendLine("# Suppress AI promo window (prevents 8-minute startup deadlock in Docker)")
+            appendLine("# AIPromoWindowAdvisor fetches a remote URL on first run; in Docker this")
+            appendLine("# times out after 480s and blocks VfsData via fleet.kernel.Transactor.")
+            appendLine("-Dllm.show.ai.promotion.window.on.start=false")
+            appendLine("# Reduce network connection timeout (safety net: cuts any remaining")
+            appendLine("# timeout-based delay from ~480s down to ~15s: 5 retries x 3s).")
+            appendLine("-Didea.connection.timeout=3000")
+            appendLine()
             appendLine("# Skip EULA, consent dialogs, and onboarding")
             appendLine("-Djb.consents.confirmation.enabled=false")
             appendLine("-Djb.privacy.policy.text=<!--999.999-->")
@@ -187,8 +196,11 @@ class IntelliJDriver(
      * code path by marking onboarding as already proposed.
      */
     private fun writeStartupProperties() {
+        // "RunOnceActivity.llm.onboarding.window.launcher.v7" = "true" makes
+        // AIPromoWindowLauncher skip the promo window on first project open
+        // (checked via PropertiesComponent.getBoolean before any verdict calculation).
         val otherXml = """<application>
-  <component name="PropertyService"><![CDATA[{"keyToString":{"experimental.ui.on.first.startup":"true","experimental.ui.onboarding.proposed.version":"suppressed"}}]]></component>
+  <component name="PropertyService"><![CDATA[{"keyToString":{"experimental.ui.on.first.startup":"true","experimental.ui.onboarding.proposed.version":"suppressed","RunOnceActivity.llm.onboarding.window.launcher.v7":"true"}}]]></component>
 </application>
 """
         driver.writeFileInContainer(
@@ -214,6 +226,35 @@ class IntelliJDriver(
         driver.writeFileInContainer(
             "$configGuestDir/early-access-registry.txt",
             content,
+        )
+    }
+
+    /**
+     * Pre-write the AI promo window state to prevent AIPromoWindowAdvisor from
+     * performing a remote network call that can block VfsData initialization for up
+     * to 8 minutes in Docker containers (socket connection timeout = 480s).
+     *
+     * Root cause: AIPromoWindowAdvisorPreheat starts verdict calculation immediately
+     * after app init. In a fresh container, the verdict is UNSURE → it fetches
+     * https://frameworks.jetbrains.com/llm-config/v2/products-promo.txt which may
+     * time out. During this time, fleet.kernel.Transactor is blocked, which in turn
+     * prevents VfsData from initializing, so the main IntelliJ window never appears.
+     *
+     * Fix: Pre-write "wasShown=true" so getVerdictFromStored() returns false immediately,
+     * and "shouldShowNextTime=NO" as an additional guard.
+     */
+    private fun writeAiPromoState() {
+        val xml = """<application>
+  <component name="AIOnboardingPromoWindowAdvisor">
+    <option name="shouldShowNextTime" value="NO" />
+    <option name="wasShown" value="true" />
+    <option name="attempts" value="1" />
+  </component>
+</application>
+"""
+        driver.writeFileInContainer(
+            "$configGuestDir/options/AIOnboardingPromoWindowAdvisor.xml",
+            xml,
         )
     }
 
