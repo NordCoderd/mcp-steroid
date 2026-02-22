@@ -437,7 +437,9 @@ println("Kotlin plugin: ${plugin?.version}")
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.vfs.VfsUtil
 
-ProjectRootManager.getInstance(project).contentRoots.forEach { root ->
+// ⚠️ contentRoots accesses the project model — must be inside readAction { }
+val roots = readAction { ProjectRootManager.getInstance(project).contentRoots.toList() }
+roots.forEach { root ->
     println("Root: ${root.path}")
     VfsUtil.iterateChildrenRecursively(root, null) { file ->
         if (file.extension == "kt") println("  ${file.path}")
@@ -1263,7 +1265,9 @@ Explore the full project structure and read multiple relevant files in a single 
 import com.intellij.openapi.roots.ProjectRootManager
 
 // Step 1: Print the full file tree for src/main and src/test
-ProjectRootManager.getInstance(project).contentRoots.forEach { root ->
+// ⚠️ contentRoots accesses the project model — must be inside readAction { }
+val contentRoots = readAction { ProjectRootManager.getInstance(project).contentRoots.toList() }
+contentRoots.forEach { root ->
     VfsUtil.iterateChildrenRecursively(root, null) { file ->
         if (!file.isDirectory && (file.extension == "java" || file.extension == "kt" || file.name == "pom.xml")) {
             println(file.path.removePrefix(project.basePath!!))
@@ -1341,7 +1345,8 @@ Getting this wrong means your files are in the wrong package (tests pass locally
 import com.intellij.openapi.roots.ProjectRootManager
 
 // Step 1: List all content source roots (shows exactly where packages start)
-ProjectRootManager.getInstance(project).contentSourceRoots.forEach { root ->
+// ⚠️ contentSourceRoots accesses the project model — must be inside readAction { }
+readAction { ProjectRootManager.getInstance(project).contentSourceRoots.toList() }.forEach { root ->
     println("Source root: ${root.path}")
 }
 
@@ -1990,9 +1995,12 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.module.ModuleManager
 
-// Project root manager
-val rootManager = ProjectRootManager.getInstance(project)
-println("SDK: ${rootManager.projectSdk?.name}")
+// ⚠️ ProjectRootManager accesses the project model — must be inside readAction { }
+val (sdkName, contentRootPaths, sourceRootPaths) = readAction {
+    val rm = ProjectRootManager.getInstance(project)
+    Triple(rm.projectSdk?.name, rm.contentRoots.map { it.path }, rm.contentSourceRoots.map { it.path })
+}
+println("SDK: $sdkName")
 
 // Module manager
 val moduleManager = ModuleManager.getInstance(project)
@@ -2001,14 +2009,10 @@ moduleManager.modules.forEach { module ->
 }
 
 // Content roots
-rootManager.contentRoots.forEach { root ->
-    println("Content root: ${root.path}")
-}
+contentRootPaths.forEach { println("Content root: $it") }
 
 // Source roots
-rootManager.contentSourceRoots.forEach { src ->
-    println("Source root: ${src.path}")
-}
+sourceRootPaths.forEach { println("Source root: $it") }
 ```
 
 ### Service Access Pattern

@@ -62,7 +62,9 @@ class ExecuteCodeToolHandler : McpRegistrar {
              - waitForSmartMode() runs automatically before your script
              - Available: project, println(), printJson(), printException(), progress()
 
-             **⚠️ THREADING RULE — NEVER SKIP**: Any PSI access (JavaPsiFacade, PsiShortNamesCache, PsiManager.findFile, module roots, annotations, etc.) **MUST** be wrapped in `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately at runtime — they are not silently ignored. This is the most common first-attempt error.
+             **⚠️ THREADING RULE — NEVER SKIP**: Any PSI access (JavaPsiFacade, PsiShortNamesCache, PsiManager.findFile, `ProjectRootManager.contentSourceRoots`, module roots, annotations, etc.) **MUST** be wrapped in `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately at runtime — they are not silently ignored. **This applies to ALL PSI calls including your very first exploration call** (e.g. listing source roots). This is the most common first-attempt error.
+
+             **⚠️ Do NOT install plugins or modify IDE internals via reflection**: This environment is pre-configured. If `required_plugins` fails, report the missing plugin ID — do NOT attempt `PluginsAdvertiser`, `PluginInstaller`, `PluginManagerCore` write APIs, or any reflection-based installation. These throw `IllegalArgumentException` / `IllegalAccessError` at runtime and waste a turn.
 
              **⚠️ writeAction { } is NOT a coroutine scope**: Calling `readAction { }` or ANY suspend function inside `writeAction { }` throws `suspension functions can only be called within coroutine body`. ALWAYS read first (outside), then write (inside):
              ```kotlin
@@ -74,6 +76,18 @@ class ExecuteCodeToolHandler : McpRegistrar {
              LocalFileSystem.getInstance().refresh(false)     // ensures git diff sees the changes
              ```
              Or use `edtWriteAction { }` (a suspend wrapper) if you need suspend calls inside the write block.
+
+             **⚠️ ALL VFS mutation ops need writeAction — not just saveText**: `createDirectoryIfMissing()`, `createChildData()`, `createChildFile()`, `createChildDirectory()`, `delete()`, `rename()`, `move()`, and `saveText()` ALL require writeAction. Calling any of these OUTSIDE a writeAction throws `Write access is allowed inside write-action only` at runtime. Always put the ENTIRE create-directory-and-write sequence inside a SINGLE writeAction block:
+             ```kotlin
+             writeAction {
+                 val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+                 val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example/model")  // ← needs writeAction
+                 val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")   // ← needs writeAction
+                 VfsUtil.saveText(f, content)                                                          // ← needs writeAction
+             }
+             // ✗ WRONG: val dir = VfsUtil.createDirectoryIfMissing(...) OUTSIDE writeAction, then writeAction { saveText }
+             // ↑ This throws "Write access is allowed inside write-action only" on the createDirectoryIfMissing call
+             ```
 
              **⚡ First-call readiness probe (verify IDE + MCP connectivity before heavy ops):**
              ```kotlin
@@ -87,6 +101,22 @@ class ExecuteCodeToolHandler : McpRegistrar {
              ```kotlin
              val text = VfsUtil.loadText(findProjectFile("src/main/resources/application.properties")!!)
              println(text)
+             ```
+
+             **Read multiple files in one call — PREFERRED over separate calls (saves ~20s per call):**
+             ```kotlin
+             // Batch exploration: replace 5-8 sequential steroid_execute_code calls with 1
+             // Read pom.xml + key source files + failing test in a single call
+             for (path in listOf(
+                 "pom.xml",
+                 "src/main/java/com/example/domain/CommentService.java",
+                 "src/main/java/com/example/domain/CommentRepository.java",
+                 "src/test/java/com/example/api/CommentControllerTest.java"
+             )) {
+                 val vf = findProjectFile(path) ?: run { println("NOT FOUND: ${'$'}path"); continue }
+                 println("\n=== ${'$'}path ===")
+                 println(VfsUtil.loadText(vf))
+             }
              ```
 
              **Create/write a Java or Kotlin source file:**
@@ -111,6 +141,8 @@ class ExecuteCodeToolHandler : McpRegistrar {
              ```
 
              **⚠️ Import-in-strings pitfall**: Never put `import foo.Bar;` at the start of a line inside a triple-quoted Kotlin string. The script preprocessor extracts those lines as Kotlin imports, causing compile errors. Use `"import" + " foo.Bar;"` or `joinToString` to build the content, or use `java.io.File(path).writeText(content)` as an alternative.
+
+             **⚠️ Char-literal pitfall in string-assembled Java**: When building Java source via Kotlin `joinToString()`, char literals like `'\''` cause escaping errors — the Kotlin string `"'\\''"` produces Java text `'\''` which is a Java syntax error (empty char literal). For `toString()` methods or any code with char literals, use triple-quoted Kotlin strings with `java.io.File.writeText()` (not affected by the import extractor), or use `PsiFileFactory.createFileFromText()` for complex Java bodies — it handles all escaping automatically. After writing, verify with `check(VfsUtil.loadText(f).contains("class Product")) { "Write failed" }`.
 
              **Find a file by name (PREFERRED over ProcessBuilder("find") or shell):**
              ```kotlin
@@ -161,8 +193,9 @@ class ExecuteCodeToolHandler : McpRegistrar {
              ```kotlin
              // ⚠️ ALWAYS verify package structure BEFORE creating new files (do NOT guess from directory names)
              // Step 1: List all content source roots to understand the module layout
+             // ⚠️ contentSourceRoots accesses the project model — MUST be inside readAction { }
              import com.intellij.openapi.roots.ProjectRootManager
-             ProjectRootManager.getInstance(project).contentSourceRoots.forEach { println(it.path) }
+             readAction { ProjectRootManager.getInstance(project).contentSourceRoots }.forEach { println(it.path) }
              // Step 2: Check if the target package actually exists in the project model
              val pkg = readAction { JavaPsiFacade.getInstance(project).findPackage("shop.api.core") }
              println("shop.api.core exists: ${'$'}{pkg != null}")
@@ -242,11 +275,13 @@ class ExecuteCodeToolHandler : McpRegistrar {
              println(if (existing == null) "NOT_FOUND: safe to create" else "EXISTS: " + existing.containingFile.virtualFile.path)
              ```
              ```kotlin
-             // Discover existing class naming conventions before creating new classes
-             // (avoids naming mismatches like EventType vs NotificationEventType)
+             // Discover existing class naming conventions BEFORE creating new classes
+             // (avoids naming mismatches like CreateCommentPayload vs AddReplyPayload vs CreateReplyPayload)
+             // Always do this FIRST when the test doesn't import the payload class directly.
              import com.intellij.psi.search.PsiShortNamesCache
              val allNames = readAction { PsiShortNamesCache.getInstance(project).allClassNames.toList() }
-             allNames.filter { it.endsWith("Status") || it.endsWith("Type") || it.endsWith("Dto") || it.endsWith("Service") }
+             allNames.filter { it.endsWith("Payload") || it.endsWith("Request") || it.endsWith("Dto") ||
+                 it.endsWith("Status") || it.endsWith("Type") || it.endsWith("Service") }
                  .sorted().forEach { println(it) }
              ```
              ```kotlin
