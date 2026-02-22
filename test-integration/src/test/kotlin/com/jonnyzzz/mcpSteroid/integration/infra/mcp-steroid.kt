@@ -468,15 +468,19 @@ if (configured == null) {
         val code = """
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.ide.projectView.ProjectView
 import com.intellij.openapi.application.EDT
 import kotlinx.coroutines.withContext
 
 // 1. Open README.md (or fallback to first .java/.kt source file)
+// Use refreshAndFindFileByPath so VFS content is loaded from disk —
+// git clone happened outside IntelliJ's file watcher, so findFileByPath
+// may return a VirtualFile whose content cache is empty (black editor).
 val basePath = project.basePath ?: ""
 val readmePath = "${'$'}basePath/README.md"
-val readmeFile = LocalFileSystem.getInstance().findFileByPath(readmePath)
+val readmeFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(readmePath)
 val fileToOpen = if (readmeFile != null && readmeFile.exists()) {
     readmeFile
 } else {
@@ -485,7 +489,7 @@ val fileToOpen = if (readmeFile != null && readmeFile.exists()) {
         .filter { it.isFile && (it.extension == "java" || it.extension == "kt") }
         .firstOrNull()
     if (sourceFile != null) {
-        LocalFileSystem.getInstance().findFileByPath(sourceFile.absolutePath)
+        LocalFileSystem.getInstance().refreshAndFindFileByPath(sourceFile.absolutePath)
     } else {
         null
     }
