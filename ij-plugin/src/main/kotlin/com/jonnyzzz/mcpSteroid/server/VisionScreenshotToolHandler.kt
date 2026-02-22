@@ -86,7 +86,7 @@ class VisionScreenshotToolHandler : McpRegistrar {
 
         val builder = ToolCallResult.builder().setExecutionId(executionId)
         suspend fun log(message: String) {
-            val text = "LOG: $message"
+            val text = message
             builder.addTextContent(text)
             context.mcpProgressReporter.report(text)
             project.executionStorage.appendExecutionEvent(executionId, text)
