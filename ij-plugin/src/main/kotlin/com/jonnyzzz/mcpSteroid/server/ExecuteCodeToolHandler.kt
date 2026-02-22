@@ -147,6 +147,34 @@ class ExecuteCodeToolHandler : McpRegistrar {
              }
              println(if (existing == null) "NOT_FOUND: safe to create" else "EXISTS: " + existing.containingFile.virtualFile.path)
              ```
+             ```kotlin
+             // Discover existing class naming conventions before creating new classes
+             // (avoids naming mismatches like EventType vs NotificationEventType)
+             import com.intellij.psi.search.PsiShortNamesCache
+             val allNames = readAction { PsiShortNamesCache.getInstance(project).allClassNames.toList() }
+             allNames.filter { it.endsWith("Status") || it.endsWith("Type") || it.endsWith("Dto") || it.endsWith("Service") }
+                 .sorted().forEach { println(it) }
+             ```
+             ```kotlin
+             // Find next Flyway migration version number (avoids V5__ collision if V5__ already exists)
+             val migDir = findProjectFile("src/main/resources/db/migration")!!
+             val nextVersion = readAction {
+                 migDir.children.map { it.name }
+                     .mapNotNull { Regex("V(\\d+)__").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+                     .maxOrNull()?.plus(1) ?: 1
+             }
+             println("NEXT_MIGRATION=V" + nextVersion)
+             ```
+             ```kotlin
+             // Targeted file read — extract only assertions/endpoints to avoid context bloat
+             val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/MyTest.java")!!)
+             testContent.lines()
+                 .filter { it.contains("assert") || it.contains("/api/") || it.contains("@Test") }
+                 .forEach { println(it) }
+             ```
+
+             **Verification gate**: Run FAIL_TO_PASS tests before marking work complete.
+             `./mvnw test -Dtest=ClassName -Dspotless.check.skip=true` — compile success alone is NOT sufficient.
 
              **Common Operations:**
              - Code navigation: Find usages, go to definition, symbol search

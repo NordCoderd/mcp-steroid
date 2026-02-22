@@ -13,15 +13,20 @@ interface ContainerProcessRunner {
         timeoutSeconds: Long = 30,
         extraEnvVars: Map<String, String> = emptyMap(),
         quietly: Boolean = false,
-    ): ProcessResult = runInContainer(
+    ): ProcessResult =
         ContainerProcessRunRequest
             .builder()
             .command(args)
             .workingDirInContainer(workingDir)
             .timeoutSeconds(timeoutSeconds)
             .quietly(quietly)
-            .build()
-    )
+            .runInContainer(this)
 
     fun withSecretPattern(secretPattern: String): ContainerProcessRunner
 }
+
+
+fun ContainerProcessRunRequest.runInContainer(container: ContainerProcessRunner) = container.runInContainer(this)
+fun <R : ContainerProcessRunRequestBuilder<R>> ContainerProcessRunRequestBuilder<R>.runInContainer(container: ContainerProcessRunner) =
+    build().runInContainer(container)
+

@@ -6,7 +6,10 @@ import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
+import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
+import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainer
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -142,9 +145,13 @@ class ConsolePumpingContainerDriver(
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 
-            val result = delegate.runInContainer(
-                listOf("bash", teeScript), workingDir, timeoutSeconds, extraEnvVars, quietly = true,
-            )
+            val result = ContainerProcessRunRequest
+                .builder()
+                .command("bash", teeScript)
+                .workingDirInContainer(workingDir)
+                .timeoutSeconds(timeoutSeconds)
+                .quietly()
+                .runInContainer(delegate)
 
             // Print filtered output to JVM test-runner console (volume-mounted, accessible on host)
             if (hostFilteredLog.exists()) {
@@ -190,7 +197,14 @@ class ConsolePumpingContainerDriver(
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 
-            return delegate.runInContainer(listOf("bash", teeScript), workingDir, timeoutSeconds, extraEnvVars, quietly = false)
+            return ContainerProcessRunRequest
+                .builder()
+                .command("bash", teeScript)
+                .workingDirInContainer(workingDir)
+                .timeoutSeconds(timeoutSeconds)
+                .extraEnv(extraEnvVars)
+                .quietly(false)
+                .runInContainer(delegate)
         } finally {
             Thread.sleep(500)
             pump.stop()

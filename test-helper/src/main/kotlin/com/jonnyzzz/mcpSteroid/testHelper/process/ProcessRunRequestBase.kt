@@ -31,7 +31,7 @@ open class ProcessRunRequestBuilderBase<R : ProcessRunRequestBuilderBase<R>> {
     protected var quietly: Boolean = false
     protected var stdin: InputStream = ByteArrayInputStream(ByteArray(0))
 
-    protected fun apply(action: R.() -> Unit): R {
+    protected inline fun apply(action: R.() -> Unit): R {
         @Suppress("UNCHECKED_CAST")
         val r = this as R
         action(r)

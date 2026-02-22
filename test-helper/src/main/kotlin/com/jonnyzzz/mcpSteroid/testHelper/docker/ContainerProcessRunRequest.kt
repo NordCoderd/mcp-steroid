@@ -7,7 +7,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequestBuilderBase
 open class ContainerProcessRunRequest(
     parent: ProcessRunRequestBase,
     val workingDirInContainer: String?,
-
     //TODO: push it up to generic process, allow removal
     val extraEnvVars: Map<String, String>,
 ) : ProcessRunRequestBase(parent) {

@@ -969,6 +969,84 @@ val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/Pr
 println(testContent)
 ```
 
+### Targeted File Read (Minimal Context — Avoid Context Bloat)
+
+Instead of printing the full file, filter for the lines you need:
+
+```kotlin
+// Extract only test assertions and endpoint URLs from a large test file
+val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/MyIntegrationTest.java")!!)
+testContent.lines()
+    .filter { it.contains("assert") || it.contains("/api/") || it.contains("@Test") || it.trim().startsWith("//") }
+    .forEach { println(it) }
+```
+
+This is much cheaper than reading the full file when you only need to know what a test asserts.
+
+### Discover Existing Class Naming Conventions
+
+Before creating a new class, check what naming patterns already exist in the project to avoid mismatches (e.g., `EventType` vs `NotificationEventType`):
+
+```kotlin
+import com.intellij.psi.search.PsiShortNamesCache
+
+val allNames = readAction { PsiShortNamesCache.getInstance(project).allClassNames.toList() }
+// Print domain model names to understand naming conventions
+allNames.filter { name ->
+    name.endsWith("Status") || name.endsWith("Type") || name.endsWith("Dto") ||
+    name.endsWith("Entity") || name.endsWith("Service") || name.endsWith("Repository")
+}.sorted().forEach { println(it) }
+```
+
+### Find Next Flyway Migration Version Number
+
+Avoid creating a migration with a version number that already exists:
+
+```kotlin
+val migDir = findProjectFile("src/main/resources/db/migration")!!
+val nextVersion = readAction {
+    migDir.children.map { it.name }
+        .mapNotNull { Regex("""V(\d+)__""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+        .maxOrNull()?.plus(1) ?: 1
+}
+println("Existing migrations:")
+readAction { migDir.children.map { it.name }.sorted() }.forEach { println("  $it") }
+println("Next version: V$nextVersion")
+```
+
+### Batch Project Exploration (One Script Instead of Many Calls)
+
+Explore the full project structure and read multiple relevant files in a single execution — avoid making 5+ separate calls to understand the codebase:
+
+```kotlin
+import com.intellij.openapi.roots.ProjectRootManager
+
+// Step 1: Print the full file tree for src/main and src/test
+ProjectRootManager.getInstance(project).contentRoots.forEach { root ->
+    VfsUtil.iterateChildrenRecursively(root, null) { file ->
+        if (!file.isDirectory && (file.extension == "java" || file.extension == "kt" || file.name == "pom.xml")) {
+            println(file.path.removePrefix(project.basePath!!))
+        }
+        true
+    }
+}
+```
+
+```kotlin
+// Step 2: Read multiple files in a single script (batch instead of per-file calls)
+val filesToRead = listOf(
+    "src/main/java/com/example/domain/FeatureService.java",
+    "src/main/java/com/example/api/controllers/FeatureController.java",
+    "src/main/java/com/example/domain/models/Feature.java",
+    "pom.xml"
+)
+for (path in filesToRead) {
+    val vf = findProjectFile(path) ?: run { println("NOT FOUND: $path"); continue }
+    println("\n=== $path ===")
+    println(VfsUtil.loadText(vf))
+}
+```
+
 ### Trigger Maven Re-import After pom.xml Changes
 
 ```kotlin

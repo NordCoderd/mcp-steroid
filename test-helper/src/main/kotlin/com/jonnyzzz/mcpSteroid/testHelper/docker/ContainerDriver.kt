@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import java.io.File
 
 /**
@@ -17,8 +18,6 @@ interface ContainerDriver : ContainerProcessRunner {
     fun withGuestWorkDir(guestWorkDir: String): ContainerDriver
     override fun withSecretPattern(secretPattern: String): ContainerDriver
     fun withEnv(key: String, value: String): ContainerDriver
-
-    fun mkdirs(guestPath: String) = runInContainer(listOf("mkdir", "-p", guestPath))
 
     fun runInContainerDetached(
         args: List<String>,
@@ -46,3 +45,11 @@ interface ContainerDriver : ContainerProcessRunner {
     companion object
 }
 
+fun ContainerDriver.mkdirs(guestPath: String): ProcessResult {
+    emptyMap<String, String>()
+    return ContainerProcessRunRequest
+        .builder()
+        .command("mkdir", "-p", guestPath)
+        .quietly()
+        .runInContainer(this)
+}

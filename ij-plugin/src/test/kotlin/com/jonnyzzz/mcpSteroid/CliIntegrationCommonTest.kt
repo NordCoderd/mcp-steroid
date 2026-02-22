@@ -9,6 +9,9 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
+import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
+import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerSession
 import kotlin.time.Duration.Companion.seconds
 
@@ -28,22 +31,26 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
     fun testHostAvailability(): Unit = timeoutRunBlocking(180.seconds) {
         val session = llmSession()
 
-        session.runInContainer(
-            listOf(
-            "curl",
-            "-v", "-X", "POST",
-            "-H", "Content-Type: application/json",
-            "-H", "Accept: application/json",
-            "-d",
-            """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
-            resolveDockerUrl()
+        ContainerProcessRunRequest
+            .builder()
+            .command(
+                "curl",
+                "-v", "-X", "POST",
+                "-H", "Content-Type: application/json",
+                "-H", "Accept: application/json",
+                "-d",
+                """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
+                resolveDockerUrl()
             )
-        )
+            .timeoutSeconds(30)
+            .quietly(false)
+            .runInContainer(session)
             .assertExitCode(0, "curl to MCP")
             .assertNoErrorsInOutput("curl to MCP")
             .assertOutputContains(
                 "jsonrpc",
                 "\"protocolVersion\":\"2025-11-25\"",
-                message = "curl to MCP")
+                message = "curl to MCP"
+            )
     }
 }
