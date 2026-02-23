@@ -1187,6 +1187,67 @@ if (cmdClass != null) {
 } else println("Class not found")
 ```
 
+### Add a Component to a Java Record via PSI (Whitespace-Safe)
+
+**Use this instead of `content.replace()`** when adding fields to Java `record` classes.
+PSI insertion is atomic and whitespace-independent — no excerpt-first ritual, no failed-replace retries.
+
+**WORKFLOW**: When adding a parameter to a command or DTO record:
+1. First, use `ReferencesSearch.search()` (below) to find ALL constructor call sites.
+2. Then add the record component via PSI.
+3. Then update each call site.
+
+```kotlin
+import com.intellij.psi.PsiJavaFile
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.openapi.command.writeCommandAction
+
+// Step 1: Find all call sites BEFORE modifying the record
+val cmdClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.example.CreateReleaseCommand",   // ← actual FQN
+        GlobalSearchScope.projectScope(project)
+    )
+}
+if (cmdClass != null) {
+    val refs = readAction { ReferencesSearch.search(cmdClass, projectScope()).findAll() }
+    println("Call sites to update (${refs.size}):")
+    refs.forEach { ref ->
+        println("  ${ref.element.containingFile.virtualFile.path.substringAfterLast('/')} → " +
+            ref.element.parent.text.take(120))
+    }
+}
+// ↑ Read this output, then update each call site — then proceed to add the record component below
+
+// Step 2: Add the record component via PSI (whitespace-safe)
+val vf = readAction {
+    FilenameIndex.getVirtualFilesByName("Commands.java", GlobalSearchScope.projectScope(project)).first()
+}
+val psiFile = readAction { PsiManager.getInstance(project).findFile(vf) as? PsiJavaFile }
+val record = readAction { psiFile?.classes?.firstOrNull { it.name == "CreateReleaseCommand" } }
+if (record != null) {
+    val factory = JavaPsiFacade.getElementFactory(project)
+    // Create as a field — IntelliJ represents record components as fields
+    val newComponent = readAction { factory.createFieldFromText("String parentCode;", record) }
+    writeCommandAction(project) {
+        // Insert AFTER the last existing component (or use addBefore to prepend)
+        val lastComponent = record.recordComponents.lastOrNull()
+        if (lastComponent != null) {
+            record.addAfter(newComponent, lastComponent)
+        } else {
+            record.add(newComponent)
+        }
+    }
+    println("Record component added successfully")
+    // Verify: list all components now
+    println("Components now: " + readAction { record.recordComponents.map { it.name } })
+} else println("Record class not found")
+```
+
+> **Rule**: If adding a parameter to a command/DTO record, ALWAYS use `ReferencesSearch.search()` FIRST
+> to enumerate ALL constructor call sites — then update each. Never manually guess which files use a
+> shared command/DTO class. This is the single most time-saving PSI operation for Spring Boot refactoring.
+
 ### Find @Repository Methods with @Query Annotations
 
 Inspect existing DB query patterns before adding new queries:
@@ -1245,6 +1306,54 @@ for (path in listOf(
     if (problems.isEmpty()) println("OK: $path")
     else problems.forEach { (id, d) -> d.forEach { println("[$id] $path: ${it.descriptionTemplate}") } }
 }
+```
+
+### Verify @ControllerAdvice / @ExceptionHandler Before Writing Controllers
+
+**CRITICAL for controllers that throw custom exceptions** (e.g. `ResourceNotFoundException`): if no `@ControllerAdvice` handles the exception, the API returns HTTP 500 instead of 404, failing tests like `shouldReturnNotFoundForNonExistentNotification`. Always verify this BEFORE finalising a new controller.
+
+```kotlin
+// Find all @ControllerAdvice/@RestControllerAdvice classes and the exceptions they handle
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.searches.AnnotatedElementsSearch
+
+val scope = GlobalSearchScope.projectScope(project)
+
+// Step 1: Locate the advice annotation class (handles both @ControllerAdvice and @RestControllerAdvice)
+val adviceAnnotation = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "org.springframework.web.bind.annotation.RestControllerAdvice", allScope()
+    ) ?: JavaPsiFacade.getInstance(project).findClass(
+        "org.springframework.web.bind.annotation.ControllerAdvice", allScope()
+    )
+}
+
+if (adviceAnnotation == null) {
+    println("ERROR: Spring Web not found on classpath — check pom.xml")
+} else {
+    val adviceClasses = AnnotatedElementsSearch.searchPsiClasses(adviceAnnotation, scope).findAll().toList()
+    if (adviceClasses.isEmpty()) {
+        println("WARNING: No @ControllerAdvice/@RestControllerAdvice found in project.")
+        println("Controllers throwing custom exceptions will return HTTP 500. Create a @RestControllerAdvice.")
+    } else {
+        adviceClasses.forEach { cls ->
+            println("Found advice: ${cls.qualifiedName}")
+            readAction {
+                cls.methods.forEach { m ->
+                    val handler = m.annotations.firstOrNull { it.qualifiedName?.endsWith("ExceptionHandler") == true }
+                    if (handler != null) {
+                        val exTypes = handler.findAttributeValue("value")?.text ?: "(all)"
+                        val status = m.annotations.firstOrNull { it.qualifiedName?.endsWith("ResponseStatus") == true }
+                            ?.findAttributeValue("code")?.text ?: "?"
+                        println("  ${m.name} handles: $exTypes → HTTP $status")
+                    }
+                }
+            }
+        }
+    }
+}
+// If the output shows no handler for your exception type → add @ExceptionHandler to existing advice,
+// or create a new @RestControllerAdvice class before writing the controller.
 ```
 
 ### Inspect JPA Entity Fields (Parent-Child Relationships)
@@ -1747,20 +1856,56 @@ if (psiClass != null) {
 
 ```kotlin
 import org.jetbrains.idea.maven.project.MavenProjectsManager
-import org.jetbrains.idea.maven.project.MavenSyncSpec
+import org.jetbrains.idea.maven.buildtool.MavenSyncSpec  // ← correct package for IU-253+; NOT .project.MavenSyncSpec
 import com.intellij.platform.backend.observation.Observation
 
 // After editing pom.xml: schedule sync AND AWAIT it with Observation.awaitConfiguration()
 // This is the production-grade API used in Android Studio — avoids 600s modal timeouts.
 val manager = MavenProjectsManager.getInstance(project)
-manager.scheduleUpdateAllMavenProjects(MavenSyncSpec.incremental("post-pom-edit sync"))
+manager.scheduleUpdateAllMavenProjects(MavenSyncSpec.full("post-pom-edit", false))
 Observation.awaitConfiguration(project)   // suspends until Maven sync + indexing fully complete
 println("Maven sync and indexing complete — safe to run tests now")
+// ⚠️ If MavenSyncSpec cannot be resolved, fall back to:
+//   ProcessBuilder("./mvnw", "dependency:resolve").directory(java.io.File(project.basePath!!)).start().waitFor()
 ```
 
 > **`Observation.awaitConfiguration()`** is the canonical way to await any background IDE activity
 > (Maven sync, Gradle import, indexing). It is suspend-compatible and handles cancellation.
 > This replaces ad-hoc polling loops or `waitForSmartMode()` after build-file changes.
+
+### Editing Existing Files via VFS (PREFERRED over native Edit tool)
+
+**Use `VfsUtil.loadText` + `VfsUtil.saveText` for editing existing files** when IDE change notification matters (e.g., pom.xml edits that trigger Maven auto-import, or any file that the IDE needs to re-parse). The native `Edit` tool writes directly to disk, bypassing IntelliJ's VFS layer — Maven auto-import may not trigger.
+
+```kotlin
+// ✓ PREFERRED: Edit existing file via VFS — triggers IDE change notification
+val vf = findProjectFile("pom.xml")!!
+val content = VfsUtil.loadText(vf)             // read OUTSIDE writeAction
+// Print the target slice first to verify exact whitespace/content before replacing:
+val idx = content.indexOf("</dependencies>")
+println("Target slice:\n" + content.substring(maxOf(0, idx - 100), minOf(content.length, idx + 50)))
+val newDeps = """
+    <dependency>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-data-jpa</artifactId>
+    </dependency>
+    <dependency>
+        <groupId>com.h2database</groupId>
+        <artifactId>h2</artifactId>
+        <scope>test</scope>
+    </dependency>
+""".trimIndent()
+val updated = content.replace("</dependencies>", "$newDeps\n</dependencies>")
+check(updated != content) { "pom.xml replace matched nothing — check exact whitespace" }
+writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction — triggers VFS notification
+println("pom.xml updated — IDE change notification fired")
+// Then trigger Maven sync (see above)
+```
+
+> **Why VFS over native Edit?**
+> - VFS write → IntelliJ detects the change → Maven auto-import triggers automatically
+> - Native `Edit` tool → writes to disk directly → IntelliJ may miss the change → Maven sync needed manually
+> - After VFS write of pom.xml, still run `MavenSyncSpec.full(...)` + `Observation.awaitConfiguration()` to be safe
 
 ### Read Maven Project Model (Dependencies, Effective POM)
 
@@ -1820,6 +1965,68 @@ runner is equivalent to clicking the green ▶ button next to a test class or me
 > ⚠️ **CRITICAL**: `JUnitConfiguration` (from `com.intellij.execution.junit`) is for **standalone
 > JUnit tests** that do NOT need Maven/Gradle. For Maven or Gradle projects use the APIs below —
 > otherwise dependencies won't be resolved and the test will fail to compile.
+
+### Completion Rule: Separate Code Correctness from Environment Availability
+
+Do not collapse everything into one "test failed" bucket. Track two independent axes:
+
+1. **Code correctness** - inspections/build checks on changed files
+2. **Environment availability** - whether runtime infra (Docker/Testcontainers, etc.) is available
+
+A fix is complete when code is correct and either:
+- target tests pass, or
+- target and baseline tests fail with the same infrastructure signature
+
+```kotlin
+import java.io.File
+import java.util.concurrent.TimeUnit
+
+data class TestOutcome(
+    val name: String,
+    val exitCode: Int?,
+    val timedOut: Boolean,
+    val lines: List<String>,
+) {
+    val passed: Boolean get() = !timedOut && exitCode == 0
+    val dockerUnavailable: Boolean
+        get() = lines.any { "Could not find a valid Docker environment" in it }
+}
+
+fun runMavenTest(testClass: String, timeoutSec: Long = 180): TestOutcome {
+    val process = ProcessBuilder("./mvnw", "test", "-Dtest=$testClass", "-q")
+        .directory(File(project.basePath!!))
+        .redirectErrorStream(true)
+        .start()
+    val lines = process.inputStream.bufferedReader().readLines()
+    val finished = process.waitFor(timeoutSec, TimeUnit.SECONDS)
+    return if (finished) {
+        TestOutcome(testClass, process.exitValue(), timedOut = false, lines = lines)
+    } else {
+        process.destroyForcibly()
+        TestOutcome(testClass, exitCode = null, timedOut = true, lines = lines)
+    }
+}
+
+val changedPaths = listOf(
+    "src/main/java/com/example/api/MyController.java",
+    "src/main/java/com/example/service/MyService.java",
+)
+val inspectionFailures = mutableListOf<String>()
+for (path in changedPaths) {
+    val vf = findProjectFile(path) ?: continue
+    val problems = runInspectionsDirectly(vf)
+    if (problems.isNotEmpty()) inspectionFailures += path
+}
+val codeReady = inspectionFailures.isEmpty()
+
+val target = runMavenTest("com.example.api.MyFeatureIntegrationTest")
+val baseline = runMavenTest("com.example.api.ExistingIntegrationBaselineTest")
+val infraBlocked = target.dockerUnavailable && baseline.dockerUnavailable
+
+val complete = codeReady && (target.passed || infraBlocked)
+println("CODE_READY=$codeReady TARGET_PASSED=${target.passed} INFRA_BLOCKED=$infraBlocked")
+println("VERIFICATION_DECISION=${if (complete) "COMPLETE" else "INCOMPLETE"}")
+```
 
 #### Maven projects — `MavenRunConfigurationType.runConfiguration()`
 
@@ -2018,6 +2225,12 @@ println(lines.takeLast(30).joinToString("\n"))
 > token overflow errors that require multi-step Bash parsing to recover from. Always run individually:
 > `-Dtest=SingleTestClass` not `-Dtest=Test1,Test2,Test3,Test4`.
 
+> **⚠️ After FAIL_TO_PASS tests pass: run the FULL test class for regression check**.
+> Using method-level filtering (`-Dtest=ClassName#method1+method2`) runs only the new tests —
+> pre-existing tests updated by the test patch are not exercised and can silently regress.
+> Always run class-level: `-Dtest=UserRestControllerTests` (no `#method` suffix) to exercise
+> all methods and confirm no regressions before outputting `ARENA_FIX_APPLIED: yes`.
+
 > **⚠️ When take/takeLast is not enough** (output still exceeds limit after first+last 30 lines):
 > Use keyword filtering to extract only signal lines from verbose Spring Boot / Testcontainers output:
 
@@ -2193,6 +2406,46 @@ println("Docker available: $dockerOk")
 ```
 
 > **When to stop investigating Docker failures**: If `./mvnw test` fails with `Could not find a valid Docker environment` AND an existing test (pre-patch) fails with the same error, the environment lacks Docker. This is an **infrastructure constraint, not a code defect**. Do NOT investigate further — use `runInspectionsDirectly` as your final verification and declare your fix complete.
+
+### Baseline-vs-Target Infrastructure Probe (Deterministic)
+
+Before declaring "environment blocked", run one **baseline** integration test and one **target**
+integration test, then compare signatures. Same infra signature in both means the blocker is
+environmental, not patch-specific.
+
+```kotlin
+import java.io.File
+
+fun runSingleMavenTest(testClass: String): List<String> {
+    val process = ProcessBuilder("./mvnw", "test", "-Dtest=$testClass", "-q")
+        .directory(File(project.basePath!!))
+        .redirectErrorStream(true)
+        .start()
+    val lines = process.inputStream.bufferedReader().readLines()
+    process.waitFor()
+    return lines
+}
+
+fun hasDockerInfraSignature(lines: List<String>): Boolean =
+    lines.any { "Could not find a valid Docker environment" in it }
+
+val baselineLines = runSingleMavenTest("com.example.ExistingIntegrationTest")
+val targetLines = runSingleMavenTest("com.example.NewBehaviorIntegrationTest")
+
+val baselineInfraBlocked = hasDockerInfraSignature(baselineLines)
+val targetInfraBlocked = hasDockerInfraSignature(targetLines)
+
+println("BASELINE_INFRA_BLOCKED=$baselineInfraBlocked")
+println("TARGET_INFRA_BLOCKED=$targetInfraBlocked")
+
+if (baselineInfraBlocked && targetInfraBlocked) {
+    println("ENVIRONMENT_STATUS=BLOCKED")
+    println("NEXT_STEP=Use inspections/build checks and finalize based on code correctness")
+} else {
+    println("ENVIRONMENT_STATUS=AVAILABLE_OR_DIFFERENT_FAILURE")
+    println("NEXT_STEP=Treat target failure as code/test issue and continue debugging")
+}
+```
 
 ### Run a Specific JUnit Test Class via IntelliJ Runner (non-Maven/Gradle only)
 
@@ -2718,7 +2971,17 @@ val psiFile = readAction {
 
 The IDE has indexed everything - use it!
 
-### 5. Use Meaningful task_id
+### 5. Use ONE Consistent task_id for the Entire Task
+
+**Use the SAME `task_id` from your first call to your last.** Do NOT change `task_id` mid-task.
+
+Changing `task_id` resets the MCP server's per-task feedback history and causes you to lose
+context of what you've already done. After changing `task_id`, agents frequently re-read all
+the same files already in their conversation history — wasting ~20s per redundant call.
+
+**After discovering Docker is unavailable, a compile error, or any other constraint:**
+continue with the SAME `task_id` and adapt your strategy (e.g., switch to `runInspectionsDirectly`
+for compile verification). Do NOT restart exploration from scratch under a new `task_id`.
 
 Group related executions with the same `task_id`.
 
@@ -2781,6 +3044,40 @@ More reliable than daemon-based analysis (works even when IDE window is not focu
 ### 10. Never Use runBlocking
 
 You're already in a coroutine context!
+
+### 11. Verified Existing Implementation Is a Successful Outcome
+
+If required behavior is already present, you still need explicit verification and explicit final
+status output. "No code changes" is valid only after verification, not by assumption.
+
+```kotlin
+val requiredPaths = listOf(
+    "src/main/java/com/example/api/MyController.java",
+    "src/main/java/com/example/service/MyService.java",
+    "src/test/java/com/example/api/MyControllerTest.java",
+)
+
+val missing = requiredPaths.filter { findProjectFile(it) == null }
+if (missing.isNotEmpty()) {
+    println("FINAL_STATUS=INCOMPLETE")
+    println("MISSING_FILES=${missing.joinToString()}")
+} else {
+    val filesWithProblems = mutableListOf<String>()
+    for (path in requiredPaths) {
+        val vf = findProjectFile(path) ?: continue
+        val problems = runInspectionsDirectly(vf)
+        if (problems.isNotEmpty()) filesWithProblems += path
+    }
+
+    if (filesWithProblems.isEmpty()) {
+        println("FINAL_STATUS=COMPLETE")
+        println("FINAL_REASON=Verified existing implementation; no edits required")
+    } else {
+        println("FINAL_STATUS=INCOMPLETE")
+        println("FILES_WITH_PROBLEMS=${filesWithProblems.joinToString()}")
+    }
+}
+```
 
 ---
 
