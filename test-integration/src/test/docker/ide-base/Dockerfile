@@ -83,8 +83,10 @@ RUN npm install -g @anthropic-ai/claude-code
 RUN npm install -g @openai/codex
 RUN npm install -g @google/gemini-cli
 
-# Create non-root user and add to docker group (required for Docker socket access)
-RUN useradd -m -s /bin/bash agent && \
+# Create docker group (docker-ce-cli doesn't create it; only the full daemon does)
+# and add non-root user to it so the agent can reach the mounted Docker socket.
+RUN groupadd docker && \
+    useradd -m -s /bin/bash agent && \
     usermod -aG docker agent && \
     mkdir -p /home/agent/.local/bin && \
     mkdir -p /home/agent/.codex && \
