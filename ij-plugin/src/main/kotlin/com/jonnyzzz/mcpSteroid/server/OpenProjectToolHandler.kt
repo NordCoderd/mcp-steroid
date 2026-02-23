@@ -41,8 +41,7 @@ class OpenProjectToolHandler : McpRegistrar {
     private val toolDescription = """
         Open a project in the IDE. This tool initiates the project opening process and returns quickly.
 
-        IMPORTANT: Project opening is ASYNCHRONOUS. This tool returns immediately after initiating
-        the open operation. You MUST poll to verify the project is fully ready before using it.
+        IMPORTANT: Project opening is ASYNCHRONOUS. This tool returns immediately; you MUST poll to verify the project is fully ready before using it.
 
         Verification Workflow:
         1. Call steroid_open_project with the project path
@@ -59,8 +58,6 @@ class OpenProjectToolHandler : McpRegistrar {
         - If trust_project=true (default), the trust dialog is skipped automatically
         - Other dialogs (project type, SDK selection, etc.) may still appear
         - Always check modalDialogShowing in steroid_list_windows response
-
-        After execution, call steroid_execute_feedback to log your feedback.
     """.trimIndent()
 
     override fun register(server: McpServerCore) {

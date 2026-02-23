@@ -6,6 +6,21 @@ import com.intellij.openapi.components.service
 
 inline val codeButcher: CodeButcher get() = service()
 
+private val defaultImports = listOf(
+    "import com.intellij.openapi.project.*",
+    "import com.intellij.openapi.application.*",
+    "import com.intellij.openapi.application.readAction",
+    "import com.intellij.openapi.application.writeAction",
+    "import com.intellij.openapi.vfs.*",
+    "import com.intellij.openapi.editor.*",
+    "import com.intellij.openapi.fileEditor.*",
+    "import com.intellij.openapi.command.*",
+    "import com.intellij.psi.*",
+    "import kotlinx.coroutines.*",
+    "import kotlin.time.Duration.Companion.seconds",
+    "import kotlin.time.Duration.Companion.minutes",
+)
+
 private val mcpScriptContextFqn = McpScriptContext::class.java.name
 private val mcpScriptBuilderFqn = McpScriptBuilder::class.java.name
 private val mcpScriptBuilderAddBlock = McpScriptBuilder::addBlock.name
@@ -52,18 +67,7 @@ class CodeButcher {
         }
 
         val code = buildString {
-            appendLine("import com.intellij.openapi.project.*")
-            appendLine("import com.intellij.openapi.application.*")
-            appendLine("import com.intellij.openapi.application.readAction")
-            appendLine("import com.intellij.openapi.application.writeAction")
-            appendLine("import com.intellij.openapi.vfs.*")
-            appendLine("import com.intellij.openapi.editor.*")
-            appendLine("import com.intellij.openapi.fileEditor.*")
-            appendLine("import com.intellij.openapi.command.*")
-            appendLine("import com.intellij.psi.*")
-            appendLine("import kotlinx.coroutines.*")
-            appendLine("import kotlin.time.Duration.Companion.seconds")
-            appendLine("import kotlin.time.Duration.Companion.minutes")
+            append(defaultImports.joinToString(separator = "\n", postfix = "\n"))
             appendLine()
             appendLine("//imports from the submitted code")
             importLines.forEach { appendLine(it) }
@@ -78,7 +82,7 @@ class CodeButcher {
             otherLines.forEach { append("    ").appendLine(it) }
             appendLine("  }")
             appendLine("}")
-            appendLine()
+            append("\n")
         }
 
         return ScriptCoordinates(classFqn = clazzName, code = code)

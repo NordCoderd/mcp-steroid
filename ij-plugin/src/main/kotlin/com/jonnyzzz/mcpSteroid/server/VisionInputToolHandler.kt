@@ -18,8 +18,7 @@ class VisionInputToolHandler : McpRegistrar {
     private val toolDescription = """
         Send input events (keyboard + mouse) to the IDE using a sequence string.
 
-        HEAVY ENDPOINT: This is intended for debugging and tricky configuration only.
-        Prefer steroid_execute_code for regular automation.
+        HEAVY ENDPOINT: Intended for debugging only. Prefer steroid_execute_code for regular automation.
 
         Sequence format (comma-separated or newline-separated steps; commas optional with newlines):
         - stick:ALT           (hold a key until the end)
@@ -36,8 +35,6 @@ class VisionInputToolHandler : McpRegistrar {
         All keys are released at the end of the sequence.
 
         The input is delivered to the window captured by steroid_take_screenshot (window_id from metadata) and the focus is forced to that window.
-
-        After execution, call steroid_execute_feedback to log your feedback.
     """.trimIndent()
 
     override fun register(server: McpServerCore) {
