@@ -202,7 +202,7 @@ private class ContainerDriverImpl(
             .command("docker", "cp", localPath.absolutePath, "$containerId:$containerPath")
             .description("Copy ${localPath.name} to container:$containerPath")
             .workingDir(scope.workDir)
-            .timeoutSeconds(30L)
+            .timeoutSeconds(120L)
             .quietly()
             .runProcess(scope.processRunner)
             .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }

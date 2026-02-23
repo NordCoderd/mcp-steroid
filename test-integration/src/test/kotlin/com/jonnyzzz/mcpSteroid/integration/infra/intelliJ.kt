@@ -299,7 +299,7 @@ class IntelliJDriver(
         driver.runInContainer(
             listOf("unzip", "-o", containerTempZip),
             workingDir = pluginsGuestDir,
-            timeoutSeconds = 30,
+            timeoutSeconds = 60,
         ).assertExitCode(0)
     }
 
