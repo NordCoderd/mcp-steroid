@@ -182,6 +182,7 @@ class DpaiaClaudeComparisonTest {
                     testPatch = setupTestCase.testPatch,
                     displayName = setupTestCase.instanceId,
                 ),
+                mountDockerSocket = true,
             ).waitForProjectReady()
         }
 
@@ -191,6 +192,7 @@ class DpaiaClaudeComparisonTest {
                 lifetimeWithoutMcp,
                 consoleTitle = "claude-cmp-none",
                 aiMode = AiMode.NONE,
+                mountDockerSocket = true,
             )
             // No waitForProjectReady() — no-MCP agent never uses IntelliJ
         }

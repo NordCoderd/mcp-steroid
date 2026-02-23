@@ -65,13 +65,27 @@ RUN mkdir -p /etc/apt/keyrings && \
 
 ARG CACHE_BUST=1
 
+# Install Docker CLI for Testcontainers (Docker-in-Docker) support.
+# Installs docker-ce-cli from Docker's official apt repo and adds the `agent`
+# user to the `docker` group so it can access a mounted /var/run/docker.sock.
+RUN install -m 0755 -d /etc/apt/keyrings && \
+    curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc && \
+    chmod a+r /etc/apt/keyrings/docker.asc && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] \
+https://download.docker.com/linux/debian bookworm stable" \
+        > /etc/apt/sources.list.d/docker.list && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends docker-ce-cli && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install AI agent CLIs for integration tests
 RUN npm install -g @anthropic-ai/claude-code
 RUN npm install -g @openai/codex
 RUN npm install -g @google/gemini-cli
 
-# Create non-root user
+# Create non-root user and add to docker group (required for Docker socket access)
 RUN useradd -m -s /bin/bash agent && \
+    usermod -aG docker agent && \
     mkdir -p /home/agent/.local/bin && \
     mkdir -p /home/agent/.codex && \
     mkdir -p /home/agent/.gemini && \

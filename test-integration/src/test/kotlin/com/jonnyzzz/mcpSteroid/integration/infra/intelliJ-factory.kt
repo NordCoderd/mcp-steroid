@@ -21,6 +21,19 @@ fun IntelliJContainer.Companion.create(
     distribution: IdeDistribution = IdeDistribution.fromSystemProperties(),
     aiMode: AiMode = AiMode.AI_MCP,
     repoCacheDir: File? = IdeTestFolders.repoCacheDirOrNull,
+    /**
+     * When true, mounts the host Docker socket (`/var/run/docker.sock`) into the container
+     * at the same path so Testcontainers-based tests can start sibling Docker containers.
+     *
+     * Requirements:
+     * - The host Docker socket must exist at `/var/run/docker.sock`
+     * - The `ide-base` Docker image must have `docker-ce-cli` installed (already done) and
+     *   the `agent` user must be in the `docker` group (already done in the Dockerfile)
+     *
+     * Default: `false` (Docker socket not mounted — arena tests that use Testcontainers
+     * will fail with "Could not find a valid Docker environment" unless this is enabled).
+     */
+    mountDockerSocket: Boolean = false,
 ): IntelliJContainer {
     val ideArchive = distribution.resolveAndDownload()
     val ideProduct = distribution.product
@@ -50,9 +63,19 @@ fun IntelliJContainer.Companion.create(
 
     val containerMountedPath = "/mcp-run-dir"
 
+    val dockerSocketFile = File("/var/run/docker.sock")
+    if (mountDockerSocket) {
+        require(dockerSocketFile.exists()) {
+            "mountDockerSocket=true but Docker socket not found at ${dockerSocketFile.absolutePath}. " +
+            "Ensure Docker is running on the host."
+        }
+        println("[IDE-AGENT] Docker socket mount enabled: ${dockerSocketFile.absolutePath}")
+    }
+
     val volumes = buildList {
         add(ContainerVolume(runDir, containerMountedPath, "rw"))
         if (repoCacheDir != null) add(ContainerVolume(repoCacheDir, "/repo-cache", "ro"))
+        if (mountDockerSocket) add(ContainerVolume(dockerSocketFile, "/var/run/docker.sock", "rw"))
     }
 
     var container = startContainerDriver(

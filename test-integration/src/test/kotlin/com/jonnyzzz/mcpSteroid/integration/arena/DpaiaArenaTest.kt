@@ -164,6 +164,7 @@ class DpaiaArenaTest {
                     testPatch = setupTestCase.testPatch,
                     displayName = setupTestCase.instanceId,
                 ),
+                mountDockerSocket = true,
             ).waitForProjectReady()
         }
 

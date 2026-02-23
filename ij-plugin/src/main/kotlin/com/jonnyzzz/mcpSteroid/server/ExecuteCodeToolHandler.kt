@@ -58,6 +58,16 @@ class ExecuteCodeToolHandler : McpRegistrar {
 
              **EXCEPTION — use native Read tool for simple file reads**: The native Read tool can access /mcp-run-dir/ paths directly. For reading a single file's content, prefer the Read tool over VfsUtil.loadText() — it's faster (no compilation overhead). Reserve exec_code for operations that REQUIRE IntelliJ APIs: PSI analysis, compilation checks, test execution, find usages, refactoring, VCS inspection. If you just need to read file text, use the Read tool.
 
+             **⚠️ exec_code VFS reads do NOT satisfy the native Edit tool's read-before-write constraint**: If you read a file via exec_code (`VfsUtil.loadText(vf)`) and then try to use the native `Edit` tool on the same file, you will get `"File has not been read yet"`. These are tracked separately. Options: (a) also issue a native `Read` tool call for that file before using `Edit`, or (b) use a `writeAction { }` block in exec_code to both read and write the file atomically — this is PREFERRED because it saves a round-trip and avoids the constraint entirely:
+             ```kotlin
+             val vf = findProjectFile("src/main/java/com/example/MyClass.java")!!
+             val content = VfsUtil.loadText(vf)  // read OUTSIDE writeAction
+             val updated = content.replace("oldMethod", "newMethod")
+             check(updated != content) { "replace matched nothing — check whitespace" }
+             writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
+             // ↑ This replaces both Read + Edit tools in a single exec_code call
+             ```
+
              **Quick Start:**
              - Your code is a suspend function body (never use runBlocking)
              - Use readAction { } for PSI/VFS reads, writeAction { } for modifications
@@ -437,18 +447,19 @@ class ExecuteCodeToolHandler : McpRegistrar {
              import com.intellij.openapi.externalSystem.task.TaskCallback
              import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
              import org.jetbrains.plugins.gradle.util.GradleConstants
-             import java.util.concurrent.CountDownLatch
-             import java.util.concurrent.TimeUnit
-             val latch = CountDownLatch(1); var ok = false
+             import kotlinx.coroutines.CompletableDeferred
+             import kotlinx.coroutines.withTimeout
+             import kotlin.time.Duration.Companion.minutes
+             val result = CompletableDeferred<Boolean>()
              val s = com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings()
              s.externalProjectPath = project.basePath!!
              s.taskNames = listOf(":api:test", "--tests", "shop.api.composite.product.ProductCompositeServiceApplicationTests")
              s.externalSystemIdString = GradleConstants.SYSTEM_ID.toString()
              ExternalSystemUtil.runTask(s, com.intellij.execution.executors.DefaultRunExecutor.EXECUTOR_ID,
                  project, GradleConstants.SYSTEM_ID,
-                 object : TaskCallback { override fun onSuccess() { ok=true; latch.countDown() }; override fun onFailure() { latch.countDown() } },
+                 object : TaskCallback { override fun onSuccess() { result.complete(true) }; override fun onFailure() { result.complete(false) } },
                  ProgressExecutionMode.IN_BACKGROUND_ASYNC, false)
-             latch.await(10, TimeUnit.MINUTES); println("Gradle result: success=${'$'}ok")
+             val ok = withTimeout(5.minutes) { result.await() }; println("Gradle result: success=${'$'}ok")
              // ⚠️ If success=false: do NOT immediately fall back to ProcessBuilder("./gradlew").
              // ⚠️ CRITICAL: Even if ProcessBuilder("./gradlew") exits 0 with "BUILD SUCCESSFUL",
              //    that only means Gradle completed WITHOUT error — NOT that tests ran and passed.

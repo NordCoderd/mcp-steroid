@@ -1118,6 +1118,13 @@ println("Use: ${persistencePrefix}.persistence.Entity")
 **CRITICAL**: When adding a new field to a command/DTO/entity class, always find all call sites
 *before* writing any code. Missing even one call site causes a compile error.
 
+> **⚠️ Safe Constructor/Signature Change Recipe**: `runInspectionsDirectly` is file-scoped and
+> does NOT catch cross-file compile errors from constructor changes. Before adding a parameter to
+> any constructor, record, or method signature: (1) run `ReferencesSearch` to find ALL call sites,
+> (2) update every call site in the same exec_code session, (3) then run `./mvnw compile -q` to
+> verify project-wide correctness. Skipping step 1 causes "cannot find symbol" errors that only
+> surface during test execution, not during file-level inspection.
+
 ```kotlin
 import com.intellij.psi.search.searches.ReferencesSearch
 
@@ -1761,21 +1768,21 @@ import org.jetbrains.idea.maven.execution.MavenRunnerParameters
 import org.jetbrains.idea.maven.execution.MavenRunnerSettings
 import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.minutes
 
-val latch = CountDownLatch(1)
-var passed = false
+val result = CompletableDeferred<Boolean>()
 
 // Subscribe BEFORE launching so we don't miss the event
 val connection = project.messageBus.connect()
 connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
     override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) {
-        passed = testsRoot.isPassed()
+        val passed = testsRoot.isPassed()
         val failed = testsRoot.getAllTests().count { it.isDefect }
         println("Tests finished — passed=$passed failures=$failed")
         connection.disconnect()
-        latch.countDown()
+        result.complete(passed)
     }
     override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
     override fun onTestFailed(test: SMTestProxy) { println("FAILED: ${test.name}") }
@@ -1809,7 +1816,7 @@ MavenRunConfigurationType.runConfiguration(
     /* runnerSettings (MavenRunnerSettings) = */ null,
 ) { /* ProgramRunner.Callback — completion handled by SMTRunnerEventsListener above */ }
 
-latch.await(5, TimeUnit.MINUTES)
+val passed = withTimeout(5.minutes) { result.await() }
 println("Result: passed=$passed")
 ```
 
@@ -1825,19 +1832,19 @@ import com.intellij.execution.runners.ProgramRunnerUtil
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.minutes
 
-val latch = CountDownLatch(1)
-var passed = false
+val result = CompletableDeferred<Boolean>()
 
 val connection = project.messageBus.connect()
 connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
     override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) {
-        passed = testsRoot.isPassed()
+        val passed = testsRoot.isPassed()
         println("Tests finished — passed=$passed")
         connection.disconnect()
-        latch.countDown()
+        result.complete(passed)
     }
     override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
     override fun onTestFailed(test: SMTestProxy) { println("FAILED: ${test.name}") }
@@ -1869,7 +1876,7 @@ val settings = runManager.createConfiguration(config, factory)
 runManager.addConfiguration(settings)
 ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
 
-latch.await(5, TimeUnit.MINUTES)
+val passed = withTimeout(5.minutes) { result.await() }
 println("Result: passed=$passed")
 ```
 
@@ -1985,11 +1992,11 @@ import com.intellij.openapi.externalSystem.service.execution.ProgressExecutionMo
 import com.intellij.openapi.externalSystem.task.TaskCallback
 import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
 import org.jetbrains.plugins.gradle.util.GradleConstants
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.minutes
 
-val latch = CountDownLatch(1)
-var gradleSuccess = false
+val result = CompletableDeferred<Boolean>()
 
 val settings = ExternalSystemTaskExecutionSettings().apply {
     externalProjectPath = project.basePath!!
@@ -2004,13 +2011,13 @@ ExternalSystemUtil.runTask(
     project,
     GradleConstants.SYSTEM_ID,
     object : TaskCallback {
-        override fun onSuccess() { gradleSuccess = true; latch.countDown() }
-        override fun onFailure() { gradleSuccess = false; latch.countDown() }
+        override fun onSuccess() { result.complete(true) }
+        override fun onFailure() { result.complete(false) }
     },
     ProgressExecutionMode.IN_BACKGROUND_ASYNC,
     false
 )
-latch.await(5, TimeUnit.MINUTES)
+val gradleSuccess = withTimeout(5.minutes) { result.await() }
 println("Gradle result: success=$gradleSuccess")
 ```
 
@@ -2142,10 +2149,11 @@ before launching the test. Use `testsRoot.isPassed()` for overall pass/fail:
 ```kotlin
 import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.minutes
 
-val latch = CountDownLatch(1)
+val result = CompletableDeferred<Unit>()
 
 // Subscribe BEFORE launching (don't miss the event)
 val connection = project.messageBus.connect()
@@ -2158,7 +2166,7 @@ connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEven
         println("Done — passed=$passed errors=$hasErrors failures=$failCount")
         allTests.filter { it.isDefect }.forEach { println("  FAILED: ${it.name}") }
         connection.disconnect()
-        latch.countDown()
+        result.complete(Unit)
     }
     override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
     override fun onTestFailed(test: SMTestProxy) {}
@@ -2180,7 +2188,7 @@ connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEven
 // Then launch via MavenRunConfigurationType or GradleRunConfiguration (see ★ PREFERRED ★ above)
 // ... launch code here ...
 
-latch.await(5, TimeUnit.MINUTES)
+withTimeout(5.minutes) { result.await() }
 ```
 
 ### Check Compile Errors Without Running Full Build
