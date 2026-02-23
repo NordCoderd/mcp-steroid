@@ -136,6 +136,26 @@ val classes = readAction {
 // (rare - most operations don't trigger indexing)
 ```
 
+> **Bulk file creation triggers re-indexing**: Writing new files via `writeAction { VfsUtil.saveText(...) }` causes IntelliJ to re-index those files.
+> - **In a subsequent exec_code call**: Safe — `waitForSmartMode()` runs automatically at script start, so PSI is up-to-date by the time your code runs.
+> - **In the same exec_code call** (create files then immediately inspect them): call `waitForSmartMode()` explicitly after the `writeAction` block and before any `runInspectionsDirectly` / `ReferencesSearch` / `JavaPsiFacade.findClass()` calls on the new files.
+>
+> ```kotlin
+> // Pattern: create files AND inspect in the SAME exec_code call
+> writeAction {
+>     val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+>     val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example")
+>     val f = dir.findChild("MyService.java") ?: dir.createChildData(this, "MyService.java")
+>     VfsUtil.saveText(f, "package com.example;\npublic class MyService {}")
+> }
+> waitForSmartMode()  // ← flush PSI index before inspecting the newly created file
+> val vf = findProjectFile("src/main/java/com/example/MyService.java")!!
+> val problems = runInspectionsDirectly(vf)
+> println(if (problems.isEmpty()) "OK" else problems.toString())
+> ```
+>
+> **Best practice**: Create files in one exec_code call, then inspect in a separate exec_code call — `waitForSmartMode()` runs automatically between calls.
+
 ### Execution Flow
 
 1. **Submit code** via `steroid_execute_code`
@@ -2336,6 +2356,58 @@ writeAction {
 > **`[ClassEscapesItsScope]`** appears on Spring `@Service`, `@Repository`, and `@Component` beans that expose package-private types through public methods (e.g. a `public` method returning a package-private domain object). This is **expected in Spring Boot projects** and non-blocking — it does not prevent compilation or deployment.
 >
 > **Before spending a turn trying to fix it**: Check whether the same warning appears on existing (pre-patch) services or repositories in the project. If `FeatureService`, `FavoriteFeatureService`, or other existing beans have the same warning, your new `@Service` will too — it is a deliberate design pattern in the codebase. Do NOT refactor to fix it; simply note it and move on.
+
+### Inspection Result: ConstantValue "Value is always null" on DTO Accessor → CRITICAL Bug
+
+> **`[ConstantValue] Value ... is always 'null'`** on a DTO method call (e.g. `dto.releasedAt()`, `dto.status()`, `dto.version()`) in a test file is a **critical data-flow finding, NOT a style warning**. IntelliJ's type system has proven the accessor always returns `null` — which happens when the **DTO record is missing that component field** (the accessor method does not exist or returns null unconditionally).
+>
+> **Do NOT dismiss `ConstantValue` on DTO/record accessor calls as "pre-existing static analysis notes" or "noise".** It is a guaranteed runtime `NullPointerException` or assertion failure at test execution time.
+
+**Severity classification — prevents misclassification:**
+
+| Inspection ID | Severity | Action |
+|---------------|----------|--------|
+| `ConstantValue` ("always null/true/false") | **CRITICAL** — runtime failure guaranteed | Investigate immediately |
+| `AssertBetweenInconvertibleTypes` | **CRITICAL** — assertion always passes/fails | Investigate |
+| `ClassCanBeRecord` | **REQUIRED** — structural mismatch | Convert to record |
+| `ClassEscapesItsScope` on Spring beans | **EXPECTED** — ignore | Skip |
+| `DeprecatedIsStillUsed` | **LOW** — cosmetic | Fix if time allows |
+| `GrazieInspectionRunner` | **COSMETIC** — grammar | Ignore |
+
+**Diagnosis recipe** — run when you see `[ConstantValue] Value ... is always 'null'` on a DTO accessor:
+
+```kotlin
+// Step 1: Read the DTO record source to see its actual component list
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
+val dtoFile = readAction {
+    FilenameIndex.getVirtualFilesByName("ReleaseDto.java", GlobalSearchScope.projectScope(project)).firstOrNull()
+}
+if (dtoFile != null) {
+    println("=== DTO source ===")
+    println(VfsUtil.loadText(dtoFile))
+}
+
+// Step 2: Cross-reference with what the test calls on the DTO
+val testFile = readAction {
+    FilenameIndex.getVirtualFilesByName("ReleaseControllerTests.java", GlobalSearchScope.projectScope(project)).firstOrNull()
+}
+if (testFile != null) {
+    val text = VfsUtil.loadText(testFile)
+    // Extract .methodName() calls that look like DTO accessors (lower-camel, not assertion calls):
+    val dtoCalls = Regex("\\.([a-z][a-zA-Z0-9]+)\\(\\)")
+        .findAll(text)
+        .map { it.groupValues[1] }
+        .filter { it !in setOf("body", "isEqualTo", "isNotNull", "statusCode", "then", "when", "get", "size", "isEmpty") }
+        .toSet()
+    println("DTO methods called in tests: $dtoCalls")
+}
+// Compare output: methods in dtoCalls absent from DTO record components = missing fields to add
+```
+
+> **Fix**: Add the missing components to the DTO `record` definition. For example, if `ReleaseDto` is
+> `public record ReleaseDto(String name, String version)` and the test calls `dto.releasedAt()`, add
+> `Instant releasedAt` to the record — and update the mapper/service/query that constructs the DTO.
 
 ---
 
