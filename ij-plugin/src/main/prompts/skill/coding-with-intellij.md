@@ -1665,11 +1665,20 @@ if (psiClass != null) {
 
 ```kotlin
 import org.jetbrains.idea.maven.project.MavenProjectsManager
+import org.jetbrains.idea.maven.project.MavenSyncSpec
+import com.intellij.platform.backend.observation.Observation
 
-// After editing pom.xml, sync Maven to download new dependencies
-MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()
-println("Maven sync triggered — wait for background indexing before running tests")
+// After editing pom.xml: schedule sync AND AWAIT it with Observation.awaitConfiguration()
+// This is the production-grade API used in Android Studio — avoids 600s modal timeouts.
+val manager = MavenProjectsManager.getInstance(project)
+manager.scheduleUpdateAllMavenProjects(MavenSyncSpec.incremental("post-pom-edit sync"))
+Observation.awaitConfiguration(project)   // suspends until Maven sync + indexing fully complete
+println("Maven sync and indexing complete — safe to run tests now")
 ```
+
+> **`Observation.awaitConfiguration()`** is the canonical way to await any background IDE activity
+> (Maven sync, Gradle import, indexing). It is suspend-compatible and handles cancellation.
+> This replaces ad-hoc polling loops or `waitForSmartMode()` after build-file changes.
 
 ### Read Maven Project Model (Dependencies, Effective POM)
 
@@ -1712,11 +1721,12 @@ println("Build aborted: ${result.isAborted}")
 
 ### Run Tests via IntelliJ IDE Runner ★ PREFERRED ★
 
-> **⚠️ Arena / Docker environment**: Tests that use `@Testcontainers` or require a running
-> database ALWAYS fail in arena Docker containers with `Could not find a valid Docker environment`.
-> This is an **infrastructure constraint, not a code defect**. Do NOT waste turns running
-> `./mvnw test` on Testcontainers-based tests to "confirm" compilation — use `runInspectionsDirectly()`
-> instead, then declare your fix complete if inspections pass.
+> **⚠️ Arena / Docker environment**: Tests that use `@Testcontainers` require Docker-in-Docker to be
+> available. Most arena environments support this — **do NOT skip running tests just because you see
+> `@Testcontainers`**. Only treat Docker as unavailable if you run a baseline test (a test that existed
+> BEFORE your changes) and it fails with `Could not find a valid Docker environment` — then it's an
+> infrastructure constraint, not a code defect. Use `runInspectionsDirectly()` as your final check
+> in that case and declare your fix complete.
 
 **Always prefer this over `./mvnw test` or `./gradlew test`.** Running tests through the IDE
 runner is equivalent to clicking the green ▶ button next to a test class or method. Benefits:
