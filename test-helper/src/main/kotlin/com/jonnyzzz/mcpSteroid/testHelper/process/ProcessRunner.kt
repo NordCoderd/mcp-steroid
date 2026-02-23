@@ -1,10 +1,11 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.process
 
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import java.io.InputStream
-import java.util.Collections
 import java.util.concurrent.TimeUnit
 
 //TODO: hide this class
@@ -87,7 +88,10 @@ class ProcessRunner(
 
         val process = processBuilder.start()
 
-        val messagesChannel = Collections.synchronizedList(mutableListOf<ProcessStreamLine>())
+        val messagesChannel = MutableSharedFlow<ProcessStreamLine>(
+            replay = Int.MAX_VALUE,
+            onBufferOverflow = BufferOverflow.DROP_OLDEST
+        )
 
         fun readOutput(stream: InputStream, prefix: String, type: ProcessStreamType) {
             try {
@@ -99,7 +103,7 @@ class ProcessRunner(
                             if (!request.quietly) {
                                 println("[$prefix] $filterSecrets")
                             }
-                            messagesChannel.add(ProcessStreamLine(type, line))
+                            messagesChannel.tryEmit(ProcessStreamLine(type, line))
                         }
                     }
                 }
@@ -119,7 +123,7 @@ class ProcessRunner(
             } catch (e: Exception) {
                 if (!request.quietly) {
                     println("[$logPrefix] stdin copy error: ${e.message}")
-                    messagesChannel.add(ProcessStreamLine(ProcessStreamType.INFO, "Failed to send STDIN: ${e.message}\n" + e.stackTraceToString()))
+                    messagesChannel.tryEmit(ProcessStreamLine(ProcessStreamType.INFO, "Failed to send STDIN: ${e.message}\n" + e.stackTraceToString()))
                 }
             }
         }
@@ -143,9 +147,9 @@ class ProcessRunner(
         )
     }
 
-    private data class StartedProcessImpl(
+    private class StartedProcessImpl(
         val process: Process,
-        val messagesChannel: List<ProcessStreamLine>,
+        val messagesChannel: MutableSharedFlow<ProcessStreamLine>,
         val thread: List<Thread>,
     ) : StartedProcess {
         val pid: PID get() = process.PID()
@@ -158,20 +162,10 @@ class ProcessRunner(
             get() = runCatching { process.exitValue() } .getOrNull()
 
         override val messagesFlow: Flow<ProcessStreamLine>
-            get() = flow {
-                var visited = 0
-                while (process.isAlive) {
-                    messagesChannel.toList().drop(visited).forEach {
-                        visited++
-                        emit(it)
-                    }
-                    //this is heavily inefficient
-                    Thread.sleep(100)
-                }
-            }
+            get() = messagesChannel.asSharedFlow()
 
         private fun builder(type: ProcessStreamType) : String {
-            return messagesChannel
+            return messagesChannel.replayCache
                 .filter { it.type == type }
                 .joinToString(separator = "\n") { it.line }
         }
