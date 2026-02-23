@@ -185,37 +185,77 @@ class DockerDriver(
      * Docker output format: "0.0.0.0:52134" or "[::]:52134"
      */
     fun queryMappedPort(containerId: String, containerPort: Int): Int {
-        val maxRetries = 5
+        val maxRetries = 15
         val retryDelayMs = 2_000L
-        var lastError: Exception? = null
+        var lastProbe = "none"
 
         for (attempt in 1..maxRetries) {
-            try {
-                val result = ProcessRunRequest.builder()
-                    .command("docker", "port", containerId, "$containerPort/tcp")
-                    .description("Query host port for $containerPort")
-                    .workingDir(workDir)
-                    .timeoutSeconds(5)
-                    .quietly()
-                    .runProcess(processRunner)
-                    .assertExitCode(0) { "Failed to query mapped port for $containerPort: $stderr" }
+            val result = ProcessRunRequest.builder()
+                .command("docker", "port", containerId, "$containerPort/tcp")
+                .description("Query host port for $containerPort")
+                .workingDir(workDir)
+                .timeoutSeconds(5)
+                .quietly()
+                .runProcess(processRunner)
 
-                // Parse "0.0.0.0:52134" or "[::]:52134" — take the last colon-separated part
-                return result.stdout.trim().lines().firstOrNull()?.substringAfterLast(':')?.toIntOrNull()
-                    ?: error("Failed to parse host port from: ${result.stdout}")
-            } catch (e: Exception) {
-                lastError = e
-                if (attempt < maxRetries) {
-                    println("[DOCKER] Waiting for port $containerPort to be mapped (attempt $attempt/$maxRetries)...")
-                    Thread.sleep(retryDelayMs)
-                }
+            val mappedPort = parseMappedPortOutput(result.stdout)
+            if (result.exitCode == 0 && mappedPort != null) {
+                return mappedPort
+            }
+
+            val stdout = result.stdout.trim().ifBlank { "<empty>" }
+            val stderr = result.stderr.trim().ifBlank { "<empty>" }
+            lastProbe = "docker port exitCode=${result.exitCode}, stdout='$stdout', stderr='$stderr'"
+
+            val containerRunning = queryContainerRunningState(containerId)
+            if (containerRunning == false) {
+                error(
+                    "Failed to query mapped port for container $containerId port $containerPort: " +
+                            "container is not running. Last probe: $lastProbe"
+                )
+            }
+
+            if (attempt < maxRetries) {
+                println("[$logPrefix] Waiting for port $containerPort to be mapped (attempt $attempt/$maxRetries)...")
+                Thread.sleep(retryDelayMs)
             }
         }
 
         error(
             "Failed to query mapped port for container $containerId port $containerPort after $maxRetries attempts. " +
-                    "Last error: $lastError"
+                    "Last probe: $lastProbe"
         )
+    }
+
+    private fun queryContainerRunningState(containerId: String): Boolean? {
+        val result = ProcessRunRequest.builder()
+            .command("docker", "inspect", "-f", "{{.State.Running}}", containerId)
+            .description("Check container running state")
+            .workingDir(workDir)
+            .timeoutSeconds(5)
+            .quietly()
+            .runProcess(processRunner)
+        if (result.exitCode != 0) return null
+        return parseContainerRunningState(result.stdout)
+    }
+
+    companion object {
+        internal fun parseMappedPortOutput(stdout: String): Int? {
+            return stdout
+                .lineSequence()
+                .map { it.trim() }
+                .firstNotNullOfOrNull { line ->
+                    line.takeIf { it.isNotBlank() }?.substringAfterLast(':')?.toIntOrNull()
+                }
+        }
+
+        internal fun parseContainerRunningState(stdout: String): Boolean? {
+            return when (stdout.trim().lowercase()) {
+                "true" -> true
+                "false" -> false
+                else -> null
+            }
+        }
     }
 
     /**
