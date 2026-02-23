@@ -185,18 +185,37 @@ class DockerDriver(
      * Docker output format: "0.0.0.0:52134" or "[::]:52134"
      */
     fun queryMappedPort(containerId: String, containerPort: Int): Int {
-        val result = ProcessRunRequest.builder()
-            .command("docker", "port", containerId, "$containerPort/tcp")
-            .description("Query host port for $containerPort")
-            .workingDir(workDir)
-            .timeoutSeconds(5)
-            .quietly()
-            .runProcess(processRunner)
-            .assertExitCode(0) { "Failed to query mapped port for $containerPort: $stderr" }
+        val maxRetries = 5
+        val retryDelayMs = 2_000L
+        var lastError: Exception? = null
 
-        // Parse "0.0.0.0:52134" or "[::]:52134" — take the last colon-separated part
-        return result.stdout.trim().lines().first().substringAfterLast(':').toIntOrNull()
-            ?: error("Failed to parse host port from: ${result.stdout}")
+        for (attempt in 1..maxRetries) {
+            try {
+                val result = ProcessRunRequest.builder()
+                    .command("docker", "port", containerId, "$containerPort/tcp")
+                    .description("Query host port for $containerPort")
+                    .workingDir(workDir)
+                    .timeoutSeconds(5)
+                    .quietly()
+                    .runProcess(processRunner)
+                    .assertExitCode(0) { "Failed to query mapped port for $containerPort: $stderr" }
+
+                // Parse "0.0.0.0:52134" or "[::]:52134" — take the last colon-separated part
+                return result.stdout.trim().lines().firstOrNull()?.substringAfterLast(':')?.toIntOrNull()
+                    ?: error("Failed to parse host port from: ${result.stdout}")
+            } catch (e: Exception) {
+                lastError = e
+                if (attempt < maxRetries) {
+                    println("[DOCKER] Waiting for port $containerPort to be mapped (attempt $attempt/$maxRetries)...")
+                    Thread.sleep(retryDelayMs)
+                }
+            }
+        }
+
+        error(
+            "Failed to query mapped port for container $containerId port $containerPort after $maxRetries attempts. " +
+                    "Last error: $lastError"
+        )
     }
 
     /**
@@ -278,4 +297,3 @@ class DockerDriver(
     }
 
 }
-
