@@ -155,6 +155,8 @@ val classes = readAction {
 > ```
 >
 > **Best practice**: Create files in one exec_code call, then inspect in a separate exec_code call — `waitForSmartMode()` runs automatically between calls.
+>
+> **⚠️ Create one file per exec_code call** when possible. Bundling multiple file creations in a single call makes error attribution hard: if the call throws an exception midway, it's unclear which files were created and which failed. Create files one at a time, verify existence (`findProjectFile(path) != null`), then proceed to the next.
 
 ### Execution Flow
 
@@ -252,6 +254,18 @@ fun findProjectFile(relativePath: String): VirtualFile?
 // Find PsiFile relative to project base path (suspend - uses readAction)
 suspend fun findProjectPsiFile(relativePath: String): PsiFile?
 ```
+
+> **⚠️ `findProjectFile()` pitfall for resource files**: This function requires the **full relative path** from the project root (e.g., `"src/main/resources/application.properties"`). Calling it with just a filename (`findProjectFile("application.properties")`) **always returns null** — causing NPE on `!!`. For files under `src/main/resources/`, use `FilenameIndex.getVirtualFilesByName()` which searches by filename without requiring the full path:
+> ```kotlin
+> import com.intellij.psi.search.FilenameIndex
+> import com.intellij.psi.search.GlobalSearchScope
+> val scope = GlobalSearchScope.projectScope(project)
+> val appProps = readAction {
+>     FilenameIndex.getVirtualFilesByName("application.properties", scope)
+>         .firstOrNull { it.path.contains("src/main/resources") }
+> } ?: error("application.properties not found in src/main/resources")
+> println(VfsUtil.loadText(appProps))
+> ```
 
 ### IDE Utilities
 
@@ -1090,6 +1104,133 @@ println("File created and VFS refreshed")
 > // Use this output as the prefix for your new migration file name
 > ```
 
+### Spring Boot Feature Implementation Workflow (New Feature / JWT / Security)
+
+When implementing a new Spring Boot feature from scratch (e.g., JWT authentication, a new service + controller), follow this workflow to minimize wasted turns:
+
+**Phase 1: Explore (1-2 exec_code calls)**
+```kotlin
+// Call 1: readiness + Docker + VCS + test file content in ONE call
+println("Project: ${project.name}, base: ${project.basePath}")
+println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
+val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
+println("Docker: ${dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0}")
+// VCS check
+val changes = readAction {
+    com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
+        .allChanges.mapNotNull { it.virtualFile?.path }
+}
+println(if (changes.isEmpty()) "VCS: clean" else "VCS-modified:\n" + changes.joinToString("\n"))
+// Read test file and pom.xml in SAME call to understand what's needed
+val testVf = findProjectFile("src/test/java/eval/sample/AuthControllerTest.java")  // ← use actual test path
+if (testVf != null) println("\n=== TEST ===\n" + VfsUtil.loadText(testVf))
+val pomVf = findProjectFile("pom.xml")
+if (pomVf != null) println("\n=== pom.xml ===\n" + VfsUtil.loadText(pomVf))
+```
+
+**Phase 2: Add dependencies to pom.xml (1 exec_code call)**
+```kotlin
+// Read → inject new dependencies → write via VFS (DO NOT use native Write tool)
+val pomFile = findProjectFile("pom.xml")!!
+val content = VfsUtil.loadText(pomFile)
+val jjwtDeps = """
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>0.12.6</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>0.12.6</version>
+            <scope>runtime</scope>
+        </dependency>"""
+val updated = content.replace("</dependencies>", "$jjwtDeps\n  </dependencies>")
+check(updated != content) { "replace matched nothing — check pom.xml </dependencies> tag" }
+writeAction { VfsUtil.saveText(pomFile, updated) }
+println("pom.xml updated")
+// Then trigger Maven sync (next step) before inspecting or compiling
+```
+
+**Phase 3: Create source files via exec_code VFS APIs (1-2 calls)**
+```kotlin
+// ALWAYS use writeAction + VFS to create new files — NOT native Write tool.
+// VFS creates index immediately; native Write bypasses it.
+// Use triple-quoted strings for Java code with .class refs and $ signs:
+writeAction {
+    val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+    val secDir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/eval/sample/security")!!
+    // Create JwtService.java
+    val jwtService = secDir.findChild("JwtService.java") ?: secDir.createChildData(this, "JwtService.java")
+    VfsUtil.saveText(jwtService, """
+        package eval.sample.security;
+
+        import io.jsonwebtoken.Jwts;
+        import io.jsonwebtoken.security.Keys;
+        import org.springframework.stereotype.Service;
+        import java.util.Date;
+
+        @Service
+        public class JwtService {
+            private static final String SECRET = "your-secret-key-here-must-be-at-least-256-bits";
+
+            public String generateToken(String username) {
+                return Jwts.builder()
+                    .subject(username)
+                    .issuedAt(new Date())
+                    .expiration(new Date(System.currentTimeMillis() + 86400000))
+                    .signWith(Keys.hmacShaKeyFor(SECRET.getBytes()))
+                    .compact();
+            }
+        }
+    """.trimIndent())
+    println("Created JwtService.java")
+    // Create more files similarly...
+}
+// After creating files, trigger re-indexing for compile checks:
+waitForSmartMode()
+```
+
+**Phase 4: Verify compilation before running tests (~5s vs 90s for Maven)**
+```kotlin
+// Run IDE inspection on all newly created files — much faster than ./mvnw test-compile
+for (path in listOf(
+    "src/main/java/eval/sample/security/JwtService.java",
+    "src/main/java/eval/sample/security/SecurityConfig.java",
+    "src/main/java/eval/sample/security/JwtAuthenticationFilter.java"
+)) {
+    val vf = findProjectFile(path) ?: run { println("NOT FOUND: $path"); continue }
+    val problems = runInspectionsDirectly(vf)
+    if (problems.isEmpty()) println("OK: $path")
+    else problems.forEach { (id, d) -> d.forEach { println("[$id] $path: ${it.descriptionTemplate}") } }
+}
+// Only if all OK: proceed to Maven test run
+```
+
+**Phase 5: Run the failing test class**
+```kotlin
+val process = ProcessBuilder("./mvnw", "test", "-Dtest=AuthControllerTest", "-Dspotless.check.skip=true")
+    .directory(java.io.File(project.basePath!!))
+    .redirectErrorStream(true).start()
+val lines = process.inputStream.bufferedReader().readLines()
+val exitCode = process.waitFor()
+println("Exit: $exitCode | lines: ${lines.size}")
+println(lines.take(30).joinToString("\n"))   // Spring context / Testcontainers errors at top
+println(lines.takeLast(30).joinToString("\n")) // Maven BUILD summary at bottom
+```
+
+> **Key rules**:
+> - If `steroid_execute_code` returns an error: read the error message and **retry with fixed code** — do NOT fall back to native Write/Bash
+> - If an exec_code error is about missing import → add the import and retry
+> - If an exec_code error is about `Write access allowed inside write-action only` → wrap VFS calls in `writeAction { }`
+> - If exec_code compilation fails with `.class` or `$` → use triple-quoted Kotlin strings for Java source content
+
 ### Find All @Entity / @Service / @RestController Classes
 
 ```kotlin
@@ -1863,6 +2004,32 @@ if (psiClass != null) {
 } else println("Class not found — check the FQN")
 ```
 
+### Add Maven Dependencies to pom.xml via VFS (Reliable Pattern)
+
+**PREFER exec_code VFS write over native Edit tool** for pom.xml changes. VFS write triggers IDE file-change notification immediately, making Maven auto-import more reliable.
+
+```kotlin
+// Step 1: Add dependency via VFS text replace
+val pomFile = findProjectFile("pom.xml")!!
+val content = VfsUtil.loadText(pomFile)
+
+// Print excerpt before replacing — catch whitespace issues before they waste a turn:
+val idx = content.indexOf("</dependencies>")
+println("EXCERPT (around </dependencies>):\n" + content.substring((idx - 50).coerceAtLeast(0), idx + 20))
+
+val newDep = """
+    <dependency>
+        <groupId>io.jsonwebtoken</groupId>
+        <artifactId>jjwt-api</artifactId>
+        <version>0.12.6</version>
+    </dependency>"""  // ← adjust groupId/artifactId/version as needed
+val updated = content.replace("</dependencies>", "$newDep\n  </dependencies>")
+check(updated != content) { "replace matched nothing — pom.xml may not have a </dependencies> tag" }
+writeAction { VfsUtil.saveText(pomFile, updated) }
+println("pom.xml updated — trigger Maven sync next")
+// Step 2: After writing, trigger Maven sync (next section)
+```
+
 ### Trigger Maven Re-import After pom.xml Changes
 
 ```kotlin
@@ -2242,6 +2409,15 @@ println(lines.takeLast(30).joinToString("\n"))
 > Always run class-level: `-Dtest=UserRestControllerTests` (no `#method` suffix) to exercise
 > all methods and confirm no regressions before outputting `ARENA_FIX_APPLIED: yes`.
 
+> **⚠️ After FAIL_TO_PASS class passes: run the FULL project test suite** (`./mvnw test`, no `-Dtest=` filter)
+> to catch regressions in OTHER test classes that share service or data layer code with FAIL_TO_PASS.
+> Example: adding password validation to `UserServiceImpl` may break `AbstractUserServiceTests`,
+> `UserServiceJdbcTests`, `UserServiceJpaTests`, `UserServiceSpringDataJpaTests` if they use `"password"`
+> as test data. These tests are not in FAIL_TO_PASS but will fail after your change.
+> **Before outputting `ARENA_FIX_APPLIED: yes`**: (1) Run class-level FAIL_TO_PASS tests → pass,
+> (2) Search for `Abstract*Tests` and other test classes sharing the same data, update them if needed,
+> (3) Run `./mvnw test` (full suite, no filter) → exit 0. Only then output the success marker.
+
 > **⚠️ When take/takeLast is not enough** (output still exceeds limit after first+last 30 lines):
 > Use keyword filtering to extract only signal lines from verbose Spring Boot / Testcontainers output:
 
@@ -2334,11 +2510,15 @@ For **Gradle** projects, use `./gradlew` with `--tests` for targeted test class 
 
 > **⚠️ CRITICAL — Output Truncation Required**: Same as Maven — Gradle integration test output can be 200k+ chars. **Always use `takeLast()` and `take()` to capture both ends.**
 
+> **⚠️ UP-TO-DATE false-positive after writing new files**: After creating new source files via `writeAction { VfsUtil.saveText(...) }`, Gradle may report the test task as `UP-TO-DATE` and skip executing tests entirely — yet still exit with code 0 and print `BUILD SUCCESSFUL`. The task inputs appear unchanged from Gradle's perspective because the compilation cache was not invalidated. **Always add `--rerun-tasks` to the FIRST Gradle test invocation after writing new source files.** If you see `BUILD SUCCESSFUL` with no `Tests run:` line in the output, add `--rerun-tasks` and rerun.
+
 ```kotlin
 // Run a specific test class in a specific Gradle submodule
+// ⚠️ After writing new source files: ALWAYS add --rerun-tasks to the first test run
+// to avoid the UP-TO-DATE false-positive (Gradle skips tests silently, exits 0)
 val proc = ProcessBuilder("./gradlew", ":product-service:test",
     "--tests", "com.example.product.ProductServiceTest",
-    "--no-daemon", "-q")
+    "--rerun-tasks", "--no-daemon")
     .directory(java.io.File(project.basePath!!))
     .redirectErrorStream(true).start()
 val lines = proc.inputStream.bufferedReader().readLines()
@@ -2375,6 +2555,7 @@ println(lines.takeLast(30).joinToString("\n"))
 | Skip spotless | `-Dspotless.check.skip=true` | (not needed usually) |
 | No daemon | n/a | `--no-daemon` |
 | Quiet output | `-q` | `-q` |
+| Force re-run (post-write) | (Maven always reruns) | `--rerun-tasks` |
 
 ### Environment Diagnostics (Docker / System — Consolidated)
 
@@ -3194,6 +3375,80 @@ if (ktClass != null) {
     }
 }
 ```
+
+---
+
+## Refactoring: Find All Call Sites Before Adding Parameters
+
+When adding a new field or parameter to a record, command, or DTO class, use `ReferencesSearch`
+to locate every call site **before** editing. This prevents compile errors from undiscovered
+constructors or factory calls in other files.
+
+```kotlin
+// Before adding a field to CreateReleaseCommand — find every constructor call site first
+import com.intellij.psi.search.searches.ReferencesSearch
+val cmdClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.example.commands.CreateReleaseCommand",
+        GlobalSearchScope.projectScope(project)
+    )
+}
+if (cmdClass != null) {
+    val usages = readAction {
+        ReferencesSearch.search(cmdClass, GlobalSearchScope.projectScope(project)).findAll()
+    }
+    usages.forEach { ref ->
+        val file = ref.element.containingFile.virtualFile.path.substringAfterLast('/')
+        println("$file:${ref.element.textOffset} → " + ref.element.parent.text.take(120))
+    }
+} else println("class not found — check FQN")
+// Fix every listed call site BEFORE running the compiler.
+// This 1 call replaces reading 3-5 files just to find constructors.
+```
+
+---
+
+## Docker-Unavailable Fallback: Compile Verification When Tests Cannot Run
+
+When `./mvnw test` fails with `Could not find a valid Docker environment` or a `DockerException`,
+Testcontainers cannot start the database container. Your code changes may be correct even though
+no test passed. Use this two-step verification:
+
+**Step 1 — Confirm it is a Docker-only failure** (not a compile or logic error):
+```kotlin
+// Run this after a test failure to determine whether Docker is the sole blocker:
+val proc = ProcessBuilder("./mvnw", "test", "-Dtest=MyIntegrationTest", "-Dspotless.check.skip=true")
+    .directory(java.io.File(project.basePath!!)).redirectErrorStream(true).start()
+val lines = proc.inputStream.bufferedReader().readLines()
+proc.waitFor()
+val dockerError = lines.any { "Could not find a valid Docker" in it || "DockerException" in it }
+println("Docker-only failure: $dockerError")
+println(lines.takeLast(20).joinToString("\n"))
+```
+
+**Step 2 — Verify compilation separately** (only when step 1 confirms Docker is the sole blocker):
+```kotlin
+// Verify compile with test-compile (faster than full test, no Docker needed):
+val proc = ProcessBuilder("./mvnw", "test-compile", "-Dspotless.check.skip=true")
+    .directory(java.io.File(project.basePath!!)).redirectErrorStream(true).start()
+val lines = proc.inputStream.bufferedReader().readLines()
+val exitCode = proc.waitFor()
+println("test-compile exit: $exitCode")
+println(lines.filter { "ERROR" in it || "BUILD" in it || "FAILURE" in it }.joinToString("\n"))
+// Exit code 0 = compilation success → safe to report ARENA_FIX_APPLIED: yes with caveat
+// Exit code 1 = compile errors → fix errors first
+```
+
+**Reporting rule** (only when both conditions hold):
+- `./mvnw test` failed with an explicit `DockerException` / `Could not find a valid Docker environment`
+- `./mvnw test-compile` exits 0
+
+→ Report: `ARENA_FIX_APPLIED: yes`
+→ Note: `(tests blocked by Docker unavailability — compilation verified via test-compile)`
+
+**Do NOT** apply this path when tests fail for any other reason (logic errors, missing methods,
+Spring context startup failures). The Docker-unavailable path is ONLY valid when the error is
+literally "cannot connect to Docker daemon."
 
 ---
 
