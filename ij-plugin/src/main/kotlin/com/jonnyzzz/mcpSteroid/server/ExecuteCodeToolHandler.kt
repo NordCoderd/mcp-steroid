@@ -77,7 +77,15 @@ class ExecuteCodeToolHandler : McpRegistrar {
 
              **⚠️ THREADING RULE — NEVER SKIP**: Any PSI access (JavaPsiFacade, PsiShortNamesCache, PsiManager.findFile, `ProjectRootManager.contentSourceRoots`, module roots, annotations, etc.) **MUST** be wrapped in `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately at runtime — they are not silently ignored. **This applies to ALL PSI calls including your very first exploration call** (e.g. listing source roots). This is the most common first-attempt error.
 
-             **⚠️ Do NOT install plugins or modify IDE internals via reflection**: This environment is pre-configured. If `required_plugins` fails, report the missing plugin ID — do NOT attempt `PluginsAdvertiser`, `PluginInstaller`, `PluginManagerCore` write APIs, or any reflection-based installation. These throw `IllegalArgumentException` / `IllegalAccessError` at runtime and waste a turn.
+             **⚠️ Do NOT install plugins or modify IDE internals via reflection**: This environment is pre-configured. If `required_plugins` fails, report the missing plugin ID — do NOT attempt `PluginsAdvertiser`, `PluginInstaller`, `PluginManagerCore` write APIs, or any reflection-based installation. These throw `IllegalArgumentException` / `IllegalAccessError` at runtime and waste a turn. To check if a plugin is already installed (without installing it):
+             ```kotlin
+             import com.intellij.ide.plugins.PluginManagerCore
+             import com.intellij.openapi.extensions.PluginId
+             val pluginId = PluginId.getId("org.jetbrains.kotlin")
+             val installed = PluginManagerCore.isPluginInstalled(pluginId)
+             println("Plugin installed: ${'$'}installed")
+             // If not installed: report the plugin ID and stop — do NOT attempt programmatic installation
+             ```
 
              **⚠️ writeAction { } is NOT a coroutine scope**: Calling `readAction { }` or ANY suspend function inside `writeAction { }` throws `suspension functions can only be called within coroutine body`. ALWAYS read first (outside), then write (inside):
              ```kotlin
@@ -404,12 +412,15 @@ class ExecuteCodeToolHandler : McpRegistrar {
              println(lines.takeLast(15).joinToString("\n")) // Maven BUILD FAILURE at bottom
              ```
              ```kotlin
-             // Docker pre-check BEFORE running @Testcontainers tests — fail fast, save 2-3 turns
-             // Run this FIRST when you suspect Docker may be unavailable in the environment
+             // ⚡ Docker pre-check — RUN PROACTIVELY when FAIL_TO_PASS tests use @Testcontainers or extend AbstractIT
+             // Do NOT wait for a test failure to discover Docker issues — check on your VERY FIRST exec_code call.
+             // Saves 8+ turns (9 turns wasted if you discover unavailability only after repeated test runs).
+             // Trigger: any FAIL_TO_PASS test class annotated @Testcontainers or extending AbstractIT/AbstractITBase/IntegrationTest
              val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
              val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
              println("Docker available: ${'$'}dockerOk")
-             // If dockerOk=false: use runInspectionsDirectly for verification, skip integration tests
+             // If dockerOk=false: use runInspectionsDirectly for compile verification, skip integration tests entirely,
+             // output ARENA_FIX_APPLIED: yes. Do NOT investigate Docker further — it is an infrastructure constraint.
              ```
              ```kotlin
              // Run a specific JUnit test class via IntelliJ runner (NON-MAVEN/GRADLE PROJECTS ONLY)

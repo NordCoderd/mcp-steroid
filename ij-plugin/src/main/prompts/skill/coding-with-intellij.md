@@ -455,6 +455,27 @@ val plugin = PluginManagerCore.loadedPlugins
 println("Kotlin plugin: ${plugin?.version}")
 ```
 
+### Check Plugin Installed (Before Using Plugin APIs)
+
+> **⚠️ Do NOT call `PluginsAdvertiser.installAndEnable` or any programmatic plugin installer.**
+> These APIs change signatures between IntelliJ versions and throw `IllegalArgumentException` /
+> `IllegalAccessError` at runtime (2025.x+). Always check first; if not installed, use `required_plugins`
+> parameter instead and let the tool system handle it.
+
+```kotlin
+import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.extensions.PluginId
+
+// Check if a plugin is installed (and loaded) — use this BEFORE calling any plugin-specific API
+val pluginId = PluginId.getId("com.intellij.database")  // replace with the plugin you need
+val installed = PluginManagerCore.isPluginInstalled(pluginId)
+val loaded = PluginManagerCore.getPlugin(pluginId)?.isEnabled == true
+println("Plugin $pluginId: installed=$installed loaded=$loaded")
+
+// If not loaded: do NOT attempt installation. Instead, report the missing plugin ID and stop.
+// The steroid_execute_code `required_plugins` parameter is the correct way to declare dependencies.
+```
+
 ### Navigate Project Files
 
 ```kotlin
@@ -2133,17 +2154,22 @@ println("PATH: ${System.getenv("PATH")}")
 
 > **Key principle**: If you need 3+ diagnostic shell commands, collapse them into ONE `steroid_execute_code` call. The JVM inside IntelliJ has unrestricted filesystem and process access — identical to what Bash can do, but without the per-call overhead.
 
-> **Proactive Docker pre-check** — run BEFORE executing `@Testcontainers` tests to fail fast rather
-> than wasting 2-3 turns on test runs that will all fail with "Could not find a valid Docker environment":
+> **⚡ Proactive Docker pre-check — TRIGGER: run on your VERY FIRST `steroid_execute_code` call when**
+> **FAIL_TO_PASS tests use `@Testcontainers` or extend `AbstractIT` / `IntegrationTest` / `AbstractITBase`.**
+> Do NOT wait for test failures to discover Docker unavailability — that wastes 8+ turns (~3 min).
+> Combine with your IDE readiness probe so it costs zero extra turns:
 
 ```kotlin
-// Check Docker availability BEFORE running Testcontainer-dependent integration tests
-val dockerProcess = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
-val completed = dockerProcess.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
-val dockerOk = completed && dockerProcess.exitValue() == 0
+// STEP ZERO: combine IDE probe + Docker check in one call (before any implementation)
+println("Project: ${project.name} @ ${project.basePath}")
+println("Smart mode: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
+val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
+val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
 println("Docker available: $dockerOk")
-// If dockerOk=false: skip integration tests, use runInspectionsDirectly for verification,
-// and report ARENA_FIX_APPLIED: yes. Do NOT investigate Docker setup further.
+// Decision based on result:
+// dockerOk=true  → proceed normally; run @Testcontainers tests as final verification
+// dockerOk=false → use runInspectionsDirectly for compile verification only; DO NOT run integration tests
+//                  report ARENA_FIX_APPLIED: yes once inspections pass; do NOT investigate Docker further
 ```
 
 > **When to stop investigating Docker failures**: If `./mvnw test` fails with `Could not find a valid Docker environment` AND an existing test (pre-patch) fails with the same error, the environment lacks Docker. This is an **infrastructure constraint, not a code defect**. Do NOT investigate further — use `runInspectionsDirectly` as your final verification and declare your fix complete.
