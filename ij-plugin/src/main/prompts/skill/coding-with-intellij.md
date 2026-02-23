@@ -1172,6 +1172,40 @@ repo?.methods?.forEach { method ->
 }
 ```
 
+### Validate Spring Data JPA Repository After Adding Derived Query Methods
+
+**Always run `runInspectionsDirectly` on the repository file immediately after adding derived query methods.** Spring Data JPA method names like `findByFeature_Code` and `findByParentComment_Id` follow strict naming conventions derived from entity field paths. They compile fine in Java but throw `QueryCreationException` at Spring context startup — which only surfaces during `./mvnw test`, not during `./mvnw test-compile`.
+
+> **Rule**: Inspect every file you **modify** — not just files you **create**. The most common undetected error pattern is: inspections pass on all newly created files, but the modified repository has a subtly invalid method name that causes a 90+ second Maven test failure. Catching it with `runInspectionsDirectly` (~5s) prevents that wasted turn.
+
+```kotlin
+// After modifying a Spring Data JPA repository (adding new findBy... methods):
+val repoVf = findProjectFile("src/main/java/com/example/CommentRepository.java")!!
+val problems = runInspectionsDirectly(repoVf)
+if (problems.isEmpty()) println("OK: repository methods are valid")
+else problems.forEach { (id, d) -> d.forEach { println("[$id] ${it.descriptionTemplate}") } }
+// Spring Data Plugin reports: SpringDataMethodInconsistency, invalid derived query names, etc.
+// Example valid derived queries for a Comment entity with Feature and ParentComment fields:
+//   findByFeature_Code(String code)       → traverses Comment.feature.code
+//   findByParentComment_Id(Long id)       → traverses Comment.parentComment.id
+// Example invalid: findByFeatureCode(String code) if field is 'feature.code' not 'featureCode'
+```
+
+**Batch: inspect multiple modified files at once**
+```kotlin
+// Inspect both modified file AND newly created files in a single call
+for (path in listOf(
+    "src/main/java/com/example/CommentRepository.java",   // ← MODIFIED (added findBy methods)
+    "src/main/java/com/example/CommentService.java",      // ← CREATED
+    "src/main/java/com/example/api/CommentController.java" // ← CREATED
+)) {
+    val vf = findProjectFile(path) ?: run { println("NOT FOUND: $path"); continue }
+    val problems = runInspectionsDirectly(vf)
+    if (problems.isEmpty()) println("OK: $path")
+    else problems.forEach { (id, d) -> d.forEach { println("[$id] $path: ${it.descriptionTemplate}") } }
+}
+```
+
 ### Inspect JPA Entity Fields (Parent-Child Relationships)
 
 Understand existing JPA mappings before adding `@ManyToOne` / `@OneToMany` relationships:
@@ -2605,6 +2639,42 @@ Includes full stack trace in output.
 ### 8. Keep Trying
 
 The IntelliJ API has a learning curve - persistence pays off!
+
+### 8a. Single Exploration Pass — Never Re-read Files Already in Context
+
+Every file you read via `steroid_execute_code` is in your conversation history for the rest
+of the session. Do NOT re-read a file you already read earlier:
+
+- Files you read remain available in your conversation history.
+- Only re-read a file if you **explicitly modified it** and need to verify the write succeeded.
+- Do NOT restart exploration under a new `task_id` — you will re-read the same files and waste turns.
+- Do NOT re-create a file because you forgot whether you created it — use `findProjectFile()` to check existence.
+
+This rule is critical: each `steroid_execute_code` call takes ~20 seconds. Re-reading files already in
+context wastes turns and time without adding information.
+
+### 8b. Recovering from steroid_execute_code Compile Errors
+
+When `steroid_execute_code` fails with a Kotlin compilation error (e.g. `unresolved reference 'GlobalSearchScope'`):
+
+1. **Read the error message** — it names the exact unresolved symbol.
+2. **Add the missing import** at the top of your script and resubmit.
+3. **Do NOT switch to Bash/grep** after a compile error — one corrected steroid call is faster than 10 grep commands.
+
+Common imports that are frequently missing:
+
+```kotlin
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope   // ← most often missing
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.psi.search.PsiShortNamesCache
+import com.intellij.psi.JavaPsiFacade
+import com.intellij.psi.PsiManager
+import com.intellij.openapi.vfs.VfsUtil
+```
+
+If the error is `suspension functions can only be called within coroutine body`, your helper
+function is missing the `suspend` keyword — add `suspend fun myHelper()`.
 
 ### 9. Use runInspectionsDirectly for Code Analysis
 

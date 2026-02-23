@@ -604,6 +604,16 @@ class ExecuteCodeToolHandler : McpRegistrar {
              signatures. After modifying a widely-used class (DTO, command, entity), also check dependent
              files, or run `./mvnw test-compile -q` (with takeLast() truncation) for project-wide verification.
 
+             **⚠️ Inspect MODIFIED files too — not just newly created ones**: After adding methods to an existing file (e.g., adding derived query methods to `CommentRepository.java`), run `runInspectionsDirectly` on that file immediately. Spring Data JPA derived query names (`findByFeature_Code`, `findByParentComment_Id`) compile fine in Java but throw `QueryCreationException` at Spring context startup — the Spring Data plugin inspection catches these in ~5s, before `./mvnw test` (~90s):
+             ```kotlin
+             // ⚠️ After MODIFYING a repository (adding findBy... methods) — inspect it immediately:
+             val repoVf = findProjectFile("src/main/java/com/example/CommentRepository.java")!!
+             val problems = runInspectionsDirectly(repoVf)
+             if (problems.isEmpty()) println("OK: repository methods are valid")
+             else problems.forEach { (id, d) -> d.forEach { println("[" + id + "] " + it.descriptionTemplate) } }
+             // Look for: SpringDataMethodInconsistency, invalid derived query name warnings
+             ```
+
              **⚠️ `runInspectionsDirectly` also catches Spring issues**: Duplicate `@Bean` definitions, missing `@Component` annotations, unresolved `@Autowired` dependencies. Run it on your `@Configuration` classes **BEFORE** `./mvnw test` to catch Spring bean override exceptions early (~5s vs ~90s per Maven cold-start). This surfaces `NoUniqueBeanDefinitionException`-class bugs before they cause confusing test failures.
 
              **Verification gate**: Run FAIL_TO_PASS tests before marking work complete.
