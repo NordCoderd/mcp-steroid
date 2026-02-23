@@ -1020,18 +1020,29 @@ println("File created and VFS refreshed")
 
 ## Java / Spring Boot Patterns
 
-> **Step -1 — Multi-agent coordination: Check VCS changes BEFORE writing any code**
+> **Step -1 — Combined startup call: readiness + Docker + VCS in ONE exec_code call**
 >
-> Multiple agent slots may share the same IntelliJ project simultaneously. Before writing a
-> single file, check what another slot has already created or modified:
+> For any Spring Boot / Maven task, combine your first three checks into a single call.
+> This saves ~60s (3 round-trips × ~20s each) and gives you everything you need to plan exploration:
 >
 > ```kotlin
+> // Recommended FIRST exec_code call — do NOT split into 3 separate calls:
+> println("Project: ${project.name}, base: ${project.basePath}")
+> println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
+> val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
+> val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
+> println("Docker: $dockerOk")
 > val changes = readAction {
 >     com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
 >         .allChanges.mapNotNull { it.virtualFile?.path }
 > }
-> println(if (changes.isEmpty()) "Clean slate" else "FILES ALREADY MODIFIED:\n" + changes.joinToString("\n"))
-> // If files are listed: read them BEFORE writing to avoid overwriting parallel-agent work
+> println(if (changes.isEmpty()) "VCS: clean slate" else "VCS-modified files:\n" + changes.joinToString("\n"))
+> // If files are listed: read them BEFORE writing to avoid overwriting parallel-agent work.
+> // If dockerOk=false: still attempt to run FAIL_TO_PASS tests — many use H2 in-memory DB,
+> // no Docker needed. Only fall back to runInspectionsDirectly if the test fails with an
+> // explicit Docker connection error ("Cannot connect to Docker daemon").
+> // Then add file reads for VCS-modified files + FAIL_TO_PASS test files IN THIS SAME CALL
+> // to compress exploration from 7+ calls to 2-3.
 > ```
 
 > **Step 0 — Explore with PSI BEFORE reading files**
