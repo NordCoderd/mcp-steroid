@@ -47,6 +47,21 @@ class DpaiaArenaTest {
     @TestFactory
     @Timeout(value = 60, unit = TimeUnit.MINUTES)
     fun `arena test cases`(): List<DynamicTest> {
+        // If session initialization failed in @BeforeAll, return a single failing DynamicTest
+        // so JUnit reports a real failure (not a skipped/missing class with no test records).
+        val infra = sessionFailure
+        if (infra != null) {
+            return listOf(
+                DynamicTest.dynamicTest("[infra] session initialization failed") {
+                    throw AssertionError(
+                        "[ARENA] INFRA_FAILURE: session could not be initialized. " +
+                                "Cause: ${infra.message}",
+                        infra
+                    )
+                }
+            )
+        }
+
         val selectedCases = selectTestCases()
         println("[ARENA] Selected ${selectedCases.size} test case(s) for execution")
 
@@ -106,6 +121,15 @@ class DpaiaArenaTest {
 
         @JvmStatic
         val lifetime by lazy { CloseableStackHost() }
+
+        /**
+         * Stores the exception thrown during [session] lazy initialization, if any.
+         * Set by [beforeAll] when session init fails — read by [arena test cases] to
+         * return a single failing [DynamicTest] instead of having JUnit mark the entire
+         * class as `initializationError` with zero test records.
+         */
+        @Volatile
+        var sessionFailure: Exception? = null
 
         private val dataset by lazy {
             println("[ARENA] Downloading dataset from $DATASET_URL ...")
@@ -243,7 +267,11 @@ class DpaiaArenaTest {
                 // Write a structured JSON artifact so Phase 3/4 analysis can detect infra-only
                 // failures without parsing raw log text (avoids misleading "0 MCP calls" verdicts).
                 writeInfraFailureSummary(setupTestCase.instanceId, e)
-                throw e
+                // Store the failure instead of rethrowing — rethrowing here causes JUnit to mark
+                // the entire class as initializationError with zero test records, hiding the
+                // failure from test reports. Instead, we surface it as a real failing DynamicTest
+                // in the @TestFactory so the run shows a visible, named failure.
+                sessionFailure = e
             }
         }
 
