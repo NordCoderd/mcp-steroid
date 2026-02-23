@@ -15,6 +15,7 @@ Never include AI as co-author or mention AI in commit messages.
 - **BANNED:** `runCatching{}.onFailure{}` — use `try { } catch (e: Exception) { }` instead. Other `runCatching` uses (`.getOrNull()`, `.getOrDefault()`) are fine
 - **BANNED:** Code must never reference or depend on `run-agent.sh` or `docs/run-agent.sh`. These scripts are tools for humans and AI agents to use manually, not for programmatic execution. Code should implement agent integrations directly using CLI flags and arguments. `run-agent.sh` must **never** be installed inside Docker containers (no `COPY run-agent.sh` or `RUN chmod +x ... run-agent.sh` in Dockerfiles)
 - **BANNED:** Gradle build files must never reach into another subproject's `build/` directory directly. Use Gradle dependency configurations to share artifacts between subprojects. Fail fast with a clear `require()`/`error()` — no silent fallbacks that hide misconfiguration
+- **BANNED:** Do NOT use `append("\n")` or `append("...\n")` tricks to work around the `NoLargeInlineStringsTest` lint rule. When a `buildString { }` block exceeds the consecutive-`appendLine` limit, the correct fix is to move the content to `src/main/prompts/` resource files and reference them via article URIs — not to sprinkle `append("\n")` calls to artificially break the line count.
 - Log new ideas/tasks in TODO* files (TODO.md, TODO-*.md)
 - **No infrastructure workarounds**: when tests fail due to infrastructure limitations (missing Docker socket, missing CLI, wrong JDK), fix the infrastructure — mount Docker socket, install Docker CLI, configure JDK. Do NOT add code that detects the limitation and silently skips tests or changes behavior. A failing test that reveals a real problem is better than a passing test that hides it.
 - **Prefer Kotlin Coroutines native APIs over Java threading primitives**: use `CompletableDeferred<T>` + `withTimeout(duration) { deferred.await() }` instead of `CountDownLatch`. Use `Channel<T>` for streaming. Use `suspendCancellableCoroutine` for one-shot callbacks. `CountDownLatch` / `Semaphore` / `Object.wait()` are banned in new coroutine code — they block threads and are not cancellation-aware.
@@ -139,10 +140,19 @@ private fun testExecParams(code: String, timeout: Int = 30) = ExecCodeParams(
 )
 ```
 
+### Test Task Isolation Rules
+
+- **`./gradlew :ij-plugin:test`** — runs only unit/in-process tests. Docker CLI tests are excluded by default.
+  - Docker CLI tests (require Docker + API keys): run explicitly with `--tests '*CliClaudeIntegrationTest*'` etc.
+  - `./gradlew test` at root does NOT run `test-integration:test` (guarded by `onlyIf`).
+- **`./gradlew :test-integration:test`** — MUST be invoked explicitly with `:test-integration:` prefix.
+  - Running `./gradlew test` at root silently skips `test-integration:test` (`onlyIf` returns false).
+  - Direct invocation `./gradlew :test-integration:test --tests '...'` still works.
+
 ### Key Test Files
 
-- **McpServerIntegrationTest** — MCP protocol handshake, tool flows, session management
-- **CliClaudeIntegrationTest** / **CliCodexIntegrationTest** / **CliGeminiIntegrationTest** — Docker-isolated CLI tests (need API keys)
+- **McpServerIntegrationTest** — MCP protocol handshake, tool flows, session management (in-process, no Docker)
+- **CliClaudeIntegrationTest** / **CliCodexIntegrationTest** / **CliGeminiIntegrationTest** — Docker-isolated CLI tests (need API keys); excluded from default `ij-plugin:test`
 - **ScriptExecutorTest** — Fast failure semantics, compilation/runtime errors
 - **ExecutionManagerTest** — Execution with progress reporting
 

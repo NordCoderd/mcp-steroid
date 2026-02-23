@@ -110,6 +110,17 @@ fun Test.configureIntegrationTest() {
 
 tasks.test {
     configureIntegrationTest()
+
+    // Prevent this task from being silently triggered by root-level './gradlew test' aggregation.
+    // Integration tests require Docker, API keys, and IDE containers — they must be invoked explicitly.
+    //
+    // Correct usage:
+    //   ./gradlew :test-integration:test --tests '*DebuggerDemoTest.claude*'
+    //   ./gradlew :test-integration:test --tests '*DpaiaArenaTest*' -Darena.test.instanceId=<id>
+    //   ./gradlew :test-integration:testReleaseSmokeIdea
+    onlyIf("Requires explicit :test-integration: task invocation — not for root aggregation") {
+        gradle.startParameter.taskNames.any { it.contains(":test-integration:") }
+    }
 }
 
 /**

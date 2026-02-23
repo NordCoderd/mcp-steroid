@@ -499,6 +499,22 @@ tasks.verifyPlugin {
     dependsOn(verifyBundledLibraries)
 }
 
+// Exclude Docker/API-key-dependent CLI tests from the default 'test' run.
+// These tests require a Docker daemon and LLM API keys (ANTHROPIC_API_KEY etc.).
+// Run them explicitly when infrastructure is available:
+//   ./gradlew :ij-plugin:test --tests '*CliClaudeIntegrationTest*'
+//   ./gradlew :ij-plugin:test --tests '*CliCodexIntegrationTest*'
+//   ./gradlew :ij-plugin:test --tests '*CliGeminiIntegrationTest*'
+//   ./gradlew :ij-plugin:test --tests '*CliIntegrationCommonTest*'
+tasks.test {
+    filter {
+        excludeTestsMatching("*CliClaudeIntegrationTest*")
+        excludeTestsMatching("*CliCodexIntegrationTest*")
+        excludeTestsMatching("*CliGeminiIntegrationTest*")
+        excludeTestsMatching("*CliIntegrationCommonTest*")
+    }
+}
+
 // Deploy plugin to running IDEs with hot-reload support
 val deployPlugin by tasks.registering {
     group = "intellij platform"
