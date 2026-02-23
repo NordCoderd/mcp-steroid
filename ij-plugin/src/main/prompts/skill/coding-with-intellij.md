@@ -1809,11 +1809,11 @@ MavenRunConfigurationType.runConfiguration(
     /* runnerSettings (MavenRunnerSettings) = */ null,
 ) { /* ProgramRunner.Callback — completion handled by SMTRunnerEventsListener above */ }
 
-latch.await(10, TimeUnit.MINUTES)
+latch.await(5, TimeUnit.MINUTES)
 println("Result: passed=$passed")
 ```
 
-> **⚠️ Docker / CI environments — use `dialog_killer: true`**: When running `MavenRunConfigurationType.runConfiguration()` in a Docker or CI container, Maven project-reimport dialogs can block the run silently for the full latch timeout (10 minutes wasted). Pass `dialog_killer: true` as the `steroid_execute_code` parameter to auto-dismiss these modals. If the latch still times out after 2-3 minutes despite `dialog_killer: true`, **stop waiting and fall back to `ProcessBuilder("./mvnw", ...)` immediately** — do not wait the full 10 minutes.
+> **⚠️ Docker / CI environments — use `dialog_killer: true`**: When running `MavenRunConfigurationType.runConfiguration()` in a Docker or CI container, Maven project-reimport dialogs can block the run silently for the full latch timeout (5 minutes wasted). Pass `dialog_killer: true` as the `steroid_execute_code` parameter to auto-dismiss these modals. If the latch still times out after 2-3 minutes despite `dialog_killer: true`, **stop waiting and fall back to `ProcessBuilder("./mvnw", ...)` immediately** — do not wait the full 5 minutes.
 
 #### Gradle projects — `GradleRunConfiguration.setRunAsTest(true)`
 
@@ -1869,7 +1869,7 @@ val settings = runManager.createConfiguration(config, factory)
 runManager.addConfiguration(settings)
 ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
 
-latch.await(10, TimeUnit.MINUTES)
+latch.await(5, TimeUnit.MINUTES)
 println("Result: passed=$passed")
 ```
 
@@ -2010,7 +2010,7 @@ ExternalSystemUtil.runTask(
     ProgressExecutionMode.IN_BACKGROUND_ASYNC,
     false
 )
-latch.await(10, TimeUnit.MINUTES)
+latch.await(5, TimeUnit.MINUTES)
 println("Gradle result: success=$gradleSuccess")
 ```
 
@@ -2180,7 +2180,7 @@ connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEven
 // Then launch via MavenRunConfigurationType or GradleRunConfiguration (see ★ PREFERRED ★ above)
 // ... launch code here ...
 
-latch.await(10, TimeUnit.MINUTES)
+latch.await(5, TimeUnit.MINUTES)
 ```
 
 ### Check Compile Errors Without Running Full Build
@@ -2190,8 +2190,16 @@ latch.await(10, TimeUnit.MINUTES)
 > **⚠️ Scope limitation**: `runInspectionsDirectly` is **file-scoped** — it only analyzes the single
 > file you pass. It does NOT catch compile errors in OTHER files that reference your changed signatures.
 > After modifying a widely-used class (DTO, command, entity, record), also check the key dependent files
-> (service, controller, mapper, test), or run `./mvnw test-compile -q` (with takeLast() truncation) for
+> (service, controller, mapper, test), or run `./mvnw compile -q` (with takeLast() truncation) for
 > project-wide verification.
+>
+> **Staged verification recipe (Maven projects)**:
+> 1. `runInspectionsDirectly(vf)` for each changed file — catches single-file syntax/import errors (~5s each)
+> 2. `./mvnw compile -q` — catches cross-file type errors, missing methods, broken call sites (~30-60s)
+> 3. `./mvnw test -Dtest=TargetTest` — only after steps 1+2 pass (runs Docker-dependent tests)
+>
+> Do NOT skip step 2 and jump directly to step 3 — a compile error in a dependent file will fail the test
+> with a confusing runtime stacktrace rather than a clean compile error message.
 
 > **⚠️ Spring bonus — also catches bean conflicts**: `runInspectionsDirectly` detects Spring Framework
 > issues beyond compile errors: duplicate `@Bean` method definitions in `@Configuration` classes (causes
