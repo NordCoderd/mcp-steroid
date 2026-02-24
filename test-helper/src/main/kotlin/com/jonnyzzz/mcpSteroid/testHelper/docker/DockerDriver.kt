@@ -56,7 +56,7 @@ class DockerDriver(
     fun startContainer2(
         request: StartContainerRequest,
     ): String {
-        val imageName = request.imageName ?: error("No image name")
+        val imageName = request.image ?: error("No image name")
 
         val command = buildList {
             add("docker")

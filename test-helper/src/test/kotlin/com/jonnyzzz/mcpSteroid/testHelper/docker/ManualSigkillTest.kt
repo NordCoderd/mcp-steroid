@@ -40,7 +40,7 @@ fun main() {
     val containerId = driver.startContainer(
         lifetime = lifetime,
         StartContainerRequest()
-            .imageName("alpine:latest")
+            .image("alpine:latest")
             .entryPoint("sleep", "infinity")
     )
 

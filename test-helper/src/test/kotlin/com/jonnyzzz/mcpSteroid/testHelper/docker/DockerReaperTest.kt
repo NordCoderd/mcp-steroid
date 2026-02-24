@@ -52,7 +52,7 @@ class DockerReaperTest {
         val containerId = driver.startContainer(
             lifetime,
             StartContainerRequest()
-                .imageName("alpine:latest")
+                .image("alpine:latest")
                 .entryPoint("sleep", "infinity")
         )
 
@@ -96,7 +96,7 @@ class DockerReaperTest {
             val containerId = driver.startContainer(
                 lifetime = lifetime,
                 StartContainerRequest()
-                    .imageName("alpine:latest")
+                    .image("alpine:latest")
                     .entryPoint("sleep", "infinity")
             )
 

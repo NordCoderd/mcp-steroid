@@ -48,7 +48,7 @@ fun startContainerDriver(
     val containerId = scope.startContainer(
         lifetime,
         StartContainerRequest()
-            .imageName(imageId)
+            .image(imageId)
             .extraEnvVars(extraEnvVars)
             .volumes(volumes)
             .ports(ports)

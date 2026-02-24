@@ -5,7 +5,7 @@ import java.time.Duration
 
 @Suppress("DATA_CLASS_COPY_VISIBILITY_WILL_BE_CHANGED_WARNING", "DataClassPrivateConstructor")
 data class StartContainerRequest private constructor(
-    val imageName: String? = null,
+    val image: String? = null,
     val extraEnvVars: Map<String, String> = emptyMap(),
     val volumes: List<ContainerVolume> = emptyList(),
     val ports: List<ContainerPort> = emptyList(),
@@ -17,14 +17,14 @@ data class StartContainerRequest private constructor(
         operator fun invoke() : StartContainerRequest = StartContainerRequest()
     }
 
-    fun imageName(x : String) = copy(imageName = x)
-    fun extraEnvVars(x : Map<String, String>) = copy(extraEnvVars = x)
-    fun volumes(x : List<ContainerVolume>) = copy(volumes = x)
-    fun ports(x : List<ContainerPort>) = copy(ports = x)
-    fun entryPoint(x: List<String>) = copy(entryPoint = x)
+    fun image(image : String) = copy(image = image)
+    fun extraEnvVars(extraEnvVars : Map<String, String>) = copy(extraEnvVars = extraEnvVars)
+    fun volumes(volumes : List<ContainerVolume>) = copy(volumes = volumes)
+    fun ports(ports : List<ContainerPort>) = copy(ports = ports)
+    fun entryPoint(args: List<String>) = copy(entryPoint = args)
     fun entryPoint(vararg args: String) = entryPoint(args.toList())
-    fun autoRemove(x : Boolean) = copy(autoRemove = x)
-    fun timeout(x : Duration) = copy(timeout = x)
+    fun autoRemove(autoRemove : Boolean) = copy(autoRemove = autoRemove)
+    fun timeout(timeout : Duration) = copy(timeout = timeout)
 }
 
 
