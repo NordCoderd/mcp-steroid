@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 
 data class ContainerHolder(
@@ -32,47 +31,6 @@ interface ContainerDriver : ContainerProcessRunner {
         extraEnvVars: Map<String, String> = emptyMap(),
     ): RunningContainerProcess
 
-    fun writeFileInContainer(
-        containerPath: String,
-        content: String,
-        executable: Boolean = false,
-    ) {
-        val parentDir = containerPath.substringBeforeLast('/')
-        if (parentDir.isNotEmpty()) {
-
-            runInContainer(
-                ContainerProcessRunRequest.builder()
-                    .command("mkdir", "-p", parentDir)
-                    .description("mkdir $parentDir")
-                    .timeoutSeconds(5)
-                    .quietly()
-                    .build()
-            )
-                .assertExitCode(0)
-        }
-
-        runInContainer(
-            ContainerProcessRunRequest.builder()
-                .command("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
-                .description("Write content to $containerPath")
-                .timeoutSeconds(5)
-                .quietly()
-                .build()
-        )
-            .assertExitCode(0)
-
-        if (executable) {
-            runInContainer(
-                ContainerProcessRunRequest.builder()
-                    .command("chmod", "+x", containerPath)
-                    .description("chmod +x $containerPath")
-                    .timeoutSeconds(5)
-                    .quietly()
-                    .build()
-            )
-                .assertExitCode(0)
-        }
-    }
 
     companion object
 }

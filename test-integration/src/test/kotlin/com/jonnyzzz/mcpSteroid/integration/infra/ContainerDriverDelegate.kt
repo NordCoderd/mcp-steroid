@@ -16,6 +16,5 @@ abstract class ContainerDriverDelegate<D: ContainerDriverDelegate<D>>(
     final override val volumes: List<ContainerVolume> by delegate::volumes
 
     final override fun withEnv(key: String, value: String): ContainerDriver = createNewDriver(delegate.withEnv(key, value))
-    final override fun writeFileInContainer(containerPath: String, content: String, executable: Boolean) = delegate.writeFileInContainer(containerPath, content, executable)
     override fun toString(): String = "${javaClass.simpleName}($delegate)"
 }

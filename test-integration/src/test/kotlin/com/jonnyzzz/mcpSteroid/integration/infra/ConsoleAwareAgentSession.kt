@@ -10,6 +10,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
+import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 

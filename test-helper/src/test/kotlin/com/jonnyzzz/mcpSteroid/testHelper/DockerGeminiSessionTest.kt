@@ -114,6 +114,5 @@ class DockerGeminiSessionTest {
 
         override fun withEnv(key: String, value: String): ContainerDriver = error("not needed in test")
         override fun runInContainerDetached(args: List<String>, workingDir: String?, extraEnvVars: Map<String, String>): RunningContainerProcess = error("not needed in test")
-        override fun writeFileInContainer(containerPath: String, content: String, executable: Boolean) = error("not needed in test")
     }
 }

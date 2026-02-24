@@ -40,3 +40,45 @@ fun ContainerDriver.copyToContainer(localPath: File, containerPath: String) {
         .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
 }
 
+
+fun ContainerDriver.writeFileInContainer(
+    containerPath: String,
+    content: String,
+    executable: Boolean = false,
+) {
+    val parentDir = containerPath.substringBeforeLast('/')
+    if (parentDir.isNotEmpty()) {
+
+        runInContainer(
+            ContainerProcessRunRequest.builder()
+                .command("mkdir", "-p", parentDir)
+                .description("mkdir $parentDir")
+                .timeoutSeconds(5)
+                .quietly()
+                .build()
+        )
+            .assertExitCode(0)
+    }
+
+    runInContainer(
+        ContainerProcessRunRequest.builder()
+            .command("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
+            .description("Write content to $containerPath")
+            .timeoutSeconds(5)
+            .quietly()
+            .build()
+    )
+        .assertExitCode(0)
+
+    if (executable) {
+        runInContainer(
+            ContainerProcessRunRequest.builder()
+                .command("chmod", "+x", containerPath)
+                .description("chmod +x $containerPath")
+                .timeoutSeconds(5)
+                .quietly()
+                .build()
+        )
+            .assertExitCode(0)
+    }
+}

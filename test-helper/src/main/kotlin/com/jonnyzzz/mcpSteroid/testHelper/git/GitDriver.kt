@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper.git
 
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mkdirs
+import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 
 /**
