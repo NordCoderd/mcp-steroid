@@ -10,7 +10,7 @@ import com.intellij.openapi.util.registry.Registry
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddCommand
 import com.jonnyzzz.mcpSteroid.mcp.*
 import com.jonnyzzz.mcpSteroid.prompts.generated.McpSteroidInfoPrompt
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPrompt
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPromptArticle
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.cio.*
@@ -201,19 +201,19 @@ class SteroidsMcpServer(
                 get("/") {
                     call.respondText(
                         contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                        text = SkillPrompt().readPrompt()
+                        text = SkillPromptArticle().payload.readPrompt()
                     )
                 }
                 get("/skill.md") {
                     call.respondText(
                         contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                        text = SkillPrompt().readPrompt()
+                        text = SkillPromptArticle().payload.readPrompt()
                     )
                 }
                 get("/SKILL.md") {
                     call.respondText(
                         contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                        text = SkillPrompt().readPrompt()
+                        text = SkillPromptArticle().payload.readPrompt()
                     )
                 }
             }
