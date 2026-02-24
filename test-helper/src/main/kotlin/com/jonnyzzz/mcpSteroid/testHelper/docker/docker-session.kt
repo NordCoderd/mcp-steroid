@@ -73,10 +73,6 @@ private class ContainerDriverImpl(
         hostPorts[port.containerPort]
             ?: error("Port ${port.containerPort} is not mapped. Available: ${hostPorts.keys}")
 
-    override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withGuestWorkDir(guestWorkDir), containerId, imageName, volumes, hostPorts)
-    }
-
     override fun withSecretPattern(secretPattern: String): ContainerDriver {
         return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes, hostPorts)
     }

@@ -54,7 +54,8 @@ class AiAgentDriver(
     }
 
     private val scope by lazy {
-        container.withGuestWorkDir(intellijDriver.getGuestProjectDir())
+        //TODO: Workdir in the container is not set for the agents!
+        container
     }
 
     val mcpSteroidHostUrl by mcp::hostMcpUrl

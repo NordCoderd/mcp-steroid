@@ -15,19 +15,13 @@ class DockerDriver(
     val logPrefix: String,
     val secretPatterns: List<String> = emptyList(),
     val environmentVariables: Map<String, String> = emptyMap(),
-    val guestWorkDir: String? = null,
 ) {
-    fun withGuestWorkDir(guestWorkDir: String): DockerDriver {
-        return DockerDriver(workDir, logPrefix, secretPatterns, environmentVariables, guestWorkDir)
-    }
-
     fun withSecretPattern(secretPattern: String): DockerDriver {
         return DockerDriver(
             workDir,
             logPrefix,
             (secretPatterns + secretPattern).distinct(),
             environmentVariables,
-            guestWorkDir
         )
     }
 
@@ -37,7 +31,6 @@ class DockerDriver(
             logPrefix,
             secretPatterns,
             (environmentVariables + (key to value)).toSortedMap(),
-            guestWorkDir
         )
     }
 

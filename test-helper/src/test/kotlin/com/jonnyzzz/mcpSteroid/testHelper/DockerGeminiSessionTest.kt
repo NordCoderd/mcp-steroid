@@ -112,7 +112,6 @@ class DockerGeminiSessionTest {
 
         override fun mapGuestPathToHostPath(path: String): File = error("not needed in test")
         override fun mapGuestPortToHostPort(port: ContainerPort): Int = error("not needed in test")
-        override fun withGuestWorkDir(guestWorkDir: String): ContainerDriver = error("not needed in test")
         override fun withSecretPattern(secretPattern: String): ContainerDriver = error("not needed in test")
         override fun withEnv(key: String, value: String): ContainerDriver = error("not needed in test")
         override fun runInContainerDetached(args: List<String>, workingDir: String?, extraEnvVars: Map<String, String>): RunningContainerProcess = error("not needed in test")
