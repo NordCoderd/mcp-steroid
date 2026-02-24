@@ -38,6 +38,7 @@ abstract class CompilePromptsTask : DefaultTask() {
             if (isSectionFile(clazz.path) && clazz.fileType == "kt") {
                 ctx.generateKtSectionCompilationTest(clazz)
             }
+            ctx.generateMdKtBlockCompilationTests(clazz)
         }
 
         // First pass: group articles per folder
