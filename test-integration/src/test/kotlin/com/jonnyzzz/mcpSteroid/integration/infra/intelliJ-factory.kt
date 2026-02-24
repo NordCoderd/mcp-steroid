@@ -2,12 +2,13 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.git.BareRepoCache
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.git.BareRepoCache
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -298,11 +299,13 @@ private fun pickIdeWindow(
 }
 
 private fun discoverProcessFamilyPids(container: ContainerDriver, rootPid: Long): Set<Long> {
-    val processMap = container.runInContainer(
-        listOf("bash", "-c", "ps -eo pid=,ppid="),
-        timeoutSeconds = 5,
-        quietly = true,
-    )
+    val processMap = container.startProcessInContainer(
+        ExecContainerProcessRequest()
+            .args("bash", "-c", "ps -eo pid=,ppid=")
+            .timeoutSeconds(5)
+            .quietly()
+            .description("ps -eo pid=,ppid="),
+    ).awaitForProcessFinish()
     if (processMap.exitCode != 0) return setOf(rootPid)
 
     val childrenByParent = mutableMapOf<Long, MutableList<Long>>()

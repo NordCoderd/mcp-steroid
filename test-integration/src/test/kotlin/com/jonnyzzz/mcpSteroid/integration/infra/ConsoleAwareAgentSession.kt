@@ -3,15 +3,14 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
+import com.jonnyzzz.mcpSteroid.testHelper.process.asStartedProcess
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -90,30 +89,30 @@ class ConsolePumpingContainerDriver(
     private val counter = AtomicInteger(0)
 
     override fun startProcessInContainer(request: ExecContainerProcessRequest): StartedProcess {
-        TODO("Not yet implemented")
-    }
-
-    override fun createNewDriver(delegate: ContainerDriver) =
-        ConsolePumpingContainerDriver(delegate, console, agentName, filterType, agentsGuestDir)
-
-    override fun runInContainer(
-        args: List<String>,
-        workingDir: String?,
-        timeoutSeconds: Long,
-        extraEnvVars: Map<String, String>,
-        quietly: Boolean,
-    ): ProcessResult {
-        require(!quietly) { "quietly mode is not supported for console runs" }
+        require(!request.quietly) { "quietly mode is not supported for console runs" }
 
         val idx = counter.incrementAndGet()
         val slug = agentName.lowercase().replace(" ", "-")
 
-        return if (filterType != null && agentsGuestDir != null) {
-            runWithInContainerFilter(args, workingDir, timeoutSeconds, extraEnvVars, idx, slug, filterType, agentsGuestDir)
+        val result = if (filterType != null && agentsGuestDir != null) {
+            runWithInContainerFilter(
+                request.args, request.workingDirInContainer,
+                request.timeout.toSeconds(), request.extraEnvVars,
+                idx, slug, filterType, agentsGuestDir,
+            )
         } else {
-            runWithCombinedLogTee(args, workingDir, timeoutSeconds, extraEnvVars, idx, slug)
+            runWithCombinedLogTee(
+                request.args, request.workingDirInContainer,
+                request.timeout.toSeconds(), request.extraEnvVars,
+                idx, slug,
+            )
         }
+
+        return result.asStartedProcess()
     }
+
+    override fun createNewDriver(delegate: ContainerDriver) =
+        ConsolePumpingContainerDriver(delegate, console, agentName, filterType, agentsGuestDir)
 
     private fun runWithInContainerFilter(
         args: List<String>,

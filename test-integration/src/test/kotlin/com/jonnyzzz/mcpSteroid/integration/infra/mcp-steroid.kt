@@ -1,12 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.infra
 
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
-import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
@@ -51,29 +52,29 @@ class McpSteroidDriver(
         // First wait for the server to be reachable via a simple GET health check.
         // This avoids creating orphan sessions from repeated initialize requests.
         waitFor(300_000, "Wait for MCP Steroid ready") {
-            val result = driver.runInContainer(
-                listOf(
-                    "curl", "-s", "-f",
-                    guestMcpUrl,
-                    "-H", "Accept: application/json",
-                ),
-                timeoutSeconds = 5,
-            )
+            val result = driver.startProcessInContainer(
+                ExecContainerProcessRequest()
+                    .args("curl", "-s", "-f", guestMcpUrl, "-H", "Accept: application/json")
+                    .timeoutSeconds(5)
+                    .description("curl health check $guestMcpUrl"),
+            ).awaitForProcessFinish()
             result.exitCode == 0
         }
 
         // Verify the MCP protocol works with a proper initialize handshake
         val mcpInit = """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"integration-test","version":"1.0"}}}"""
-        val result = driver.runInContainer(
-            listOf(
-                "curl", "-s", "-f", "-X", "POST",
-                guestMcpUrl,
-                "-H", "Content-Type: application/json",
-                "-H", "Accept: application/json",
-                "-d", mcpInit,
-            ),
-            timeoutSeconds = 10,
-        )
+        val result = driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args(
+                    "curl", "-s", "-f", "-X", "POST",
+                    guestMcpUrl,
+                    "-H", "Content-Type: application/json",
+                    "-H", "Accept: application/json",
+                    "-d", mcpInit,
+                )
+                .timeoutSeconds(10)
+                .description("curl MCP initialize handshake"),
+        ).awaitForProcessFinish()
         result.assertExitCode(0) {
             "MCP initialize handshake failed: ${result.stdout}"
         }
@@ -733,10 +734,12 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             add(requestBody)
         }
 
-        val result = driver.runInContainer(
-            curlCommand,
-            timeoutSeconds = timeoutSeconds,
-        )
+        val result = driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args(curlCommand)
+                .timeoutSeconds(timeoutSeconds)
+                .description("curl MCP request"),
+        ).awaitForProcessFinish()
 
         result.assertExitCode(0) { "MCP request failed: ${result.stdout}" }
 

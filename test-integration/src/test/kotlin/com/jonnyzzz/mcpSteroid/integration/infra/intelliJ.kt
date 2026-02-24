@@ -3,14 +3,15 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.integration.infra.McpSteroidDriver.Companion.MCP_STEROID_PORT
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.copyToContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mkdirs
 import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import java.io.File
 import kotlin.concurrent.thread
 
@@ -46,7 +47,11 @@ class IntelliJDriver(
         driver.mkdirs(logsGuestDir)
         driver.mkdirs(pluginsGuestDir)
 
-        driver.runInContainer(listOf("ls", "-la", intelliJGuestHomeDir))
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("ls", "-la", intelliJGuestHomeDir)
+                .description("ls -la $intelliJGuestHomeDir"),
+        ).awaitForProcessFinish()
 
         writeEulaAcceptance()
         writeConsentOptions()
@@ -58,12 +63,18 @@ class IntelliJDriver(
 
         println("[IDE-AGENT] Starting ${ideProduct.displayName}...")
         val launcherPath = "$intelliJGuestHomeDir/bin/${ideProduct.launcherExecutable}"
-        driver.runInContainer(listOf("ls", "-la", "$intelliJGuestHomeDir/bin"))
-        driver.runInContainer(
-            listOf("test", "-x", launcherPath),
-            timeoutSeconds = 5,
-            quietly = true,
-        ).assertExitCode(0)
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("ls", "-la", "$intelliJGuestHomeDir/bin")
+                .description("ls -la $intelliJGuestHomeDir/bin"),
+        ).awaitForProcessFinish()
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("test", "-x", launcherPath)
+                .timeoutSeconds(5)
+                .quietly()
+                .description("test -x $launcherPath"),
+        ).awaitForProcessFinish().assertExitCode(0)
 
         val idea = driver.runInContainerDetached(
             listOf(launcherPath, projectGuestDir),
@@ -300,11 +311,13 @@ class IntelliJDriver(
         driver.mkdirs(pluginsGuestDir)
         driver.mkdirs(containerTempDir)
         driver.copyToContainer(pluginZipPath, containerTempZip)
-        driver.runInContainer(
-            listOf("unzip", "-o", containerTempZip),
-            workingDir = pluginsGuestDir,
-            timeoutSeconds = 60,
-        ).assertExitCode(0)
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("unzip", "-o", containerTempZip)
+                .workingDirInContainer(pluginsGuestDir)
+                .timeoutSeconds(60)
+                .description("unzip plugin to $pluginsGuestDir"),
+        ).awaitForProcessFinish().assertExitCode(0)
     }
 
 }

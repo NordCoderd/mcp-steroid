@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration.tests
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.integration.infra.shellEscape
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.prepareNpxProxyForUrl
 import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import kotlinx.serialization.json.Json
@@ -83,10 +84,12 @@ class NpxToolVisibilityTest {
         // Add a small sleep before EOF so the proxy has time to process both requests.
         val script = "{ printf '%s\\n%s\\n' ${shellEscape(initializeRequest)} ${shellEscape(toolsListRequest)}; sleep 2; } | $npxCmdStr 2>/dev/null"
 
-        val result = container.runInContainer(
-            listOf("bash", "-c", script),
-            timeoutSeconds = 60,
-        )
+        val result = container.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("bash", "-c", script)
+                .timeoutSeconds(60)
+                .description("npx proxy tools list"),
+        ).awaitForProcessFinish()
 
         println("[NPX-VISIBILITY] Exit code: ${result.exitCode}")
         println("[NPX-VISIBILITY] Output (${result.stdout.length} chars):\n${result.stdout}")
