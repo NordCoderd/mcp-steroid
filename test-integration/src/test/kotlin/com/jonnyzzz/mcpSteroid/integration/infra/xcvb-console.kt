@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
@@ -39,11 +40,13 @@ class ConsoleDriver(
     fun writeLine(text: String) {
         println(text)
         // Single docker exec call: heredoc append with quoted delimiter to prevent expansion
-        container.runInContainer(
-            listOf("bash", "-c", "cat >> $consoleFile << 'CONSOLE_LINE_END'\n$text\nCONSOLE_LINE_END"),
-            timeoutSeconds = 5,
-            quietly = true,
-        )
+        container.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("bash", "-c", "cat >> $consoleFile << 'CONSOLE_LINE_END'\n$text\nCONSOLE_LINE_END")
+                .timeoutSeconds(5)
+                .quietly()
+                .description("writeLine to console"),
+        ).awaitForProcessFinish()
     }
 
     // -- ANSI formatting helpers --

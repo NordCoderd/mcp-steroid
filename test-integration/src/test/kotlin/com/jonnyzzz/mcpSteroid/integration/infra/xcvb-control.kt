@@ -1,8 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.infra
 
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 
 
 class XcvbInputDriver(
@@ -14,20 +15,23 @@ class XcvbInputDriver(
     )
 
     private fun xdotool(vararg args: String): String {
-        return driver
-            .runInContainer(
-                listOf("xdotool") + args.toList(),
-                timeoutSeconds = 10,
-            )
+        return driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args(listOf("xdotool") + args.toList())
+                .timeoutSeconds(10)
+                .description("xdotool ${args.joinToString(" ")}"),
+        ).awaitForProcessFinish()
             .assertExitCode(0, "[xcvb] xdotool ${args.joinToString(" ")} failed")
             .stdout.trim()
     }
 
     private fun getMouseLocationOrNull(): MouseLocation? {
-        val result = driver.runInContainer(
-            listOf("xdotool", "getmouselocation", "--shell"),
-            timeoutSeconds = 5,
-        )
+        val result = driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("xdotool", "getmouselocation", "--shell")
+                .timeoutSeconds(5)
+                .description("xdotool getmouselocation --shell"),
+        ).awaitForProcessFinish()
         if (result.exitCode != 0) return null
 
         var x: Int? = null
@@ -47,22 +51,22 @@ class XcvbInputDriver(
 
     /** Copy text to the X11 clipboard. */
     fun clipboardCopy(text: String) {
-        driver
-            .runInContainer(
-                listOf("bash", "-c", "echo -n ${shellEscape(text)} | xclip -selection clipboard"),
-                timeoutSeconds = 5,
-            ).assertExitCode(0, "[xcvb] clipboardCopy failed")
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("bash", "-c", "echo -n ${shellEscape(text)} | xclip -selection clipboard")
+                .timeoutSeconds(5)
+                .description("clipboardCopy"),
+        ).assertExitCode(0) { "[xcvb] clipboardCopy failed" }
     }
 
     /** Read text from the X11 clipboard. */
     fun clipboardPaste(): String {
-        return driver
-            .runInContainer(
-                listOf("xclip", "-selection", "clipboard", "-o"),
-                timeoutSeconds = 5,
-            )
-            .assertExitCode(0, "[xcvb] clipboardPaste failed")
-            .stdout.trim()
+        return driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("xclip", "-selection", "clipboard", "-o")
+                .timeoutSeconds(5)
+                .description("clipboardPaste"),
+        ).assertExitCode(0) { "[xcvb] clipboardPaste failed" }.stdout.trim()
     }
 
     /** Move the mouse cursor to the given display coordinates. */

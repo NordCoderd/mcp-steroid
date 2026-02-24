@@ -2,11 +2,12 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mkdirs
 import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import java.io.File
 
 class XcvbScreenshotDriver(
@@ -42,10 +43,12 @@ class XcvbScreenshotDriver(
     /** Capture a rectangular region of the screen to a file inside the container. */
     fun screenshotRegion(filename: String = "screenshot-${System.currentTimeMillis()}.png") : File {
         val destPath = "$screenshotDirInContainer/$filename"
-        driver.runInContainer(
-            listOf("scrot", destPath),
-            timeoutSeconds = 10,
-        ).assertExitCode(0)
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("scrot", destPath)
+                .timeoutSeconds(10)
+                .description("scrot $filename"),
+        ).assertExitCode(0) { "scrot $destPath failed" }
 
         println("[xcvb] Screenshot captured to $destPath")
 

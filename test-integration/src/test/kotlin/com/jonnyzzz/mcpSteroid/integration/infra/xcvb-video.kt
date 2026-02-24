@@ -2,14 +2,15 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mkdirs
 import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import kotlin.concurrent.thread
 
 class XcvbVideoDriver(
@@ -142,13 +143,16 @@ class XcvbVideoDriver(
         // Copy the finalized video from the container-local path to the mounted volume.
         // Using cp (open-write-close) instead of letting ffmpeg write directly to the
         // mount avoids the virtiofs stale-data issue.
-        driver.runInContainer(
-            listOf("bash", "-c", buildString {
-                appendLine(rsyncCommand())
-                appendLine("sync")
-            }),
-            timeoutSeconds = 30,
-        ).assertExitCode(0, "Failed to copy video")
+        val rsyncAndSyncScript = buildString {
+            appendLine(rsyncCommand())
+            appendLine("sync")
+        }
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("bash", "-c", rsyncAndSyncScript)
+                .timeoutSeconds(30)
+                .description("rsync video and sync"),
+        ).assertExitCode(0) { "Failed to copy video" }
 
         runCatching {
             val hostVideoFile = driver.mapGuestPathToHostPath(videoGuestPath)

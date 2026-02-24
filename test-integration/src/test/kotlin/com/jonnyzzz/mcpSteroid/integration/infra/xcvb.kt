@@ -2,9 +2,10 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 
 class XcvbDriver(
     private val lifetime: CloseableStack,
@@ -34,13 +35,15 @@ class XcvbDriver(
         )
 
         println("[xcvb] Waiting for display $DISPLAY to be ready...")
-        driver.runInContainer(
-            listOf(
-                "bash", "-c",
-                "for i in \$(seq 1 150); do xdpyinfo -display $DISPLAY >/dev/null 2>&1 && exit 0; sleep 0.1; done; exit 1",
-            ),
-            timeoutSeconds = 20,
-        ).assertExitCode(0){ "[xcvb] Display $DISPLAY did not become ready within 15s" }
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args(
+                    "bash", "-c",
+                    "for i in \$(seq 1 150); do xdpyinfo -display $DISPLAY >/dev/null 2>&1 && exit 0; sleep 0.1; done; exit 1",
+                )
+                .timeoutSeconds(20)
+                .description("wait for X display $DISPLAY"),
+        ).assertExitCode(0) { "[xcvb] Display $DISPLAY did not become ready within 15s" }
 
         println("[xcvb] Display $DISPLAY is ready")
 

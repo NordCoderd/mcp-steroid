@@ -2,10 +2,11 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 
 data class WindowRect(
     val x: Int,
@@ -85,11 +86,13 @@ class XcvbWindowDriver(
             done
         """.trimIndent()
 
-        val result = driver.runInContainer(
-            listOf("bash", "-c", script),
-            timeoutSeconds = 5,
-            quietly = quietly,
-        )
+        val result = driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("bash", "-c", script)
+                .timeoutSeconds(5)
+                .quietly(quietly)
+                .description("listWindows"),
+        ).awaitForProcessFinish()
         if (result.exitCode != 0) return emptyList()
 
         return result.stdout.lineSequence()
@@ -137,19 +140,25 @@ class XcvbWindowDriver(
         // to acknowledge the resize via WM size hints, but xterm does not use size hints,
         // causing a 5-second timeout. Without --sync the operation fires and returns
         // immediately, which is sufficient for our layout purposes.
-        driver.runInContainer(
-            listOf("xdotool", "windowsize", windowId, rect.width.toString(), rect.height.toString()),
-            timeoutSeconds = 5,
-        ).assertExitCode(0)
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("xdotool", "windowsize", windowId, rect.width.toString(), rect.height.toString())
+                .timeoutSeconds(5)
+                .description("xdotool windowsize $windowId"),
+        ).awaitForProcessFinish().assertExitCode(0)
 
-        driver.runInContainer(
-            listOf("xdotool", "windowmove", windowId, rect.x.toString(), rect.y.toString()),
-            timeoutSeconds = 5,
-        ).assertExitCode(0)
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("xdotool", "windowmove", windowId, rect.x.toString(), rect.y.toString())
+                .timeoutSeconds(5)
+                .description("xdotool windowmove $windowId"),
+        ).awaitForProcessFinish().assertExitCode(0)
 
-        driver.runInContainer(
-            listOf("xdotool", "windowraise", windowId),
-            timeoutSeconds = 5,
-        ).assertExitCode(0)
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("xdotool", "windowraise", windowId)
+                .timeoutSeconds(5)
+                .description("xdotool windowraise $windowId"),
+        ).awaitForProcessFinish().assertExitCode(0)
     }
 }
