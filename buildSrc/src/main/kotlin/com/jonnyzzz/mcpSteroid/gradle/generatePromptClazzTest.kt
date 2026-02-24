@@ -73,14 +73,15 @@ fun PromptGenerationContext.generateKtSectionCompilationTest(
                 addStatement("val outputJar = tempDir.resolve(%S)", "out.jar")
                 addStatement("val classpath = scriptClassLoaderFactory.ideClasspath()")
                 addStatement(
-                    "val cmd = %T(outputJar).withNoStdLib(true).addClasspathEntries(classpath).addSource(sourceFile).build()",
+                    "val cmd = %T(outputJar).withNoStdLib(true).withExtraParameters(listOf(%S)).addClasspathEntries(classpath).addSource(sourceFile).build()",
                     kotlincCommandLineBuilderClass,
+                    "-Werror",
                 )
                 addStatement("val result = kotlincProcessClient.kotlinc(cmd.args, tempDir)")
                 addStatement("val output = (result.stdout + %S + result.stderr).trim()", "\n")
                 addStatement(
                     "assertEquals(%S + output, 0, result.exitCode)",
-                    "Compilation failed for ${clazz.src.name}:\n",
+                    "Compilation failed or has warnings (-Werror) for ${clazz.src.name}:\n",
                 )
             }
         })

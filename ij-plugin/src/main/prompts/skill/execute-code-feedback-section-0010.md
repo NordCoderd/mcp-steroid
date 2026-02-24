@@ -31,19 +31,3 @@ Empty feedback stubs waste a round-trip (~20s) and inflate call counts without a
 - **Actions**: Trigger any IDE action programmatically
 
 ## Quick Example
-
-```kotlin
-val file = findProjectFile("src/Main.kt")
-val text = readAction {
-    PsiManager.getInstance(project).findFile(file!!)?.text
-}
-println("File length: " + text?.length)
-```
-
-## When to Use Other Steroid Tools Instead
-
-- `steroid_list_projects` — list open projects and their paths
-- `steroid_list_windows` — check window state, indexing progress, modal dialogs
-- `steroid_open_project` — open a project directory in the IDE
-- `steroid_action_discovery` — discover quick-fixes, intentions, and actions at a file location
-- `steroid_take_screenshot` / `steroid_input` — visual UI inspection and interaction
