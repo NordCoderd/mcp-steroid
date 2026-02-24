@@ -2,9 +2,12 @@
 package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.filter.OutputFilter
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
-import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerSession
+import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
+import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
+import java.io.File
 
 abstract class AIAgentCompanion<T : Any>(val dockerFileBase: String) {
     abstract val displayName: String
@@ -14,7 +17,24 @@ abstract class AIAgentCompanion<T : Any>(val dockerFileBase: String) {
 
     fun create(lifetime: CloseableStack): T {
         println("[DOCKER-${dockerFileBase.uppercase()}] Session created in container")
-        val session = ContainerDriver.startDockerSession(lifetime, dockerFileBase)
+        val dockerfilePath = File("src/test/docker/$dockerFileBase/Dockerfile")
+
+        require(dockerfilePath.isFile) { "Docker file $dockerfilePath must exist" }
+
+        val logPrefix = dockerFileBase.uppercase()
+        val workDir = createTempDirectory(logPrefix.lowercase())
+        lifetime.registerCleanupAction {
+            workDir.deleteRecursively()
+        }
+
+        val scope = DockerDriver(workDir, logPrefix, listOf<String>())
+        val imageId = buildDockerImage(
+            logPrefix = logPrefix,
+            dockerfilePath,
+            timeoutSeconds = 600,
+        )
+
+        val session = startContainerDriver(lifetime, scope, StartContainerRequest().image(imageId))
         return create(session)
     }
 

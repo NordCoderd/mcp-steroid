@@ -53,56 +53,6 @@ class DockerDriver(
         println("[$logPrefix] Tagged image $imageId → $tag")
     }
 
-    fun startContainer2(
-        request: StartContainerRequest,
-    ): String {
-        val imageName = request.image ?: error("No image name")
-
-        val command = buildList {
-            add("docker")
-            add("run")
-            add("-d")
-            if (request.autoRemove) add("--rm")
-            add("--add-host=host.docker.internal:host-gateway")
-
-            (environmentVariables + request.extraEnvVars).forEach { (key, value) ->
-                add("-e")
-                add("$key=$value")
-            }
-
-            request.volumes.forEach { v ->
-                add("-v")
-                add("${v.host.absolutePath}:${v.guest}:${v.mode}")
-            }
-
-            request.ports.forEach { p ->
-                add("-p")
-                add("0:${p.containerPort}")
-            }
-
-            add(imageName)
-
-            // Add container command if specified
-            addAll(request.entryPoint)
-        }
-
-        val result = runProcessTemplate
-            .command(command)
-            .description("Start container from $imageName with ${request.entryPoint}")
-            .withTimeout(request.timeout)
-            .startProcess()
-            .assertExitCode(0) {
-                "Failed to start Docker container: $stderr"
-            }
-
-        val containerId = result.stdout.trim()
-        if (containerId.isEmpty()) {
-            throw IllegalStateException("Failed to start Docker container: ${result.stderr}")
-        }
-
-        println("[$logPrefix] Container started: $containerId")
-        return containerId
-    }
 
     //TODO: this should either return container driver, or move outside of here
     fun startContainer(

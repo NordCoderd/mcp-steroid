@@ -5,6 +5,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.git.BareRepoCache
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
+import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
@@ -80,13 +81,14 @@ fun IntelliJContainer.Companion.create(
     }
 
     var container = startContainerDriver(
-        lifetime, scope, imageId,
-        extraEnvVars = emptyMap(),
-        volumes = volumes,
-        ports = listOf(
-            XcvbVideoDriver.VIDEO_STREAMING_PORT,
-            McpSteroidDriver.MCP_STEROID_PORT,
-        ),
+        lifetime, scope,
+        StartContainerRequest()
+            .image(imageId)
+            .volumes(volumes)
+            .ports(
+                XcvbVideoDriver.VIDEO_STREAMING_PORT,
+                McpSteroidDriver.MCP_STEROID_PORT,
+            ),
     )
 
     val xcvb = XcvbDriver(

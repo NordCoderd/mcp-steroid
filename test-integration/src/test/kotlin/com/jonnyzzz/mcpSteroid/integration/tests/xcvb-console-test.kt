@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration.tests
 
 import com.jonnyzzz.mcpSteroid.integration.infra.*
+import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import org.junit.jupiter.api.Test
@@ -18,11 +19,12 @@ class XcvbConsoleTest {
         val (scope, imageId) = buildIdeImage(dockerFileBase, imageName, ideArchive)
 
         var container = startContainerDriver(
-            lifetime, scope, imageId,
-            extraEnvVars = emptyMap(),
-            ports = listOf(
-                XcvbVideoDriver.VIDEO_STREAMING_PORT
-            )
+            lifetime, scope,
+            StartContainerRequest()
+                .image(imageId)
+                .ports(
+                    XcvbVideoDriver.VIDEO_STREAMING_PORT
+                )
         )
 
         val layoutManager = HorizontalLayoutManager()

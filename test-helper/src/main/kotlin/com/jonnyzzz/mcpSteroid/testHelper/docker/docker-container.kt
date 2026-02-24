@@ -1,33 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
-import java.time.Duration
-
-@Suppress("DATA_CLASS_COPY_VISIBILITY_WILL_BE_CHANGED_WARNING", "DataClassPrivateConstructor")
-data class StartContainerRequest private constructor(
-    val image: String? = null,
-    val extraEnvVars: Map<String, String> = emptyMap(),
-    val volumes: List<ContainerVolume> = emptyList(),
-    val ports: List<ContainerPort> = emptyList(),
-    val entryPoint: List<String> = emptyList(),
-    val autoRemove: Boolean = true,
-    val timeout: Duration = Duration.ofMinutes(5),
-) {
-    companion object {
-        operator fun invoke() : StartContainerRequest = StartContainerRequest()
-    }
-
-    fun image(image : String) = copy(image = image)
-    fun extraEnvVars(extraEnvVars : Map<String, String>) = copy(extraEnvVars = extraEnvVars)
-    fun volumes(volumes : List<ContainerVolume>) = copy(volumes = volumes)
-    fun ports(ports : List<ContainerPort>) = copy(ports = ports)
-    fun entryPoint(args: List<String>) = copy(entryPoint = args)
-    fun entryPoint(vararg args: String) = entryPoint(args.toList())
-    fun autoRemove(autoRemove : Boolean) = copy(autoRemove = autoRemove)
-    fun timeout(timeout : Duration) = copy(timeout = timeout)
-}
-
-
 /**
  * Base class for managing CLI sessions running inside Docker containers.
  * Provides common functionality for building images, starting/stopping containers,

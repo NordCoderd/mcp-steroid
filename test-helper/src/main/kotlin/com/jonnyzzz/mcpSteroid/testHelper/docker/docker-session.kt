@@ -2,63 +2,25 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
 import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
-import java.io.File
 import java.time.LocalDateTime.now
 import java.time.format.DateTimeFormatter
-
-fun ContainerDriver.Companion.startDockerSession(
-    lifetime: CloseableStack,
-    dockerFileBase: String, //aka codex-cli
-    secretPatterns: List<String> = listOf(),
-): ContainerDriver {
-    val dockerfilePath = File("src/test/docker/$dockerFileBase/Dockerfile")
-    require(dockerfilePath.isFile) { "Docker file $dockerfilePath must exist" }
-
-    val logPrefix = dockerFileBase.uppercase().replace("/", "-")
-    val workDir = createTempDirectory(logPrefix.lowercase())
-    println("[$logPrefix] Creating new session in temp dir: $workDir")
-    lifetime.registerCleanupAction {
-        workDir.deleteRecursively()
-        println("[$logPrefix] Temp directory cleaned up: $workDir")
-    }
-
-    val scope = DockerDriver(workDir, logPrefix, secretPatterns)
-
-    val imageId = buildDockerImage(
-        logPrefix = logPrefix,
-        dockerfilePath,
-        timeoutSeconds = 600,
-    )
-
-    return startContainerDriver(lifetime, scope, imageId)
-}
 
 fun startContainerDriver(
     lifetime: CloseableStack,
     scope: DockerDriver,
-    imageId: String,
-    extraEnvVars: Map<String, String> = emptyMap(),
-    volumes: List<ContainerVolume> = listOf(),
-    ports: List<ContainerPort> = listOf(),
-    autoRemove: Boolean = false,
+    request: StartContainerRequest,
 ): ContainerDriver {
     val containerId = scope.startContainer(
         lifetime,
-        StartContainerRequest()
-            .image(imageId)
-            .extraEnvVars(extraEnvVars)
-            .volumes(volumes)
-            .ports(ports)
-            .autoRemove(autoRemove)
+        request
     )
 
     // Register with reaper for cleanup on crash/SIGKILL
     DockerReaper.registerContainer(containerId, scope.workDir)
 
-    return ContainerDriverImpl(scope, containerId, imageId, volumes)
+    return ContainerDriverImpl(scope, containerId, request.image ?: error("Missing image for $request"), request.volumes)
 }
 
 private class ContainerDriverImpl(

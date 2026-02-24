@@ -3,7 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import java.io.File
 
-internal fun createTempDirectory(prefix: String): File {
+fun createTempDirectory(prefix: String): File {
     val tempDir = File(System.getProperty("java.io.tmpdir"), "docker-$prefix-${System.currentTimeMillis()}")
     tempDir.mkdirs()
     return tempDir

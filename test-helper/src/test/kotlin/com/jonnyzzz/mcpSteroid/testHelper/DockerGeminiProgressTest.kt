@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import kotlinx.serialization.json.Json
@@ -62,8 +63,7 @@ class DockerGeminiProgressTest {
         val container = startContainerDriver(
             lifetime = stack,
             scope = driver,
-            imageId = imageId,
-            autoRemove = true
+            StartContainerRequest().image(imageId),
         )
         return DockerGeminiSession.create(container)
     }

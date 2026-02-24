@@ -79,10 +79,10 @@ object DockerReaper {
             val containerDriver = startContainerDriver(
                 lifetime = runningLifetime,
                 scope = driver,
-                imageId = reaperImageId,
-                volumes = listOf(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock")),
-                ports = listOf(port8080),
-                autoRemove = true,
+                StartContainerRequest()
+                    .image(reaperImageId)
+                    .volumes(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock"))
+                    .ports(port8080)
             )
 
             val reaperContainerId = containerDriver.containerId
