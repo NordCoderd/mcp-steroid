@@ -59,7 +59,7 @@ class DockerDriver(
         lifetime: CloseableStack,
         request: StartContainerRequest,
     ): String {
-        val containerId = startContainer2(request)
+        val containerId = startDockerContainer(request)
 
         // Register normal cleanup action
         lifetime.registerCleanupAction {

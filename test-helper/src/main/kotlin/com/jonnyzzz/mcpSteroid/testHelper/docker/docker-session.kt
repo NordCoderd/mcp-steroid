@@ -28,15 +28,14 @@ private class ContainerDriverImpl(
     override val containerId: String,
     private val imageName: String,
     override val volumes: List<ContainerVolume> = emptyList(),
-    private val hostPorts: Map<Int, Int> = emptyMap(),
 ) : ContainerDriver {
 
     override fun withSecretPattern(secretPattern: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes, hostPorts)
+        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes)
     }
 
     override fun withEnv(key: String, value: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName, volumes, hostPorts)
+        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName, volumes)
     }
 
     override fun runInContainer(
@@ -71,10 +70,10 @@ private class ContainerDriverImpl(
         val wrapperScript = buildString {
             this.appendLine("#!/bin/bash")
             this.appendLine("$innerCommand >$logDir/stdout.log 2>$logDir/stderr.log &")
-            this.appendLine("_PID=\$!")
-            this.appendLine("echo \$_PID > $logDir/pid")
-            this.appendLine("wait \$_PID")
-            this.appendLine("echo \$? > $logDir/exitcode")
+            this.appendLine($$"_PID=$!")
+            this.appendLine($$"echo $_PID > $$logDir/pid")
+            this.appendLine($$"wait $_PID")
+            this.appendLine($$"echo $? > $$logDir/exitcode")
         }
         // Write the wrapper script into the container
         val scriptPath = "$logDir/run.sh"
