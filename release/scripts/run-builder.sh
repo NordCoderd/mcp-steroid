@@ -126,6 +126,29 @@ if [[ ! -S /var/run/docker.sock ]]; then
   exit 1
 fi
 
+# Verify Docker daemon is actually responsive, not just socket-present.
+# Catches: daemon stuck, storage I/O errors (containerd metadata DB corruption),
+# and other states where docker build/run would hang or fail mid-way.
+echo "Checking Docker daemon health..."
+docker_info_output=""
+if ! docker_info_output="$(timeout 15 docker info 2>&1)"; then
+  echo "Docker daemon is unresponsive (docker info failed or timed out)." >&2
+  echo "Restart Docker Desktop/daemon and verify with: docker info" >&2
+  if [[ -n "$docker_info_output" ]]; then
+    echo "docker info output: $docker_info_output" >&2
+  fi
+  exit 1
+fi
+# Fail fast on known storage corruption patterns that cause mid-run failures
+if echo "$docker_info_output" | grep -qi "input/output error\|i/o error"; then
+  echo "Docker daemon reports storage I/O errors — daemon may be corrupted." >&2
+  echo "Remediation: restart Docker Desktop or run 'sudo systemctl restart docker'" >&2
+  echo "Reported errors:" >&2
+  echo "$docker_info_output" | grep -i "error\|warning" >&2
+  exit 1
+fi
+echo "Docker daemon healthy."
+
 load_env_from_files_if_missing OPENAI_API_KEY "${HOME}/.openai"
 if [[ -z "${CODEX_API_KEY:-}" && -n "${OPENAI_API_KEY:-}" ]]; then
   export CODEX_API_KEY="$OPENAI_API_KEY"
