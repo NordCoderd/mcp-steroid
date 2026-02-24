@@ -147,7 +147,7 @@ test("parseMarkerContent extracts url and label", () => {
   const content = [
     "http://localhost:63342/mcp",
     "",
-    "IntelliJ MCP Steroid Server",
+    "MCP Steroid Server",
     "URL: http://localhost:63342/mcp",
     "",
     "IntelliJ IDEA 2025.3",

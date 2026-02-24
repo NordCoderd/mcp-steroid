@@ -11,7 +11,7 @@ class SkillCatalogTest : BasePlatformTestCase() {
         val skillArticle = index.articles.values.first { article ->
             val content = article.payload.readPrompt()
             val parsed = parseSkillFrontmatter(content)
-            parsed.frontmatter?.name == "intellij-mcp-steroid"
+            parsed.frontmatter?.name == "mcp-steroid"
         }
 
         val content = skillArticle.payload.readPrompt()
@@ -32,7 +32,7 @@ class SkillCatalogTest : BasePlatformTestCase() {
         val debuggerArticle = index.articles.values.firstOrNull { article ->
             val content = article.payload.readPrompt()
             val parsed = parseSkillFrontmatter(content)
-            parsed.frontmatter?.name == "intellij-mcp-steroid-debugger"
+            parsed.frontmatter?.name == "mcp-steroid-debugger"
         }
         assertNotNull("Debugger skill should have frontmatter with prompt name", debuggerArticle)
     }

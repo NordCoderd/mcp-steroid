@@ -4,7 +4,7 @@ Status: validated spec (bridge-aware update)
 Last updated: 2026-02-15
 
 ## 1. Purpose
-Create a local NPX-run stdio MCP proxy (TypeScript implementation) that discovers all running IntelliJ MCP Steroid servers on the machine and exposes them as a single MCP server to any agent. The proxy aggregates discovery, routes tool calls to the correct upstream server, and optionally records MCP traffic under the user's home directory.
+Create a local NPX-run stdio MCP proxy (TypeScript implementation) that discovers all running MCP Steroid servers on the machine and exposes them as a single MCP server to any agent. The proxy aggregates discovery, routes tool calls to the correct upstream server, and optionally records MCP traffic under the user's home directory.
 
 ## 2. Goals
 - Provide a single stdio MCP endpoint that dynamically aggregates multiple running MCP Steroid servers.
@@ -44,7 +44,7 @@ Proxy requirements:
 - If PID is dead, ignore (do not delete; upstream already does cleanup).
 
 ### 5.2 Optional discovery: per-project file
-Each IntelliJ project can contain `.idea/mcp-steroids.txt` with the same first-line URL. This is optional for the proxy; prefer the user home marker for global discovery.
+Each IntelliJ project can contain `.idea/mcp-steroid.md` with the same first-line URL. This is optional for the proxy; prefer the user home marker for global discovery.
 
 ### 5.3 Health validation
 For each discovered `serverUrl`:

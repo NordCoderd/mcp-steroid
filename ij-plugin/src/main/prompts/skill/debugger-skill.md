@@ -1,5 +1,5 @@
 ---
-name: intellij-mcp-steroid-debugger
+name: mcp-steroid-debugger
 description: Use IntelliJ debugger APIs via steroid_execute_code to set breakpoints, start debug sessions, evaluate variables, step through code, and inspect threads.
 ---
 

@@ -1291,7 +1291,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertEquals(skillResource.uri, content.uri)
         assertEquals("text/markdown", content.mimeType)
         assertNotNull("Resource should have text content", content.text)
-        assertTrue("Content should contain SKILL.md content", content.text!!.contains("IntelliJ MCP Steroid"))
+        assertTrue("Content should contain SKILL.md content", content.text!!.contains("MCP Steroid"))
         assertTrue("Content should contain quickstart", content.text.contains("Quickstart"))
     }
 
@@ -1322,7 +1322,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertNull("prompts/list should succeed", listRpc.error)
 
         val promptsList = McpJson.decodeFromJsonElement<PromptsListResult>(listRpc.result!!)
-        val mainPrompt = promptsList.prompts.find { it.name == "intellij-mcp-steroid" }
+        val mainPrompt = promptsList.prompts.find { it.name == "mcp-steroid" }
         assertNotNull("Should expose main skill prompt", mainPrompt)
         assertEquals("IntelliJ API Power User Guide", mainPrompt!!.title)
 
@@ -1335,7 +1335,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 put("id", "prompts-get")
                 put("method", "prompts/get")
                 putJsonObject("params") {
-                    put("name", "intellij-mcp-steroid")
+                    put("name", "mcp-steroid")
                 }
             }.toString())
         }
@@ -1349,7 +1349,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val message = getResult.messages.first()
         assertEquals("user", message.role)
         val content = message.content as PromptContent.Text
-        assertTrue(content.text.contains("IntelliJ MCP Steroid"))
+        assertTrue(content.text.contains("MCP Steroid"))
         assertFalse(content.text.trimStart().startsWith("---"))
     }
 

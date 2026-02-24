@@ -44,7 +44,7 @@ function parseMarkerContent(content, pid) {
     const line = lines[i];
     if (!line) continue;
     if (line.startsWith("URL:")) continue;
-    if (line.startsWith("IntelliJ MCP Steroid Server")) continue;
+    if (line.startsWith("MCP Steroid Server")) continue;
     if (line.startsWith("Created:")) continue;
     if (line.startsWith("Plugin ")) continue;
     if (line.startsWith("IDE ")) continue;

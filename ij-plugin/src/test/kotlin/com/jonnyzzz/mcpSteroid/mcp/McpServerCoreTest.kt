@@ -276,7 +276,7 @@ class McpServerCoreTest {
     fun `test prompts list and get`() = runBlocking {
         server.promptRegistry.registerPrompt(
             prompt = Prompt(
-                name = "intellij-mcp-steroid",
+                name = "mcp-steroid",
                 title = "IntelliJ API Power User Guide",
                 description = "Test prompt description",
             ),
@@ -299,14 +299,14 @@ class McpServerCoreTest {
         val listResponse = McpJson.decodeFromString<JsonRpcResponse>(listResponseJson!!)
         assertNull(listResponse.error)
         val listResult = McpJson.decodeFromJsonElement<PromptsListResult>(listResponse.result!!)
-        assertTrue(listResult.prompts.any { it.name == "intellij-mcp-steroid" })
+        assertTrue(listResult.prompts.any { it.name == "mcp-steroid" })
 
         val getRequest = buildJsonObject {
             put("jsonrpc", "2.0")
             put("id", 2)
             put("method", "prompts/get")
             putJsonObject("params") {
-                put("name", "intellij-mcp-steroid")
+                put("name", "mcp-steroid")
             }
         }
 

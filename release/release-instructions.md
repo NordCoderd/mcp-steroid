@@ -15,7 +15,7 @@ Use the same workflow style as `~/Work/jonnyzzz-ai-coder/THE_PROMPT_v5.md`:
 1. Use run-based traceability for every sub-agent run.
 2. Use `~/Work/jonnyzzz-ai-coder/run-agent.sh` to start sub-agents.
 3. Keep artifacts per run (`prompt.md`, `agent-stdout.txt`, `agent-stderr.txt`, `cwd.txt`).
-4. Prefer IntelliJ MCP Steroid for code-aware operations; shell fallback is acceptable for orchestration scripts.
+4. Prefer MCP Steroid for code-aware operations; shell fallback is acceptable for orchestration scripts.
 5. Keep append-only coordination notes in `MESSAGE-BUS.md` and blockers in `ISSUES.md`.
 6. If a stage fails, document failure clearly and restart from the appropriate stage.
 

@@ -71,7 +71,7 @@ class ServerUrlWriter : Disposable {
 
         appendLine(serverUrl)
         appendLine()
-        appendLine("IntelliJ MCP Steroid Server")
+        appendLine("MCP Steroid Server")
         appendLine("URL: $serverUrl")
         appendLine()
         appendLine("Created: ${ZonedDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME)}")

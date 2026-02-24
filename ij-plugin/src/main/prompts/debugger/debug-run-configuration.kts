@@ -2,7 +2,7 @@ import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultDebugExecutor
 
-val configurationName = "mcp-steroids [test]"  // TODO: Set your run configuration name
+val configurationName = "mcp-steroid [test]"  // TODO: Set your run configuration name
 val runManager = RunManager.getInstance(project)
 val settings = runManager.allSettings.firstOrNull { it.name == configurationName }
     ?: error("Run configuration not found: $configurationName")
