@@ -30,26 +30,4 @@ open class DockerProcessRunRequestBuilder<R : DockerProcessRunRequestBuilder<R>>
 
 
 
-@Suppress("DATA_CLASS_COPY_VISIBILITY_WILL_BE_CHANGED_WARNING", "DataClassPrivateConstructor")
-data class StartContainerRequest private constructor(
-    val imageName: String? = null,
-    val extraEnvVars: Map<String, String> = emptyMap(),
-    val volumes: List<ContainerVolume> = emptyList(),
-    val ports: List<ContainerPort> = emptyList(),
-    val entryPoint: List<String> = emptyList(),
-    val autoRemove: Boolean = true,
-    val timeout: Duration = Duration.ofMinutes(5),
-) {
-    companion object {
-        operator fun invoke() : StartContainerRequest = StartContainerRequest()
-    }
-
-    fun imageName(x : String) = copy(imageName = x)
-    fun extraEnvVars(x : Map<String, String>) = copy(extraEnvVars = x)
-    fun volumes(x : List<ContainerVolume>) = copy(volumes = x)
-    fun ports(x : List<ContainerPort>) = copy(ports = x)
-    fun entryPoint(x: List<String>) = copy(entryPoint = x)
-    fun autoRemove(x : Boolean) = copy(autoRemove = x)
-    fun timeout(x : Duration) = copy(timeout = x)
-}
 
