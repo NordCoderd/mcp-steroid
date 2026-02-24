@@ -141,3 +141,90 @@ val created = readAction {
 println("Created Java files:\n" + created.joinToString("\n"))
 // If a file you expected is missing, create ONLY that one — do not recreate the others
 ```
+
+---
+
+## ⚠️ Multi-Module Gradle: Run Tests in the Correct Subproject
+
+`./gradlew test --tests ClassName` silently finds NO tests when the class is in a submodule.
+ALWAYS use the subproject prefix and `--rerun-tasks` after writing new files:
+
+```kotlin
+// Find the correct Gradle subproject path from module content roots:
+import com.intellij.openapi.roots.ProjectRootManager
+val roots = readAction { ProjectRootManager.getInstance(project).contentSourceRoots }
+roots.forEach { println(it.path) }
+// Identify which path contains your test class, then use that subproject in the task name.
+
+// Run tests in the correct submodule via IDE (respects project SDK, reuses Gradle daemon):
+import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings
+import com.intellij.openapi.externalSystem.service.execution.ProgressExecutionMode
+import com.intellij.openapi.externalSystem.task.TaskCallback
+import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
+import org.jetbrains.plugins.gradle.util.GradleConstants
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.minutes
+
+val result = CompletableDeferred<Boolean>()
+val s = ExternalSystemTaskExecutionSettings()
+s.externalProjectPath = project.basePath!!
+// ⚠️ Include subproject prefix AND --rerun-tasks to prevent UP-TO-DATE skip after file creation:
+s.taskNames = listOf(":microservices:product-composite-service:test",
+    "--tests", "shop.microservices.composite.product.ProductCompositeApiTests",
+    "--rerun-tasks", "--no-daemon")
+s.externalSystemIdString = GradleConstants.SYSTEM_ID.toString()
+ExternalSystemUtil.runTask(s, com.intellij.execution.executors.DefaultRunExecutor.EXECUTOR_ID,
+    project, GradleConstants.SYSTEM_ID,
+    object : TaskCallback {
+        override fun onSuccess() { result.complete(true) }
+        override fun onFailure() { result.complete(false) }
+    },
+    ProgressExecutionMode.IN_BACKGROUND_ASYNC, false)
+val ok = withTimeout(5.minutes) { result.await() }
+println("Gradle result: success=$ok")
+// If success=false: read JUnit XML in build/test-results/ for failure details.
+```
+
+**⚠️ If `./gradlew test --tests ClassName` returns "No tests found"**: the class is in a submodule.
+Add the subproject prefix (e.g. `:microservices:product-composite-service:test`).
+
+---
+
+## Maven Generated Sources — When a Class Exists in PSI But Has No Source File
+
+In Maven projects with OpenAPI generator or annotation processors, DTO classes and API interfaces are generated into `target/generated-sources/`. They are **visible in IntelliJ's PSI index** but have **NO file in `src/`** — `FilenameIndex.getVirtualFilesByName("UserDto.java", ...)` returns empty.
+
+**STOP after 2 failed filename lookups**: if the class is not found by filename, switch to PSI class lookup.
+
+```kotlin
+// Wrong: filename search fails for generated classes
+// val vfs = readAction { FilenameIndex.getVirtualFilesByName("UserDto.java", scope) }  // returns []
+
+// Correct: PSI class lookup finds generated classes too
+// Use allScope() — not projectScope() — to include generated sources:
+import com.intellij.psi.search.GlobalSearchScope
+val generatedClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "org.springframework.samples.petclinic.dto.UserDto",
+        GlobalSearchScope.allScope(project)  // allScope() searches generated sources
+    )
+}
+println(if (generatedClass != null) "Found: " + generatedClass.containingFile?.virtualFile?.path
+        else "Not in PSI — class not yet generated or wrong FQN")
+
+// Find where a generated class is USED (no source file needed):
+import com.intellij.psi.search.PsiSearchHelper
+val scope = GlobalSearchScope.projectScope(project)
+val usageFiles = mutableListOf<String>()
+readAction {
+    PsiSearchHelper.getInstance(project).processAllFilesWithWord("UserDto", scope, { psiFile ->
+        usageFiles.add(psiFile.virtualFile.path); true
+    }, true)
+}
+println("Files referencing UserDto:\n" + usageFiles.joinToString("\n"))
+
+// Check if target/generated-sources exists at all:
+val genSources = findProjectFile("target/generated-sources")
+println("Generated sources dir: " + (genSources?.path ?: "NOT FOUND — run mvnw generate-sources first"))
+```
