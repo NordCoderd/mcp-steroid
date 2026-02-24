@@ -2,8 +2,13 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
+import java.time.Duration
 
 interface ContainerProcessRunner {
+    fun startProcessInContainer(
+        request: RunContainerProcessRequest
+    ): StartedProcess
 
     fun runInContainer(request: ContainerProcessRunRequest): ProcessResult {
         return runInContainer(
@@ -22,15 +27,14 @@ interface ContainerProcessRunner {
         extraEnvVars: Map<String, String> = emptyMap(),
         quietly: Boolean = false,
     ): ProcessResult {
-        val req = ContainerProcessRunRequest
-            .builder()
-            .command(args)
+        val req = RunContainerProcessRequest()
+            .args(args)
             .workingDirInContainer(workingDir)
-            .timeoutSeconds(timeoutSeconds)
+            .timeout(Duration.ofSeconds(timeoutSeconds))
             .quietly(quietly)
-            .description(args.joinToString(" ").take(80))
-            .build()
+            .extraEnvVars(extraEnvVars)
+            .description("In container: ${args.joinToString(" ")}")
 
-        return runInContainer(req)
+        return startProcessInContainer(req).awaitForProcessFinish()
     }
 }

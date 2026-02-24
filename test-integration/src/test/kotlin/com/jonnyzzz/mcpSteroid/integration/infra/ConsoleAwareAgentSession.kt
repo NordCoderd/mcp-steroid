@@ -7,10 +7,12 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
+import com.jonnyzzz.mcpSteroid.testHelper.docker.RunContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
+import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -87,6 +89,10 @@ class ConsolePumpingContainerDriver(
     private val agentsGuestDir: String? = null,
 ) : ContainerDriverDelegate<ConsolePumpingContainerDriver>(delegate) {
     private val counter = AtomicInteger(0)
+
+    override fun startProcessInContainer(request: RunContainerProcessRequest): StartedProcess {
+        TODO("Not yet implemented")
+    }
 
     override fun createNewDriver(delegate: ContainerDriver) =
         ConsolePumpingContainerDriver(delegate, console, agentName, filterType, agentsGuestDir)
@@ -214,20 +220,6 @@ class ConsolePumpingContainerDriver(
             Thread.sleep(500)
             pump.stop()
         }
-    }
-
-    override fun runInContainerDetached(
-        args: List<String>,
-        workingDir: String?,
-        extraEnvVars: Map<String, String>,
-    ): RunningContainerProcess {
-        val proc = delegate.runInContainerDetached(args, workingDir, extraEnvVars)
-
-        // Pump the detached process stdout/stderr
-        console.startFilePump(proc.stdoutPath, "[$agentName]", ConsoleDriver.CYAN)
-        console.startFilePump(proc.stderrPath, "[$agentName]", ConsoleDriver.RED)
-
-        return proc
     }
 
     override fun toString(): String = "ConsolePumping[$agentName]($delegate)"

@@ -25,13 +25,6 @@ interface ContainerDriver : ContainerProcessRunner {
 
     fun withEnv(key: String, value: String): ContainerDriver
 
-    fun runInContainerDetached(
-        args: List<String>,
-        workingDir: String? = null,
-        extraEnvVars: Map<String, String> = emptyMap(),
-    ): RunningContainerProcess
-
-
     companion object
 }
 

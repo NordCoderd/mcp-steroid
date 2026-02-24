@@ -9,6 +9,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mkdirs
+import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
 import kotlin.concurrent.thread
 
 class XcvbVideoDriver(

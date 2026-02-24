@@ -5,6 +5,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import java.time.Duration
@@ -53,73 +54,13 @@ private class ContainerDriverImpl(
         return ContainerDriverImpl(logPrefix, environmentVariables + (key to value), containerId, imageName, volumes)
     }
 
-    override fun runInContainer(
-        args: List<String>,
-        workingDir: String?,
-        timeoutSeconds: Long,
-        extraEnvVars: Map<String, String>,
-        quietly: Boolean,
-    ): ProcessResult {
-        val req = RunContainerProcessRequest()
-            .args(args)
-            .description("In container: ${args.joinToString(" ")}")
-            .timeout(Duration.ofSeconds(timeoutSeconds))
-            .quietly(quietly)
-            .workingDirInContainer(workingDir)
-            .extraEnvVars(extraEnvVars)
-
-        return runInContainerEx(req)
-    }
-
-    override fun runInContainerDetached(
-        args: List<String>,
-        workingDir: String?,
-        extraEnvVars: Map<String, String>
-    ): RunningContainerProcess {
-        val timestamp = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS").format(now())
-        val name = args.first().substringAfterLast("/")
-        val logDir = "/tmp/run-$timestamp-$name"
-        // Build the wrapper script that runs the real command,
-        // captures its PID, and redirects output to files
-        val innerCommand = escapeShellArgs(args)
-        val wrapperScript = buildString {
-            this.appendLine("#!/bin/bash")
-            this.appendLine("$innerCommand >$logDir/stdout.log 2>$logDir/stderr.log &")
-            this.appendLine($$"_PID=$!")
-            this.appendLine($$"echo $_PID > $$logDir/pid")
-            this.appendLine($$"wait $_PID")
-            this.appendLine($$"echo $? > $$logDir/exitcode")
-        }
-        // Write the wrapper script into the container
-        val scriptPath = "$logDir/run.sh"
-        writeFileInContainer(scriptPath, wrapperScript, executable = true)
-        // Run the wrapper script detached
-
-        val req = RunContainerProcessRequest()
-            .args("bash", scriptPath)
-            .description("In detached $innerCommand")
-            .timeout(Duration.ofSeconds(10))
-            .quietly()
-            .workingDirInContainer(workingDir)
-            .extraEnvVars(extraEnvVars)
-            .detach(true)
-
-        runInContainerEx(req)
-            .assertExitCode(0) { "Failed to start detached process '$name': $stderr" }
-
-        println("[${logPrefix}] Detached process '$name' started, stdout/stderr at $logDir")
-        val info = DetachedContainerProcess(name = name, logDir = logDir)
-        return RunningContainerProcess(this, info.name, info.logDir)
-    }
-
     override fun toString(): String {
         return "DockerContained(id=$containerId, image=$imageName)"
     }
 
-    //TODO: return StartedProcess!
-    fun runInContainerEx(
+    override fun startProcessInContainer(
         request: RunContainerProcessRequest
-    ): ProcessResult {
+    ): StartedProcess {
 
         val command = buildList {
             add("docker")
@@ -147,6 +88,5 @@ private class ContainerDriverImpl(
             .withTimeout(request.timeout)
             .quietly(request.quietly)
             .startProcess()
-            .awaitForProcessFinish()
     }
 }

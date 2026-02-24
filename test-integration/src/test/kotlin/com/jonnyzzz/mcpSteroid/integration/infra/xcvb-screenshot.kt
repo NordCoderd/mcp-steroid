@@ -6,6 +6,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mkdirs
+import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
 import java.io.File
 
 class XcvbScreenshotDriver(
