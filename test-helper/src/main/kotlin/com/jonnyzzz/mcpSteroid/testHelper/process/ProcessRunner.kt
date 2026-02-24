@@ -47,26 +47,7 @@ class ProcessRunner(
      */
     fun runProcess(request: ProcessRunRequest): ProcessResult {
         val processInfo = startProcessImpl(request)
-
-        val process = processInfo.process
-
-        val completed = process.waitFor(request.timeoutSeconds, TimeUnit.SECONDS)
-
-        if (!completed) {
-            process.destroyForcibly()
-            println("[$logPrefix] Timed out after ${request.timeoutSeconds}s")
-            return ProcessResultValue(-1, processInfo.stdout, "Timeout\n${processInfo.stderr}")
-        }
-
-        processInfo.thread.forEach {
-            it.join(1000)
-            it.interrupt()
-            it.join()
-        }
-
-        val exitCode = process.exitValue()
-        println("[$logPrefix] Exit code: $exitCode")
-        return ProcessResultValue(exitCode, processInfo.stdout, processInfo.stderr)
+        return processInfo.waitForProcessFinish()
     }
 
     fun startProcess(request: ProcessRunRequest): StartedProcess = startProcessImpl(request)
@@ -141,6 +122,7 @@ class ProcessRunner(
         errorThread.start()
 
         return StartedProcessImpl(
+            request,
             process,
             messagesChannel,
             listOf(stdinThread, outputThread, errorThread)
@@ -148,11 +130,14 @@ class ProcessRunner(
     }
 
     private class StartedProcessImpl(
+        val request: ProcessRunRequest,
         val process: Process,
         val messagesChannel: MutableSharedFlow<ProcessStreamLine>,
         val thread: List<Thread>,
     ) : StartedProcess {
         val pid: PID get() = process.PID()
+
+        val logPrefix: String get() = ""
 
         override fun destroyForcibly() {
             process.destroyForcibly()
@@ -178,6 +163,36 @@ class ProcessRunner(
 
         override fun toString(): String {
             return "StartedProcessImpl(pid=$pid, exitCode=$exitCode, output='$stdout', stderr='$stderr')"
+        }
+
+        private fun waitForThreads() {
+            thread.forEach {
+                runCatching {
+                    it.join(1000)
+                    if (it.isAlive) {
+                        println("[$logPrefix] Waiting for process thread ${it.name}")
+                        it.interrupt()
+                        it.join()
+                    }
+                }
+            }
+        }
+
+        fun waitForProcessFinish() : ProcessResult{
+            val completed = process.waitFor(request.timeoutSeconds, TimeUnit.SECONDS)
+
+            if (!completed) {
+                process.destroyForcibly()
+                waitForThreads()
+
+                println("[${logPrefix}] Timed out after ${request.timeoutSeconds}s")
+                return ProcessResultValue(-1, stdout, "Timeout\n${stderr}")
+            } else {
+                waitForThreads()
+                val exitCode = process.exitValue()
+                println("[$logPrefix] Exit code: $exitCode")
+                return ProcessResultValue(exitCode, stdout, stderr)
+            }
         }
     }
 }
