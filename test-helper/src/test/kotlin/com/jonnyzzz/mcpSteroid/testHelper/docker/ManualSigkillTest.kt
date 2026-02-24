@@ -37,12 +37,13 @@ fun main() {
 
     // Start a container
     println("\n[2] Starting test container...")
-    val containerId = driver.startContainer(
+    val containerId = startContainerDriver(
         lifetime = lifetime,
+        driver,
         StartContainerRequest()
             .image("alpine:latest")
             .entryPoint("sleep", "infinity")
-    )
+    ).containerId
 
     // Register with reaper
     DockerReaper.registerContainer(containerId, workDir)

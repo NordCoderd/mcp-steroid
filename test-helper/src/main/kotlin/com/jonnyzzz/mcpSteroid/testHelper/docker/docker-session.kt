@@ -12,15 +12,23 @@ fun startContainerDriver(
     scope: DockerDriver,
     request: StartContainerRequest,
 ): ContainerDriver {
-    val containerId = scope.startContainer(
-        lifetime,
-        request
-    )
+    val containerId = startDockerContainer(request)
+
+    // Register normal cleanup action
+    lifetime.registerCleanupAction {
+        println("[${scope.logPrefix}] Stopping and removing container: $containerId")
+        scope.killContainer(containerId)
+    }
 
     // Register with reaper for cleanup on crash/SIGKILL
     DockerReaper.registerContainer(containerId, scope.workDir)
 
-    return ContainerDriverImpl(scope, containerId, request.image ?: error("Missing image for $request"), request.volumes)
+    return ContainerDriverImpl(
+        scope,
+        containerId,
+        request.image ?: error("Missing image for $request"),
+        request.volumes
+    )
 }
 
 private class ContainerDriverImpl(
