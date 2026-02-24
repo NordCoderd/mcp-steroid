@@ -7,6 +7,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
+import java.time.Duration
 import java.time.LocalDateTime.now
 import java.time.format.DateTimeFormatter
 import kotlin.collections.component1
@@ -59,16 +60,13 @@ private class ContainerDriverImpl(
         extraEnvVars: Map<String, String>,
         quietly: Boolean,
     ): ProcessResult {
-        val req = DockerProcessRunRequest.builder()
-            .containerId(containerId)
-            .command(args)
+        val req = RunContainerProcessRequest()
+            .args(args)
             .description("In container: ${args.joinToString(" ")}")
-            .timeoutSeconds(timeoutSeconds)
+            .timeout(Duration.ofSeconds(timeoutSeconds))
             .quietly(quietly)
             .workingDirInContainer(workingDir)
-            .extraEnv(extraEnvVars)
-            .detach(false)
-            .build()
+            .extraEnvVars(extraEnvVars)
 
         return runInContainerEx(req)
     }
@@ -97,16 +95,14 @@ private class ContainerDriverImpl(
         writeFileInContainer(scriptPath, wrapperScript, executable = true)
         // Run the wrapper script detached
 
-        val req = DockerProcessRunRequest.builder()
-            .containerId(containerId)
-            .command("bash", scriptPath)
+        val req = RunContainerProcessRequest()
+            .args("bash", scriptPath)
             .description("In detached $innerCommand")
-            .timeoutSeconds(10)
+            .timeout(Duration.ofSeconds(10))
             .quietly()
             .workingDirInContainer(workingDir)
-            .extraEnv(extraEnvVars)
+            .extraEnvVars(extraEnvVars)
             .detach(true)
-            .build()
 
         runInContainerEx(req)
             .assertExitCode(0) { "Failed to start detached process '$name': $stderr" }
@@ -122,9 +118,8 @@ private class ContainerDriverImpl(
 
     //TODO: return StartedProcess!
     fun runInContainerEx(
-        request: DockerProcessRunRequest
+        request: RunContainerProcessRequest
     ): ProcessResult {
-        val shellCommand = escapeShellArgs(request.command)
 
         val command = buildList {
             add("docker")
@@ -138,18 +133,18 @@ private class ContainerDriverImpl(
                 add("-w")
                 add(it)
             }
-            add(request.containerId)
+            add(containerId)
             add("bash")
             add("-c")
-            add(shellCommand)
+            add(escapeShellArgs(request.args))
         }
 
         return RunProcessRequest()
             .withLogPrefix(logPrefix)
             .timeoutSeconds(30)
             .command(command)
-            .description(request.description)
-            .timeoutSeconds(request.timeoutSeconds)
+            .description(request.description ?: error("Missing description in $request"))
+            .withTimeout(request.timeout)
             .quietly(request.quietly)
             .startProcess()
             .awaitForProcessFinish()

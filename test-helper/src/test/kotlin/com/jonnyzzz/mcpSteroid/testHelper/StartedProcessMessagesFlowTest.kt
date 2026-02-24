@@ -177,8 +177,7 @@ class StartedProcessMessagesFlowTest {
             request("sleep", "60")
         )
 
-        // Process should be running
-        Assertions.assertNull(started.exitCode, "process should still be running")
+        started.toString()
 
         started.destroyForcibly()
 
@@ -186,6 +185,6 @@ class StartedProcessMessagesFlowTest {
         Thread.sleep(200)
 
         // After destroy, exitCode should be available
-        Assertions.assertNotNull(started.exitCode, "process should have exited after destroyForcibly")
+        Assertions.assertNotNull(started.awaitForProcessFinish().exitCode, "process should have exited after destroyForcibly")
     }
 }

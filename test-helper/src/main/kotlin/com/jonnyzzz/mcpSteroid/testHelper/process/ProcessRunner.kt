@@ -161,7 +161,7 @@ private class StartedProcessImpl(
         process.destroyForcibly()
     }
 
-    override val exitCode: Int?
+    val exitCode: Int?
         get() = runCatching { process.exitValue() } .getOrNull()
 
     override val messagesFlow: Flow<ProcessStreamLine>
@@ -186,10 +186,10 @@ private class StartedProcessImpl(
             .joinToString(separator = "\n") { it.line }
     }
 
-    override val stdout: String
+    val stdout: String
         get() = builder(ProcessStreamType.STDOUT)
 
-    override val stderr: String
+    val stderr: String
         get() = builder(ProcessStreamType.STDERR)
 
     override fun toString(): String {

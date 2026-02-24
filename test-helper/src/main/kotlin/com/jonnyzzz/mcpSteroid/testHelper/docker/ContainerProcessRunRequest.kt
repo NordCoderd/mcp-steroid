@@ -67,6 +67,7 @@ data class RunContainerProcessRequest private constructor(
     fun workingDirInContainer(workingDirInContainer: String?) = copy(workingDirInContainer = workingDirInContainer)
     fun extraEnvVars(extraEnvVars: Map<String, String>) = copy(extraEnvVars = extraEnvVars)
     fun args(args: List<String> = listOf()) = copy(args = args)
+    fun args(vararg args: String) = args(args.toList())
     fun logPrefix(logPrefix: String? = null) = copy(logPrefix = logPrefix)
     fun description(description: String? = null) = copy(description = description)
     fun quietly(quietly: Boolean = false) = copy(quietly = quietly)

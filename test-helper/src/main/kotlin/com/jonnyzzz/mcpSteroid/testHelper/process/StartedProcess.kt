@@ -16,7 +16,7 @@ data class ProcessStreamLine(
     val line: String,
 )
 
-interface StartedProcess : ProcessResult {
+interface StartedProcess {
     /**
      * Returns flow of all messages of process output, each time
      */
