@@ -6,15 +6,10 @@ import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.GeminiOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
-import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.*
 import java.io.File
-import java.util.Locale
 
 /**
  * Manages a Gemini CLI session running inside a Docker container.
@@ -23,12 +18,13 @@ class DockerGeminiSession(
     private val session: ContainerProcessRunner,
     private val apiKey: String,
     private val debug: Boolean = false,
+    private val workdirInContainer: String,
 ) : AiAgentSession {
     override val displayName: String = Companion.displayName
 
-    override fun registerHttpMcp(mcpUrl: String, mcpName: String) : AiAgentSession {
+    override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         runInContainer(args = geminiMcpAddArgs(mcpUrl, mcpName))
-            .assertExitCode(0, message = "MCP server registration")
+            .assertExitCode(0) { "MCP server registration" }
             .assertNoErrorsInOutput(message = "MCP server registration")
 
         return this
@@ -36,13 +32,13 @@ class DockerGeminiSession(
 
     override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String): AiAgentSession {
         runInContainer(args = geminiMcpAddStdioArgs(npxCommand, mcpName))
-            .assertExitCode(0, message = "NPX MCP server registration")
+            .assertExitCode(0) { "NPX MCP server registration" }
             .assertNoErrorsInOutput(message = "NPX MCP server registration")
 
         return this
     }
 
-    fun runInContainer(args: List<String>, timeoutSeconds: Long = 120): ProcessResult {
+    fun runInContainer(args: List<String>, timeoutSeconds: Long = 120): StartedProcess {
         val geminiArgs = buildList {
             add("gemini")
             if (debug) {
@@ -59,18 +55,15 @@ class DockerGeminiSession(
             }
         }
 
-        val req = ContainerProcessRunRequest
-            .builder()
-            .command(command = geminiArgs)
-            .workingDirInContainer(null)
+        val req = ExecContainerProcessRequest()
+            .args(geminiArgs)
             .timeoutSeconds(timeoutSeconds = timeoutSeconds)
-            .quietly(false)
             .description(geminiArgs.joinToString(" ").take(80))
             .secretPatterns(apiKey)
             .extraEnv(env)
-            .build()
+            .workingDirInContainer(workdirInContainer)
 
-        return session.runInContainer(req)
+        return session.startProcessInContainer(req)
     }
 
     /**
@@ -86,35 +79,7 @@ class DockerGeminiSession(
      * human-readable text.
      */
     override fun runPrompt(prompt: String, timeoutSeconds: Long): ProcessResult {
-        var effectiveResult = runPromptOnce(prompt, timeoutSeconds)
-
-        // Gemini API occasionally drops the socket mid-stream (UND_ERR_SOCKET / terminated).
-        // Retry once because this is an external transient failure unrelated to MCP behavior.
-        if (shouldRetryTransientApiError(effectiveResult)) {
-            effectiveResult = runPromptOnce(prompt, timeoutSeconds)
-        }
-
-        val rawOutput = effectiveResult.stdout
-        val resultText = outputFilter.filterText(rawOutput)
-        // Gemini CLI sometimes exits with 137 (SIGKILL) even after completing successfully.
-        // Treat this as success when the raw NDJSON confirms a successful result was produced.
-        val effectiveExitCode = if (effectiveResult.exitCode == 137 && rawOutput.contains("\"status\":\"success\"")) {
-            0
-        } else {
-            effectiveResult.exitCode ?: -1
-        }
-
-        //TODO: looks like the case for specific interface to return the JSON output VS the processed output
-        //TODO: should be a common interface all AI Agents implement
-        return ProcessResultValue(
-            exitCode = effectiveExitCode,
-            stdout = resultText,
-            stderr = effectiveResult.stderr,
-        )
-    }
-
-    private fun runPromptOnce(prompt: String, timeoutSeconds: Long): ProcessResult {
-        val rawResult = runInContainer(
+        val effectiveResult = runInContainer(
             args = listOf(
                 "--screen-reader", "true",
                 "--sandbox-mode", "none",
@@ -123,40 +88,17 @@ class DockerGeminiSession(
                 "--prompt", prompt,
             ),
             timeoutSeconds = timeoutSeconds
+        ).awaitForProcessFinish()
+
+        //TODO: looks like the case for specific interface to return the JSON output VS the processed output
+        //TODO: should be a common interface all AI Agents implement
+        return ProcessResultValue(
+            exitCode = effectiveResult.exitCode ?: -1,
+            stdout = outputFilter.filterText(effectiveResult.stdout),
+            stderr = effectiveResult.stderr,
         )
-
-        val effectiveResult = if (shouldRetryWithModernSandboxFlag(rawResult)) {
-            runInContainer(
-                args = listOf(
-                    "--screen-reader", "true",
-                    "--sandbox", "false",
-                    "--approval-mode", "yolo",
-                    "--output-format", "stream-json",
-                    "--prompt", prompt,
-                ),
-                timeoutSeconds = timeoutSeconds
-            )
-        } else {
-            rawResult
-        }
-        return effectiveResult
     }
 
-    private fun shouldRetryTransientApiError(result: ProcessResult): Boolean {
-        if (result.exitCode == 0) return false
-        val combined = (result.stdout + "\n" + result.stderr).lowercase(Locale.US)
-        return combined.contains("api error: terminated") ||
-                combined.contains("error when talking to gemini api") ||
-                combined.contains("und_err_socket") ||
-                combined.contains("other side closed")
-    }
-
-    private fun shouldRetryWithModernSandboxFlag(result: ProcessResult): Boolean {
-        if (result.exitCode == 0) return false
-        val combined = (result.stdout + "\n" + result.stderr).lowercase(Locale.US)
-        return combined.contains("unknown arguments: sandbox-mode") ||
-                combined.contains("unknown arguments: sandboxmode")
-    }
 
     companion object : AIAgentCompanion<DockerGeminiSession>("gemini-cli") {
         override val displayName = "Gemini"
@@ -165,19 +107,16 @@ class DockerGeminiSession(
         override fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
             System.getenv("GOOGLE_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
-            val home = System.getProperty("user.home")
-            for (filename in listOf(".vertes", ".vertex")) {
-                val keyFile = File(home, filename)
-                if (keyFile.exists()) {
-                    val content = keyFile.readText().trim()
-                    if (content.isNotBlank()) return content
-                }
+            val keyFile = File(System.getProperty("user.home"), ".vertex")
+            if (keyFile.exists()) {
+                val content = keyFile.readText().trim()
+                if (content.isNotBlank()) return content
             }
-            error("GEMINI_API_KEY required (set env GEMINI_API_KEY, GOOGLE_API_KEY, or ~/.vertes / ~/.vertex)")
+            error("GEMINI_API_KEY required (set env GEMINI_API_KEY, GOOGLE_API_KEY, or ~/.vertex)")
         }
 
         override fun createImpl(session: ContainerProcessRunner, apiKey: String): DockerGeminiSession {
-            return DockerGeminiSession(session, apiKey)
+            return DockerGeminiSession(session, apiKey, workdirInContainer = workdirInContainerDefault)
         }
     }
 }

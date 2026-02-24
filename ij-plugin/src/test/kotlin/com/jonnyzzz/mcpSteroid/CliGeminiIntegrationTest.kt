@@ -1,4 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+@file:Suppress("RedundantOverride")
+
 package com.jonnyzzz.mcpSteroid
 
 import com.intellij.testFramework.common.timeoutRunBlocking
@@ -23,7 +25,7 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
     fun testGeminiInstalled(): Unit = timeoutRunBlocking(180.seconds) {
         geminiSession()
             .runInContainer(args = listOf("--version"))
-            .assertExitCode(0, "Gemini")
+            .assertExitCode(0) { "Gemini failed" }
     }
 
     fun testMcpServerRegistration() {
@@ -31,8 +33,8 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
         timeoutRunBlocking(180.seconds) {
             val session = geminiSession()
             session.registerHttpMcp(resolveDockerUrl(), mcpName)
-            session.runInContainer(listOf("mcp", "list", ))
-                .assertExitCode(0, "mcp list should succeed")
+            session.runInContainer(listOf("mcp", "list"))
+                .assertExitCode(0) { "mcp list should succeed" }
                 .assertOutputContains(mcpName, message = "mcp list should contain registered server")
         }
     }

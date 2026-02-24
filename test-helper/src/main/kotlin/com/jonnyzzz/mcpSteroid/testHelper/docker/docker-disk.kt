@@ -8,12 +8,12 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import java.io.File
 
 fun ContainerDriver.mkdirs(guestPath: String): ProcessResult {
-    return runInContainer(ContainerProcessRunRequest
-        .builder()
-        .command("mkdir", "-p", guestPath)
-        .description("Create directory $guestPath in the container")
-        .quietly()
-        .build())
+    return startProcessInContainer(
+        ExecContainerProcessRequest()
+            .args("mkdir", "-p", guestPath)
+            .description("Create directory $guestPath in the container")
+            .quietly()
+    ).awaitForProcessFinish()
 }
 
 fun ContainerDriver.copyFromContainer(containerPath: String, localPath: File) {
@@ -48,37 +48,24 @@ fun ContainerDriver.writeFileInContainer(
 ) {
     val parentDir = containerPath.substringBeforeLast('/')
     if (parentDir.isNotEmpty()) {
-
-        runInContainer(
-            ContainerProcessRunRequest.builder()
-                .command("mkdir", "-p", parentDir)
-                .description("mkdir $parentDir")
-                .timeoutSeconds(5)
-                .quietly()
-                .build()
-        )
-            .assertExitCode(0)
+        mkdirs(parentDir).assertExitCode(0) { "Failed to create directory in container $parentDir: $stderr" }
     }
 
-    runInContainer(
-        ContainerProcessRunRequest.builder()
-            .command("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
+    startProcessInContainer(
+        ExecContainerProcessRequest()
+            .args("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
             .description("Write content to $containerPath")
             .timeoutSeconds(5)
             .quietly()
-            .build()
-    )
-        .assertExitCode(0)
+    ).assertExitCode(0) { "Failed to write content in container to $containerPath: $content: $stderr" }
 
     if (executable) {
-        runInContainer(
-            ContainerProcessRunRequest.builder()
-                .command("chmod", "+x", containerPath)
+        startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("chmod", "+x", containerPath)
                 .description("chmod +x $containerPath")
                 .timeoutSeconds(5)
                 .quietly()
-                .build()
-        )
-            .assertExitCode(0)
+        ).assertExitCode(0) { "Failed to chmod the created file in container to $containerPath: $stderr" }
     }
 }

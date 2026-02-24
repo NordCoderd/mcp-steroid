@@ -59,6 +59,7 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
 
         // Check codex version
         session.runInContainer(listOf("--version"))
+            .assertExitCode(0) { "Failed to exec --version command"}
             .assertNoErrorsInOutput("version command")
             .assertExitCode(0, "version command")
     }
@@ -79,7 +80,7 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
 
         session
             .runInContainer(listOf("mcp", "get", mcpName))
-            .assertExitCode(0, "MCP get command")
+            .assertExitCode(0) { "MCP get command" }
             .assertOutputContains(
                 "enabled: true",
                 "transport: streamable_http",

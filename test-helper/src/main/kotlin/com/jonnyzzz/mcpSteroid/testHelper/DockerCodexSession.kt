@@ -8,9 +8,11 @@ import com.jonnyzzz.mcpSteroid.filter.CodexOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
+import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
 import java.io.File
@@ -26,12 +28,13 @@ class DockerCodexSession(
     private val session: ContainerProcessRunner,
     private val apiKey: String,
     private val debug: Boolean = false,
+    private val workdirInContainer: String,
 ) : AiAgentSession {
     override val displayName: String = Companion.displayName
 
     override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
         runInContainer(args = codexMcpAddArgs(mcpUrl, mcpName))
-            .assertExitCode(0, message = "MCP server registration")
+            .assertExitCode(0) { "MCP server registration" }
             .assertNoErrorsInOutput("MCP server registration")
 
         return this
@@ -39,7 +42,7 @@ class DockerCodexSession(
 
     override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String): AiAgentSession {
         runInContainer(args = codexMcpAddStdioArgs(npxCommand, mcpName))
-            .assertExitCode(0, message = "NPX MCP server registration")
+            .assertExitCode(0) { "NPX MCP server registration" }
             .assertNoErrorsInOutput("NPX MCP server registration")
 
         return this
@@ -49,7 +52,7 @@ class DockerCodexSession(
      * Run a codex command inside the Docker container.
      * Note: Codex doesn't support --verbose flag like Claude does.
      */
-    fun runInContainer(args: List<String>, timeoutSeconds: Long = 120): ProcessResult {
+    fun runInContainer(args: List<String>, timeoutSeconds: Long = 120): StartedProcess {
         val codexArgs = buildList {
             add("codex")
             addAll(args)
@@ -64,18 +67,15 @@ class DockerCodexSession(
                 put("DEBUG", "*")
             }
         }
-        val req = ContainerProcessRunRequest
-            .builder()
-            .command(codexArgs)
-            .workingDirInContainer(null)
-            .timeoutSeconds(timeoutSeconds = timeoutSeconds)
-            .quietly(false)
-            .description(codexArgs.joinToString(" ").take(80))
+        val req = ExecContainerProcessRequest()
+            .args(codexArgs)
+            .timeoutSeconds(timeoutSeconds)
+            .description("Codex: " + codexArgs.joinToString(" ").take(80))
             .secretPatterns(apiKey)
+            .workingDirInContainer(workdirInContainer)
             .extraEnv(extraEnvVars)
-            .build()
 
-        return session.runInContainer(req)
+        return session.startProcessInContainer(req)
     }
 
     /**
@@ -103,7 +103,7 @@ class DockerCodexSession(
         val rawResult = runInContainer(
             args = codexArgs,
             timeoutSeconds = timeoutSeconds
-        )
+        ).awaitForProcessFinish()
 
         val resultText = outputFilter.filterText(rawResult.stdout)
         return ProcessResultValue(
@@ -128,7 +128,7 @@ class DockerCodexSession(
         }
 
         override fun createImpl(session: ContainerProcessRunner, apiKey: String): DockerCodexSession {
-            return DockerCodexSession(session, apiKey)
+            return DockerCodexSession(session, apiKey, workdirInContainer = workdirInContainerDefault)
         }
     }
 }

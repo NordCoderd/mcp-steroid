@@ -7,8 +7,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.DockerClaudeSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerCodexSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.copyToContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
@@ -83,14 +82,12 @@ class AiAgentDriver(
         container.writeFileInContainer("/tmp/deploy-filter.sh", deployScript, executable = true)
         emptyMap<String, String>()
 
-        container.runInContainer(
-            ContainerProcessRunRequest
-                .builder()
-                .command(listOf("bash", "/tmp/deploy-filter.sh"))
+        container.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args(listOf("bash", "/tmp/deploy-filter.sh"))
                 .workingDirInContainer(null)
                 .timeoutSeconds(timeoutSeconds = 60)
                 .description("Deploying agent output-filter")
-                .build()
         )
             .assertExitCode(0) {
                 "agent-output-filter deployment failed:\n$stdout\n$stderr"

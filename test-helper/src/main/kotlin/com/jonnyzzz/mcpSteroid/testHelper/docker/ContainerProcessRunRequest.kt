@@ -48,7 +48,7 @@ open class ContainerProcessRunRequestBuilder<R : ContainerProcessRunRequestBuild
 
 
 @Suppress("DATA_CLASS_COPY_VISIBILITY_WILL_BE_CHANGED_WARNING", "DataClassPrivateConstructor")
-data class RunContainerProcessRequest private constructor(
+data class ExecContainerProcessRequest private constructor(
     val workingDirInContainer: String?,
     val extraEnvVars: Map<String, String>,
     val args: List<String> = listOf(),
@@ -61,11 +61,11 @@ data class RunContainerProcessRequest private constructor(
     val secretPatterns: List<String> = listOf(),
 ) {
     companion object {
-        operator fun invoke() : RunContainerProcessRequest = RunContainerProcessRequest()
+        operator fun invoke() : ExecContainerProcessRequest = ExecContainerProcessRequest()
     }
 
     fun workingDirInContainer(workingDirInContainer: String?) = copy(workingDirInContainer = workingDirInContainer)
-    fun extraEnvVars(extraEnvVars: Map<String, String>) = copy(extraEnvVars = extraEnvVars)
+    fun extraEnv(extraEnvVars: Map<String, String>) = copy(extraEnvVars = extraEnvVars)
     fun args(args: List<String> = listOf()) = copy(args = args)
     fun args(vararg args: String) = args(args.toList())
     fun logPrefix(logPrefix: String? = null) = copy(logPrefix = logPrefix)
@@ -76,8 +76,10 @@ data class RunContainerProcessRequest private constructor(
     fun detached() = detach(true)
 
     fun timeout(timeout: Duration = Duration.ofSeconds(30)) = copy(timeout = timeout)
+    fun timeoutSeconds(timeoutSeconds: Long) = timeout(Duration.ofSeconds(timeoutSeconds))
 
     fun stdin(stdin: Flow<ByteArray> = emptyFlow()) = copy(stdin = stdin)
 
     fun secretPatterns(secretPatterns: List<String> = listOf()) = copy(secretPatterns = secretPatterns)
+    fun secretPatterns(vararg secretPatterns: String) = secretPatterns(secretPatterns.toList())
 }

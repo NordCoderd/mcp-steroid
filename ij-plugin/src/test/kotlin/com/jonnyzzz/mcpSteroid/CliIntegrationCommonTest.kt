@@ -10,11 +10,10 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
-import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
@@ -52,22 +51,20 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
     fun testHostAvailability(): Unit = timeoutRunBlocking(180.seconds) {
         val session = llmSession()
 
-        session.runInContainer(
-        ContainerProcessRunRequest
-            .builder()
-            .command(
-                "curl",
-                "-v", "-X", "POST",
-                "-H", "Content-Type: application/json",
-                "-H", "Accept: application/json",
-                "-d",
-                """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
-                resolveDockerUrl()
-            )
-            .timeoutSeconds(30)
-            .quietly(false)
-            .build())
-            .assertExitCode(0, "curl to MCP")
+        session.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args(
+                    "curl",
+                    "-v", "-X", "POST",
+                    "-H", "Content-Type: application/json",
+                    "-H", "Accept: application/json",
+                    "-d",
+                    """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
+                    resolveDockerUrl()
+                )
+                .timeoutSeconds(5)
+        )
+            .assertExitCode(0) { "curl to MCP failed" }
             .assertNoErrorsInOutput("curl to MCP")
             .assertOutputContains(
                 "jsonrpc",

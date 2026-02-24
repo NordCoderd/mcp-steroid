@@ -3,14 +3,9 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
-import java.time.Duration
-import java.time.LocalDateTime.now
-import java.time.format.DateTimeFormatter
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.collections.forEach
@@ -59,7 +54,7 @@ private class ContainerDriverImpl(
     }
 
     override fun startProcessInContainer(
-        request: RunContainerProcessRequest
+        request: ExecContainerProcessRequest
     ): StartedProcess {
 
         val command = buildList {

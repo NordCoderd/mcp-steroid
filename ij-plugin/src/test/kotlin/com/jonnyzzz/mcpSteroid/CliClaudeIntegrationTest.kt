@@ -56,7 +56,7 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
     fun testClaudeInstalled(): Unit = timeoutRunBlocking(180.seconds) {
         claudeSession()
             .runInContainer(listOf("--version"))
-            .assertExitCode(0, "Claude --version should succeed")
+            .assertExitCode(0) { "Claude --version should succeed" }
     }
 
     fun testMcpServerRegistration(): Unit = timeoutRunBlocking(180.seconds) {
@@ -67,7 +67,7 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
 
         session
             .runInContainer(listOf("mcp", "get", mcpName))
-            .assertExitCode(0, "MCP get command")
+            .assertExitCode(0) { "MCP get command" }
             .assertOutputContains("Status:", "Connected", message = "MCP server registration")
             .assertNoErrorsInOutput(message = "MCP server registration")
     }

@@ -7,18 +7,8 @@ import java.time.Duration
 
 interface ContainerProcessRunner {
     fun startProcessInContainer(
-        request: RunContainerProcessRequest
+        request: ExecContainerProcessRequest
     ): StartedProcess
-
-    fun runInContainer(request: ContainerProcessRunRequest): ProcessResult {
-        return runInContainer(
-            request.command,
-            request.workingDirInContainer,
-            request.timeoutSeconds,
-            request.extraEnvVars,
-            request.quietly
-        )
-    }
 
     fun runInContainer(
         args: List<String>,
@@ -27,12 +17,12 @@ interface ContainerProcessRunner {
         extraEnvVars: Map<String, String> = emptyMap(),
         quietly: Boolean = false,
     ): ProcessResult {
-        val req = RunContainerProcessRequest()
+        val req = ExecContainerProcessRequest()
             .args(args)
             .workingDirInContainer(workingDir)
             .timeout(Duration.ofSeconds(timeoutSeconds))
             .quietly(quietly)
-            .extraEnvVars(extraEnvVars)
+            .extraEnv(extraEnvVars)
             .description("In container: ${args.joinToString(" ")}")
 
         return startProcessInContainer(req).awaitForProcessFinish()

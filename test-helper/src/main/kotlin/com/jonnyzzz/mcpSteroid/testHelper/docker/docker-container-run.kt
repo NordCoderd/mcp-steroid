@@ -32,13 +32,13 @@ fun ContainerDriver.runInContainerDetached(
     writeFileInContainer(scriptPath, wrapperScript, executable = true)
     // Run the wrapper script detached
 
-    val req = RunContainerProcessRequest()
+    val req = ExecContainerProcessRequest()
         .args("bash", scriptPath)
         .description("In detached $innerCommand")
         .timeout(Duration.ofSeconds(10))
         .quietly()
         .workingDirInContainer(workingDir)
-        .extraEnvVars(extraEnvVars)
+        .extraEnv(extraEnvVars)
         .detach(true)
 
     startProcessInContainer(req)

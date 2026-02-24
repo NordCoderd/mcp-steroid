@@ -13,6 +13,8 @@ abstract class AIAgentCompanion<T : Any>(val dockerFileBase: String) {
     abstract val displayName: String
     abstract val outputFilter: OutputFilter
 
+    val workdirInContainerDefault = "/home/agent" //TODO
+
     protected abstract fun readApiKey(): String
 
     fun create(lifetime: CloseableStack): T {
@@ -27,7 +29,7 @@ abstract class AIAgentCompanion<T : Any>(val dockerFileBase: String) {
             workDir.deleteRecursively()
         }
 
-        val scope = DockerDriver(workDir, logPrefix, listOf<String>())
+        val scope = DockerDriver(workDir, logPrefix, listOf())
         val imageId = buildDockerImage(
             logPrefix = logPrefix,
             dockerfilePath,

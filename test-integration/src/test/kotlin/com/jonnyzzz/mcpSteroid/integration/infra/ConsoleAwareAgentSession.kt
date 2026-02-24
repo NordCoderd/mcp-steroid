@@ -7,8 +7,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.RunContainerProcessRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
@@ -90,7 +89,7 @@ class ConsolePumpingContainerDriver(
 ) : ContainerDriverDelegate<ConsolePumpingContainerDriver>(delegate) {
     private val counter = AtomicInteger(0)
 
-    override fun startProcessInContainer(request: RunContainerProcessRequest): StartedProcess {
+    override fun startProcessInContainer(request: ExecContainerProcessRequest): StartedProcess {
         TODO("Not yet implemented")
     }
 
@@ -153,15 +152,14 @@ class ConsolePumpingContainerDriver(
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 
-            val result = delegate.runInContainer(ContainerProcessRunRequest
-                .builder()
-                .command("bash", teeScript)
+            val result = delegate.startProcessInContainer(ExecContainerProcessRequest()
+                .args("bash", teeScript)
                 .workingDirInContainer(workingDir)
                 .timeoutSeconds(timeoutSeconds)
                 .extraEnv(extraEnvVars)
                 .description("Run agent [$slug-$idx] with in-container filter")
                 .quietly()
-                .build())
+            ).awaitForProcessFinish()
 
             // Print filtered output to JVM test-runner console (volume-mounted, accessible on host)
             if (hostFilteredLog.exists()) {
@@ -207,15 +205,16 @@ class ConsolePumpingContainerDriver(
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 
-            return delegate.runInContainer(ContainerProcessRunRequest
-                .builder()
-                .command("bash", teeScript)
-                .workingDirInContainer(workingDir)
-                .timeoutSeconds(timeoutSeconds)
-                .extraEnv(extraEnvVars)
-                .description("Run agent [$slug-$idx] with combined log tee")
-                .quietly(false)
-                .build())
+            return delegate.startProcessInContainer(
+                ExecContainerProcessRequest()
+                    .args("bash", teeScript)
+                    .workingDirInContainer(workingDir)
+                    .timeoutSeconds(timeoutSeconds)
+                    .extraEnv(extraEnvVars)
+                    .description("Run agent [$slug-$idx] with combined log tee")
+                    .quietly(false)
+            )
+                .awaitForProcessFinish()
         } finally {
             Thread.sleep(500)
             pump.stop()
