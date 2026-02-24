@@ -1,12 +1,15 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.process
 
+import kotlinx.coroutines.CoroutineName
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.runBlocking
 import java.io.InputStream
 import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 
 //TODO: hide this class
 data class ProcessResultValue(
@@ -94,11 +97,15 @@ class ProcessRunner(
         }
 
         // Thread for copying stdin to the process
-        val stdinThread = Thread {
+        val stdinThread = thread(start = false, name = "$logPrefix-stdin-reader") {
             try {
-                request.stdin.use { input ->
-                    process.outputStream.use { output ->
-                        input.copyTo(output)
+                process.outputStream.use { output ->
+                    runBlocking(CoroutineName("$logPrefix-stdin")) {
+                        @Suppress("BlockingMethodInNonBlockingContext")
+                        request.stdin.collect {
+                            output.write(it)
+                            output.flush()
+                        }
                     }
                 }
             } catch (e: Exception) {
@@ -109,11 +116,11 @@ class ProcessRunner(
             }
         }
 
-        val outputThread = Thread {
+        val outputThread = thread(start = false, name = "$logPrefix-stdout") {
             readOutput(process.inputStream, "$logPrefix OUT", ProcessStreamType.STDOUT)
         }
 
-        val errorThread = Thread {
+        val errorThread = thread(start = false, name = "$logPrefix-stderr") {
             readOutput(process.errorStream, "$logPrefix ERR", ProcessStreamType.STDERR)
         }
 
