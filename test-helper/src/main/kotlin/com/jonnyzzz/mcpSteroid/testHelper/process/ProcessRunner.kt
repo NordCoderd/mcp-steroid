@@ -6,8 +6,11 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.runBlocking
+import java.io.File
 import java.io.InputStream
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
@@ -17,6 +20,34 @@ data class ProcessResultValue(
     override val stdout: String,
     override val stderr: String,
 ) : ProcessResult
+
+
+@ConsistentCopyVisibility
+data class RunProcessRequest private constructor(
+    val workingDir: File? = null,
+    val args: List<String> = listOf(),
+
+    val logPrefix: String? = null,
+    val description: String? = null,
+    val quietly: Boolean = false,
+
+    val timeout: Duration = Duration.ofSeconds(30),
+
+    val stdin: Flow<ByteArray> = emptyFlow(),
+) {
+    companion object {
+        operator fun invoke() : RunProcessRequest = RunProcessRequest()
+    }
+
+    fun withWorkingDir(workingDir: File) = copy(workingDir = workingDir)
+    fun withArgs(args: List<String>) = copy(args = args)
+    fun withLogPrefix(logPrefix: String) = copy(logPrefix = logPrefix)
+    fun withDescription(description: String) = copy(description = description)
+    fun withTimeout(timeout: Duration) = copy(timeout = timeout)
+    fun withQuietly(quietly: Boolean) = copy(quietly = quietly)
+    fun withStdin(stdin: Flow<ByteArray>) = copy(stdin = stdin)
+}
+
 
 
 /**

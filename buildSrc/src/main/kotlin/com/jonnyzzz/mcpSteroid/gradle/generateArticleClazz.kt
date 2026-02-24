@@ -114,33 +114,6 @@ data class PromptArticle(
     val allClasses: List<GeneratedPromptClazz>
         get() = listOfNotNull(payload, header, seeAlso) + sections
 
-    /**
-     * Merges section file contents into a single markdown string.
-     *
-     * Sections are already sorted by path when stored. `.kt` section files are wrapped
-     * in a ` ```kotlin ``` ` code fence so the merged result is valid markdown.
-     *
-     * Only valid when [sections] is non-empty.
-     */
-    val mergedSectionsContent: String
-        get() {
-            require(sections.isNotEmpty()) {
-                "mergedSectionsContent called on non-section article: ${header.path}"
-            }
-            return buildString {
-                for ((index, section) in sections.withIndex()) {
-                    if (index > 0) append("\n\n")
-                    if (section.path.endsWith(".kt")) {
-                        appendLine("```kotlin")
-                        append(section.content.trim())
-                        appendLine()
-                        append("```")
-                    } else {
-                        append(section.content.trim())
-                    }
-                }
-            }
-        }
 }
 
 data class GeneratedArticleClazz(
@@ -282,7 +255,7 @@ fun PromptGenerationContext.generateArticleClazz(
     // - Section articles: generate a new inline class holding the merged content.
     val payloadClassName: ClassName = if (article.sections.isNotEmpty()) {
         val mergedClass = ClassName(pkg, classType.simpleName + "Payload")
-        generateStringPromptClazz(article.mergedSectionsContent, mergedClass)
+        generateSectionDelegatePayloadClazz(article.sections, mergedClass)
         mergedClass
     } else {
         article.payload!!.clazzName
