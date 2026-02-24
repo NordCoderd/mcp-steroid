@@ -16,10 +16,15 @@ import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 
-inline val scriptClassLoaderFactory get() : ScriptClassLoaderFactory = service()
+inline val scriptClassLoaderFactory get(): ScriptClassLoaderFactory = service()
+
+interface ScriptClassLoaderFactory {
+    fun ideClasspath(): List<Path>
+    fun execCodeClassloader(jar: Path): ClassLoader
+}
 
 @Service(Service.Level.APP)
-class ScriptClassLoaderFactory {
+class DefaultScriptClassLoaderFactory : ScriptClassLoaderFactory {
     private fun orderedPluginDescriptors(): List<IdeaPluginDescriptor> {
         return PluginManagerCore.loadedPlugins
             .filter {
@@ -28,12 +33,12 @@ class ScriptClassLoaderFactory {
             }
     }
 
-    fun execCodeClassloader(jar: Path): ClassLoader {
+    override fun execCodeClassloader(jar: Path): ClassLoader {
         //we cannot keep the newIdeClassloader to enforce classes GC
         return URLClassLoader(arrayOf(jar.toUri().toURL()), newIdeClassloader())
     }
 
-    fun ideClasspath(): List<Path> {
+    override fun ideClasspath(): List<Path> {
         return orderedPluginDescriptors()
             .asSequence()
             .mapNotNull { it.pluginClassLoader as UrlClassLoader? }

@@ -69,6 +69,7 @@ dependencies {
             -> error("Plugin build targets IntelliJ IDEA or PyCharm only. GoLand/WebStorm are for integration tests.")
         }
         bundledPlugin("org.jetbrains.kotlin")
+        bundledPlugin("JUnit")
         testFramework(TestFrameworkType.Platform)
     }
 
