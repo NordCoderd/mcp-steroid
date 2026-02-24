@@ -21,15 +21,18 @@ interface ContainerProcessRunner {
         timeoutSeconds: Long = 30,
         extraEnvVars: Map<String, String> = emptyMap(),
         quietly: Boolean = false,
-    ): ProcessResult =
-        ContainerProcessRunRequest
+    ): ProcessResult {
+        val req = ContainerProcessRunRequest
             .builder()
             .command(args)
             .workingDirInContainer(workingDir)
             .timeoutSeconds(timeoutSeconds)
             .quietly(quietly)
             .description(args.joinToString(" ").take(80))
-            .runInContainer(this)
+            .build()
+
+        return runInContainer(req)
+    }
 
     fun withSecretPattern(secretPattern: String): ContainerProcessRunner
 }

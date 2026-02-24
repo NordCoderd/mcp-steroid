@@ -5,6 +5,17 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 
+data class ContainerHolder(
+    val logPrefix: String,
+    val startRequest: StartContainerRequest,
+    val containerId: String,
+) {
+
+    fun newRunProcess() = RunProcessRequest()
+        .logPrefix(logPrefix)
+}
+
+
 /**
  * Base class for managing CLI sessions running inside Docker containers.
  * Provides common functionality for building images, starting/stopping containers,

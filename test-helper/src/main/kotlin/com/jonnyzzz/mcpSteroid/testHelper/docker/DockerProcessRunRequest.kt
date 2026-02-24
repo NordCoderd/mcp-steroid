@@ -11,10 +11,6 @@ open class DockerProcessRunRequest(
 fun DockerProcessRunRequest.Companion.builder() = DockerProcessRunRequestBuilder()
 
 
-fun DockerProcessRunRequest.runInContainer(container: DockerDriver) = container.runInContainer(this)
-fun <R : DockerProcessRunRequestBuilder<R>> DockerProcessRunRequestBuilder<R>.runInContainer(container: DockerDriver) =
-    build().runInContainer(container)
-
 open class DockerProcessRunRequestBuilder<R : DockerProcessRunRequestBuilder<R>>() :
     ContainerProcessRunRequestBuilder<R>() {
     var containerId: String? = null

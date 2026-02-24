@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import java.time.LocalDateTime.now
 import java.time.format.DateTimeFormatter
@@ -53,7 +54,8 @@ private class ContainerDriverImpl(
         timeoutSeconds: Long,
         extraEnvVars: Map<String, String>,
         quietly: Boolean,
-    ) = DockerProcessRunRequest.builder()
+    ): ProcessResult {
+        val req = DockerProcessRunRequest.builder()
             .containerId(containerId)
             .command(args)
             .description("In container: ${args.joinToString(" ")}")
@@ -63,7 +65,9 @@ private class ContainerDriverImpl(
             .extraEnv(extraEnvVars)
             .detach(false)
             .build()
-            .runInContainer(scope)
+
+        return scope.runInContainer(req)
+    }
 
     override fun runInContainerDetached(
         args: List<String>,
@@ -89,7 +93,7 @@ private class ContainerDriverImpl(
         writeFileInContainer(scriptPath, wrapperScript, executable = true)
         // Run the wrapper script detached
 
-        DockerProcessRunRequest.builder()
+        val req = DockerProcessRunRequest.builder()
             .containerId(containerId)
             .command("bash", scriptPath)
             .description("In detached $innerCommand")
@@ -99,14 +103,14 @@ private class ContainerDriverImpl(
             .extraEnv(extraEnvVars)
             .detach(true)
             .build()
-            .runInContainer(scope)
+
+        scope.runInContainer(req)
             .assertExitCode(0) { "Failed to start detached process '$name': $stderr" }
 
         println("[${scope.logPrefix}] Detached process '$name' started, stdout/stderr at $logDir")
         val info = DetachedContainerProcess(name = name, logDir = logDir)
         return RunningContainerProcess(this, info.name, info.logDir)
     }
-
 
     override fun toString(): String {
         return "DockerContained(id=$containerId, image=$imageName)"
