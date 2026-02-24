@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.testHelper.process
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 
 data class PID(val pid: String)
 
@@ -35,4 +36,11 @@ interface StartedProcess {
 
 fun StartedProcess.assertExitCode(expectedExitCode: Int, message: ProcessResult.() -> String) =
     awaitForProcessFinish().assertExitCode(expectedExitCode, message)
+
+/** Wraps a [ProcessResult] as a [StartedProcess] that has already finished. */
+fun ProcessResult.asStartedProcess(): StartedProcess = object : StartedProcess {
+    override val messagesFlow = emptyFlow<ProcessStreamLine>()
+    override fun awaitForProcessFinish(): ProcessResult = this@asStartedProcess
+    override fun destroyForcibly() {}
+}
 

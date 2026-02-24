@@ -53,28 +53,31 @@ class RunningContainerProcess(
 
     /** Read current stdout content from the container. */
     fun readStdOut(timeoutSeconds: Long = 10): String {
-        val result = driver.runInContainer(
-            listOf("cat", stdoutPath),
-            timeoutSeconds = timeoutSeconds,
-        )
-        return result.stdout
+        return driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("cat", stdoutPath)
+                .timeoutSeconds(timeoutSeconds)
+                .description("cat $stdoutPath"),
+        ).awaitForProcessFinish().stdout
     }
 
     /** Read current stderr content from the container. */
     fun readStderr(timeoutSeconds: Long = 10): String {
-        val result = driver.runInContainer(
-            listOf("cat", stderrPath),
-            timeoutSeconds = timeoutSeconds,
-        )
-        return result.stdout
+        return driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("cat", stderrPath)
+                .timeoutSeconds(timeoutSeconds)
+                .description("cat $stderrPath"),
+        ).awaitForProcessFinish().stdout
     }
 
     val pid: Long by lazy {
-        val result = driver.runInContainer(
-            listOf("cat", pidPath),
-            timeoutSeconds = 5L,
-        ).assertExitCode(0)
-        result.stdout.trim().toLong()
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("cat", pidPath)
+                .timeoutSeconds(5)
+                .description("cat $pidPath"),
+        ).assertExitCode(0) { "cat $pidPath failed" }.stdout.trim().toLong()
     }
 
     /**
@@ -82,28 +85,34 @@ class RunningContainerProcess(
      * is still running (exitcode file not yet written).
      */
     fun readExitCode(timeoutSeconds: Long = 5): Int? {
-        val result = driver.runInContainer(
-            listOf("cat", exitCodePath),
-            timeoutSeconds = timeoutSeconds,
-        )
+        val result = driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("cat", exitCodePath)
+                .timeoutSeconds(timeoutSeconds)
+                .description("cat $exitCodePath"),
+        ).awaitForProcessFinish()
         if (result.exitCode != 0) return null
         return result.stdout.trim().toIntOrNull()
     }
 
     /** Kill the background process if it is still running. */
     fun kill(signal: String = "TERM", timeoutSeconds: Long = 5) {
-        driver.runInContainer(
-            listOf("kill", "-$signal", this.pid.toString()),
-            timeoutSeconds = timeoutSeconds,
-        )
+        driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("kill", "-$signal", pid.toString())
+                .timeoutSeconds(timeoutSeconds)
+                .description("kill -$signal $pid"),
+        ).awaitForProcessFinish()
     }
 
     /** Check if the process is still running. */
     fun isRunning(timeoutSeconds: Long = 5): Boolean {
-        val result = driver.runInContainer(
-            listOf("kill", "-0", pid.toString()),
-            timeoutSeconds = timeoutSeconds,
-        )
+        val result = driver.startProcessInContainer(
+            ExecContainerProcessRequest()
+                .args("kill", "-0", pid.toString())
+                .timeoutSeconds(timeoutSeconds)
+                .description("kill -0 $pid"),
+        ).awaitForProcessFinish()
         return result.exitCode == 0
     }
 
