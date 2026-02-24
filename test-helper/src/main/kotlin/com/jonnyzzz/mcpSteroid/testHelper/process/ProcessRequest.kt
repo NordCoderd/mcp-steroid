@@ -52,11 +52,3 @@ data class RunProcessRequest private constructor(
     fun stdin(stdin: ByteArray) = withStdin(flowOf(stdin))
     fun stdin(stdin: String) = stdin(stdin.toByteArray())
 }
-
-fun ProcessRunRequest.toRunProcessRequest() = RunProcessRequest()
-    .withWorkingDir(this.workingDir)
-    .withArgs(this.command)
-    .withDescription(this.description)
-    .withTimeout(Duration.ofSeconds(this.timeoutSeconds))
-    .withQuietly(this.quietly)
-    .withStdin(this.stdin)
