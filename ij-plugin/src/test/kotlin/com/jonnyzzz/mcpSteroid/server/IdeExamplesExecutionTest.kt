@@ -532,7 +532,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testExtractMethodExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.extractMethodKts.payload.readPrompt()
+        val raw = index.extractMethodMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -553,7 +553,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testIntroduceVariableExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.introduceVariableKts.payload.readPrompt()
+        val raw = index.introduceVariableMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -574,7 +574,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testInlineMethodExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.inlineMethodKts.payload.readPrompt()
+        val raw = index.inlineMethodMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -594,7 +594,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testChangeSignatureExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.changeSignatureKts.payload.readPrompt()
+        val raw = index.changeSignatureMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -618,7 +618,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testMoveFileExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.moveFileKts.payload.readPrompt()
+        val raw = index.moveFileMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = moveSamplePath,
@@ -641,7 +641,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testSafeDeleteExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.safeDeleteKts.payload.readPrompt()
+        val raw = index.safeDeleteMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = safeDeletePath,
@@ -661,7 +661,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testOptimizeImportsExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.optimizeImportsKts.payload.readPrompt()
+        val raw = index.optimizeImportsMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = importsSamplePath,
@@ -679,7 +679,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testGenerateOverrideExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.generateOverrideKts.payload.readPrompt()
+        val raw = index.generateOverrideMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = greeterImplPath,
@@ -698,7 +698,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testInspectAndFixExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.inspectAndFixKts.payload.readPrompt()
+        val raw = index.inspectAndFixMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = inspectionSamplePath,
@@ -716,7 +716,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testHierarchySearchExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.hierarchySearchKts.payload.readPrompt()
+        val raw = index.hierarchySearchMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             classFqn = "sample.BaseType",
@@ -731,7 +731,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testCallHierarchyExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.callHierarchyKts.payload.readPrompt()
+        val raw = index.callHierarchyMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             filePath = refactorSamplePath,
@@ -747,13 +747,13 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testRunConfigurationExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.runConfigurationKts.payload.readPrompt()
+        val raw = index.runConfigurationMd.ktBlock000.readPrompt()
         val result = executeExample("run-configuration", raw)
         assertExampleResult(result, "Run Configurations")
     }
 
     fun testPullUpMembersExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.pullUpMembersKts.payload.readPrompt()
+        val raw = index.pullUpMembersMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             sourceClassFqn = "sample.pullup.PullUpChild",
@@ -779,7 +779,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testPushDownMembersExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.pushDownMembersKts.payload.readPrompt()
+        val raw = index.pushDownMembersMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             sourceClassFqn = "sample.pushdown.PushDownBase",
@@ -810,7 +810,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testExtractInterfaceExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.extractInterfaceKts.payload.readPrompt()
+        val raw = index.extractInterfaceMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             sourceClassFqn = "sample.extract.ExtractSource",
@@ -851,7 +851,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testMoveClassExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.moveClassKts.payload.readPrompt()
+        val raw = index.moveClassMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             classFqn = "sample.moveclass.MoveClassSample",
@@ -874,7 +874,7 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testGenerateConstructorExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.generateConstructorKts.payload.readPrompt()
+        val raw = index.generateConstructorMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             classFqn = "sample.ConstructorSample",
@@ -892,19 +892,19 @@ class IdeExamplesExecutionTest : BasePlatformTestCase() {
     }
 
     fun testProjectDependenciesExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.projectDependenciesKts.payload.readPrompt()
+        val raw = index.projectDependenciesMd.ktBlock000.readPrompt()
         val result = executeExample("project-dependencies", raw)
         assertExampleResult(result, "Project Dependencies")
     }
 
     fun testInspectionSummaryExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.inspectionSummaryKts.payload.readPrompt()
+        val raw = index.inspectionSummaryMd.ktBlock000.readPrompt()
         val result = executeExample("inspection-summary", raw)
         assertExampleResult(result, "Enabled inspections")
     }
 
     fun testProjectSearchExampleExecutes(): Unit = timeoutRunBlocking(60.seconds) {
-        val raw = index.projectSearchKts.payload.readPrompt()
+        val raw = index.projectSearchMd.ktBlock000.readPrompt()
         val code = configureExample(
             raw,
             fileName = "RefactorSample.java",

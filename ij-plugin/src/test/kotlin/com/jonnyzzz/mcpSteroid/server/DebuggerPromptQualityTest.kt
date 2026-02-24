@@ -12,7 +12,7 @@ class DebuggerPromptQualityTest : BasePlatformTestCase() {
     override fun runInDispatchThread(): Boolean = false
 
     fun testSetLineBreakpointUsesToggleLineBreakpoint() {
-        val prompt = debuggerIndex.setLineBreakpointKts.payload.readPrompt()
+        val prompt = debuggerIndex.setLineBreakpointMd.ktBlock000.readPrompt()
         assertTrue("Expected toggleLineBreakpoint guidance", prompt.contains("toggleLineBreakpoint"))
         assertTrue("Expected EDT guidance", prompt.contains("Dispatchers.EDT"))
         assertFalse(
@@ -22,7 +22,7 @@ class DebuggerPromptQualityTest : BasePlatformTestCase() {
     }
 
     fun testDebugRunConfigurationUsesModernProgramRunnerUtilPackage() {
-        val prompt = debuggerIndex.debugRunConfigurationKts.payload.readPrompt()
+        val prompt = debuggerIndex.debugRunConfigurationMd.ktBlock000.readPrompt()
         assertTrue(
             "Expected modern ProgramRunnerUtil package",
             prompt.contains("import com.intellij.execution.ProgramRunnerUtil")

@@ -46,7 +46,7 @@ class LanguageSupportExecutionTest : BasePlatformTestCase() {
     fun testLanguageSupportViaGoToDefinition(): Unit = timeoutRunBlocking(120.seconds) {
         val available = resolveAvailableSpecs()
 
-        val raw = index.goToDefinitionKts.payload.readPrompt()
+        val raw = index.goToDefinitionMd.ktBlock000.readPrompt()
         for (sample in samples.filter { it.spec in available }) {
             val code = configureExample(
                 raw,
