@@ -4,9 +4,15 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import java.time.LocalDateTime.now
 import java.time.format.DateTimeFormatter
+import kotlin.collections.component1
+import kotlin.collections.component2
+import kotlin.collections.forEach
+import kotlin.collections.plus
 
 fun startContainerDriver(
     lifetime: CloseableStack,
@@ -16,10 +22,11 @@ fun startContainerDriver(
     val containerId = startDockerContainer(request)
 
     val driver = ContainerDriverImpl(
-        scope,
-        containerId,
-        request.image ?: error("Missing image for $request"),
-        request.volumes
+        logPrefix = request.logPrefix ?: error("No logPrefix provided"),
+        environmentVariables = emptyMap(),
+        containerId = containerId,
+        imageName = request.image ?: error("Missing image for $request"),
+        volumes = request.volumes
     )
 
     // Register normal cleanup action
@@ -34,18 +41,15 @@ fun startContainerDriver(
 }
 
 private class ContainerDriverImpl(
-    private val scope: DockerDriver,
+    val logPrefix: String,
+    val environmentVariables: Map<String, String>,
     override val containerId: String,
     private val imageName: String,
     override val volumes: List<ContainerVolume> = emptyList(),
 ) : ContainerDriver {
 
-    override fun withSecretPattern(secretPattern: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes)
-    }
-
     override fun withEnv(key: String, value: String): ContainerDriver {
-        return ContainerDriverImpl(scope.withEnv(key, value), containerId, imageName, volumes)
+        return ContainerDriverImpl(logPrefix, environmentVariables + (key to value), containerId, imageName, volumes)
     }
 
     override fun runInContainer(
@@ -66,7 +70,7 @@ private class ContainerDriverImpl(
             .detach(false)
             .build()
 
-        return scope.runInContainer(req)
+        return runInContainerEx(req)
     }
 
     override fun runInContainerDetached(
@@ -104,15 +108,50 @@ private class ContainerDriverImpl(
             .detach(true)
             .build()
 
-        scope.runInContainer(req)
+        runInContainerEx(req)
             .assertExitCode(0) { "Failed to start detached process '$name': $stderr" }
 
-        println("[${scope.logPrefix}] Detached process '$name' started, stdout/stderr at $logDir")
+        println("[${logPrefix}] Detached process '$name' started, stdout/stderr at $logDir")
         val info = DetachedContainerProcess(name = name, logDir = logDir)
         return RunningContainerProcess(this, info.name, info.logDir)
     }
 
     override fun toString(): String {
         return "DockerContained(id=$containerId, image=$imageName)"
+    }
+
+    //TODO: return StartedProcess!
+    fun runInContainerEx(
+        request: DockerProcessRunRequest
+    ): ProcessResult {
+        val shellCommand = escapeShellArgs(request.command)
+
+        val command = buildList {
+            add("docker")
+            add("exec")
+            if (request.detach) add("--detach")
+            (environmentVariables + request.extraEnvVars).forEach { (key, value) ->
+                add("-e")
+                add("$key=$value")
+            }
+            request.workingDirInContainer?.let {
+                add("-w")
+                add(it)
+            }
+            add(request.containerId)
+            add("bash")
+            add("-c")
+            add(shellCommand)
+        }
+
+        return RunProcessRequest()
+            .withLogPrefix(logPrefix)
+            .timeoutSeconds(30)
+            .command(command)
+            .description(request.description)
+            .timeoutSeconds(request.timeoutSeconds)
+            .quietly(request.quietly)
+            .startProcess()
+            .awaitForProcessFinish()
     }
 }

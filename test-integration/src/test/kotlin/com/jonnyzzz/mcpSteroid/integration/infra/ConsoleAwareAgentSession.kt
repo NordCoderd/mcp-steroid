@@ -10,7 +10,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
-import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainer
 import java.io.File
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -142,11 +141,12 @@ class ConsolePumpingContainerDriver(
                 // Pipeline: stdout+stderr → raw.jsonl (tee) → filter → filtered.log
                 // stdout of the script is intentionally empty; filter output goes to file only.
                 appendLine("$escaped 2>&1 | tee $rawLog | $FILTER_BIN $filterType > $filteredLog")
+                @Suppress("SpellCheckingInspection")
                 appendLine($$"exit ${PIPESTATUS[0]}")
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 
-            val result = ContainerProcessRunRequest
+            val result = delegate.runInContainer(ContainerProcessRunRequest
                 .builder()
                 .command("bash", teeScript)
                 .workingDirInContainer(workingDir)
@@ -154,8 +154,7 @@ class ConsolePumpingContainerDriver(
                 .extraEnv(extraEnvVars)
                 .description("Run agent [$slug-$idx] with in-container filter")
                 .quietly()
-                .build()
-                .runInContainer(delegate)
+                .build())
 
             // Print filtered output to JVM test-runner console (volume-mounted, accessible on host)
             if (hostFilteredLog.exists()) {
@@ -201,7 +200,7 @@ class ConsolePumpingContainerDriver(
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 
-            return ContainerProcessRunRequest
+            return delegate.runInContainer(ContainerProcessRunRequest
                 .builder()
                 .command("bash", teeScript)
                 .workingDirInContainer(workingDir)
@@ -209,7 +208,7 @@ class ConsolePumpingContainerDriver(
                 .extraEnv(extraEnvVars)
                 .description("Run agent [$slug-$idx] with combined log tee")
                 .quietly(false)
-                .runInContainer(delegate)
+                .build())
         } finally {
             Thread.sleep(500)
             pump.stop()

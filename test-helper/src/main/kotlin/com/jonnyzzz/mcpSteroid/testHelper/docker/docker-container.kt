@@ -15,7 +15,6 @@ data class ContainerHolder(
         .logPrefix(logPrefix)
 }
 
-
 /**
  * Base class for managing CLI sessions running inside Docker containers.
  * Provides common functionality for building images, starting/stopping containers,
@@ -23,17 +22,15 @@ data class ContainerHolder(
  */
 interface ContainerDriver : ContainerProcessRunner {
     val containerId: String
-
     val volumes: List<ContainerVolume>
 
-    override fun withSecretPattern(secretPattern: String): ContainerDriver
     fun withEnv(key: String, value: String): ContainerDriver
 
     fun runInContainerDetached(
         args: List<String>,
         workingDir: String? = null,
         extraEnvVars: Map<String, String> = emptyMap(),
-    ) : RunningContainerProcess
+    ): RunningContainerProcess
 
     fun writeFileInContainer(
         containerPath: String,
@@ -42,28 +39,37 @@ interface ContainerDriver : ContainerProcessRunner {
     ) {
         val parentDir = containerPath.substringBeforeLast('/')
         if (parentDir.isNotEmpty()) {
-            ContainerProcessRunRequest.builder()
-                .command("mkdir", "-p", parentDir)
-                .description("mkdir $parentDir")
-                .timeoutSeconds(5)
-                .quietly()
-                .runInContainer(this)
+
+            runInContainer(
+                ContainerProcessRunRequest.builder()
+                    .command("mkdir", "-p", parentDir)
+                    .description("mkdir $parentDir")
+                    .timeoutSeconds(5)
+                    .quietly()
+                    .build()
+            )
                 .assertExitCode(0)
         }
-        ContainerProcessRunRequest.builder()
-            .command("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
-            .description("Write content to $containerPath")
-            .timeoutSeconds(5)
-            .quietly()
-            .runInContainer(this)
-            .assertExitCode(0)
-        if (executable) {
+
+        runInContainer(
             ContainerProcessRunRequest.builder()
-                .command("chmod", "+x", containerPath)
-                .description("chmod +x $containerPath")
+                .command("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
+                .description("Write content to $containerPath")
                 .timeoutSeconds(5)
                 .quietly()
-                .runInContainer(this)
+                .build()
+        )
+            .assertExitCode(0)
+
+        if (executable) {
+            runInContainer(
+                ContainerProcessRunRequest.builder()
+                    .command("chmod", "+x", containerPath)
+                    .description("chmod +x $containerPath")
+                    .timeoutSeconds(5)
+                    .quietly()
+                    .build()
+            )
                 .assertExitCode(0)
         }
     }

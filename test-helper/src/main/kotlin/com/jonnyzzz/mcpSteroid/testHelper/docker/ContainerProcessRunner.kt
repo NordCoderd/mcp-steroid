@@ -33,12 +33,4 @@ interface ContainerProcessRunner {
 
         return runInContainer(req)
     }
-
-    fun withSecretPattern(secretPattern: String): ContainerProcessRunner
 }
-
-
-fun ContainerProcessRunRequest.runInContainer(container: ContainerProcessRunner) = container.runInContainer(this)
-fun <R : ContainerProcessRunRequestBuilder<R>> ContainerProcessRunRequestBuilder<R>.runInContainer(container: ContainerProcessRunner) =
-    build().runInContainer(container)
-

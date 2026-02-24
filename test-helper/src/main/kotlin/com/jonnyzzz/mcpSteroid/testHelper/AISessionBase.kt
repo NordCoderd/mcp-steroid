@@ -41,7 +41,7 @@ abstract class AIAgentCompanion<T : Any>(val dockerFileBase: String) {
     fun create(session: ContainerProcessRunner): T {
         println("[DOCKER-${dockerFileBase.uppercase()}] Session created in container")
         val apiKey = readApiKey()
-        return createImpl(session.withSecretPattern(apiKey), apiKey)
+        return createImpl(session, apiKey)
     }
 
     protected abstract fun createImpl(session: ContainerProcessRunner, apiKey: String): T

@@ -4,7 +4,6 @@ package com.jonnyzzz.mcpSteroid.testHelper
 import com.jonnyzzz.mcpSteroid.filter.GeminiOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
@@ -12,7 +11,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.io.File
 
 /**
  * Tests that [GeminiOutputFilter] produces readable output from NDJSON.
@@ -114,7 +112,6 @@ class DockerGeminiSessionTest {
         override val volumes: List<ContainerVolume>
             get() = error("not needed in test")
 
-        override fun withSecretPattern(secretPattern: String): ContainerDriver = error("not needed in test")
         override fun withEnv(key: String, value: String): ContainerDriver = error("not needed in test")
         override fun runInContainerDetached(args: List<String>, workingDir: String?, extraEnvVars: Map<String, String>): RunningContainerProcess = error("not needed in test")
         override fun writeFileInContainer(containerPath: String, content: String, executable: Boolean) = error("not needed in test")

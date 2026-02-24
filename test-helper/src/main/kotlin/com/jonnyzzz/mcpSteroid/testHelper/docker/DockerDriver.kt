@@ -29,42 +29,4 @@ class DockerDriver(
         )
     }
 
-    val runProcessTemplate get() = RunProcessRequest()
-        .withLogPrefix(logPrefix)
-        .withSecretPatterns(secretPatterns)
-        .workingDir(workDir)
-        .timeoutSeconds(30)
-
-    //TODO: return StartedProcess!
-    fun runInContainer(
-        request: DockerProcessRunRequest
-    ): ProcessResult {
-        val shellCommand = escapeShellArgs(request.command)
-
-        val command = buildList {
-            add("docker")
-            add("exec")
-            if (request.detach) add("--detach")
-            (environmentVariables + request.extraEnvVars).forEach { (key, value) ->
-                add("-e")
-                add("$key=$value")
-            }
-            request.workingDirInContainer?.let {
-                add("-w")
-                add(it)
-            }
-            add(request.containerId)
-            add("bash")
-            add("-c")
-            add(shellCommand)
-        }
-
-        return runProcessTemplate
-            .command(command)
-            .description(request.description)
-            .timeoutSeconds(request.timeoutSeconds)
-            .quietly(request.quietly)
-            .startProcess()
-            .awaitForProcessFinish()
-    }
 }

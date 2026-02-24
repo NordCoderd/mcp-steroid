@@ -8,12 +8,12 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import java.io.File
 
 fun ContainerDriver.mkdirs(guestPath: String): ProcessResult {
-    return ContainerProcessRunRequest
+    return runInContainer(ContainerProcessRunRequest
         .builder()
         .command("mkdir", "-p", guestPath)
         .description("Create directory $guestPath in the container")
         .quietly()
-        .runInContainer(this)
+        .build())
 }
 
 fun ContainerDriver.copyFromContainer(containerPath: String, localPath: File) {
