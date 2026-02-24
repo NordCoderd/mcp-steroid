@@ -3,15 +3,15 @@ package com.jonnyzzz.mcpSteroid.testHelper.process
 
 import com.jonnyzzz.mcpSteroid.testHelper.truncate
 import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.InputStream
 import java.time.Duration
+import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
@@ -55,6 +55,17 @@ data class RunProcessRequest private constructor(
     fun addSecretPatterns(secretPatterns: List<String>) = copy(secretPatterns = (this.secretPatterns + secretPatterns).distinct())
 }
 
+fun RunProcessRequest.workdir(workingDir: File) = withWorkingDir(workingDir)
+fun RunProcessRequest.command(command: List<String>) = withArgs(command)
+fun RunProcessRequest.command(builder: MutableList<String>.() -> Unit) = command(buildList(builder))
+fun RunProcessRequest.command(vararg command: String) = command(command.toList())
+fun RunProcessRequest.description(description: String) = withDescription(description)
+fun RunProcessRequest.timeoutSeconds(timeoutSeconds: Long) = withTimeout(Duration.ofSeconds(timeoutSeconds))
+fun RunProcessRequest.quietly(quietly: Boolean) = withQuietly(quietly)
+fun RunProcessRequest.quietly() = quietly(true)
+fun RunProcessRequest.stdin(stdin: ByteArray) = withStdin(flowOf(stdin))
+fun RunProcessRequest.stdin(stdin: String) = stdin(stdin.toByteArray())
+
 
 fun ProcessRunRequest.toRunProcessRequest() = RunProcessRequest()
     .withWorkingDir(this.workingDir)
@@ -84,8 +95,19 @@ class ProcessRunner(
      * @param request The process run request with all configuration
      */
     fun startProcess(request: ProcessRunRequest): StartedProcess {
-        val req = request.toRunProcessRequest().addSecretPatterns(secretPatterns).withDefaultLogPrefix(logPrefix)
-        return startProcessImpl(req)
+        val req = request.toRunProcessRequest()
+        return startProcess(req)
+    }
+
+    /**
+     * Run a process using the request configuration and waits for it to complete
+     * This is the primary method for running processes.
+     * Secrets are filtered from log output but preserved in returned ProcessResult.
+     *
+     * @param request The process run request with all configuration
+     */
+    fun startProcess(request: RunProcessRequest): StartedProcess {
+        return startProcessImpl(request.addSecretPatterns(secretPatterns).withDefaultLogPrefix(logPrefix))
     }
 }
 
@@ -122,10 +144,7 @@ private fun startProcessImpl(request: RunProcessRequest): StartedProcessImpl {
 
     val process = processBuilder.start()
 
-    val messagesChannel = MutableSharedFlow<ProcessStreamLine>(
-        replay = Int.MAX_VALUE,
-        onBufferOverflow = BufferOverflow.DROP_OLDEST
-    )
+    val messagesChannel = Collections.synchronizedList(mutableListOf<ProcessStreamLine>())
 
     fun readOutput(stream: InputStream, prefix: String, type: ProcessStreamType) {
         runCatching {
@@ -137,7 +156,7 @@ private fun startProcessImpl(request: RunProcessRequest): StartedProcessImpl {
                         if (!request.quietly) {
                             println("[$prefix] $filterSecrets")
                         }
-                        messagesChannel.tryEmit(ProcessStreamLine(type, line))
+                        messagesChannel.add(ProcessStreamLine(type, line))
                     }
                 }
             }
@@ -158,7 +177,7 @@ private fun startProcessImpl(request: RunProcessRequest): StartedProcessImpl {
             }
         } catch (e: Exception) {
             println("[$logPrefix] stdin copy error: ${e.message}")
-            messagesChannel.tryEmit(
+            messagesChannel.add(
                 ProcessStreamLine(
                     ProcessStreamType.INFO,
                     "Failed to send STDIN: ${e.message}\n" + e.stackTraceToString()
@@ -190,7 +209,7 @@ private fun startProcessImpl(request: RunProcessRequest): StartedProcessImpl {
 private class StartedProcessImpl(
     val request: RunProcessRequest,
     val process: Process,
-    val messagesChannel: MutableSharedFlow<ProcessStreamLine>,
+    val messagesChannel: List<ProcessStreamLine>,
     val thread: List<Thread>,
 ) : StartedProcess {
     val pid: PID get() = process.PID()
@@ -205,10 +224,23 @@ private class StartedProcessImpl(
         get() = runCatching { process.exitValue() } .getOrNull()
 
     override val messagesFlow: Flow<ProcessStreamLine>
-        get() = messagesChannel.asSharedFlow()
+        get() = flow {
+            var offset = 0
+            while (true) {
+                messagesChannel.drop(offset).forEach {
+                    offset++
+                    emit(it)
+                }
+
+                @Suppress("BlockingMethodInNonBlockingContext")
+                if (process.waitFor(100, TimeUnit.MILLISECONDS)) {
+                    return@flow
+                }
+            }
+        }
 
     private fun builder(type: ProcessStreamType) : String {
-        return messagesChannel.replayCache
+        return messagesChannel
             .filter { it.type == type }
             .joinToString(separator = "\n") { it.line }
     }

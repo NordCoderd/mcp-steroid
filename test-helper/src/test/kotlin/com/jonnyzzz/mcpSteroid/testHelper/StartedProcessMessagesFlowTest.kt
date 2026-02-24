@@ -1,11 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper
 
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequestBuilder
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessStreamType
-import com.jonnyzzz.mcpSteroid.testHelper.process.builder
+import com.jonnyzzz.mcpSteroid.testHelper.process.*
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -21,13 +17,12 @@ class StartedProcessMessagesFlowTest {
     @TempDir
     lateinit var tempDir: File
 
-    private fun request(vararg command: String, block: ProcessRunRequestBuilder<*>.() -> Unit = {}) =
-        ProcessRunRequest.Companion.builder()
+    private fun request(vararg command: String, block: RunProcessRequest.() -> RunProcessRequest = {this}) =
+        RunProcessRequest()
             .command(*command)
             .description("test")
-            .workingDir(tempDir)
-            .apply(block)
-            .build()
+            .workdir(tempDir)
+            .run(block)
 
     @Test
     fun `messagesFlow emits stdout lines`() = runBlocking {
