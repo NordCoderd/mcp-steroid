@@ -160,8 +160,9 @@ fun waitFor(timeoutMillis: Long, condition: String = "condition", action: () -> 
         }
         Thread.sleep(50)
     }
+    val elapsed = System.currentTimeMillis() - now
     val msg = buildString {
-        append("Failed waiting for $condition!")
+        append("Failed waiting for $condition after ${elapsed}ms!")
         val exc = lastException
         if (exc != null) append(" Last error: ${exc.message}")
     }

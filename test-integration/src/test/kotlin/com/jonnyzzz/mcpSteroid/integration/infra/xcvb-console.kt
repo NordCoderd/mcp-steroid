@@ -183,27 +183,47 @@ class XcvbConsoleDriver(
         }
 
         var lastLogMs = 0L
-        val consoleWindowId = waitForValue(30_000, "Wait for console Window") {
-            val windows = windowDriver.listWindows()
-            val byPid = windows.firstOrNull { it.pid != null && it.pid == consoleProcess.pid }
-            if (byPid != null) return@waitForValue byPid
-            // Fallback: match by title (WM_NAME), since some xterm builds/configs
-            // do not expose _NET_WM_PID via xdotool getwindowpid.
-            val byTitle = windows.firstOrNull { it.title.contains(title) }
-            if (byTitle != null) {
-                val xtermPid = try { consoleProcess.pid } catch (_: Exception) { -1L }
-                println("[xcvb] Console window matched by title '$title' (pid-file=$xtermPid, window.pid=${byTitle.pid})")
-                return@waitForValue byTitle
+        var lastWindowsSnapshot = emptyList<WindowInfo>()
+        val consoleWindowId = try {
+            waitForValue(30_000, "console window '$title'") {
+                val windows = windowDriver.listWindows()
+                lastWindowsSnapshot = windows
+                val byPid = windows.firstOrNull { it.pid != null && it.pid == consoleProcess.pid }
+                if (byPid != null) return@waitForValue byPid
+                // Fallback: match by title (WM_NAME), since some xterm builds/configs
+                // do not expose _NET_WM_PID via xdotool getwindowpid.
+                val byTitle = windows.firstOrNull { it.title.contains(title) }
+                if (byTitle != null) {
+                    val xtermPid = try { consoleProcess.pid } catch (_: Exception) { -1L }
+                    println("[xcvb] Console window matched by title '$title' (pid-file=$xtermPid, window.pid=${byTitle.pid})")
+                    return@waitForValue byTitle
+                }
+                // Diagnostic: log every ~5s to diagnose why neither PID nor title matched
+                val nowMs = System.currentTimeMillis()
+                if (nowMs - lastLogMs > 5_000) {
+                    lastLogMs = nowMs
+                    val xtermPid = try { consoleProcess.pid } catch (_: Exception) { -1L }
+                    println("[xcvb-debug] Waiting for xterm window (pid-file=$xtermPid title='$title'). Found ${windows.size} windows:")
+                    windows.forEach { w -> println("[xcvb-debug]   id=${w.id} pid=${w.pid} title='${w.title}'") }
+                }
+                null
             }
-            // Diagnostic: log every ~5s to diagnose why neither PID nor title matched
-            val nowMs = System.currentTimeMillis()
-            if (nowMs - lastLogMs > 5_000) {
-                lastLogMs = nowMs
-                val xtermPid = try { consoleProcess.pid } catch (_: Exception) { -1L }
-                println("[xcvb-debug] Waiting for xterm window (pid-file=$xtermPid title='$title'). Found ${windows.size} windows:")
-                windows.forEach { w -> println("[xcvb-debug]   id=${w.id} pid=${w.pid} title='${w.title}'") }
+        } catch (t: RuntimeException) {
+            val windowsDump = lastWindowsSnapshot.joinToString(separator = "\n") { w ->
+                "  id=${w.id} pid=${w.pid} title='${w.title}'"
             }
-            null
+            throw RuntimeException(
+                buildString {
+                    append("Failed waiting for console window '$title'.")
+                    if (windowsDump.isNotEmpty()) {
+                        appendLine()
+                        append("Last visible windows:")
+                        appendLine()
+                        append(windowsDump)
+                    }
+                },
+                t,
+            )
         }
 
         windowDriver.updateLayout(consoleWindowId, layoutRect)

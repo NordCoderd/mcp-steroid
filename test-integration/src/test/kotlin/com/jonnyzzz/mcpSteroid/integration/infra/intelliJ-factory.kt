@@ -150,6 +150,7 @@ fun IntelliJContainer.Companion.create(
     var trackedPids = setOf(ijProcess.pid)
     var lastPidRefreshAt = 0L
     var lastWindows = emptyList<WindowInfo>()
+    var lastWindowDiagnosticsAt = 0L
     val ijWindowInfo = try {
         // 60s is safe: X11 frame appears before most startup work completes; the only
         // confirmed long blocker (AIPromoWindowAdvisor, 480s) is suppressed by our 4-layer fix.
@@ -162,6 +163,15 @@ fun IntelliJContainer.Companion.create(
             }
 
             lastWindows = windowsDriver.listWindows()
+
+            if (now - lastWindowDiagnosticsAt >= 5_000) {
+                lastWindowDiagnosticsAt = now
+                println("[IDE-AGENT] Waiting for ${ideProduct.displayName} window: PIDs=${trackedPids.sorted()}, visible=${lastWindows.size}")
+                lastWindows.forEach { w ->
+                    println("[IDE-AGENT]   id=${w.id} pid=${w.pid} ${w.rect.width}x${w.rect.height} title='${w.title}'")
+                }
+            }
+
             pickIdeWindow(lastWindows, trackedPids, realConsoleTitle)
         }
     } catch (t: RuntimeException) {
@@ -263,12 +273,12 @@ private fun pickIdeWindow(
     val sizableWindows = windows
         .asSequence()
         .filter { it.rect.width > 300 && it.rect.height > 300 }
-        .filter { it.pid != null }
         .filter { it.title.isNotBlank() }
         .filterNot { it.title.equals("Desktop", ignoreCase = true) }
         .toList()
     if (sizableWindows.isEmpty()) return null
 
+    // First preference: match by known process family PID
     val byProcessFamily = sizableWindows.filter { window ->
         val pid = window.pid ?: return@filter false
         pid in candidatePids
@@ -277,6 +287,7 @@ private fun pickIdeWindow(
         return byProcessFamily.maxByOrNull { it.rect.width * it.rect.height }
     }
 
+    // Fallback: largest sizable non-console window (covers windows without exposed PID)
     return sizableWindows
         .asSequence()
         .filterNot { it.title.contains(consoleTitle, ignoreCase = true) }
