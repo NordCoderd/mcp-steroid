@@ -83,17 +83,6 @@ class ProcessRunner(
      *
      * @param request The process run request with all configuration
      */
-    fun runProcess(request: ProcessRunRequest): ProcessResult {
-        return startProcess(request).waitForProcessFinish()
-    }
-
-    /**
-     * Run a process using the request configuration and waits for it to complete
-     * This is the primary method for running processes.
-     * Secrets are filtered from log output but preserved in returned ProcessResult.
-     *
-     * @param request The process run request with all configuration
-     */
     fun startProcess(request: ProcessRunRequest): StartedProcess {
         val req = request.toRunProcessRequest().addSecretPatterns(secretPatterns).withDefaultLogPrefix(logPrefix)
         return startProcessImpl(req)
@@ -247,7 +236,7 @@ private class StartedProcessImpl(
         }
     }
 
-    override fun waitForProcessFinish() : ProcessResult {
+    override fun awaitForProcessFinish() : ProcessResult {
         val completed = process.waitFor(request.timeout.toMillis(), TimeUnit.MILLISECONDS)
 
         if (!completed) {

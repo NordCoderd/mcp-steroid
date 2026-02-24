@@ -7,7 +7,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.builder
-import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
+import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import java.io.File
 import java.time.LocalDateTime.now
 import java.time.format.DateTimeFormatter
@@ -192,7 +192,7 @@ private class ContainerDriverImpl(
             .workingDir(scope.workDir)
             .timeoutSeconds(30L)
             .quietly()
-            .runProcess(scope.processRunner)
+            .startProcess(scope.processRunner)
             .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
     }
 
@@ -204,7 +204,7 @@ private class ContainerDriverImpl(
             .workingDir(scope.workDir)
             .timeoutSeconds(120L)
             .quietly()
-            .runProcess(scope.processRunner)
+            .startProcess(scope.processRunner)
             .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
     }
 

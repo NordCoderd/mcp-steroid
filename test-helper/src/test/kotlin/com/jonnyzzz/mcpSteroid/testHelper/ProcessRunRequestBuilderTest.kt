@@ -6,6 +6,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
+import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -120,8 +121,9 @@ class ProcessRunRequestBuilderTest {
             .command("bash", "-c", "sleep 0.1; echo ext-test")
             .description("test")
             .workingDir(tempDir)
-            .runProcess(runner)
-        result.assertExitCode(0) { "builder extension runProcess should succeed" }
+            .startProcess(runner)
+            .assertExitCode(0) { "builder extension runProcess should succeed" }
+
         Assertions.assertTrue(
             result.stdout.contains("ext-test"),
             "output should contain ext-test, got: ${result.stdout}"

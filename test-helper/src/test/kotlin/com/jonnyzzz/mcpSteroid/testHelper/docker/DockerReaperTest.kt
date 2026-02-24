@@ -6,8 +6,10 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
+import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -69,7 +71,8 @@ class DockerReaperTest {
                 .workingDir(workDir)
                 .timeoutSeconds(5)
                 .quietly()
-                .runProcess(processRunner)
+                .startProcess(processRunner)
+                .awaitForProcessFinish()
 
         assertTrue(beforeResult.stdout.trim().isNotEmpty(), "Container should be running")
 
@@ -83,7 +86,8 @@ class DockerReaperTest {
             .workingDir(workDir)
             .timeoutSeconds(5)
             .quietly()
-            .runProcess(processRunner)
+            .startProcess(processRunner)
+            .awaitForProcessFinish()
 
         assertTrue(afterResult.stdout.trim().isEmpty(), "Container should be removed")
         println("Container $containerId cleaned up successfully via CloseableStack")
@@ -115,7 +119,7 @@ class DockerReaperTest {
                 .workingDir(workDir)
                 .timeoutSeconds(5)
                 .quietly()
-                .runProcess(processRunner)
+                .startProcess(processRunner)
                 .assertExitCode(0) { "Failed to check reaper: $stderr" }
 
             assertTrue(reaperResult.stdout.trim().isNotEmpty(), "Reaper container should be running")

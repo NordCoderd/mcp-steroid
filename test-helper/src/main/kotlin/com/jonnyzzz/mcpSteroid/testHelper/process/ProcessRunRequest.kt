@@ -14,10 +14,11 @@ open class ProcessRunRequest(
     companion object
 }
 
-fun <R : ProcessRunRequestBuilder<R>> ProcessRunRequestBuilder<R>.runProcess(processRunner: ProcessRunner) =
-    build().runProcess(processRunner)
+fun <R : ProcessRunRequestBuilder<R>> ProcessRunRequestBuilder<R>.startProcess(processRunner: ProcessRunner) =
+    processRunner.startProcess(build())
 
-fun ProcessRunRequest.runProcess(runner: ProcessRunner) = runner.runProcess(this)
+fun <R : ProcessRunRequestBuilder<R>> ProcessRunRequestBuilder<R>.runProcess(processRunner: ProcessRunner) =
+    startProcess(processRunner).awaitForProcessFinish()
 
 fun ProcessRunRequest.Companion.builder() = ProcessRunRequestBuilder()
 

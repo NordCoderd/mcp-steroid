@@ -9,10 +9,10 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
+import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import java.time.format.DateTimeFormatter.ofPattern
 import kotlin.collections.component1
 import kotlin.collections.component2
 import kotlin.io.path.createTempFile
@@ -62,7 +62,7 @@ class DockerDriver(
             .description("Tag Docker image as $tag")
             .workingDir(workDir)
             .timeoutSeconds(30)
-            .runProcess(processRunner)
+            .startProcess(processRunner)
             .assertExitCode(0) { "Failed to tag Docker image $imageId as $tag: $stderr" }
         println("[$logPrefix] Tagged image $imageId → $tag")
     }
@@ -106,7 +106,7 @@ class DockerDriver(
                     .description("Build Docker image $dockerfilePath")
                     .workingDir(dockerfilePath.parentFile)
                     .timeoutSeconds(timeoutSeconds)
-                    .runProcess(processRunner)
+                    .startProcess(processRunner)
                     .assertExitCode(0) { "Failed to build Docker image.\n$stderr" }
 
             val imageId = iidFile.readText().trim()
@@ -159,7 +159,7 @@ class DockerDriver(
             .command(command)
             .description("Start container from $imageName")
             .workingDir(workDir)
-            .runProcess(processRunner)
+            .startProcess(processRunner)
             .assertExitCode(0) {
                 "Failed to start Docker container: $stderr"
             }
@@ -196,7 +196,8 @@ class DockerDriver(
                 .workingDir(workDir)
                 .timeoutSeconds(5)
                 .quietly()
-                .runProcess(processRunner)
+                .startProcess(processRunner)
+                .awaitForProcessFinish()
 
             val mappedPort = parseMappedPortOutput(result.stdout)
             if (result.exitCode == 0 && mappedPort != null) {
@@ -234,7 +235,9 @@ class DockerDriver(
             .workingDir(workDir)
             .timeoutSeconds(5)
             .quietly()
-            .runProcess(processRunner)
+            .startProcess(processRunner)
+            .awaitForProcessFinish()
+
         if (result.exitCode != 0) return null
         return parseContainerRunningState(result.stdout)
     }
@@ -275,7 +278,7 @@ class DockerDriver(
             .workingDir(workDir)
             .timeoutSeconds(5)
             .quietly()
-            .runProcess(processRunner)
+            .startProcess(processRunner)
             .assertExitCode(0) { "Failed to query container IP: $stderr" }
 
         return result.stdout
@@ -291,7 +294,8 @@ class DockerDriver(
             .workingDir(workDir)
             .timeoutSeconds(10)
             .quietly()
-            .runProcess(processRunner)
+            .startProcess(processRunner)
+            .awaitForProcessFinish()
 
         ProcessRunRequest.builder()
             .command("docker", "rm", "-f", containerId)
@@ -299,11 +303,13 @@ class DockerDriver(
             .workingDir(workingDir = workDir)
             .timeoutSeconds(timeoutSeconds = 5)
             .quietly()
-            .runProcess(processRunner)
+            .startProcess(processRunner)
+            .awaitForProcessFinish()
 
         println("[$logPrefix] Container removed successfully")
     }
 
+    //TODO: return StartedProcess!
     fun runInContainer(
         request: DockerProcessRunRequest
     ): ProcessResult {
@@ -333,7 +339,7 @@ class DockerDriver(
             .workingDir(workDir)
             .timeoutSeconds(request.timeoutSeconds)
             .quietly(request.quietly)
-            .runProcess(processRunner)
+            .startProcess(processRunner)
     }
 
 }

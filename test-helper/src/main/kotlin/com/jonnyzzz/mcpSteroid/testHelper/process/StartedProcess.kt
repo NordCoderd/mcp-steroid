@@ -25,10 +25,14 @@ interface StartedProcess : ProcessResult {
     /**
      * Waits for process to finish with respect to process run timeout
      */
-    fun waitForProcessFinish() : ProcessResult
+    fun awaitForProcessFinish() : ProcessResult
 
     /**
      * Forcibly destroys the underlying process.
      */
     fun destroyForcibly()
 }
+
+fun StartedProcess.assertExitCode(expectedExitCode: Int, message: ProcessResult.() -> String) =
+    awaitForProcessFinish().assertExitCode(expectedExitCode, message)
+
