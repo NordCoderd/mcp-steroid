@@ -1,3 +1,7 @@
+IDE Examples Overview
+
+Overview of IntelliJ IDE power operation examples.
+
 # IntelliJ IDE Power Operations (Non-LSP)
 
 This collection provides example code snippets implementing advanced IDE operations

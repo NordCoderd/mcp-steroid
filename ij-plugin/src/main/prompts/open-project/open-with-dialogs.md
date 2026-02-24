@@ -1,3 +1,7 @@
+Open Project (With Dialog Handling)
+
+Open a project and handle dialogs interactively.
+
 # Open Project (With Dialog Handling)
 
 Open a project and interactively handle any dialogs that appear.

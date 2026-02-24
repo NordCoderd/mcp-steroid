@@ -1,3 +1,7 @@
+Coding with IntelliJ - Comprehensive Guide
+
+Comprehensive guide for writing IntelliJ API code via steroid_execute_code.
+
 # Coding with IntelliJ APIs - Comprehensive Guide for AI Agents
 
 This guide teaches you how to write effective Kotlin code that executes inside IntelliJ IDEA's runtime environment via `steroid_execute_code`. You'll learn the execution model, available APIs, and best practices for working with PSI (Program Structure Interface), VFS (Virtual File System), and other IntelliJ platform APIs.

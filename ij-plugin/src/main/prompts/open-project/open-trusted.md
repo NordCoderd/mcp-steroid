@@ -1,3 +1,7 @@
+Open Project (Trusted)
+
+Open a project with automatic trust, skipping the trust dialog.
+
 # Open Project (Trusted)
 
 Open a project with automatic trust, skipping the trust dialog.
