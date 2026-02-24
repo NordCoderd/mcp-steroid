@@ -67,8 +67,10 @@ object DockerReaper {
                 logPrefix = "REAPER",
                 reaperDockerfile,
                 120,
+                quietly = true,
             )
-            driver.tagDockerImage(reaperImageId, "mcp-steroid-reaper")
+
+            tagDockerImage(reaperImageId, "mcp-steroid-reaper")
 
             // Start the reaper container using ContainerDriver infrastructure.
             // startContainerDriver calls back into registerContainer()
@@ -90,7 +92,7 @@ object DockerReaper {
 
             // Map the container port to host port using ContainerDriver
             val hostPort = containerDriver.mapGuestPortToHostPort(port8080)
-            val containerIp = driver.queryContainerIp(reaperContainerId)
+            val containerIp = containerDriver.queryContainerIp()
             println("[REAPER] Listening on host port: $hostPort")
 
             val endpoints = buildList {

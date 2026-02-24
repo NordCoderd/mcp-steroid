@@ -20,6 +20,7 @@ fun buildDockerImage(
     dockerfilePath: File,
     timeoutSeconds: Long,
     buildArgs: Map<String, String> = emptyMap(),
+    quietly: Boolean = false,
 ): String {
     require(dockerfilePath.exists() && dockerfilePath.isFile) {
         "File does not exist: $dockerfilePath"
@@ -50,6 +51,7 @@ fun buildDockerImage(
             .description("Build Docker image $dockerfilePath")
             .workingDir(dockerfilePath.parentFile)
             .timeoutSeconds(timeoutSeconds)
+            .quietly(quietly)
             .startProcess()
             .assertExitCode(0) { "Failed to build Docker image.\n$stderr" }
 
@@ -65,3 +67,23 @@ fun buildDockerImage(
         iidFile.delete()
     }
 }
+
+
+/**
+ * Tag an existing Docker image with a new name.
+ *
+ * @param imageId Source image reference (e.g. `sha256:<hex>` or existing tag)
+ * @param tag Target tag (e.g. `mcp-steroid-ide-base-test:latest`)
+ */
+fun tagDockerImage(imageId: String, tag: String) {
+    RunProcessRequest()
+        .logPrefix("tag")
+        .command("docker", "tag", imageId, tag)
+        .description("Tag Docker image as $tag")
+        .quietly()
+        .startProcess()
+        .assertExitCode(0) { "Failed to tag Docker image $imageId as $tag: $stderr" }
+
+    println("Tagged image $imageId → $tag")
+}
+

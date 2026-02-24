@@ -14,21 +14,22 @@ fun startContainerDriver(
 ): ContainerDriver {
     val containerId = startDockerContainer(request)
 
-    // Register normal cleanup action
-    lifetime.registerCleanupAction {
-        println("[${scope.logPrefix}] Stopping and removing container: $containerId")
-        scope.killContainer(containerId)
-    }
-
-    // Register with reaper for cleanup on crash/SIGKILL
-    DockerReaper.registerContainer(containerId, scope.workDir)
-
-    return ContainerDriverImpl(
+    val driver = ContainerDriverImpl(
         scope,
         containerId,
         request.image ?: error("Missing image for $request"),
         request.volumes
     )
+
+    // Register normal cleanup action
+    lifetime.registerCleanupAction {
+        driver.killContainer()
+    }
+
+    // Register with reaper for cleanup on crash/SIGKILL
+    DockerReaper.registerContainer(containerId, scope.workDir)
+
+    return driver
 }
 
 private class ContainerDriverImpl(
@@ -97,6 +98,7 @@ private class ContainerDriverImpl(
             .workingDirInContainer(workingDir)
             .extraEnv(extraEnvVars)
             .detach(true)
+            .build()
             .runInContainer(scope)
             .assertExitCode(0) { "Failed to start detached process '$name': $stderr" }
 
@@ -105,45 +107,6 @@ private class ContainerDriverImpl(
         return RunningContainerProcess(this, info.name, info.logDir)
     }
 
-    override fun writeFileInContainer(
-        containerPath: String,
-        content: String,
-        executable: Boolean
-    ) {
-        // Ensure parent directory exists
-        val parentDir = containerPath.substringBeforeLast('/')
-
-        if (parentDir.isNotEmpty()) {
-            DockerProcessRunRequest.builder()
-                .containerId(containerId)
-                .command("mkdir", "-p", parentDir)
-                .description("mkdir $parentDir")
-                .timeoutSeconds(5)
-                .quietly()
-                .runInContainer(scope)
-            .assertExitCode(0)
-        }
-
-        DockerProcessRunRequest.builder()
-            .containerId(containerId)
-            .command("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
-            .description("Write content to $containerPath: $content")
-            .timeoutSeconds(5)
-            .quietly()
-            .runInContainer(scope)
-            .assertExitCode(0)
-
-        if (executable) {
-            DockerProcessRunRequest.builder()
-                .containerId(containerId)
-                .command(listOf("chmod", "+x", containerPath))
-                .description("chmod +x $containerPath")
-                .timeoutSeconds(5)
-                .quietly()
-                .runInContainer(scope)
-                .assertExitCode(0)
-        }
-    }
 
     override fun toString(): String {
         return "DockerContained(id=$containerId, image=$imageName)"

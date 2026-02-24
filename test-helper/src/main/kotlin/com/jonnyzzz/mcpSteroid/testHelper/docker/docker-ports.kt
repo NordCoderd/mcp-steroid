@@ -39,3 +39,29 @@ internal fun parseMappedPortOutput(stdout: String): Int? {
         }
 }
 
+
+/**
+ * Query bridge-network container IP (for example 172.17.x.x).
+ * Returns null when inspect output does not contain an address.
+ */
+fun ContainerDriver.queryContainerIp(): String? {
+    val result = RunProcessRequest()
+        .logPrefix(containerId)
+        .command(
+            "docker",
+            "inspect",
+            "-f",
+            "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}",
+            containerId
+        )
+        .description("Query container IP")
+        .timeoutSeconds(5)
+        .quietly()
+        .startProcess()
+        .assertExitCode(0) { "Failed to query container IP: $stderr" }
+
+    return result.stdout
+        .trim()
+        .split(Regex("\\s+"))
+        .firstOrNull { it.isNotBlank() }
+}

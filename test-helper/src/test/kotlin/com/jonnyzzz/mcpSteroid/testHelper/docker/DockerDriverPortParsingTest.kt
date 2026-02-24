@@ -31,22 +31,4 @@ class DockerDriverPortParsingTest {
         val mapped = parseMappedPortOutput("")
         assertNull(mapped)
     }
-
-    @Test
-    fun `parseContainerRunningState parses true`() {
-        val running = DockerDriver.parseContainerRunningState("true\n")
-        assertTrue(running == true)
-    }
-
-    @Test
-    fun `parseContainerRunningState parses false`() {
-        val running = DockerDriver.parseContainerRunningState(" false ")
-        assertFalse(running == true)
-    }
-
-    @Test
-    fun `parseContainerRunningState returns null for unknown value`() {
-        val running = DockerDriver.parseContainerRunningState("<no value>")
-        assertNull(running)
-    }
 }

@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
+import com.jonnyzzz.mcpSteroid.testHelper.docker.tagDockerImage
 import java.io.File
 import java.nio.file.Files.createLink
 import kotlin.io.path.exists
@@ -51,7 +52,6 @@ private fun buildSharedBaseImage(): String {
     synchronized(baseImageLock) {
         baseImageId?.let { return it }  // double-checked locking
         val baseContext = prepareContext("docker-$BASE_DOCKER_CONTEXT", BASE_DOCKER_CONTEXT)
-        val baseScope = DockerDriver(baseContext, "IDE-AGENT")
         val rawImageId = buildDockerImage(
             logPrefix = "IDE-AGENT",
             dockerfilePath = File(baseContext, "Dockerfile"),
@@ -61,7 +61,7 @@ private fun buildSharedBaseImage(): String {
         // via a named reference in their FROM statement. Docker 26+ BuildKit rejects bare
         // SHA256 hex strings in FROM instructions — only named tags are accepted.
         val tagName = "mcp-steroid-ide-base-test:latest"
-        baseScope.tagDockerImage("sha256:$rawImageId", tagName)
+        tagDockerImage("sha256:$rawImageId", tagName)
         baseImageId = tagName
         return tagName
     }

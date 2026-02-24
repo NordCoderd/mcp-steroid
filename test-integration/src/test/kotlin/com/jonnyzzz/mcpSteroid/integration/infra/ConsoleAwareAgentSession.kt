@@ -54,7 +54,7 @@ class ConsoleAwareAgentSession(
     }
 
     override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String) =
-        ConsoleAwareAgentSession(delegate.registerNpxMcp(npxCommand, mcpName), console, agentName,)
+        ConsoleAwareAgentSession(delegate.registerNpxMcp(npxCommand, mcpName), console, agentName)
 }
 
 private const val FILTER_BIN = "/opt/agent-output-filter/bin/agent-output-filter"
@@ -142,7 +142,7 @@ class ConsolePumpingContainerDriver(
                 // Pipeline: stdout+stderr → raw.jsonl (tee) → filter → filtered.log
                 // stdout of the script is intentionally empty; filter output goes to file only.
                 appendLine("$escaped 2>&1 | tee $rawLog | $FILTER_BIN $filterType > $filteredLog")
-                appendLine("exit \${PIPESTATUS[0]}")
+                appendLine($$"exit ${PIPESTATUS[0]}")
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 
@@ -154,6 +154,7 @@ class ConsolePumpingContainerDriver(
                 .extraEnv(extraEnvVars)
                 .description("Run agent [$slug-$idx] with in-container filter")
                 .quietly()
+                .build()
                 .runInContainer(delegate)
 
             // Print filtered output to JVM test-runner console (volume-mounted, accessible on host)
@@ -196,7 +197,7 @@ class ConsolePumpingContainerDriver(
             val scriptContent = buildString {
                 appendLine("#!/bin/bash")
                 appendLine("$escaped 2>&1 | awk -v logfile=$combinedLog '{print; print >> logfile; fflush(); fflush(logfile)}'")
-                appendLine("exit \${PIPESTATUS[0]}")
+                appendLine($$"exit ${PIPESTATUS[0]}")
             }
             delegate.writeFileInContainer(teeScript, scriptContent, executable = true)
 

@@ -89,6 +89,7 @@ class AiAgentDriver(
             .workingDirInContainer(null)
             .timeoutSeconds(timeoutSeconds = 60)
             .description("Deploying agent output-filter")
+            .build()
             .runInContainer(container)
             .assertExitCode(0) {
                 "agent-output-filter deployment failed:\n$stdout\n$stderr"

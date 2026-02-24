@@ -97,7 +97,8 @@ private fun ContainerDriver.deployNpxProxy(
           "allowHosts": ["host.docker.internal", "localhost", "127.0.0.1"],
           "upstreamTimeoutMs": 15000
         }
-        """.trimIndent()
+        """.trimIndent(),
+        executable = false,
     )
 
     writeFileInContainer(
@@ -107,7 +108,8 @@ private fun ContainerDriver.deployNpxProxy(
 
         IntelliJ MCP Steroid Server
 URL: $ideMcpUrl
-        """.trimIndent() + "\n"
+        """.trimIndent() + "\n",
+        executable = false,
     )
 
     return StdioMcpCommand(

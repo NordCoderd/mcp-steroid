@@ -128,7 +128,7 @@ class GitDriver(
 
         val patchPath = "$repoDir/_tmp_patch.diff"
         println("[GIT] Applying patch to $repoDir...")
-        driver.writeFileInContainer(patchPath, patchContent)
+        driver.writeFileInContainer(patchPath, patchContent, executable = false)
 
         try {
             driver.runInContainer(

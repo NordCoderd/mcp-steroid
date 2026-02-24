@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid
 
 import com.intellij.openapi.util.Disposer
-import com.intellij.openapi.util.io.FileUtil.createTempDirectory
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
@@ -67,6 +66,7 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
             )
             .timeoutSeconds(30)
             .quietly(false)
+            .build()
             .runInContainer(session)
             .assertExitCode(0, "curl to MCP")
             .assertNoErrorsInOutput("curl to MCP")

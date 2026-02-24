@@ -43,6 +43,7 @@ fun startDockerContainer(
     request: StartContainerRequest,
 ): String {
     val imageId = request.image ?: error("No image name")
+    val logPrefix = request.logPrefix ?: error("No log prefix")
 
     val command = buildList {
         add("docker")
@@ -74,7 +75,7 @@ fun startDockerContainer(
 
     val result = RunProcessRequest()
         .command(command)
-        .logPrefix(request.logPrefix ?: imageId)
+        .logPrefix(logPrefix)
         .description("Start container from $imageId with ${request.entryPoint}")
         .withTimeout(request.timeout)
         .startProcess()
@@ -87,6 +88,6 @@ fun startDockerContainer(
         throw IllegalStateException("Failed to start Docker container: ${result.stderr}")
     }
 
-    println("[${request.logPrefix}] Container started: $containerId")
+    println("[$logPrefix] Container started: $containerId")
     return containerId
 }
