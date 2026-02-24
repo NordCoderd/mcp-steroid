@@ -92,7 +92,7 @@ class ProcessRunnerTest {
             timeoutSeconds(1)
         }.runProcess(runner)
         result.assertExitCode(-1) { "runProcess should return -1 on timeout" }
-        assertTrue(result.stderr.contains("Timeout"), "stderr should mention timeout, got: ${result.stderr}")
+        assertTrue(result.stderr.contains("Terminated by timeout"), "stderr should mention timeout, got: ${result.stderr}")
     }
 
     // --- secret filtering ---

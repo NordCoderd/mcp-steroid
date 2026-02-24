@@ -23,6 +23,11 @@ interface StartedProcess : ProcessResult {
     val messagesFlow: Flow<ProcessStreamLine>
 
     /**
+     * Waits for process to finish with respect to process run timeout
+     */
+    fun waitForProcessFinish() : ProcessResult
+
+    /**
      * Forcibly destroys the underlying process.
      */
     fun destroyForcibly()
