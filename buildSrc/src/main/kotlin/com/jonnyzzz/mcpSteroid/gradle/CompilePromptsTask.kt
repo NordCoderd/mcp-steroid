@@ -35,6 +35,9 @@ abstract class CompilePromptsTask : DefaultTask() {
 
         promptClasses.forEach { clazz ->
             ctx.generatePromptClazzTest(clazz)
+            if (isSectionFile(clazz.path) && clazz.fileType == "kt") {
+                ctx.generateKtSectionCompilationTest(clazz)
+            }
         }
 
         // First pass: group articles per folder
