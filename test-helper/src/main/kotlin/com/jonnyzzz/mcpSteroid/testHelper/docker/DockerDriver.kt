@@ -3,18 +3,11 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequest
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
-import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.process.builder
-import com.jonnyzzz.mcpSteroid.testHelper.process.runProcess
-import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
+import com.jonnyzzz.mcpSteroid.testHelper.process.*
 import java.io.File
+import java.time.Duration
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
-import kotlin.collections.component1
-import kotlin.collections.component2
 import kotlin.io.path.createTempFile
 
 class DockerDriver(
@@ -48,7 +41,14 @@ class DockerDriver(
         )
     }
 
+    //TODO: rework it
     val processRunner get() = ProcessRunner(logPrefix, secretPatterns.toList())
+
+    val runProcessTemplate get() = RunProcessRequest()
+        .withLogPrefix(logPrefix)
+        .withSecretPatterns(secretPatterns)
+        .workingDir(workDir)
+        .timeoutSeconds(30)
 
     /**
      * Tag an existing Docker image with a new name.
@@ -57,13 +57,13 @@ class DockerDriver(
      * @param tag Target tag (e.g. `mcp-steroid-ide-base-test:latest`)
      */
     fun tagDockerImage(imageId: String, tag: String) {
-        ProcessRunRequest.builder()
+        runProcessTemplate
             .command("docker", "tag", imageId, tag)
             .description("Tag Docker image as $tag")
-            .workingDir(workDir)
-            .timeoutSeconds(30)
-            .startProcess(processRunner)
+            .quietly()
+            .startProcess()
             .assertExitCode(0) { "Failed to tag Docker image $imageId as $tag: $stderr" }
+
         println("[$logPrefix] Tagged image $imageId → $tag")
     }
 
@@ -101,16 +101,20 @@ class DockerDriver(
                 add(".")
             }
 
-            ProcessRunRequest.builder()
+            runProcessTemplate
                     .command(command)
                     .description("Build Docker image $dockerfilePath")
                     .workingDir(dockerfilePath.parentFile)
                     .timeoutSeconds(timeoutSeconds)
-                    .startProcess(processRunner)
+                    .startProcess()
                     .assertExitCode(0) { "Failed to build Docker image.\n$stderr" }
 
             val imageId = iidFile.readText().trim()
-            require(imageId.startsWith("sha256:")) { "Unexpected image ID format from --iidfile: $imageId" }
+            require(imageId.startsWith("sha256:")) {
+                @Suppress("SpellCheckingInspection")
+                "Unexpected image ID format from --iidfile: $imageId"
+            }
+
             println("[$logPrefix] Docker image built $imageId")
             return imageId.removePrefix("sha256:").trim()
         } finally {
@@ -118,33 +122,29 @@ class DockerDriver(
         }
     }
 
-    fun startContainer(
-        lifetime: CloseableStack,
-        imageName: String,
-        extraEnvVars: Map<String, String> = emptyMap(),
-        volumes: List<ContainerVolume> = emptyList(),
-        ports: List<ContainerPort> = emptyList(),
-        cmd: List<String> = emptyList(),
-        autoRemove: Boolean = false,
+    fun startContainer2(
+        request: StartContainerRequest,
     ): String {
+        val imageName = request.imageName ?: error("No image name")
+
         val command = buildList {
             add("docker")
             add("run")
             add("-d")
-            if (autoRemove) add("--rm")
+            if (request.autoRemove) add("--rm")
             add("--add-host=host.docker.internal:host-gateway")
 
-            (environmentVariables + extraEnvVars).forEach { (key, value) ->
+            (environmentVariables + request.extraEnvVars).forEach { (key, value) ->
                 add("-e")
                 add("$key=$value")
             }
 
-            volumes.forEach { v ->
+            request.volumes.forEach { v ->
                 add("-v")
                 add("${v.host.absolutePath}:${v.guest}:${v.mode}")
             }
 
-            ports.forEach { p ->
+            request.ports.forEach { p ->
                 add("-p")
                 add("0:${p.containerPort}")
             }
@@ -152,14 +152,14 @@ class DockerDriver(
             add(imageName)
 
             // Add container command if specified
-            addAll(cmd)
+            addAll(request.entryPoint)
         }
 
-        val result = ProcessRunRequest.builder()
+        val result = runProcessTemplate
             .command(command)
-            .description("Start container from $imageName")
-            .workingDir(workDir)
-            .startProcess(processRunner)
+            .description("Start container from $imageName with ${request.entryPoint}")
+            .withTimeout(request.timeout)
+            .startProcess()
             .assertExitCode(0) {
                 "Failed to start Docker container: $stderr"
             }
@@ -170,12 +170,37 @@ class DockerDriver(
         }
 
         println("[$logPrefix] Container started: $containerId")
+        return containerId
+    }
+
+    //TODO: this should either return container driver, or move outside of here
+    fun startContainer(
+        lifetime: CloseableStack,
+        imageName: String,
+        extraEnvVars: Map<String, String> = emptyMap(),
+        volumes: List<ContainerVolume> = emptyList(),
+        ports: List<ContainerPort> = emptyList(),
+        cmd: List<String> = emptyList(),
+        autoRemove: Boolean = true,
+        timeoutSeconds: Long = 300,
+    ): String {
+        val containerId = startContainer2(
+            StartContainerRequest()
+                .imageName(imageName)
+                .extraEnvVars(extraEnvVars)
+                .volumes(volumes)
+                .ports(ports)
+                .entryPoint(cmd)
+                .autoRemove(autoRemove)
+                .timeout(Duration.ofSeconds(timeoutSeconds))
+        )
 
         // Register normal cleanup action
         lifetime.registerCleanupAction {
             println("[$logPrefix] Stopping and removing container: $containerId")
             killContainer(containerId)
         }
+
 
         return containerId
     }
@@ -185,61 +210,19 @@ class DockerDriver(
      * Docker output format: "0.0.0.0:52134" or "[::]:52134"
      */
     fun queryMappedPort(containerId: String, containerPort: Int): Int {
-        val maxRetries = 15
-        val retryDelayMs = 2_000L
-        var lastProbe = "none"
+        val result = runProcessTemplate
+            .command("docker", "port", containerId, "$containerPort/tcp")
+            .description("Query host port for $containerPort")
+            .timeoutSeconds(5)
+            .startProcess()
+            .assertExitCode(0) { "Failed to map container port $containerPort for $containerId" }
 
-        for (attempt in 1..maxRetries) {
-            val result = ProcessRunRequest.builder()
-                .command("docker", "port", containerId, "$containerPort/tcp")
-                .description("Query host port for $containerPort")
-                .workingDir(workDir)
-                .timeoutSeconds(5)
-                .quietly()
-                .startProcess(processRunner)
-                .awaitForProcessFinish()
-
-            val mappedPort = parseMappedPortOutput(result.stdout)
-            if (result.exitCode == 0 && mappedPort != null) {
-                return mappedPort
-            }
-
-            val stdout = result.stdout.trim().ifBlank { "<empty>" }
-            val stderr = result.stderr.trim().ifBlank { "<empty>" }
-            lastProbe = "docker port exitCode=${result.exitCode}, stdout='$stdout', stderr='$stderr'"
-
-            val containerRunning = queryContainerRunningState(containerId)
-            if (containerRunning == false) {
-                error(
-                    "Failed to query mapped port for container $containerId port $containerPort: " +
-                            "container is not running. Last probe: $lastProbe"
-                )
-            }
-
-            if (attempt < maxRetries) {
-                println("[$logPrefix] Waiting for port $containerPort to be mapped (attempt $attempt/$maxRetries)...")
-                Thread.sleep(retryDelayMs)
-            }
+        val mappedPort = parseMappedPortOutput(result.stdout)
+        if (result.exitCode == 0 && mappedPort != null) {
+            return mappedPort
         }
 
-        error(
-            "Failed to query mapped port for container $containerId port $containerPort after $maxRetries attempts. " +
-                    "Last probe: $lastProbe"
-        )
-    }
-
-    private fun queryContainerRunningState(containerId: String): Boolean? {
-        val result = ProcessRunRequest.builder()
-            .command("docker", "inspect", "-f", "{{.State.Running}}", containerId)
-            .description("Check container running state")
-            .workingDir(workDir)
-            .timeoutSeconds(5)
-            .quietly()
-            .startProcess(processRunner)
-            .awaitForProcessFinish()
-
-        if (result.exitCode != 0) return null
-        return parseContainerRunningState(result.stdout)
+        error("Failed to query mapped port for container $containerId port $containerPort. $result")
     }
 
     companion object {
@@ -266,7 +249,7 @@ class DockerDriver(
      * Returns null when inspect output does not contain an address.
      */
     fun queryContainerIp(containerId: String): String? {
-        val result = ProcessRunRequest.builder()
+        val result = runProcessTemplate
             .command(
                 "docker",
                 "inspect",
@@ -275,10 +258,9 @@ class DockerDriver(
                 containerId
             )
             .description("Query container IP")
-            .workingDir(workDir)
             .timeoutSeconds(5)
             .quietly()
-            .startProcess(processRunner)
+            .startProcess()
             .assertExitCode(0) { "Failed to query container IP: $stderr" }
 
         return result.stdout
@@ -288,22 +270,18 @@ class DockerDriver(
     }
 
     fun killContainer(containerId: String) {
-        ProcessRunRequest.builder()
+        runProcessTemplate
             .command("docker", "kill", containerId)
             .description("kill container")
-            .workingDir(workDir)
             .timeoutSeconds(10)
-            .quietly()
-            .startProcess(processRunner)
+            .startProcess()
             .awaitForProcessFinish()
 
-        ProcessRunRequest.builder()
+        runProcessTemplate
             .command("docker", "rm", "-f", containerId)
             .description("Remove container")
-            .workingDir(workingDir = workDir)
             .timeoutSeconds(timeoutSeconds = 5)
-            .quietly()
-            .startProcess(processRunner)
+            .startProcess()
             .awaitForProcessFinish()
 
         println("[$logPrefix] Container removed successfully")
@@ -333,13 +311,11 @@ class DockerDriver(
             add(shellCommand)
         }
 
-        return ProcessRunRequest.builder()
+        return runProcessTemplate
             .command(command)
             .description(request.description)
-            .workingDir(workDir)
             .timeoutSeconds(request.timeoutSeconds)
             .quietly(request.quietly)
-            .startProcess(processRunner)
+            .startProcess()
     }
-
 }

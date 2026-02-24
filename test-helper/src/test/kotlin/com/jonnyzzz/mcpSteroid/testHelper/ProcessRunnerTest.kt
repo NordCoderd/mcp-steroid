@@ -4,12 +4,6 @@ package com.jonnyzzz.mcpSteroid.testHelper
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
 import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
-import com.jonnyzzz.mcpSteroid.testHelper.process.command
-import com.jonnyzzz.mcpSteroid.testHelper.process.description
-import com.jonnyzzz.mcpSteroid.testHelper.process.quietly
-import com.jonnyzzz.mcpSteroid.testHelper.process.stdin
-import com.jonnyzzz.mcpSteroid.testHelper.process.timeoutSeconds
-import com.jonnyzzz.mcpSteroid.testHelper.process.workdir
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -25,7 +19,7 @@ class ProcessRunnerTest {
         RunProcessRequest()
             .command(*command)
             .description("test")
-            .workdir(tempDir)
+            .workingDir(tempDir)
             .run(block)
 
     // --- runProcess basic ---

@@ -53,19 +53,20 @@ data class RunProcessRequest private constructor(
 
     fun withSecretPatterns(secretPatterns: List<String>) = copy(secretPatterns = secretPatterns)
     fun addSecretPatterns(secretPatterns: List<String>) = copy(secretPatterns = (this.secretPatterns + secretPatterns).distinct())
+
+
+    fun logPrefix(logPrefix: String) = withLogPrefix(logPrefix)
+    fun workingDir(workingDir: File) = withWorkingDir(workingDir)
+    fun command(command: List<String>) = withArgs(command)
+    fun command(builder: MutableList<String>.() -> Unit) = command(buildList(builder))
+    fun command(vararg command: String) = command(command.toList())
+    fun description(description: String) = withDescription(description)
+    fun timeoutSeconds(timeoutSeconds: Long) = withTimeout(Duration.ofSeconds(timeoutSeconds))
+    fun quietly(quietly: Boolean) = withQuietly(quietly)
+    fun quietly() = quietly(true)
+    fun stdin(stdin: ByteArray) = withStdin(flowOf(stdin))
+    fun stdin(stdin: String) = stdin(stdin.toByteArray())
 }
-
-fun RunProcessRequest.workdir(workingDir: File) = withWorkingDir(workingDir)
-fun RunProcessRequest.command(command: List<String>) = withArgs(command)
-fun RunProcessRequest.command(builder: MutableList<String>.() -> Unit) = command(buildList(builder))
-fun RunProcessRequest.command(vararg command: String) = command(command.toList())
-fun RunProcessRequest.description(description: String) = withDescription(description)
-fun RunProcessRequest.timeoutSeconds(timeoutSeconds: Long) = withTimeout(Duration.ofSeconds(timeoutSeconds))
-fun RunProcessRequest.quietly(quietly: Boolean) = withQuietly(quietly)
-fun RunProcessRequest.quietly() = quietly(true)
-fun RunProcessRequest.stdin(stdin: ByteArray) = withStdin(flowOf(stdin))
-fun RunProcessRequest.stdin(stdin: String) = stdin(stdin.toByteArray())
-
 
 fun ProcessRunRequest.toRunProcessRequest() = RunProcessRequest()
     .withWorkingDir(this.workingDir)
@@ -77,6 +78,12 @@ fun ProcessRunRequest.toRunProcessRequest() = RunProcessRequest()
 
 
 private fun RunProcessRequest.withDefaultLogPrefix(prefix: String) = if (this.logPrefix.isNullOrEmpty()) this else withLogPrefix(prefix)
+
+
+fun RunProcessRequest.startProcess(processRunner: ProcessRunner): StartedProcess {
+    return processRunner.startProcess(this)
+}
+
 
 /**
  * Utility for running processes with consistent logging.
@@ -95,10 +102,14 @@ class ProcessRunner(
      * @param request The process run request with all configuration
      */
     fun startProcess(request: RunProcessRequest): StartedProcess {
-        return startProcessImpl(request.addSecretPatterns(secretPatterns).withDefaultLogPrefix(logPrefix))
+        return startProcessImpl(applyTemplate(request))
     }
+
+    fun applyTemplate(request: RunProcessRequest) =  request.addSecretPatterns(secretPatterns).withDefaultLogPrefix(logPrefix)
 }
 
+
+fun RunProcessRequest.startProcess() : StartedProcess = startProcessImpl(this)
 
 /**
  * Filter secrets from text, replacing them with REDACTED.
@@ -202,7 +213,7 @@ private class StartedProcessImpl(
 ) : StartedProcess {
     val pid: PID get() = process.PID()
 
-    val logPrefix by request::logPrefix
+    private val logPrefix get() = request.logPrefix
 
     override fun destroyForcibly() {
         process.destroyForcibly()

@@ -18,9 +18,6 @@ fun <R : ProcessRunRequestBuilder<R>> ProcessRunRequestBuilder<R>.startProcess(p
     return processRunner.startProcess(build().toRunProcessRequest())
 }
 
-fun <R : ProcessRunRequestBuilder<R>> ProcessRunRequestBuilder<R>.runProcess(processRunner: ProcessRunner) =
-    startProcess(processRunner).awaitForProcessFinish()
-
 fun ProcessRunRequest.Companion.builder() = ProcessRunRequestBuilder()
 
 open class ProcessRunRequestBuilder<R : ProcessRunRequestBuilder<R>> : ProcessRunRequestBuilderBase<R>() {

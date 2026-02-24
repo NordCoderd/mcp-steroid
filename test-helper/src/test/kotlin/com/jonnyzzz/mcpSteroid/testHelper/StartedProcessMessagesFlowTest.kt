@@ -21,7 +21,7 @@ class StartedProcessMessagesFlowTest {
         RunProcessRequest()
             .command(*command)
             .description("test")
-            .workdir(tempDir)
+            .workingDir(tempDir)
             .run(block)
 
     @Test
