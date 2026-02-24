@@ -9,46 +9,138 @@ import com.squareup.kotlinpoet.PropertySpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.buildCodeBlock
 
+/**
+ * Returns true if [path] looks like a section file: the filename contains `-section-`
+ * and ends with `.md` or `.kt`.
+ *
+ * Section files are the building blocks of multi-section articles. They are named like
+ * `<article-stem>-section-<id>.(md|kt)` and are merged (in alphabetical order) to form
+ * the article's payload content.
+ */
+fun isSectionFile(path: String): Boolean {
+    val name = path.substringAfterLast("/")
+    return Regex("""-section-[^/]+\.(md|kt)$""").containsMatchIn(name)
+}
+
+/**
+ * Derives the article stem path from a section file path.
+ *
+ * Examples:
+ * - `skill/foo-bar-section-0001.md`  →  `skill/foo-bar`
+ * - `coding-with-intellij-section-0002.kt`  →  `coding-with-intellij`
+ */
+fun articleStemFromSection(path: String): String {
+    val dir = path.substringBeforeLast("/", missingDelimiterValue = "")
+    val name = path.substringAfterLast("/")
+    val stem = name.replace(Regex("""-section-[^.]+\.(md|kt)$"""), "")
+    return if (dir.isEmpty()) stem else "$dir/$stem"
+}
+
 fun groupByArticle(promptClasses: List<GeneratedPromptClazz>): List<PromptArticle> {
     val headerExt = "-header.md"
     val seeAlsoExt = "-see-also.md"
 
-    // Group files by stripping known suffixes to find article stems
-    val articles = promptClasses.groupBy { clazz ->
+    // Group all files by their article stem.
+    // Section files have their -section-XXXX.(md|kt) suffix stripped to find the stem.
+    val grouped = promptClasses.groupBy { clazz ->
         val path = clazz.path
         when {
             path.endsWith(headerExt) -> path.removeSuffix(headerExt)
             path.endsWith(seeAlsoExt) -> path.removeSuffix(seeAlsoExt)
-            else -> path.removeSuffix(".kts").removeSuffix(".md")
+            isSectionFile(path) -> articleStemFromSection(path)
+            else -> path.removeSuffix(".kts").removeSuffix(".md").removeSuffix(".kt")
         }
-    }.mapNotNull { (stem, group) ->
+    }
+
+    return grouped.mapNotNull { (stem, group) ->
         val header = group.singleOrNull { it.path.endsWith(headerExt) } ?: return@mapNotNull null
         val seeAlso = group.singleOrNull { it.path.endsWith(seeAlsoExt) }
+        val sections = group.filter { isSectionFile(it.path) }.sortedBy { it.path }
+        val singlePayload = group.singleOrNull {
+            !it.path.endsWith(headerExt) && !it.path.endsWith(seeAlsoExt) && !isSectionFile(it.path)
+        }
 
-        // Payload is whichever file is NOT the header and NOT the see-also
-        val payload = group.singleOrNull { !it.path.endsWith(headerExt) && !it.path.endsWith(seeAlsoExt) }
-            ?: return@mapNotNull null
-
-        // Must have at least header + payload (see-also is optional)
-        PromptArticle(
-            header = header,
-            seeAlso = seeAlso,
-            payload = payload,
-        )
+        if (sections.isNotEmpty()) {
+            require(singlePayload == null) {
+                "Article '$stem' has both section files and a single payload file '${singlePayload?.path}'. " +
+                    "Remove the single payload file or the section files."
+            }
+            PromptArticle(header = header, seeAlso = seeAlso, payload = null, sections = sections)
+        } else {
+            val payload = singlePayload ?: return@mapNotNull null
+            PromptArticle(header = header, seeAlso = seeAlso, payload = payload, sections = emptyList())
+        }
     }
-    return articles
 }
 
 data class PromptArticle(
     val header: GeneratedPromptClazz,
     val seeAlso: GeneratedPromptClazz?,
-    val payload: GeneratedPromptClazz,
+    /** Non-null for single-file articles; null when the article uses section files. */
+    val payload: GeneratedPromptClazz?,
+    /** Non-empty for multi-section articles; empty when the article uses a single payload file. */
+    val sections: List<GeneratedPromptClazz> = emptyList(),
 ) {
-    val mainElement get() = payload
+    init {
+        require((sections.isNotEmpty()) xor (payload != null)) {
+            "Article must have either section files or a single payload file (not both, not neither). " +
+                "Header: ${header.path}"
+        }
+    }
 
-    /** All non-null generated classes in this article */
+    /**
+     * The canonical payload path used for URI and class-name derivation.
+     *
+     * - Single-file articles: the actual payload file path.
+     * - Section articles: a virtual `<stem>.md` path derived from the first section filename
+     *   (same as if the payload existed as a single file with that name).
+     */
+    val canonicalPayloadPath: String
+        get() = when {
+            payload != null -> payload.path
+            else -> {
+                val firstPath = sections.first().path
+                val dir = firstPath.substringBeforeLast("/", missingDelimiterValue = "")
+                val name = firstPath.substringAfterLast("/")
+                val stem = name.replace(Regex("""-section-[^.]+\.(md|kt)$"""), "")
+                if (dir.isEmpty()) "$stem.md" else "$dir/$stem.md"
+            }
+        }
+
+    /** The primary element for naming purposes (payload or first section). */
+    val mainElement: GeneratedPromptClazz get() = payload ?: sections.first()
+
+    /** All non-null generated classes in this article (header, optional see-also, payload or sections). */
     val allClasses: List<GeneratedPromptClazz>
-        get() = listOfNotNull(payload, header, seeAlso)
+        get() = listOfNotNull(payload, header, seeAlso) + sections
+
+    /**
+     * Merges section file contents into a single markdown string.
+     *
+     * Sections are already sorted by path when stored. `.kt` section files are wrapped
+     * in a ` ```kotlin ``` ` code fence so the merged result is valid markdown.
+     *
+     * Only valid when [sections] is non-empty.
+     */
+    val mergedSectionsContent: String
+        get() {
+            require(sections.isNotEmpty()) {
+                "mergedSectionsContent called on non-section article: ${header.path}"
+            }
+            return buildString {
+                for ((index, section) in sections.withIndex()) {
+                    if (index > 0) append("\n\n")
+                    if (section.path.endsWith(".kt")) {
+                        appendLine("```kotlin")
+                        append(section.content.trim())
+                        appendLine()
+                        append("```")
+                    } else {
+                        append(section.content.trim())
+                    }
+                }
+            }
+        }
 }
 
 data class GeneratedArticleClazz(
@@ -59,8 +151,7 @@ data class GeneratedArticleClazz(
     val uri: String,
 ) : Generated {
     override val entryName: String
-        get() = article?.mainElement?.entryName
-            ?: path.substringAfterLast("/").toPromptIdentifierName()
+        get() = path.substringAfterLast("/").toPromptIdentifierName()
 }
 
 /**
@@ -94,7 +185,7 @@ fun folderToDisplayName(folder: String): String {
  */
 fun payloadFileStem(payloadPath: String): String {
     val fileName = payloadPath.substringAfterLast("/")
-    val stem = fileName.removeSuffix(".kts").removeSuffix(".md")
+    val stem = fileName.removeSuffix(".kts").removeSuffix(".md").removeSuffix(".kt")
     // Convert UPPER_CASE_NAME to lower-kebab-case: replace _ with -, lowercase
     return stem.replace('_', '-').lowercase()
 }
@@ -114,11 +205,19 @@ fun buildArticleUri(folder: String, payloadPath: String): String {
 
 /**
  * Compute the generated article class name for a [PromptArticle].
- * This is deterministic and matches the class name that [generateArticleClazz] will create.
+ *
+ * The name is derived from the article's [PromptArticle.canonicalPayloadPath] stem,
+ * so it is the same regardless of whether the article uses a single file or multiple sections.
+ * This matches the class name that [generateArticleClazz] will create.
  */
 fun articleClassName(article: PromptArticle): ClassName {
     val packageName = article.allClasses.map { it.clazzName.packageName }.distinct().single()
-    val className = article.mainElement.clazzName.simpleName + "Article"
+    val stem = article.canonicalPayloadPath
+        .substringAfterLast("/")
+        .removeSuffix(".kts")
+        .removeSuffix(".md")
+        .removeSuffix(".kt")
+    val className = stem.toPromptClassName() + "PromptArticle"
     return ClassName(packageName, className)
 }
 
@@ -155,7 +254,7 @@ fun articleDescriptionFirstLine(article: PromptArticle): String {
  * Build a see-also markdown entry for an article.
  */
 fun buildSeeAlsoLine(folder: String, article: PromptArticle): String {
-    val uri = buildArticleUri(folder, article.mainElement.path)
+    val uri = buildArticleUri(folder, article.canonicalPayloadPath)
     val name = articleName(article)
     val desc = articleDescriptionFirstLine(article)
     val suffix = if (desc.isNotEmpty()) " - $desc" else ""
@@ -167,7 +266,7 @@ fun PromptGenerationContext.generateArticleClazz(
     article: PromptArticle,
     seeAlsoContent: String,
 ): GeneratedArticleClazz {
-    val uri = buildArticleUri(folder, article.mainElement.path)
+    val uri = buildArticleUri(folder, article.canonicalPayloadPath)
     val name = articleName(article)
     val description = articleDescription(article)
 
@@ -178,11 +277,22 @@ fun PromptGenerationContext.generateArticleClazz(
 
     val nullablePromptBase = promptBaseClass.copy(nullable = true)
 
+    // Determine the payload class:
+    // - Single-file articles: use the already-generated class for that file.
+    // - Section articles: generate a new inline class holding the merged content.
+    val payloadClassName: ClassName = if (article.sections.isNotEmpty()) {
+        val mergedClass = ClassName(pkg, classType.simpleName + "Payload")
+        generateStringPromptClazz(article.mergedSectionsContent, mergedClass)
+        mergedClass
+    } else {
+        article.payload!!.clazzName
+    }
+
     // payload property
     props += PropertySpec.builder("payload", promptBaseClass)
         .addModifiers(KModifier.OVERRIDE)
         .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-            addStatement("return %T()", article.payload.clazzName)
+            addStatement("return %T()", payloadClassName)
         }).build())
         .build()
 
@@ -243,7 +353,7 @@ fun PromptGenerationContext.generateArticleClazz(
         .build()
 
     writeClazz(fileSpec, classType)
-    return GeneratedArticleClazz(folder, article.mainElement.path, classType, article, uri)
+    return GeneratedArticleClazz(folder, article.canonicalPayloadPath, classType, article, uri)
 }
 
 /**
