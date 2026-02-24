@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
+import kotlin.system.exitProcess
 
 /**
  * Manual test for SIGKILL handling.
@@ -38,9 +39,9 @@ fun main() {
     println("\n[2] Starting test container...")
     val containerId = driver.startContainer(
         lifetime = lifetime,
-        imageName = "alpine:latest",
-        extraEnvVars = emptyMap(),
-        cmd = listOf("sleep", "infinity")
+        StartContainerRequest()
+            .imageName("alpine:latest")
+            .entryPoint("sleep", "infinity")
     )
 
     // Register with reaper
@@ -64,7 +65,7 @@ fun main() {
 
     if (checkResult.isEmpty()) {
         println("\n[ERROR] Container is not running!")
-        System.exit(1)
+        exitProcess(1)
     }
 
     println("\n[4] Container verified running: $checkResult")

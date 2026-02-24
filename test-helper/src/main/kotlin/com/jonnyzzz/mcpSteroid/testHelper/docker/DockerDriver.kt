@@ -5,7 +5,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
 import com.jonnyzzz.mcpSteroid.testHelper.process.*
 import java.io.File
-import java.time.Duration
 
 class DockerDriver(
     val workDir: File,
@@ -30,9 +29,6 @@ class DockerDriver(
             (environmentVariables + (key to value)).toSortedMap(),
         )
     }
-
-    //TODO: rework it
-    val processRunner get() = ProcessRunner(logPrefix, secretPatterns.toList())
 
     val runProcessTemplate get() = RunProcessRequest()
         .withLogPrefix(logPrefix)
@@ -111,24 +107,9 @@ class DockerDriver(
     //TODO: this should either return container driver, or move outside of here
     fun startContainer(
         lifetime: CloseableStack,
-        imageName: String,
-        extraEnvVars: Map<String, String> = emptyMap(),
-        volumes: List<ContainerVolume> = emptyList(),
-        ports: List<ContainerPort> = emptyList(),
-        cmd: List<String> = emptyList(),
-        autoRemove: Boolean = true,
-        timeoutSeconds: Long = 300,
+        request: StartContainerRequest,
     ): String {
-        val containerId = startContainer2(
-            StartContainerRequest()
-                .imageName(imageName)
-                .extraEnvVars(extraEnvVars)
-                .volumes(volumes)
-                .ports(ports)
-                .entryPoint(cmd)
-                .autoRemove(autoRemove)
-                .timeout(Duration.ofSeconds(timeoutSeconds))
-        )
+        val containerId = startContainer2(request)
 
         // Register normal cleanup action
         lifetime.registerCleanupAction {

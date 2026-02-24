@@ -50,10 +50,10 @@ class DockerReaperTest {
         DockerReaper.start(workDir)
 
         val containerId = driver.startContainer(
-            lifetime = lifetime,
-            imageName = "alpine:latest",
-            extraEnvVars = emptyMap(),
-            cmd = listOf("sleep", "infinity")
+            lifetime,
+            StartContainerRequest()
+                .imageName("alpine:latest")
+                .entryPoint("sleep", "infinity")
         )
 
         DockerReaper.registerContainer(containerId, workDir)
@@ -95,9 +95,9 @@ class DockerReaperTest {
 
             val containerId = driver.startContainer(
                 lifetime = lifetime,
-                imageName = "alpine:latest",
-                extraEnvVars = emptyMap(),
-                cmd = listOf("sleep", "infinity")
+                StartContainerRequest()
+                    .imageName("alpine:latest")
+                    .entryPoint("sleep", "infinity")
             )
 
             DockerReaper.registerContainer(containerId, workDir)

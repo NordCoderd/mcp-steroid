@@ -22,6 +22,7 @@ data class StartContainerRequest private constructor(
     fun volumes(x : List<ContainerVolume>) = copy(volumes = x)
     fun ports(x : List<ContainerPort>) = copy(ports = x)
     fun entryPoint(x: List<String>) = copy(entryPoint = x)
+    fun entryPoint(vararg args: String) = entryPoint(args.toList())
     fun autoRemove(x : Boolean) = copy(autoRemove = x)
     fun timeout(x : Duration) = copy(timeout = x)
 }

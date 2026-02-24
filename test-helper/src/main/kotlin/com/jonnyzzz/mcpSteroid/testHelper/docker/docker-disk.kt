@@ -8,7 +8,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import java.io.File
 
 fun ContainerDriver.mkdirs(guestPath: String): ProcessResult {
-    emptyMap<String, String>()
     return ContainerProcessRunRequest
         .builder()
         .command("mkdir", "-p", guestPath)
