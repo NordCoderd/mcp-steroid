@@ -168,7 +168,7 @@ The IDE runner is the equivalent of clicking the green ▶ button next to a test
 - Reuses the running JVM — faster than spawning a new Maven/Gradle process
 
 See `mcp-steroid://skill/coding-with-intellij` → **"Run Tests via IntelliJ IDE Runner ★ PREFERRED ★"**
-for the complete pattern (JUnitConfiguration + ExecutionEnvironmentBuilder + CountDownLatch).
+for the complete pattern (MavenRunConfigurationType / GradleRunConfiguration + CompletableDeferred).
 
 Only fall back to `./mvnw test` / `./gradlew test` when the IDE runner cannot be used (e.g., tests
 require a full Maven lifecycle). Even then, **never print the full output** — always `take(30) +
