@@ -63,7 +63,8 @@ object DockerReaper {
             val reaperDockerfile = projectHome.resolve("test-helper/src/main/docker/reaper/Dockerfile")
             require(reaperDockerfile.isFile) { "Reaper Dockerfile must exist: $reaperDockerfile" }
 
-            val reaperImageId = driver.buildDockerImage(
+            val reaperImageId = buildDockerImage(
+                logPrefix = "REAPER",
                 reaperDockerfile,
                 120,
             )

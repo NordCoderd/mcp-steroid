@@ -10,25 +10,25 @@ import org.junit.jupiter.api.Test
 class DockerDriverPortParsingTest {
     @Test
     fun `parseMappedPortOutput parses IPv4 mapping`() {
-        val mapped = DockerDriver.parseMappedPortOutput("0.0.0.0:52134")
+        val mapped = parseMappedPortOutput("0.0.0.0:52134")
         assertEquals(52134, mapped)
     }
 
     @Test
     fun `parseMappedPortOutput parses IPv6 mapping`() {
-        val mapped = DockerDriver.parseMappedPortOutput("[::]:40211")
+        val mapped = parseMappedPortOutput("[::]:40211")
         assertEquals(40211, mapped)
     }
 
     @Test
     fun `parseMappedPortOutput skips blank lines`() {
-        val mapped = DockerDriver.parseMappedPortOutput("\n\n0.0.0.0:31000\n")
+        val mapped = parseMappedPortOutput("\n\n0.0.0.0:31000\n")
         assertEquals(31000, mapped)
     }
 
     @Test
     fun `parseMappedPortOutput returns null for empty output`() {
-        val mapped = DockerDriver.parseMappedPortOutput("")
+        val mapped = parseMappedPortOutput("")
         assertNull(mapped)
     }
 

@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
 import java.io.File
 import java.nio.file.Files.createLink
 import kotlin.io.path.exists
@@ -36,7 +37,8 @@ fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): 
     val contextDir = prepareContext("docker-$imageName", BASE_DOCKER_CONTEXT, dockerFileBase)
     linkIdeArchive(contextDir, ideArchive)
     val scope = DockerDriver(contextDir, "IDE-AGENT")
-    val imageId = scope.buildDockerImage(
+    val imageId = buildDockerImage(
+        logPrefix = "IDE-AGENT",
         dockerfilePath = File(contextDir, "Dockerfile"),
         timeoutSeconds = 900,
         buildArgs = mapOf("BASE_IMAGE" to resolvedBaseImageId),
@@ -50,7 +52,8 @@ private fun buildSharedBaseImage(): String {
         baseImageId?.let { return it }  // double-checked locking
         val baseContext = prepareContext("docker-$BASE_DOCKER_CONTEXT", BASE_DOCKER_CONTEXT)
         val baseScope = DockerDriver(baseContext, "IDE-AGENT")
-        val rawImageId = baseScope.buildDockerImage(
+        val rawImageId = buildDockerImage(
+            logPrefix = "IDE-AGENT",
             dockerfilePath = File(baseContext, "Dockerfile"),
             timeoutSeconds = 900,
         )

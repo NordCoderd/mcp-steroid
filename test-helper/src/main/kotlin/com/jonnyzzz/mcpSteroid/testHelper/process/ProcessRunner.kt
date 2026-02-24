@@ -136,7 +136,7 @@ private fun startProcessImpl(request: RunProcessRequest): StartedProcessImpl {
     }
 
     val processBuilder = ProcessBuilder(request.args)
-    processBuilder.directory(request.workingDir ?: error("Working directory is not set for $request"))
+    processBuilder.directory(request.workingDir)
     processBuilder.redirectInput(ProcessBuilder.Redirect.PIPE)
     processBuilder.redirectOutput(ProcessBuilder.Redirect.PIPE)
     processBuilder.redirectError(ProcessBuilder.Redirect.PIPE)

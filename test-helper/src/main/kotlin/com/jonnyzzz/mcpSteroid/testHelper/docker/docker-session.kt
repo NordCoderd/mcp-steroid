@@ -30,7 +30,8 @@ fun ContainerDriver.Companion.startDockerSession(
 
     val scope = DockerDriver(workDir, logPrefix, secretPatterns)
 
-    val imageId = scope.buildDockerImage(
+    val imageId = buildDockerImage(
+        logPrefix = logPrefix,
         dockerfilePath,
         timeoutSeconds = 600,
     )
@@ -52,26 +53,16 @@ fun startContainerDriver(
     // Register with reaper for cleanup on crash/SIGKILL
     DockerReaper.registerContainer(containerId, scope.workDir)
 
-    val hostPorts = ports.associate { p ->
-        p.containerPort to scope.queryMappedPort(containerId, p.containerPort)
-    }
-    if (hostPorts.isNotEmpty()) {
-        println("[${scope.logPrefix}] Port mappings: ${hostPorts.entries.joinToString { "${it.key} -> ${it.value}" }}")
-    }
-
-    return ContainerDriverImpl(scope, containerId, imageId, volumes, hostPorts)
+    return ContainerDriverImpl(scope, containerId, imageId, volumes)
 }
 
 private class ContainerDriverImpl(
     private val scope: DockerDriver,
     override val containerId: String,
     private val imageName: String,
-    private val volumes: List<ContainerVolume> = emptyList(),
+    override val volumes: List<ContainerVolume> = emptyList(),
     private val hostPorts: Map<Int, Int> = emptyMap(),
 ) : ContainerDriver {
-    override fun mapGuestPortToHostPort(port: ContainerPort): Int =
-        hostPorts[port.containerPort]
-            ?: error("Port ${port.containerPort} is not mapped. Available: ${hostPorts.keys}")
 
     override fun withSecretPattern(secretPattern: String): ContainerDriver {
         return ContainerDriverImpl(scope.withSecretPattern(secretPattern), containerId, imageName, volumes, hostPorts)
@@ -178,44 +169,6 @@ private class ContainerDriverImpl(
                 .runInContainer(scope)
                 .assertExitCode(0)
         }
-    }
-
-    override fun copyFromContainer(containerPath: String, localPath: File) {
-        localPath.parentFile?.mkdirs()
-        ProcessRunRequest.builder()
-            .command("docker", "cp", "$containerId:$containerPath", localPath.absolutePath)
-            .description("Copy container:$containerPath to ${localPath.name}")
-            .workingDir(scope.workDir)
-            .timeoutSeconds(30L)
-            .quietly()
-            .startProcess(scope.processRunner)
-            .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
-    }
-
-    override fun copyToContainer(localPath: File, containerPath: String) {
-        require(localPath.exists()) { "Local path does not exist: $localPath" }
-        ProcessRunRequest.builder()
-            .command("docker", "cp", localPath.absolutePath, "$containerId:$containerPath")
-            .description("Copy ${localPath.name} to container:$containerPath")
-            .workingDir(scope.workDir)
-            .timeoutSeconds(120L)
-            .quietly()
-            .startProcess(scope.processRunner)
-            .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
-    }
-
-    override fun mapGuestPathToHostPath(path: String): File {
-        for (v in volumes) {
-            if (v.guest == path) {
-                return v.host
-            }
-
-            if (path.startsWith(v.guest + "/")) {
-                val prefix = path.removePrefix(v.guest + "/").trim('/')
-                return v.host.resolve(prefix)
-            }
-        }
-        error("Not found volume for guest path $path")
     }
 
     override fun toString(): String {

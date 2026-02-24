@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -27,9 +28,7 @@ class DockerCodexProgressTest {
         val result = codexSession.runPrompt(
             prompt = "List files in current directory. You must use a tool call (for example, run a shell command) to get the result.",
             timeoutSeconds = 30
-        )
-
-        result.assertExitCode(0) { "Codex command should succeed" }
+        ).assertExitCode(0) { "Codex command should succeed" }
 
         val events = parseNdjsonEvents(result.stdout)
         assertTrue(events.isNotEmpty(), "Raw output should contain NDJSON events")
@@ -56,7 +55,8 @@ class DockerCodexProgressTest {
         stack.registerCleanupAction { workDir.deleteRecursively() }
 
         val driver = DockerDriver(workDir, "CODEX-PROGRESS")
-        val imageId = driver.buildDockerImage(
+        val imageId = buildDockerImage(
+            "CODEX-PROGRESS",
             dockerfilePath = dockerfile,
             timeoutSeconds = 600,
         )

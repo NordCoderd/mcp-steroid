@@ -3,26 +3,20 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.io.File
 
 class DockerGeminiProgressTest {
 
     @Test
     fun `test Gemini shows progress events with stream-json`() = runWithCloseableStack { stack ->
-        assumeTrue(
-            hasGeminiApiKey(),
-            "Requires GEMINI_API_KEY/GOOGLE_API_KEY or a key in ~/.vertes or ~/.vertex"
-        )
-
         val geminiSession = createLightweightGeminiSession(stack)
         val result = geminiSession.runPrompt(
             prompt = """
@@ -30,9 +24,7 @@ class DockerGeminiProgressTest {
                 You must use a tool call (for example, a shell command) to get the result.
             """.trimIndent(),
             timeoutSeconds = 30
-        )
-
-        result.assertExitCode(0) { "Gemini command should succeed" }
+        ).assertExitCode(0) { "Gemini command should succeed" }
 
         val events = parseNdjsonEvents(result.stdout)
         assertTrue(events.isNotEmpty(), "Raw output should contain stream-json NDJSON events")
@@ -61,7 +53,8 @@ class DockerGeminiProgressTest {
         stack.registerCleanupAction { workDir.deleteRecursively() }
 
         val driver = DockerDriver(workDir, "GEMINI-PROGRESS")
-        val imageId = driver.buildDockerImage(
+        val imageId = buildDockerImage(
+            logPrefix = "GEMINI-PROGRESS",
             dockerfilePath = dockerfile,
             timeoutSeconds = 600,
         )
@@ -73,21 +66,6 @@ class DockerGeminiProgressTest {
             autoRemove = true
         )
         return DockerGeminiSession.create(container)
-    }
-
-    private fun hasGeminiApiKey(): Boolean {
-        if (!System.getenv("GEMINI_API_KEY").isNullOrBlank()) return true
-        if (!System.getenv("GOOGLE_API_KEY").isNullOrBlank()) return true
-
-        val home = System.getProperty("user.home")
-        for (filename in listOf(".vertes", ".vertex")) {
-            val keyFile = File(home, filename)
-            if (keyFile.isFile && keyFile.readText().trim().isNotBlank()) {
-                return true
-            }
-        }
-
-        return false
     }
 
     private fun parseNdjsonEvents(rawOutput: String): List<JsonObject> {

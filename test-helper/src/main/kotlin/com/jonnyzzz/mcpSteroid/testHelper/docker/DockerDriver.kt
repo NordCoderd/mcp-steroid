@@ -6,9 +6,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.escapeShellArgs
 import com.jonnyzzz.mcpSteroid.testHelper.process.*
 import java.io.File
 import java.time.Duration
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import kotlin.io.path.createTempFile
 
 class DockerDriver(
     val workDir: File,
@@ -58,61 +55,6 @@ class DockerDriver(
             .assertExitCode(0) { "Failed to tag Docker image $imageId as $tag: $stderr" }
 
         println("[$logPrefix] Tagged image $imageId → $tag")
-    }
-
-    /**
-     * Build a Docker image and return its content-addressable image ID (sha256:...).
-     *
-     * @param buildArgs Extra `--build-arg KEY=VALUE` entries (e.g. `BASE_IMAGE` for derived images)
-     * @return The image ID in `sha256:<hex>` format
-     */
-    fun buildDockerImage(
-        dockerfilePath: File,
-        timeoutSeconds: Long,
-        buildArgs: Map<String, String> = emptyMap(),
-    ): String {
-        require(dockerfilePath.exists() && dockerfilePath.isFile) {
-            "File does not exist: $dockerfilePath"
-        }
-
-        val nowDate = DateTimeFormatter.ISO_DATE.format(LocalDateTime.now())
-        val iidFile = createTempFile("docker-iid", ".txt").toFile()
-        try {
-            val command = buildList {
-                add("docker")
-                add("build")
-
-                @Suppress("SpellCheckingInspection")
-                add("--iidfile")
-                add(iidFile.absolutePath)
-
-                for ((k, v) in buildArgs + ("CACHE_BUST" to nowDate)) {
-                    add("--build-arg")
-                    add("$k=$v")
-                }
-
-                add(".")
-            }
-
-            runProcessTemplate
-                    .command(command)
-                    .description("Build Docker image $dockerfilePath")
-                    .workingDir(dockerfilePath.parentFile)
-                    .timeoutSeconds(timeoutSeconds)
-                    .startProcess()
-                    .assertExitCode(0) { "Failed to build Docker image.\n$stderr" }
-
-            val imageId = iidFile.readText().trim()
-            require(imageId.startsWith("sha256:")) {
-                @Suppress("SpellCheckingInspection")
-                "Unexpected image ID format from --iidfile: $imageId"
-            }
-
-            println("[$logPrefix] Docker image built $imageId")
-            return imageId.removePrefix("sha256:").trim()
-        } finally {
-            iidFile.delete()
-        }
     }
 
     fun startContainer2(
@@ -198,36 +140,7 @@ class DockerDriver(
         return containerId
     }
 
-    /**
-     * Query the host port mapped to a container port.
-     * Docker output format: "0.0.0.0:52134" or "[::]:52134"
-     */
-    fun queryMappedPort(containerId: String, containerPort: Int): Int {
-        val result = runProcessTemplate
-            .command("docker", "port", containerId, "$containerPort/tcp")
-            .description("Query host port for $containerPort")
-            .timeoutSeconds(5)
-            .startProcess()
-            .assertExitCode(0) { "Failed to map container port $containerPort for $containerId" }
-
-        val mappedPort = parseMappedPortOutput(result.stdout)
-        if (result.exitCode == 0 && mappedPort != null) {
-            return mappedPort
-        }
-
-        error("Failed to query mapped port for container $containerId port $containerPort. $result")
-    }
-
     companion object {
-        internal fun parseMappedPortOutput(stdout: String): Int? {
-            return stdout
-                .lineSequence()
-                .map { it.trim() }
-                .firstNotNullOfOrNull { line ->
-                    line.takeIf { it.isNotBlank() }?.substringAfterLast(':')?.toIntOrNull()
-                }
-        }
-
         internal fun parseContainerRunningState(stdout: String): Boolean? {
             return when (stdout.trim().lowercase()) {
                 "true" -> true
@@ -310,5 +223,6 @@ class DockerDriver(
             .timeoutSeconds(request.timeoutSeconds)
             .quietly(request.quietly)
             .startProcess()
+            .awaitForProcessFinish()
     }
 }
