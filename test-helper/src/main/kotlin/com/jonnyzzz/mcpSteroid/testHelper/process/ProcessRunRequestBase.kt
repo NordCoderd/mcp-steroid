@@ -45,6 +45,8 @@ open class ProcessRunRequestBuilderBase<R : ProcessRunRequestBuilderBase<R>> {
 
     open fun description(description: String) = apply { this.description = description }
 
+    open fun secretPatterns(apiKey: String) = apply {  }
+
     open fun timeoutSeconds(timeoutSeconds: Long) = apply { this.timeoutSeconds = timeoutSeconds }
 
     open fun quietly(quietly: Boolean) = apply { this.quietly = quietly }

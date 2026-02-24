@@ -15,7 +15,6 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
 import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
-import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
 import java.io.File
 import kotlin.time.Duration.Companion.seconds
@@ -53,6 +52,7 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
     fun testHostAvailability(): Unit = timeoutRunBlocking(180.seconds) {
         val session = llmSession()
 
+        session.runInContainer(
         ContainerProcessRunRequest
             .builder()
             .command(
@@ -66,8 +66,7 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
             )
             .timeoutSeconds(30)
             .quietly(false)
-            .build()
-            .runInContainer(session)
+            .build())
             .assertExitCode(0, "curl to MCP")
             .assertNoErrorsInOutput("curl to MCP")
             .assertOutputContains(

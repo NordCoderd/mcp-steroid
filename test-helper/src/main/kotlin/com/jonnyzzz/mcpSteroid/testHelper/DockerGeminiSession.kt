@@ -6,7 +6,9 @@ import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.GeminiOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
@@ -49,7 +51,6 @@ class DockerGeminiSession(
             addAll(args.toList())
         }
         val env = buildMap {
-            put("GEMINI_API_KEY", apiKey)
             put("GOOGLE_API_KEY", apiKey)
             if (debug) {
                 put("GEMINI_DEBUG", "1")
@@ -58,11 +59,18 @@ class DockerGeminiSession(
             }
         }
 
-        return session.runInContainer(
-            args = geminiArgs,
-            timeoutSeconds = timeoutSeconds,
-            extraEnvVars = env
-        )
+        val req = ContainerProcessRunRequest
+            .builder()
+            .command(command = geminiArgs)
+            .workingDirInContainer(null)
+            .timeoutSeconds(timeoutSeconds = timeoutSeconds)
+            .quietly(false)
+            .description(geminiArgs.joinToString(" ").take(80))
+            .secretPatterns(apiKey)
+            .extraEnv(env)
+            .build()
+
+        return session.runInContainer(req)
     }
 
     /**
@@ -168,6 +176,8 @@ class DockerGeminiSession(
             error("GEMINI_API_KEY required (set env GEMINI_API_KEY, GOOGLE_API_KEY, or ~/.vertes / ~/.vertex)")
         }
 
-        override fun createImpl(session: ContainerProcessRunner, apiKey: String) = DockerGeminiSession(session, apiKey)
+        override fun createImpl(session: ContainerProcessRunner, apiKey: String): DockerGeminiSession {
+            return DockerGeminiSession(session, apiKey)
+        }
     }
 }

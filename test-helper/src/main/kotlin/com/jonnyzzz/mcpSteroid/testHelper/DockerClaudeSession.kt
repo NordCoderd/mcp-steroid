@@ -6,7 +6,9 @@ import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
@@ -55,17 +57,25 @@ class DockerClaudeSession(
             }
             addAll(args)
         }
-        return session.runInContainer(
-            args = claudeArgs,
-            timeoutSeconds = timeoutSeconds,
-            extraEnvVars = buildMap {
-                put("ANTHROPIC_API_KEY", apiKey)
-                if (debug) {
-                    put("CLAUDE_CODE_DEBUG", "1")
-                    put("DEBUG", "*")
-                }
+        val env = buildMap {
+            put("ANTHROPIC_API_KEY", apiKey)
+            if (debug) {
+                put("CLAUDE_CODE_DEBUG", "1")
+                put("DEBUG", "*")
             }
-        )
+        }
+        val req = ContainerProcessRunRequest
+            .builder()
+            .command(command = claudeArgs)
+            .workingDirInContainer(null)
+            .timeoutSeconds(timeoutSeconds = timeoutSeconds)
+            .quietly(false)
+            .description(claudeArgs.joinToString(" ").take(80))
+            .secretPatterns(apiKey)
+            .extraEnv(env)
+            .build()
+
+        return session.runInContainer(req)
     }
 
     /**

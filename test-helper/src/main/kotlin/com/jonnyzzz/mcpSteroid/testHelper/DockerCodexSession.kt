@@ -6,7 +6,9 @@ import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.CodexOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
@@ -62,10 +64,18 @@ class DockerCodexSession(
                 put("DEBUG", "*")
             }
         }
-        return session.runInContainer(
-            codexArgs,
-            timeoutSeconds = timeoutSeconds, extraEnvVars = extraEnvVars
-        )
+        val req = ContainerProcessRunRequest
+            .builder()
+            .command(codexArgs)
+            .workingDirInContainer(null)
+            .timeoutSeconds(timeoutSeconds = timeoutSeconds)
+            .quietly(false)
+            .description(codexArgs.joinToString(" ").take(80))
+            .secretPatterns(apiKey)
+            .extraEnv(extraEnvVars)
+            .build()
+
+        return session.runInContainer(req)
     }
 
     /**
@@ -117,6 +127,8 @@ class DockerCodexSession(
             error("OPENAI_API_KEY is required for Codex CLI tests (set env or ~/.openai)")
         }
 
-        override fun createImpl(session: ContainerProcessRunner, apiKey: String) = DockerCodexSession(session, apiKey)
+        override fun createImpl(session: ContainerProcessRunner, apiKey: String): DockerCodexSession {
+            return DockerCodexSession(session, apiKey)
+        }
     }
 }
