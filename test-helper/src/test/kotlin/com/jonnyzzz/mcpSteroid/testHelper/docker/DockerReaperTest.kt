@@ -59,7 +59,7 @@ class DockerReaperTest {
         DockerReaper.registerContainer(containerId, workDir)
 
         // Verify container is running
-        val beforeResult = ProcessRunRequest.builder()
+        val beforeResult = RunProcessRequest()
                 .command("docker", "ps", "-q", "--filter", "id=$containerId")
                 .description("Check container before cleanup")
                 .workingDir(workDir)
@@ -74,7 +74,7 @@ class DockerReaperTest {
         lifetime.closeAllStacks()
 
         // Verify container is gone
-        val afterResult = ProcessRunRequest.builder()
+        val afterResult = RunProcessRequest()
             .command("docker", "ps", "-aq", "--filter", "id=$containerId")
             .description("Check container after cleanup")
             .workingDir(workDir)
@@ -103,7 +103,7 @@ class DockerReaperTest {
             DockerReaper.registerContainer(containerId, workDir)
 
             // Verify reaper container is running
-            val reaperResult = ProcessRunRequest.builder()
+            val reaperResult = RunProcessRequest()
                 .command(
                     "docker", "ps",
                     "--filter", "ancestor=mcp-steroid-reaper",
