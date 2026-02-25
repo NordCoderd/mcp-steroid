@@ -220,6 +220,83 @@ Agents (especially Gemini) may find the right answer internally but not include 
 - For truly dynamic test cases (runtime-discovered), use `@TestFactory` with `DynamicTest.dynamicTest("descriptive-name") { ... }`
 - This ensures IDE test runner, `./gradlew --tests`, and CI reports work optimally
 
+## Build Troubleshooting
+
+### Test Suite Runtimes
+
+- **`./gradlew :ij-plugin:test`** (full suite, clean): ~13–14 minutes
+- **`./gradlew :ij-plugin:test --tests '*KtBlock*'`** (KtBlocks compilation only): ~7 minutes
+- **Suspiciously fast results** (e.g., 500 tests in 14 seconds): this is **stale Gradle test cache** — results from a previous run are being replayed. Run with `--rerun-tasks` or delete `ij-plugin/build/test-results/` to force a fresh run.
+
+### IntelliJ Index Corruption
+
+**Symptom**: Many tests fail with:
+```
+TestLoggerAssertionError: Index data initialization failed
+  → IllegalStateException: Index data initialization failed
+  → PersistentEnumerator storage corrupted
+    /Users/.../ij-plugin/build/idea-sandbox/IU-2025.3/system-test/index/stubs/Stubs.storage
+```
+
+The full coroutine stacktrace shows the failure inside `IndexDataInitializer$Companion$submitGenesisTask$2.invokeSuspend` running on a `CoroutineScheduler$Worker`. This is an IntelliJ infrastructure issue — the persistent index/stub storage on disk got corrupted (usually a truncated write from a previous abrupt JVM kill).
+
+**Fix**: Delete the corrupted index storage and let IntelliJ rebuild it:
+```bash
+rm -rf ij-plugin/build/idea-sandbox/IU-2025.3/system-test/
+# Or more broadly:
+rm -rf ij-plugin/build/idea-sandbox/
+```
+
+After deletion, the next test run will rebuild indexes from scratch (adds ~30–60s to startup).
+
+**Prevention**: Avoid killing the Gradle test JVM with SIGKILL (`kill -9`) mid-run — prefer SIGTERM so IntelliJ can flush its index files cleanly.
+
+### Live JVM Thread/Coroutine Dumps
+
+When a test run hangs or behaves unexpectedly, **do NOT stop the task** — collect a thread dump first to understand what's happening:
+
+```bash
+# Find the test JVM PID (GradleWorkerMain is the test worker process)
+jps -l | grep GradleWorkerMain
+# OR
+pgrep -f GradleWorkerMain
+
+# Collect full thread dump (includes coroutine dump via DebugProbes)
+jcmd <PID> Thread.print > /tmp/thread-dump.txt
+
+# Show coroutines specifically (if kotlinx-coroutines-debug is on classpath)
+jcmd <PID> Thread.print -l > /tmp/thread-dump-with-locks.txt
+```
+
+The dump will show all threads + their stack traces, allowing you to diagnose:
+- Deadlocked threads (look for `BLOCKED` state)
+- Stuck coroutines (look for `DefaultDispatcher-worker-*` threads waiting)
+- EDT violations (look for `AWT-EventQueue-0` with deep blocking calls)
+- Which test method is currently executing
+
+### Cleaning Build Artifacts
+
+```bash
+# Clean only test outputs (forces test re-run, preserves downloaded IDEs)
+rm -rf ij-plugin/build/test-results/ ij-plugin/build/reports/
+
+# Clean corrupted IntelliJ indexes (see above)
+rm -rf ij-plugin/build/idea-sandbox/
+
+# Full clean (re-downloads nothing, IDE cached in .intellijPlatform/)
+./gradlew :ij-plugin:clean
+```
+
+### Common Test Failure Patterns
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| `PersistentEnumerator storage corrupted` | Corrupted index files | `rm -rf ij-plugin/build/idea-sandbox/` |
+| 500+ failures in <30s | Stale Gradle test cache | `./gradlew :ij-plugin:test --rerun-tasks` |
+| `KtCompilationTest` fails with `-Werror` | Deprecated API used in `.kt` section | Replace deprecated call (see MEMORY.md) |
+| `KtBlocksCompilationTest` fails | Non-compilable code in ` ```kotlin ``` ` fence | Change fence to ` ```text ``` ` in `.md` |
+| `MarkdownArticleContractTest` fails | Title >80 chars, desc >200 chars, or bare code outside fences | Fix the article header/body |
+
 ## Key Types
 
 - **ExecCodeParams**: `taskId`, `code`, `reason`, `timeout`, `rawParams`
