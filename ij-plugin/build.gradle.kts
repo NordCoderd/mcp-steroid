@@ -341,8 +341,8 @@ listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
                 }
             }
         }
-        // Include LICENSE file in plugin root
-        from(rootProject.layout.projectDirectory.file("website/static/LICENSE")) {
+        // Include LICENSE file in plugin root (website/LICENSE is the source of truth)
+        from(rootProject.layout.projectDirectory.file("website/LICENSE")) {
             into(intellijPlatform.projectName)
         }
     }
