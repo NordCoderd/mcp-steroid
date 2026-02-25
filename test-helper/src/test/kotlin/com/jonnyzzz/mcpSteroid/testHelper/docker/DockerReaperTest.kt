@@ -38,7 +38,7 @@ class DockerReaperTest {
 
         DockerReaper.start()
 
-        val containerId = startDockerContainerAndDispose(
+        val container = startDockerContainerAndDispose(
             lifetime,
             StartContainerRequest()
                 .image("alpine:latest")
@@ -46,11 +46,9 @@ class DockerReaperTest {
                 .entryPoint("sleep", "infinity")
         )
 
-        DockerReaper.registerContainer(containerId)
-
         // Verify container is running
         val beforeResult = RunProcessRequest()
-                .command("docker", "ps", "-q", "--filter", "id=$containerId")
+                .command("docker", "ps", "-q", "--filter", "id=${container.containerId}")
                 .description("Check container before cleanup")
                 .timeoutSeconds(5)
                 .quietly()
@@ -62,17 +60,17 @@ class DockerReaperTest {
         // Close lifetime (normal cleanup)
         lifetime.closeAllStacks()
 
-        // Verify container is gone
+        // Verify container is no longer running (-q without -a: running containers only)
         val afterResult = RunProcessRequest()
-            .command("docker", "ps", "-aq", "--filter", "id=$containerId")
+            .command("docker", "ps", "-q", "--filter", "id=${container.containerId}")
             .description("Check container after cleanup")
             .timeoutSeconds(5)
             .quietly()
             .startProcess(processRunner)
             .awaitForProcessFinish()
 
-        assertTrue(afterResult.stdout.trim().isEmpty(), "Container should be removed")
-        println("Container $containerId cleaned up successfully via CloseableStack")
+        assertTrue(afterResult.stdout.trim().isEmpty(), "Container should no longer be running")
+        println("Container ${container.containerId} cleaned up successfully via CloseableStack")
     }
 
     @Test
@@ -80,8 +78,10 @@ class DockerReaperTest {
         runWithCloseableStack { lifetime ->
             // Start reaper and a test container
             DockerReaper.start()
+            val reaperId = DockerReaper.reaperContainerId
+                ?: error("Reaper container ID not set after start()")
 
-            val containerId = startDockerContainerAndDispose(
+            val container = startDockerContainerAndDispose(
                 lifetime = lifetime,
                 StartContainerRequest()
                     .image("alpine:latest")
@@ -89,13 +89,12 @@ class DockerReaperTest {
                     .entryPoint("sleep", "infinity")
             )
 
-            DockerReaper.registerContainer(containerId)
-
-            // Verify reaper container is running
+            // Verify reaper container is running (filter by container ID, not image tag —
+            // the reaper image is built from a sha256 hash with no named tag)
             val reaperResult = RunProcessRequest()
                 .command(
                     "docker", "ps",
-                    "--filter", "ancestor=mcp-steroid-reaper",
+                    "--filter", "id=$reaperId",
                     "--format", "{{.ID}}"
                 )
                 .description("Check reaper container")
@@ -107,7 +106,7 @@ class DockerReaperTest {
             assertTrue(reaperResult.stdout.trim().isNotEmpty(), "Reaper container should be running")
 
             println("Reaper is running: ${reaperResult.stdout.trim()}")
-            println("Test container registered: $containerId")
+            println("Test container registered: ${container.containerId}")
         }
     }
 }

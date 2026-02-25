@@ -32,6 +32,15 @@ object DockerReaper {
     private val containerChannel = Channel<String>(128)
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
+    /**
+     * The container ID of the running reaper container, or null if not started.
+     * The reaper container is NOT killed explicitly on [shutdown] — it exits on its own
+     * once the socket closes and cleanup completes.
+     */
+    @Volatile
+    var reaperContainerId: String? = null
+        private set
+
     private data class ReaperEndpoint(
         val host: String,
         val port: Int,
@@ -66,12 +75,16 @@ object DockerReaper {
 
         val port8080 = ContainerPort(8080)
         val containerDriver = startDockerContainerAndForget(
+            // Note: the reaper container is NOT registered in a lifetime and is NOT killed explicitly.
+            // It exits by itself after the socket closes and it finishes cleaning up registered containers.
             StartContainerRequest()
                 .image(reaperImageId)
                 .volumes(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock"))
                 .ports(port8080)
                 .quietly()
         )
+
+        reaperContainerId = containerDriver.containerId
 
         // Map the container port to host port using ContainerDriver
         val hostPort = containerDriver.mapGuestPortToHostPort(port8080)
@@ -153,6 +166,7 @@ object DockerReaper {
         println("[REAPER] Shutting down...")
         scope.coroutineContext.cancelChildren()
         started.set(false)
+        reaperContainerId = null
     }
 
     private fun connectWithRetry(endpoints: List<ReaperEndpoint>): Socket {
