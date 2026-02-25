@@ -84,6 +84,7 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
                 putJsonArray("required") {
                     add("project_name")
                     add("task_id")
+                    add("execution_id")
                     add("success_rating")
                     add("explanation")
                 }
