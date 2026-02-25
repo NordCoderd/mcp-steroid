@@ -22,107 +22,31 @@ const val EXCLUDE_FROM_AUTO_TOC_MARKER = "###_EXCLUDE_FROM_AUTO_TOC_###"
 
 private val AUTO_TOC_DIRECTIVES = setOf(NO_AUTO_TOC_MARKER, EXCLUDE_FROM_AUTO_TOC_MARKER)
 
-/**
- * Returns true if [path] looks like a section file: the filename contains `-section-`
- * and ends with `.md` or `.kt`.
- */
-fun isSectionFile(path: String): Boolean {
-    val name = path.substringAfterLast("/")
-    return Regex("""-section-[^/]+\.(md|kt)$""").containsMatchIn(name)
-}
-
-/**
- * Derives the article stem path from a section file path.
- */
-fun articleStemFromSection(path: String): String {
-    val dir = path.substringBeforeLast("/", missingDelimiterValue = "")
-    val name = path.substringAfterLast("/")
-    val stem = name.replace(Regex("""-section-[^.]+\.(md|kt)$"""), "")
-    return if (dir.isEmpty()) stem else "$dir/$stem"
-}
-
 fun groupByArticle(promptClasses: List<GeneratedPromptClazz>): List<PromptArticle> {
-    val headerExt = "-header.md"
-
-    val grouped = promptClasses.groupBy { clazz ->
-        val path = clazz.path
-        when {
-            path.endsWith(headerExt) -> path.removeSuffix(headerExt)
-            isSectionFile(path) -> articleStemFromSection(path)
-            else -> path.removeSuffix(".kts").removeSuffix(".md").removeSuffix(".kt")
-        }
-    }
-
-    return grouped.mapNotNull { (stem, group) ->
-        val header = group.singleOrNull { it.path.endsWith(headerExt) }
-        val sections = group.filter { isSectionFile(it.path) }.sortedBy { it.path }
-        val singlePayload = group.singleOrNull {
-            !it.path.endsWith(headerExt) && !isSectionFile(it.path)
-        }
-
-        if (header == null) {
-            val mainFile = singlePayload ?: return@mapNotNull null
-            if (mainFile.fileType != "md") return@mapNotNull null
-            if (!stem.contains("/")) return@mapNotNull null
-            require(sections.isEmpty()) {
-                "Article '$stem' has no '-header.md' but has section files. Unsupported combination."
-            }
-            PromptArticle(header = mainFile, payload = mainFile, sections = emptyList(), newFormat = true)
-        } else if (sections.isNotEmpty()) {
-            require(singlePayload == null) {
-                "Article '$stem' has both section files and a single payload file '${singlePayload?.path}'. " +
-                    "Remove the single payload file or the section files."
-            }
-            PromptArticle(header = header, payload = null, sections = sections)
-        } else {
-            val payload = singlePayload ?: return@mapNotNull null
-            PromptArticle(header = header, payload = payload, sections = emptyList())
-        }
+    return promptClasses.mapNotNull { clazz ->
+        if (clazz.fileType != "md") return@mapNotNull null
+        if (!clazz.path.contains("/")) return@mapNotNull null  // root-level standalone files are not articles
+        PromptArticle(payload = clazz)
     }
 }
 
 data class PromptArticle(
-    val header: GeneratedPromptClazz,
-    val payload: GeneratedPromptClazz?,
-    val sections: List<GeneratedPromptClazz> = emptyList(),
-    val newFormat: Boolean = false,
+    val payload: GeneratedPromptClazz,
 ) {
-    init {
-        require((sections.isNotEmpty()) xor (payload != null)) {
-            "Article must have either section files or a single payload file (not both, not neither). " +
-                "Header: ${header.path}"
-        }
-    }
+    val canonicalPayloadPath: String get() = payload.path
 
-    val canonicalPayloadPath: String
-        get() = when {
-            payload != null -> payload.path
-            else -> {
-                val firstPath = sections.first().path
-                val dir = firstPath.substringBeforeLast("/", missingDelimiterValue = "")
-                val name = firstPath.substringAfterLast("/")
-                val stem = name.replace(Regex("""-section-[^.]+\.(md|kt)$"""), "")
-                if (dir.isEmpty()) "$stem.md" else "$dir/$stem.md"
-            }
-        }
-
-    val mainElement: GeneratedPromptClazz get() = payload ?: sections.first()
+    val mainElement: GeneratedPromptClazz get() = payload
 
     /**
      * True if the article body contains either `###_NO_AUTO_TOC_###` or `###_EXCLUDE_FROM_AUTO_TOC_###`.
      * Such articles are excluded from the auto-generated folder TOC and from sibling see-also links.
      */
     val noAutoToc: Boolean
-        get() = newFormat && AUTO_TOC_DIRECTIVES.any { directive ->
-            payload?.content?.contains(directive) == true
-        }
+        get() = AUTO_TOC_DIRECTIVES.any { payload.content.contains(it) }
 
     val allClasses: List<GeneratedPromptClazz>
-        get() = if (newFormat) {
-            listOfNotNull(payload)
-        } else {
-            listOfNotNull(payload, header) + sections
-        }
+        get() = listOf(payload)
+
 }
 
 /**
@@ -278,43 +202,23 @@ fun buildArticleUri(folder: String, payloadPath: String): String {
 }
 
 fun articleClassName(article: PromptArticle): ClassName {
-    val packageName = article.allClasses.map { it.clazzName.packageName }.distinct().single()
+    val packageName = article.payload.clazzName.packageName
     val stem = article.canonicalPayloadPath
         .substringAfterLast("/")
-        .removeSuffix(".kts")
         .removeSuffix(".md")
-        .removeSuffix(".kt")
     val className = stem.toPromptClassName() + "PromptArticle"
     return ClassName(packageName, className)
 }
 
-fun articleName(article: PromptArticle): String {
-    return if (article.newFormat) {
-        article.payload!!.content.trim().lineSequence().first().trim()
-    } else {
-        article.header.content.trim().lineSequence().first().trim()
-    }
-}
+fun articleName(article: PromptArticle): String =
+    article.payload.content.trim().lineSequence().first().trim()
 
-fun articleDescription(article: PromptArticle): String {
-    return if (article.newFormat) {
-        article.payload!!.content.trim().lineSequence()
-            .drop(1).dropWhile { it.isBlank() }.firstOrNull()?.trim() ?: ""
-    } else {
-        article.header.content.trim().lineSequence()
-            .drop(1).dropWhile { it.isBlank() }.joinToString("\n").trim()
-    }
-}
+fun articleDescription(article: PromptArticle): String =
+    article.payload.content.trim().lineSequence()
+        .drop(1).dropWhile { it.isBlank() }.firstOrNull()?.trim() ?: ""
 
-fun articleDescriptionFirstLine(article: PromptArticle): String {
-    return if (article.newFormat) {
-        article.payload!!.content.trim().lineSequence()
-            .drop(1).dropWhile { it.isBlank() }.firstOrNull()?.trim() ?: ""
-    } else {
-        article.header.content.trim().lineSequence()
-            .drop(1).dropWhile { it.isBlank() }.firstOrNull()?.trim() ?: ""
-    }
-}
+fun articleDescriptionFirstLine(article: PromptArticle): String =
+    articleDescription(article)
 
 fun buildSeeAlsoLine(folder: String, article: PromptArticle): String {
     val uri = buildArticleUri(folder, article.canonicalPayloadPath)
@@ -360,30 +264,23 @@ fun PromptGenerationContext.generateArticleClazz(
     // Description holder class
     val descHolderClass = ClassName(pkg, classType.simpleName + "Description")
     if (description.isNotEmpty()) {
-        generateStringPromptClazz(description, descHolderClass, sourcePath = article.header.path)
+        generateStringPromptClazz(description, descHolderClass, sourcePath = article.payload.path)
     }
 
-    // Effective see-also: for new-format, merge manual (from file) + generated siblings
-    val effectiveSeeAlsoContent: String
-    if (article.newFormat) {
-        val content = article.payload!!.content
-        val parts = parseNewFormatArticleParts(content)
+    // Parse parts, assert round-trip, generate payload + kt-block properties
+    val content = article.payload.content
+    val parts = parseNewFormatArticleParts(content)
 
-        // Build-time assertion: assembled parts must equal source file content
-        val assembled = assembleFullContent(parts)
-        require(assembled == content) {
-            "Build-time assertion failed for ${article.payload.path}: " +
-                "assembled parts differ from source file content.\n" +
-                "Expected length=${content.length}, assembled length=${assembled.length}.\n" +
-                "First diff at char ${content.zip(assembled).indexOfFirst { (a, b) -> a != b }}"
-        }
-
-        generateNewFormatParts(article, parts, classType, pkg, props)
-        effectiveSeeAlsoContent = buildCombinedSeeAlso(parts.seeAlsoManual, seeAlsoContent)
-    } else {
-        generateOldFormatPayload(article, classType, pkg, props)
-        effectiveSeeAlsoContent = seeAlsoContent
+    val assembled = assembleFullContent(parts)
+    require(assembled == content) {
+        "Build-time assertion failed for ${article.payload.path}: " +
+            "assembled parts differ from source file content.\n" +
+            "Expected length=${content.length}, assembled length=${assembled.length}.\n" +
+            "First diff at char ${content.zip(assembled).indexOfFirst { (a, b) -> a != b }}"
     }
+
+    generateNewFormatParts(article, parts, classType, pkg, props)
+    val effectiveSeeAlsoContent = buildCombinedSeeAlso(parts.seeAlsoManual, seeAlsoContent)
 
     // uri, name, description, seeAlso properties — same for all formats
     props += PropertySpec.builder("uri", String::class)
@@ -569,32 +466,6 @@ private fun PromptGenerationContext.generateNewFormatPayloadClass(
         .build()
 
     writeClazz(fileSpec, classType)
-}
-
-/**
- * Generates payload property for old-format articles (header + single payload file or sections).
- */
-private fun PromptGenerationContext.generateOldFormatPayload(
-    article: PromptArticle,
-    classType: ClassName,
-    pkg: String,
-    props: MutableList<PropertySpec>,
-) {
-    val payloadClassName: ClassName = when {
-        article.sections.isNotEmpty() -> {
-            val mergedClass = ClassName(pkg, classType.simpleName + "Payload")
-            generateSectionDelegatePayloadClazz(article.sections, mergedClass)
-            mergedClass
-        }
-        else -> article.payload!!.clazzName
-    }
-
-    props += PropertySpec.builder("payload", promptBaseClass)
-        .addModifiers(KModifier.OVERRIDE)
-        .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-            addStatement("return %T()", payloadClassName)
-        }).build())
-        .build()
 }
 
 /**

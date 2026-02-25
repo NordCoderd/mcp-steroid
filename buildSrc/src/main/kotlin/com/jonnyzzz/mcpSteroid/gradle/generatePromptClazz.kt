@@ -122,57 +122,6 @@ fun PromptGenerationContext.generatePromptClazz(
 }
 
 /**
- * Generate a PromptBase subclass whose payload is assembled at runtime by calling
- * [readPrompt] on each per-section Prompt class and joining them with the same
- * separator and ```kotlin``` fence logic used at build time.
- *
- * This avoids duplicating section content: each section is encoded once in its own
- * Prompt class and reused here rather than being re-encoded into a merged string.
- */
-fun PromptGenerationContext.generateSectionDelegatePayloadClazz(
-    sections: List<GeneratedPromptClazz>,
-    classType: ClassName,
-) {
-    val mimeTypeProp = PropertySpec.builder("mimeType", String::class)
-        .addModifiers(KModifier.OVERRIDE)
-        .initializer("%S", "text/markdown")
-        .build()
-
-    val readResourceFun = FunSpec.builder("readPromptInternal")
-        .addModifiers(KModifier.OVERRIDE)
-        .returns(String::class)
-        .addCode(buildCodeBlock {
-            controlFlow("return buildString") {
-                for ((index, section) in sections.withIndex()) {
-                    if (index > 0) addStatement("append(%S)", "\n\n")
-                    if (section.path.endsWith(".kt")) {
-                        addStatement("appendLine(%S)", "```kotlin")
-                        addStatement("append(%T().readPrompt().trim())", section.clazzName)
-                        addStatement("appendLine()")
-                        addStatement("append(%S)", "```")
-                    } else {
-                        addStatement("append(%T().readPrompt().trim())", section.clazzName)
-                    }
-                }
-            }
-        })
-        .build()
-
-    val typeSpec = TypeSpec.classBuilder(classType)
-        .superclass(promptBaseClass)
-        .addProperty(mimeTypeProp)
-        .addFunction(readResourceFun)
-        .build()
-
-    val fileSpec = FileSpec.builder(classType)
-        .addFileComment("GENERATED FILE - DO NOT EDIT")
-        .addType(typeSpec)
-        .build()
-
-    writeClazz(fileSpec, classType)
-}
-
-/**
  * Generate a PromptBase subclass that holds an inline string content.
  * Used for generated content like descriptions, see-also, and TOC.
  *

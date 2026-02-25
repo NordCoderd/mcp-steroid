@@ -35,9 +35,6 @@ abstract class CompilePromptsTask : DefaultTask() {
 
         promptClasses.forEach { clazz ->
             ctx.generatePromptClazzTest(clazz)
-            if (isSectionFile(clazz.path) && clazz.fileType == "kt") {
-                ctx.generateKtSectionCompilationTest(clazz)
-            }
         }
 
         // First pass: group articles per folder
@@ -54,7 +51,7 @@ abstract class CompilePromptsTask : DefaultTask() {
                     val seeAlsoContent = buildSeeAlsoContent(folder, article, folderArticles)
                     val articleClazz = ctx.generateArticleClazz(folder, article, seeAlsoContent)
                     ctx.generateArticleReadTest(articleClazz)
-                    if (article.newFormat) ctx.generateMdKtBlockCompilationTests(articleClazz)
+                    ctx.generateMdKtBlockCompilationTests(articleClazz)
                     articleClazz
                 }
 
@@ -85,7 +82,6 @@ abstract class CompilePromptsTask : DefaultTask() {
  * Used to avoid duplicating links in the auto-generated sibling list.
  */
 private fun extractManualSeeAlsoUris(article: PromptArticle): Set<String> {
-    if (!article.newFormat || article.payload == null) return emptySet()
     val content = article.payload.content
     val seeAlsoMarker = "\n\n# See also\n"
     val idx = content.indexOf(seeAlsoMarker)
