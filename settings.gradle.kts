@@ -12,3 +12,4 @@ include(":test-helper")
 include(":test-integration")
 
 include(":npx")
+include(":npx-kt")
