@@ -15,6 +15,7 @@ private fun ContainerDriver.startProcessInContainer(
         add("docker")
         add("exec")
         if (request.detach) add("--detach")
+        if (request.interactive) add("-i")
         request.extraEnvVars.forEach { (key, value) ->
             add("-e")
             add("$key=$value")

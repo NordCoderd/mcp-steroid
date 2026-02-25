@@ -13,6 +13,7 @@ data class ExecContainerProcessRequest(
     val description: String? = null,
     val quietly: Boolean = false,
     val detach: Boolean = false,
+    val interactive: Boolean = false,
     val timeout: Duration = Duration.ofSeconds(30),
     val stdin: Flow<ByteArray> = emptyFlow(),
     val secretPatterns: List<String> = listOf(),
@@ -28,6 +29,7 @@ data class ExecContainerProcessRequest(
     fun quietly() = quietly(true)
     fun detach(detach: Boolean = false) = copy(detach = detach)
     fun detached() = detach(true)
+    fun interactive() = copy(interactive = true)
 
     fun timeout(timeout: Duration = Duration.ofSeconds(30)) = copy(timeout = timeout)
     fun timeoutSeconds(timeoutSeconds: Long) = timeout(Duration.ofSeconds(timeoutSeconds))
