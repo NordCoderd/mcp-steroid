@@ -45,6 +45,8 @@ dev: update-config
 
 # Build the site to mcp-steroid-public/docs
 build: update-config
+	@# Remove symlinks in output dir — they escape Docker mount boundary and break Hugo stat
+	@find mcp-steroid-public/docs -type l -delete 2>/dev/null || true
 	docker compose run --rm build
 
 # Clean generated files (recreated by build)
