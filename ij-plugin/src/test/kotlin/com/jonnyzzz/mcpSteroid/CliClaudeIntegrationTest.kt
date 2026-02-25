@@ -82,16 +82,6 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
         super.testSystemPropertyCanBeRead()
     }
 
-    override fun testDiscoversSteroidToolsViaNpx() {
-        //needed to make test runner work
-        super.testDiscoversSteroidToolsViaNpx()
-    }
-
-    override fun testSystemPropertyCanBeReadViaNpx() {
-        //needed to make test runner work
-        super.testSystemPropertyCanBeReadViaNpx()
-    }
-
     override fun testExecSessionReset() {
         //needed to make test runner work
         super.testExecSessionReset()

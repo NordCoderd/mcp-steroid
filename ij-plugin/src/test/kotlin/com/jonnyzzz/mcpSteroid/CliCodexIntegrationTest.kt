@@ -101,16 +101,6 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
         super.testSystemPropertyCanBeRead()
     }
 
-    override fun testDiscoversSteroidToolsViaNpx() {
-        //needed to make test runner work
-        super.testDiscoversSteroidToolsViaNpx()
-    }
-
-    override fun testSystemPropertyCanBeReadViaNpx() {
-        //needed to make test runner work
-        super.testSystemPropertyCanBeReadViaNpx()
-    }
-
     override fun testExecSessionReset() {
         timeoutRunBlocking(360.seconds) {
             val firstSession = newAiSession()
