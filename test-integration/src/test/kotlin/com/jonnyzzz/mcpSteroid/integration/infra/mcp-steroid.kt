@@ -3,20 +3,12 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.contentOrNull
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonObject
+import kotlinx.serialization.json.*
 
 data class McpProjectInfo(
     val name: String,
@@ -52,19 +44,20 @@ class McpSteroidDriver(
         // First wait for the server to be reachable via a simple GET health check.
         // This avoids creating orphan sessions from repeated initialize requests.
         waitFor(300_000, "Wait for MCP Steroid ready") {
-            val result = driver.startProcessInContainer(
-                ExecContainerProcessRequest()
+            val result = driver.startProcessInContainer {
+                this
                     .args("curl", "-s", "-f", guestMcpUrl, "-H", "Accept: application/json")
                     .timeoutSeconds(5)
-                    .description("curl health check $guestMcpUrl"),
-            ).awaitForProcessFinish()
+                    .quietly()
+                    .description("curl health check $guestMcpUrl")
+            }.awaitForProcessFinish()
             result.exitCode == 0
         }
 
         // Verify the MCP protocol works with a proper initialize handshake
         val mcpInit = """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"integration-test","version":"1.0"}}}"""
-        val result = driver.startProcessInContainer(
-            ExecContainerProcessRequest()
+        driver.startProcessInContainer {
+            this
                 .args(
                     "curl", "-s", "-f", "-X", "POST",
                     guestMcpUrl,
@@ -72,11 +65,11 @@ class McpSteroidDriver(
                     "-H", "Accept: application/json",
                     "-d", mcpInit,
                 )
+                .quietly()
                 .timeoutSeconds(10)
-                .description("curl MCP initialize handshake"),
-        ).awaitForProcessFinish()
-        result.assertExitCode(0) {
-            "MCP initialize handshake failed: ${result.stdout}"
+                .description("curl MCP initialize handshake")
+        }.assertExitCode(0) {
+            "MCP initialize handshake failed: $stdout"
         }
 
         println("[IDE-AGENT] MCP Steroid is ready in the container at $guestMcpUrl")
@@ -124,7 +117,6 @@ class McpSteroidDriver(
 
     /**
      * Find the project name for the guest project directory.
-     * Calls steroid_list_projects and picks the project whose path matches [guestProjectDir].
      */
     fun resolveProjectName(): String {
         val guestProjectDir = ijDriver.getGuestProjectDir()
@@ -734,17 +726,14 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             add(requestBody)
         }
 
-        val result = driver.startProcessInContainer(
-            ExecContainerProcessRequest()
+        val result = driver.startProcessInContainer {
+            this
                 .args(curlCommand)
                 .timeoutSeconds(timeoutSeconds)
-                .description("curl MCP request"),
-        ).awaitForProcessFinish()
-
-        result.assertExitCode(0) { "MCP request failed: ${result.stdout}" }
+                .description("curl MCP request")
+        }.assertExitCode(0) { "MCP request failed: ${stdout}" }
 
         val j = result.stdout.trim()
         return json.encodeToString(json.parseToJsonElement(j))
     }
-
 }

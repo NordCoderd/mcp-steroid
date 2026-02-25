@@ -7,9 +7,7 @@ import kotlinx.coroutines.flow.flowOf
 import java.io.File
 import java.time.Duration
 
-
-@ConsistentCopyVisibility
-data class RunProcessRequest private constructor(
+data class RunProcessRequest(
     val workingDir: File? = null,
     val args: List<String> = listOf(),
 
@@ -23,10 +21,6 @@ data class RunProcessRequest private constructor(
 
     val secretPatterns: List<String> = listOf(),
 ) {
-    companion object {
-        operator fun invoke() : RunProcessRequest = RunProcessRequest()
-    }
-
     fun withWorkingDir(workingDir: File) = copy(workingDir = workingDir)
     fun withArgs(args: List<String>) = copy(args = args)
 
@@ -46,6 +40,7 @@ data class RunProcessRequest private constructor(
     fun command(builder: MutableList<String>.() -> Unit) = command(buildList(builder))
     fun command(vararg command: String) = command(command.toList())
     fun description(description: String) = withDescription(description)
+    fun updateDescription(newDescriptionOrSkip: String?) = copy(description = newDescriptionOrSkip?.takeIf { it.isNotEmpty() } ?: description)
     fun timeoutSeconds(timeoutSeconds: Long) = withTimeout(Duration.ofSeconds(timeoutSeconds))
     fun quietly(quietly: Boolean) = withQuietly(quietly)
     fun quietly() = quietly(true)

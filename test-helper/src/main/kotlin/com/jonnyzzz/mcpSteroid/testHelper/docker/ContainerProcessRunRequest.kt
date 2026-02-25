@@ -1,56 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequestBase
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunRequestBuilderBase
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import java.time.Duration
 
-open class ContainerProcessRunRequest(
-    parent: ProcessRunRequestBase,
-    val detach: Boolean,
-    val workingDirInContainer: String?,
-    //TODO: push it up to generic process, allow removal
-    val extraEnvVars: Map<String, String>,
-) : ProcessRunRequestBase(parent) {
-
-    constructor(parent: ContainerProcessRunRequest) : this(
-        parent,
-        detach = parent.detach,
-        workingDirInContainer = parent.workingDirInContainer,
-        extraEnvVars = parent.extraEnvVars.toMap(),
-    )
-
-    companion object
-}
-
-fun ContainerProcessRunRequest.Companion.builder() = ContainerProcessRunRequestBuilder()
-
-open class ContainerProcessRunRequestBuilder<R : ContainerProcessRunRequestBuilder<R>> : ProcessRunRequestBuilderBase<R>() {
-    var detach: Boolean = false
-    var workingDirInContainer: String? = null
-    var extraEnvVars: Map<String, String> = mutableMapOf()
-
-    open fun workingDirInContainer(workingDirInContainer: String?) = apply { this.workingDirInContainer = workingDirInContainer }
-
-    open fun extraEnv(env: Map<String, String>) = apply { this.extraEnvVars = env }
-    open fun extraEnv(key: String, value: String) = apply { this.extraEnvVars += key to value }
-
-    open fun detached() = detach(true)
-    open fun detach(detach: Boolean) = apply { this.detach = detach }
-
-    override fun build(): ContainerProcessRunRequest {
-        val parent = super.build()
-        return ContainerProcessRunRequest(parent, detach, workingDirInContainer, extraEnvVars)
-    }
-}
-
-
-@Suppress("DATA_CLASS_COPY_VISIBILITY_WILL_BE_CHANGED_WARNING", "DataClassPrivateConstructor")
-data class ExecContainerProcessRequest private constructor(
-    val workingDirInContainer: String?,
-    val extraEnvVars: Map<String, String>,
+data class ExecContainerProcessRequest(
+    val workingDirInContainer: String? = null,
+    val extraEnvVars: Map<String, String> = mapOf(),
     val args: List<String> = listOf(),
     val logPrefix: String? = null,
     val description: String? = null,
@@ -60,12 +17,9 @@ data class ExecContainerProcessRequest private constructor(
     val stdin: Flow<ByteArray> = emptyFlow(),
     val secretPatterns: List<String> = listOf(),
 ) {
-    companion object {
-        operator fun invoke() : ExecContainerProcessRequest = ExecContainerProcessRequest()
-    }
-
     fun workingDirInContainer(workingDirInContainer: String?) = copy(workingDirInContainer = workingDirInContainer)
     fun extraEnv(extraEnvVars: Map<String, String>) = copy(extraEnvVars = extraEnvVars)
+    fun addEnv(key: String, value: String) = extraEnv(this.extraEnvVars + (key to value))
     fun args(args: List<String> = listOf()) = copy(args = args)
     fun args(vararg args: String) = args(args.toList())
     fun logPrefix(logPrefix: String? = null) = copy(logPrefix = logPrefix)

@@ -5,17 +5,17 @@ import com.intellij.openapi.util.Disposer
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
+import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
 import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
-import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
-import java.io.File
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerContainerAndDispose
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import kotlin.time.Duration.Companion.seconds
 
 class CliIntegrationCommonTest : BasePlatformTestCase() {
@@ -30,7 +30,10 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
     }
 
     private fun llmSession(): ContainerDriver {
-        val dockerfilePath = File("src/test/docker/${"ubuntu-cli"}/Dockerfile")
+        val dockerfilePath = ProjectHomeDirectory.requireProjectHomeDirectory()
+            .resolve("src/test/docker/${"ubuntu-cli"}/Dockerfile")
+            .toFile()
+
         require(dockerfilePath.isFile) { "Docker file $dockerfilePath must exist" }
         val logPrefix = "ubuntu-cli"
         val workDir = createTempDirectory(logPrefix.lowercase())
@@ -38,21 +41,20 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
             workDir.deleteRecursively()
         }
 
-        val scope = DockerDriver(workDir, logPrefix, listOf())
-
         val imageId = buildDockerImage(
             logPrefix = logPrefix,
             dockerfilePath,
             timeoutSeconds = 600,
         )
-        return startContainerDriver(lifetime, scope, StartContainerRequest().image(imageId))
+
+        return startDockerContainerAndDispose(lifetime, StartContainerRequest().image(imageId))
     }
 
     fun testHostAvailability(): Unit = timeoutRunBlocking(180.seconds) {
         val session = llmSession()
 
-        session.startProcessInContainer(
-            ExecContainerProcessRequest()
+        session.startProcessInContainer {
+            this
                 .args(
                     "curl",
                     "-v", "-X", "POST",
@@ -62,8 +64,9 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
                     """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"test","version":"1.0"},"capabilities":{}}}""",
                     resolveDockerUrl()
                 )
+                .quietly()
                 .timeoutSeconds(5)
-        )
+        }
             .assertExitCode(0) { "curl to MCP failed" }
             .assertNoErrorsInOutput("curl to MCP")
             .assertOutputContains(

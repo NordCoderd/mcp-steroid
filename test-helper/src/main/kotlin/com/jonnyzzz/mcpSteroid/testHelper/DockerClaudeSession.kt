@@ -6,10 +6,9 @@ import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
@@ -23,7 +22,7 @@ import java.io.File
  * MCP server registrations from affecting the local Claude config.
  */
 class DockerClaudeSession(
-    private val session: ContainerProcessRunner,
+    private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
     private val workdirInContainer: String,
@@ -68,15 +67,15 @@ class DockerClaudeSession(
             }
         }
 
-        val req = ExecContainerProcessRequest()
-            .args(claudeArgs)
-            .timeoutSeconds(timeoutSeconds)
-            .description("Claude: " + claudeArgs.joinToString(" ").take(80))
-            .secretPatterns(apiKey)
-            .workingDirInContainer(workdirInContainer)
-            .extraEnv(env)
-
-        return session.startProcessInContainer(req)
+        return session.startProcessInContainer {
+            this
+                .args(claudeArgs)
+                .timeoutSeconds(timeoutSeconds)
+                .description("Claude: " + claudeArgs.joinToString(" ").take(80))
+                .secretPatterns(apiKey)
+                .workingDirInContainer(workdirInContainer)
+                .extraEnv(env)
+        }
     }
 
     /**
@@ -135,7 +134,7 @@ class DockerClaudeSession(
             error("ANTHROPIC_API_KEY is required for Claude CLI tests (set env or ~/.anthropic)")
         }
 
-        override fun createImpl(session: ContainerProcessRunner, apiKey: String): DockerClaudeSession {
+        override fun createImpl(session: ContainerDriver, apiKey: String): DockerClaudeSession {
             return DockerClaudeSession(session, apiKey, workdirInContainer = workdirInContainerDefault)
         }
     }

@@ -21,42 +21,33 @@ fun main() {
     println("SIGKILL Test - Manual Verification")
     println("=".repeat(80))
 
-    val workDir = createTempDirectory("sigkill-test")
-    val driver = DockerDriver(
-        workDir = workDir,
-        logPrefix = "SIGKILL-TEST",
-        secretPatterns = emptyList(),
-        environmentVariables = emptyMap()
-    )
-
     val lifetime = CloseableStackHost()
 
     // Start the reaper
     println("\n[1] Starting reaper...")
-    DockerReaper.start(workDir)
+    DockerReaper.start()
 
     // Start a container
     println("\n[2] Starting test container...")
-    val containerId = startContainerDriver(
+    val container = startDockerContainerAndDispose(
         lifetime = lifetime,
-        driver,
         StartContainerRequest()
             .image("alpine:latest")
             .entryPoint("sleep", "infinity")
-    ).containerId
+    )
 
     // Register with reaper
-    DockerReaper.registerContainer(containerId, workDir)
+    DockerReaper.registerContainer(container)
 
     // Print info
     val pid = ProcessHandle.current().pid()
     println("\n[3] Container started successfully!")
-    println("    Container ID: $containerId")
+    println("    Container ID: $container")
     println("    Process PID:  $pid")
 
     // Verify container is running
     Thread.sleep(2000)
-    val checkResult = ProcessBuilder("docker", "ps", "-q", "--filter", "id=$containerId")
+    val checkResult = ProcessBuilder("docker", "ps", "-q", "--filter", "id=$container")
         .redirectErrorStream(true)
         .start()
         .inputStream
@@ -80,7 +71,7 @@ fun main() {
     println("   kill -9 $pid")
     println("3. Wait 4+ seconds for reaper to detect and cleanup")
     println("4. Verify container is gone with:")
-    println("   docker ps -a | grep ${containerId.take(12)}")
+    println("   docker ps -a | grep $container")
     println("   (Should return nothing)")
     println("5. Verify reaper container also exited:")
     println("   docker ps | grep mcp-steroid-reaper")

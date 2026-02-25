@@ -2,24 +2,22 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import java.io.File
 
 fun ContainerDriver.mkdirs(guestPath: String): ProcessResult {
-    return startProcessInContainer(
-        ExecContainerProcessRequest()
+    return startProcessInContainer {
+        this
             .args("mkdir", "-p", guestPath)
             .description("Create directory $guestPath in the container")
             .quietly()
-    ).awaitForProcessFinish()
+    }.awaitForProcessFinish()
 }
 
 fun ContainerDriver.copyFromContainer(containerPath: String, localPath: File) {
     localPath.parentFile?.mkdirs()
-    RunProcessRequest()
-        .logPrefix(containerId)
+    newRunOnHost()
         .command("docker", "cp", "$containerId:$containerPath", localPath.absolutePath)
         .description("Copy container:$containerPath to ${localPath.name}")
         .timeoutSeconds(30L)
@@ -30,8 +28,7 @@ fun ContainerDriver.copyFromContainer(containerPath: String, localPath: File) {
 
 fun ContainerDriver.copyToContainer(localPath: File, containerPath: String) {
     require(localPath.exists()) { "Local path does not exist: $localPath" }
-    RunProcessRequest()
-        .logPrefix(containerId)
+    newRunOnHost()
         .command("docker", "cp", localPath.absolutePath, "$containerId:$containerPath")
         .description("Copy ${localPath.name} to container:$containerPath")
         .timeoutSeconds(120L)
@@ -39,7 +36,6 @@ fun ContainerDriver.copyToContainer(localPath: File, containerPath: String) {
         .startProcess()
         .assertExitCode(0) { "Failed to copy to container: $localPath: $stderr" }
 }
-
 
 fun ContainerDriver.writeFileInContainer(
     containerPath: String,
@@ -51,21 +47,21 @@ fun ContainerDriver.writeFileInContainer(
         mkdirs(parentDir).assertExitCode(0) { "Failed to create directory in container $parentDir: $stderr" }
     }
 
-    startProcessInContainer(
-        ExecContainerProcessRequest()
+    startProcessInContainer {
+        this
             .args("bash", "-c", "cat > $containerPath << 'FILE_EOF'\n$content\nFILE_EOF")
             .description("Write content to $containerPath")
             .timeoutSeconds(5)
             .quietly()
-    ).assertExitCode(0) { "Failed to write content in container to $containerPath: $content: $stderr" }
+    }.assertExitCode(0) { "Failed to write content in container to $containerPath: $content: $stderr" }
 
     if (executable) {
-        startProcessInContainer(
-            ExecContainerProcessRequest()
+        startProcessInContainer {
+            this
                 .args("chmod", "+x", containerPath)
                 .description("chmod +x $containerPath")
                 .timeoutSeconds(5)
                 .quietly()
-        ).assertExitCode(0) { "Failed to chmod the created file in container to $containerPath: $stderr" }
+        }.assertExitCode(0) { "Failed to chmod the created file in container to $containerPath: $stderr" }
     }
 }

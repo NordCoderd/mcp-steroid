@@ -16,6 +16,11 @@ private const val BASE_DOCKER_CONTEXT = "ide-base"
 @Volatile private var baseImageId: String? = null
 private val baseImageLock = Any()
 
+
+data class IdeImage(
+    val imageId: String,
+)
+
 /**
  * Builds the IDE Docker image for [dockerFileBase] and returns the [DockerDriver]
  * scoped to its build context together with the image ID (sha256:...).
@@ -27,24 +32,21 @@ private val baseImageLock = Any()
  * The derived image is built with `--build-arg BASE_IMAGE=<sha256>` so it
  * references the exact base image built in this JVM run, preventing collisions
  * when multiple test processes build the base image concurrently.
- *
- * @return Pair of [DockerDriver] and image ID (`sha256:...`) for the new image
  */
-fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): Pair<DockerDriver, String> {
+fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): IdeImage {
     val resolvedBaseImageId = buildSharedBaseImage()
     // Derive a per-build context dir from the full image name.
     // Since imageName already carries a unique suffix (e.g. "ide-agent-test-a1b2c3d4"),
     // this guarantees each concurrent build gets its own isolated directory.
     val contextDir = prepareContext("docker-$imageName", BASE_DOCKER_CONTEXT, dockerFileBase)
     linkIdeArchive(contextDir, ideArchive)
-    val scope = DockerDriver(contextDir, "IDE-AGENT")
     val imageId = buildDockerImage(
-        logPrefix = "IDE-AGENT",
+        logPrefix = "IDE",
         dockerfilePath = File(contextDir, "Dockerfile"),
         timeoutSeconds = 900,
         buildArgs = mapOf("BASE_IMAGE" to resolvedBaseImageId),
     )
-    return scope to imageId
+    return IdeImage(imageId)
 }
 
 private fun buildSharedBaseImage(): String {

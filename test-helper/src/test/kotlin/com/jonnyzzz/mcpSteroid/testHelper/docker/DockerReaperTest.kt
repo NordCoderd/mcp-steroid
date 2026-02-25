@@ -2,14 +2,14 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
-import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
-import com.jonnyzzz.mcpSteroid.testHelper.process.*
+import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessRunner
+import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import java.io.File
 
 /**
  * Test for custom Docker reaper cleanup mechanism.
@@ -19,51 +19,36 @@ import java.io.File
  * 2. Custom reaper starts and connects properly
  */
 class DockerReaperTest {
-    private lateinit var workDir: File
-    private lateinit var driver: DockerDriver
     private val processRunner = ProcessRunner("TEST", emptyList())
 
     @BeforeEach
     fun setUp() {
-        workDir = createTempDirectory("docker-reaper-test")
-        driver = DockerDriver(
-            workDir = workDir,
-            logPrefix = "TEST",
-            secretPatterns = emptyList(),
-            environmentVariables = emptyMap()
-        )
-    }
-
-    @AfterEach
-    fun tearDown() {
+        //we try our best to give the reaper chance to kill all registered containers, if any
         try {
             DockerReaper.shutdown()
         } catch (_: Exception) {
         }
-        workDir.deleteRecursively()
     }
 
     @Test
     fun `test container cleanup via CloseableStack`() {
         val lifetime = CloseableStackHost()
 
-        DockerReaper.start(workDir)
+        DockerReaper.start()
 
-        val containerId = startContainerDriver(
+        val containerId = startDockerContainerAndDispose(
             lifetime,
-            driver,
             StartContainerRequest()
                 .image("alpine:latest")
                 .entryPoint("sleep", "infinity")
-        ).containerId
+        )
 
-        DockerReaper.registerContainer(containerId, workDir)
+        DockerReaper.registerContainer(containerId)
 
         // Verify container is running
         val beforeResult = RunProcessRequest()
                 .command("docker", "ps", "-q", "--filter", "id=$containerId")
                 .description("Check container before cleanup")
-                .workingDir(workDir)
                 .timeoutSeconds(5)
                 .quietly()
                 .startProcess(processRunner)
@@ -78,7 +63,6 @@ class DockerReaperTest {
         val afterResult = RunProcessRequest()
             .command("docker", "ps", "-aq", "--filter", "id=$containerId")
             .description("Check container after cleanup")
-            .workingDir(workDir)
             .timeoutSeconds(5)
             .quietly()
             .startProcess(processRunner)
@@ -92,17 +76,16 @@ class DockerReaperTest {
     fun `test reaper starts and registers session`() {
         runWithCloseableStack { lifetime ->
             // Start reaper and a test container
-            DockerReaper.start(workDir)
+            DockerReaper.start()
 
-            val containerId = startContainerDriver(
+            val containerId = startDockerContainerAndDispose(
                 lifetime = lifetime,
-                driver,
                 StartContainerRequest()
                     .image("alpine:latest")
                     .entryPoint("sleep", "infinity")
-            ).containerId
+            )
 
-            DockerReaper.registerContainer(containerId, workDir)
+            DockerReaper.registerContainer(containerId)
 
             // Verify reaper container is running
             val reaperResult = RunProcessRequest()
@@ -112,7 +95,6 @@ class DockerReaperTest {
                     "--format", "{{.ID}}"
                 )
                 .description("Check reaper container")
-                .workingDir(workDir)
                 .timeoutSeconds(5)
                 .quietly()
                 .startProcess(processRunner)

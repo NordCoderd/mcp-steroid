@@ -6,8 +6,8 @@ import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.GeminiOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.*
 import java.io.File
 
@@ -15,7 +15,7 @@ import java.io.File
  * Manages a Gemini CLI session running inside a Docker container.
  */
 class DockerGeminiSession(
-    private val session: ContainerProcessRunner,
+    private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
     private val workdirInContainer: String,
@@ -55,15 +55,15 @@ class DockerGeminiSession(
             }
         }
 
-        val req = ExecContainerProcessRequest()
-            .args(geminiArgs)
-            .timeoutSeconds(timeoutSeconds = timeoutSeconds)
-            .description(geminiArgs.joinToString(" ").take(80))
-            .secretPatterns(apiKey)
-            .extraEnv(env)
-            .workingDirInContainer(workdirInContainer)
-
-        return session.startProcessInContainer(req)
+        return session.startProcessInContainer {
+            this
+                .args(geminiArgs)
+                .timeoutSeconds(timeoutSeconds = timeoutSeconds)
+                .description(geminiArgs.joinToString(" ").take(80))
+                .secretPatterns(apiKey)
+                .extraEnv(env)
+                .workingDirInContainer(workdirInContainer)
+        }
     }
 
     /**
@@ -115,7 +115,7 @@ class DockerGeminiSession(
             error("GEMINI_API_KEY required (set env GEMINI_API_KEY, GOOGLE_API_KEY, or ~/.vertex)")
         }
 
-        override fun createImpl(session: ContainerProcessRunner, apiKey: String): DockerGeminiSession {
+        override fun createImpl(session: ContainerDriver, apiKey: String): DockerGeminiSession {
             return DockerGeminiSession(session, apiKey, workdirInContainer = workdirInContainerDefault)
         }
     }

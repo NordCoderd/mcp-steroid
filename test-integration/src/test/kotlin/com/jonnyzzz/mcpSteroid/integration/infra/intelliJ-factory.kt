@@ -2,17 +2,32 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
-import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.*
 import com.jonnyzzz.mcpSteroid.testHelper.git.BareRepoCache
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.UUID
+import kotlin.collections.ArrayDeque
+import kotlin.collections.List
+import kotlin.collections.MutableList
+import kotlin.collections.Set
+import kotlin.collections.asSequence
+import kotlin.collections.buildList
+import kotlin.collections.emptyList
+import kotlin.collections.filter
+import kotlin.collections.firstOrNull
+import kotlin.collections.forEach
+import kotlin.collections.getOrPut
+import kotlin.collections.isNotEmpty
+import kotlin.collections.joinToString
+import kotlin.collections.linkedSetOf
+import kotlin.collections.maxByOrNull
+import kotlin.collections.mutableListOf
+import kotlin.collections.mutableMapOf
+import kotlin.collections.orEmpty
+import kotlin.collections.setOf
+import kotlin.collections.sorted
 
 //TODO: refactor parameters to a builder object, so we can update easily in the future, add "registerMcpSteroidToAgents" to the builder
 fun IntelliJContainer.Companion.create(
@@ -62,7 +77,7 @@ fun IntelliJContainer.Companion.create(
     // preventing races in buildIdeImage when multiple tests start concurrently.
     val uniqueSuffix = UUID.randomUUID().toString().take(8)
     val imageName = "$selectedDockerBase-test-$uniqueSuffix"
-    val (scope, imageId) = buildIdeImage(selectedDockerBase, imageName, ideArchive)
+    val imageId = buildIdeImage(selectedDockerBase, imageName, ideArchive)
 
     val containerMountedPath = "/mcp-run-dir"
 
@@ -81,10 +96,10 @@ fun IntelliJContainer.Companion.create(
         if (mountDockerSocket) add(ContainerVolume(dockerSocketFile, "/var/run/docker.sock", "rw"))
     }
 
-    var container = startContainerDriver(
-        lifetime, scope,
+    var container = startDockerContainerAndDispose(
+        lifetime,
         StartContainerRequest()
-            .image(imageId)
+            .image(imageId.imageId)
             .volumes(volumes)
             .ports(
                 XcvbVideoDriver.VIDEO_STREAMING_PORT,
@@ -234,23 +249,19 @@ fun IntelliJContainer.Companion.create(
     // Write info file with all ports and URLs for external tools
     val videoPort = container.mapGuestPortToHostPort(XcvbVideoDriver.VIDEO_STREAMING_PORT)
     val mcpUrl = mcpSteroidDriver.hostMcpUrl
-    val infoFile = File(runDir, "session-info.txt")
-    infoFile.writeText(buildString {
+    val infoString = buildString {
+        appendLine("=".repeat(20))
+        appendLine("Use these parameters to debug the test")
         appendLine("RUN_DIR=$runDir")
         appendLine("CONTAINER_ID=${container.containerId}")
         appendLine("DISPLAY=${xcvb.DISPLAY}")
         appendLine("VIDEO_DASHBOARD=http://localhost:$videoPort/")
         appendLine("VIDEO_STREAM=http://localhost:$videoPort/video.mp4")
         appendLine("MCP_STEROID=$mcpUrl")
-    })
-    println()
-    println("=".repeat(60))
-    println("  RUN DIR:         $runDir")
-    println("  VIDEO DASHBOARD: http://localhost:$videoPort/")
-    println("  MCP STEROID:     $mcpUrl")
-    println("  SESSION INFO:    $infoFile")
-    println("=".repeat(60))
-    println()
+        appendLine("=".repeat(20))
+    }
+    val infoFile = File(runDir, "session-info.txt")
+    infoFile.writeText(infoString)
 
     val session = IntelliJContainer(
         lifetime = lifetime,
@@ -299,13 +310,13 @@ private fun pickIdeWindow(
 }
 
 private fun discoverProcessFamilyPids(container: ContainerDriver, rootPid: Long): Set<Long> {
-    val processMap = container.startProcessInContainer(
-        ExecContainerProcessRequest()
+    val processMap = container.startProcessInContainer {
+        this
             .args("bash", "-c", "ps -eo pid=,ppid=")
             .timeoutSeconds(5)
             .quietly()
-            .description("ps -eo pid=,ppid="),
-    ).awaitForProcessFinish()
+            .description("ps -eo pid=,ppid=")
+    }.awaitForProcessFinish()
     if (processMap.exitCode != 0) return setOf(rootPid)
 
     val childrenByParent = mutableMapOf<Long, MutableList<Long>>()

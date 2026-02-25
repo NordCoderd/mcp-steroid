@@ -2,14 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerPort
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
-import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
-import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPortToHostPort
-import com.jonnyzzz.mcpSteroid.testHelper.docker.mkdirs
-import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
+import com.jonnyzzz.mcpSteroid.testHelper.docker.*
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import kotlin.concurrent.thread
 
@@ -147,12 +140,13 @@ class XcvbVideoDriver(
             appendLine(rsyncCommand())
             appendLine("sync")
         }
-        driver.startProcessInContainer(
-            ExecContainerProcessRequest()
+        driver.startProcessInContainer {
+            this
                 .args("bash", "-c", rsyncAndSyncScript)
                 .timeoutSeconds(30)
-                .description("rsync video and sync"),
-        ).assertExitCode(0) { "Failed to copy video" }
+                .quietly()
+                .description("rsync video and sync")
+        }.assertExitCode(0) { "Failed to copy video" }
 
         runCatching {
             val hostVideoFile = driver.mapGuestPathToHostPath(videoGuestPath)

@@ -32,19 +32,19 @@ fun ContainerDriver.runInContainerDetached(
     writeFileInContainer(scriptPath, wrapperScript, executable = true)
     // Run the wrapper script detached
 
-    val req = ExecContainerProcessRequest()
-        .args("bash", scriptPath)
-        .description("In detached $innerCommand")
-        .timeout(Duration.ofSeconds(10))
-        .quietly()
-        .workingDirInContainer(workingDir)
-        .extraEnv(extraEnvVars)
-        .detach(true)
+    startProcessInContainer {
+        this
+            .args("bash", scriptPath)
+            .description("In detached $innerCommand")
+            .timeout(Duration.ofSeconds(10))
+            .quietly()
+            .workingDirInContainer(workingDir)
+            .extraEnv(extraEnvVars)
+            .detach(true)
+    }.assertExitCode(0) { "Failed to start detached process '$name': $stderr" }
 
-    startProcessInContainer(req)
-        .assertExitCode(0) { "Failed to start detached process '$name': $stderr" }
-
-    println("Detached process '$name' started, stdout/stderr at $logDir")
+    log("Detached process '$name' started, stdout/stderr at $logDir")
     val info = DetachedContainerProcess(name = name, logDir = logDir)
     return RunningContainerProcess(this, info.name, info.logDir)
 }
+

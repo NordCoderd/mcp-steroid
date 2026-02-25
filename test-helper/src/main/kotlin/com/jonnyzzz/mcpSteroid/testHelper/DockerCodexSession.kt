@@ -6,10 +6,8 @@ import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.CodexOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerProcessRunner
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.builder
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
@@ -25,7 +23,7 @@ import java.io.File
  * The API key is read from ~/.openai mounted into the container.
  */
 class DockerCodexSession(
-    private val session: ContainerProcessRunner,
+    private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
     private val workdirInContainer: String,
@@ -67,15 +65,16 @@ class DockerCodexSession(
                 put("DEBUG", "*")
             }
         }
-        val req = ExecContainerProcessRequest()
-            .args(codexArgs)
-            .timeoutSeconds(timeoutSeconds)
-            .description("Codex: " + codexArgs.joinToString(" ").take(80))
-            .secretPatterns(apiKey)
-            .workingDirInContainer(workdirInContainer)
-            .extraEnv(extraEnvVars)
 
-        return session.startProcessInContainer(req)
+        return session.startProcessInContainer {
+            this
+                .args(codexArgs)
+                .timeoutSeconds(timeoutSeconds)
+                .description("Codex: " + codexArgs.joinToString(" ").take(80))
+                .secretPatterns(apiKey)
+                .workingDirInContainer(workdirInContainer)
+                .extraEnv(extraEnvVars)
+        }
     }
 
     /**
@@ -127,7 +126,7 @@ class DockerCodexSession(
             error("OPENAI_API_KEY is required for Codex CLI tests (set env or ~/.openai)")
         }
 
-        override fun createImpl(session: ContainerProcessRunner, apiKey: String): DockerCodexSession {
+        override fun createImpl(session: ContainerDriver, apiKey: String): DockerCodexSession {
             return DockerCodexSession(session, apiKey, workdirInContainer = workdirInContainerDefault)
         }
     }

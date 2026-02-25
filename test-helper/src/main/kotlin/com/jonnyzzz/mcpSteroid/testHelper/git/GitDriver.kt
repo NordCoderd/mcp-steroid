@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.testHelper.git
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mkdirs
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 
@@ -41,12 +42,12 @@ class GitDriver(
         args += listOf(repoUrl, targetDir)
 
         println("[GIT] Cloning $repoUrl into $targetDir (shallow=$shallow)...")
-        driver.startProcessInContainer(
-            ExecContainerProcessRequest()
+        driver.startProcessInContainer {
+            this
                 .args(args)
                 .timeoutSeconds(timeoutSeconds)
-                .description("git clone $repoUrl into $targetDir"),
-        ).assertExitCode(0) { "git clone $repoUrl failed" }
+                .description("git clone $repoUrl into $targetDir")
+        }.assertExitCode(0) { "git clone $repoUrl failed" }
     }
 
     /**
@@ -54,12 +55,12 @@ class GitDriver(
      */
     fun checkout(repoDir: String, ref: String) {
         println("[GIT] Checking out $ref in $repoDir...")
-        driver.startProcessInContainer(
-            ExecContainerProcessRequest()
+        driver.startProcessInContainer {
+            this
                 .args("git", "-C", repoDir, "checkout", ref)
                 .timeoutSeconds(30)
-                .description("git checkout $ref in $repoDir"),
-        ).assertExitCode(0) { "git checkout $ref failed" }
+                .description("git checkout $ref in $repoDir")
+        }.assertExitCode(0) { "git checkout $ref failed" }
     }
 
     /**
@@ -81,13 +82,13 @@ class GitDriver(
     ): Boolean {
         val bareGuestPath = "$cacheGuestPath/$ownerAndRepo.git"
 
-        val check = driver.startProcessInContainer(
-            ExecContainerProcessRequest()
+        val check = driver.startProcessInContainer {
+            this
                 .args("test", "-d", bareGuestPath)
                 .timeoutSeconds(5)
                 .quietly()
-                .description("test -d $bareGuestPath"),
-        ).awaitForProcessFinish()
+                .description("test -d $bareGuestPath")
+        }.awaitForProcessFinish()
         if (check.exitCode != 0) {
             println("[GIT] No cached bare repo at $bareGuestPath, will clone from remote")
             return false
@@ -97,12 +98,12 @@ class GitDriver(
         driver.mkdirs(parent)
 
         println("[GIT] Cloning from bare cache: $bareGuestPath -> $targetDir ...")
-        driver.startProcessInContainer(
-            ExecContainerProcessRequest()
+        driver.startProcessInContainer {
+            this
                 .args("git", "clone", "file://$bareGuestPath", targetDir)
                 .timeoutSeconds(120)
-                .description("git clone from bare cache $bareGuestPath"),
-        ).awaitForProcessFinish().assertExitCode(0, "git clone from bare cache $bareGuestPath")
+                .description("git clone from bare cache $bareGuestPath")
+        }.awaitForProcessFinish().assertExitCode(0, "git clone from bare cache $bareGuestPath")
 
         return true
     }
@@ -119,24 +120,15 @@ class GitDriver(
             return
         }
 
-        val patchPath = "$repoDir/_tmp_patch.diff"
+        val patchPath = "$/temp/_tmp_patch_${System.currentTimeMillis()}.diff"
         println("[GIT] Applying patch to $repoDir...")
         driver.writeFileInContainer(patchPath, patchContent, executable = false)
 
-        try {
-            driver.startProcessInContainer(
-                ExecContainerProcessRequest()
-                    .args("git", "-C", repoDir, "apply", "--allow-empty", patchPath)
-                    .timeoutSeconds(30)
-                    .description("git apply patch in $repoDir"),
-            ).awaitForProcessFinish().assertExitCode(0, "git apply patch")
-        } finally {
-            driver.startProcessInContainer(
-                ExecContainerProcessRequest()
-                    .args("rm", "-f", patchPath)
-                    .timeoutSeconds(5)
-                    .description("rm patch $patchPath"),
-            ).awaitForProcessFinish()
-        }
+        driver.startProcessInContainer {
+            this
+                .args("git", "-C", repoDir, "apply", "--allow-empty", patchPath)
+                .timeoutSeconds(30)
+                .description("git apply patch in $repoDir")
+        }.awaitForProcessFinish().assertExitCode(0, "git apply patch")
     }
 }

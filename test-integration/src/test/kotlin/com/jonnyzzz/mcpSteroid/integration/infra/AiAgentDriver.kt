@@ -7,8 +7,8 @@ import com.jonnyzzz.mcpSteroid.testHelper.DockerClaudeSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerCodexSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.copyToContainer
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import kotlin.getValue
@@ -82,28 +82,21 @@ class AiAgentDriver(
         container.writeFileInContainer("/tmp/deploy-filter.sh", deployScript, executable = true)
         emptyMap<String, String>()
 
-        container.startProcessInContainer(
-            ExecContainerProcessRequest()
+        container.startProcessInContainer {
+            this
                 .args(listOf("bash", "/tmp/deploy-filter.sh"))
                 .workingDirInContainer(null)
                 .timeoutSeconds(timeoutSeconds = 60)
                 .description("Deploying agent output-filter")
-        )
-            .assertExitCode(0) {
-                "agent-output-filter deployment failed:\n$stdout\n$stderr"
-            }
+        }.assertExitCode(0) {
+            "agent-output-filter deployment failed:\n$stdout\n$stderr"
+        }
 
         println("[AiAgentDriver] agent-output-filter deployed to /opt/agent-output-filter")
     }
 
     private fun <R : AiAgentSession> prepareAIAgent(factory: AIAgentCompanion<R>, filterType: String): AiAgentSession {
-        val session = ConsolePumpingContainerDriver(
-            scope, console, factory.displayName,
-            filterType = filterType,
-            agentsGuestDir = agentsGuestDir,
-        )
-
-        val agent: AiAgentSession = factory.create(session)
+        val agent: AiAgentSession = factory.create(container)
         val displayName: String = factory.displayName
 
         when (val conn = mcpConnection) {

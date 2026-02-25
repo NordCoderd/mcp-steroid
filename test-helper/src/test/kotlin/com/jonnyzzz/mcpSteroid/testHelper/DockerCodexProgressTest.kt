@@ -5,7 +5,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
-import com.jonnyzzz.mcpSteroid.testHelper.docker.startContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerContainerAndDispose
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -55,16 +55,14 @@ class DockerCodexProgressTest {
         val workDir = createTempDirectory("codex-progress")
         stack.registerCleanupAction { workDir.deleteRecursively() }
 
-        val driver = DockerDriver(workDir, "CODEX-PROGRESS")
         val imageId = buildDockerImage(
             "CODEX-PROGRESS",
             dockerfilePath = dockerfile,
             timeoutSeconds = 600,
         )
 
-        val container = startContainerDriver(
+        val container = startDockerContainerAndDispose(
             lifetime = stack,
-            scope = driver,
             StartContainerRequest().image(imageId),
         )
         return DockerCodexSession.create(container)

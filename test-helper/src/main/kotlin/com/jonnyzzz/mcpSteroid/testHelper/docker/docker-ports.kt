@@ -14,20 +14,20 @@ data class ContainerPort(
  * Docker output format: "0.0.0.0:52134" or "[::]:52134"
  */
 fun ContainerDriver.mapGuestPortToHostPort(containerPort: ContainerPort): Int {
-    val result = RunProcessRequest()
-        .logPrefix(containerId)
+    val result = newRunOnHost()
         .command("docker", "port", containerId, "${containerPort.containerPort}/tcp")
         .description("Query host port for $containerPort")
         .timeoutSeconds(5)
+        .quietly()
         .startProcess()
-        .assertExitCode(0) { "Failed to map container port $containerPort for $containerId" }
+        .assertExitCode(0) { "Failed to map container port $containerPort for $containerIdForLog" }
 
     val mappedPort = parseMappedPortOutput(result.stdout)
     if (result.exitCode == 0 && mappedPort != null) {
         return mappedPort
     }
 
-    error("Failed to query mapped port for container $containerId port $containerPort. $result")
+    error("Failed to query mapped port for container $containerIdForLog port $containerPort. $result")
 }
 
 internal fun parseMappedPortOutput(stdout: String): Int? {
@@ -45,8 +45,7 @@ internal fun parseMappedPortOutput(stdout: String): Int? {
  * Returns null when inspect output does not contain an address.
  */
 fun ContainerDriver.queryContainerIp(): String? {
-    val result = RunProcessRequest()
-        .logPrefix(containerId)
+    val result = newRunOnHost()
         .command(
             "docker",
             "inspect",
@@ -54,11 +53,11 @@ fun ContainerDriver.queryContainerIp(): String? {
             "{{range .NetworkSettings.Networks}}{{.IPAddress}} {{end}}",
             containerId
         )
-        .description("Query container IP")
+        .description("Query container IP for $containerIdForLog")
         .timeoutSeconds(5)
         .quietly()
         .startProcess()
-        .assertExitCode(0) { "Failed to query container IP: $stderr" }
+        .assertExitCode(0) { "Failed to query container IP for $containerId: $stderr" }
 
     return result.stdout
         .trim()

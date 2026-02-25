@@ -1,10 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
-import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.PrintWriter
 import java.net.Socket
@@ -13,10 +13,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Custom Docker resource reaper that automatically cleans up containers
  * when the JVM process crashes or is killed with SIGKILL.
- *
- * This is our own implementation replacing testcontainers/ryuk:
  * - Builds and starts a custom reaper container (Docker CLI + socat)
- * - Uses [DockerDriver] to build the image and [startContainerDriver] to start the container
+ * - Uses [DockerDriver] to build the image and [startDockerContainerAndDispose] to start the container
  * - Uses [ContainerDriver] to map ports
  * - Connects via TCP socket and sends line-based commands
  * - Protocol: `container=<id>` registers a container, `ping` keeps alive
@@ -44,128 +42,96 @@ object DockerReaper {
      * Start the custom reaper container and establish connection.
      * Idempotent — only the first call performs actual work.
      *
-     * Uses [DockerDriver] to build the image and [startContainerDriver] to start the container.
+     * Uses [DockerDriver] to build the image and [startDockerContainerAndDispose] to start the container.
      * Uses [ContainerDriver.mapGuestPortToHostPort] for port mapping.
      * Container IDs registered before the connection is established are buffered
      * in a [Channel] with capacity 128.
      */
-    fun start(workDir: File) {
+    fun start() {
         if (!started.compareAndSet(false, true)) return
 
         println("[REAPER] Starting custom reaper container...")
+        // Build the reaper image from the docker/reaper directory
+        val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory().toFile()
+        val reaperDockerfile = projectHome.resolve("test-helper/src/main/docker/reaper/Dockerfile")
+        require(reaperDockerfile.isFile) { "Reaper Dockerfile must exist: $reaperDockerfile" }
 
-        var lifetime: CloseableStackHost? = null
-        try {
-            val driver = DockerDriver(workDir, "REAPER")
+        val reaperImageId = buildDockerImage(
+            logPrefix = "REAPER",
+            reaperDockerfile,
+            120,
+            quietly = true,
+        )
 
-            // Build the reaper image from the docker/reaper directory
-            val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory().toFile()
-            val reaperDockerfile = projectHome.resolve("test-helper/src/main/docker/reaper/Dockerfile")
-            require(reaperDockerfile.isFile) { "Reaper Dockerfile must exist: $reaperDockerfile" }
+        val port8080 = ContainerPort(8080)
+        val containerDriver = startDockerContainerAndForget(
+            StartContainerRequest()
+                .logPrefix("REAPER")
+                .image(reaperImageId)
+                .volumes(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock"))
+                .ports(port8080)
+                .quietly()
+        )
 
-            val reaperImageId = buildDockerImage(
-                logPrefix = "REAPER",
-                reaperDockerfile,
-                120,
-                quietly = true,
-            )
+        // Map the container port to host port using ContainerDriver
+        val hostPort = containerDriver.mapGuestPortToHostPort(port8080)
+        val containerIp = containerDriver.queryContainerIp()
+        containerDriver.log("Listening on host port: $hostPort")
 
-            tagDockerImage(reaperImageId, "mcp-steroid-reaper")
-
-            // Start the reaper container using ContainerDriver infrastructure.
-            // startContainerDriver calls back into registerContainer()
-            // which buffers the reaper's own container ID in the channel.
-            val runningLifetime = CloseableStackHost()
-            lifetime = runningLifetime
-            val port8080 = ContainerPort(8080)
-            val containerDriver = startContainerDriver(
-                lifetime = runningLifetime,
-                scope = driver,
-                StartContainerRequest()
-                    .image(reaperImageId)
-                    .volumes(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock"))
-                    .ports(port8080)
-            )
-
-            val reaperContainerId = containerDriver.containerId
-            println("[REAPER] Container started: $reaperContainerId")
-
-            // Map the container port to host port using ContainerDriver
-            val hostPort = containerDriver.mapGuestPortToHostPort(port8080)
-            val containerIp = containerDriver.queryContainerIp()
-            println("[REAPER] Listening on host port: $hostPort")
-
-            val endpoints = buildList {
-                // Works for tests running directly on host.
-                add(ReaperEndpoint(host = "localhost", port = hostPort, label = "mapped host port"))
-                // Works for tests running in a dockerized builder container.
-                add(ReaperEndpoint(host = "host.docker.internal", port = hostPort, label = "docker host alias"))
-                // Works from sibling containers on the default bridge network.
-                if (!containerIp.isNullOrBlank()) {
-                    add(ReaperEndpoint(host = containerIp, port = port8080.containerPort, label = "container bridge IP"))
-                }
-            }.distinctBy { it.host to it.port }
-
-            // Connect to the reaper socket with retries.
-            val socket = connectWithRetry(endpoints)
-            val writer = PrintWriter(socket.getOutputStream(), true)
-            val writeLock = Any()
-
-            val sendLine: (String) -> Unit = { line ->
-                synchronized(writeLock) {
-                    try {
-                        writer.println(line)
-                    } catch (e: Exception) {
-                        println("[REAPER] Failed to send '$line': ${e.message}")
-                    }
-                }
+        val endpoints = buildList {
+            // Works for tests running directly on host.
+            add(ReaperEndpoint(host = "localhost", port = hostPort, label = "mapped host port"))
+            // Works for tests running in a dockerized builder container.
+            add(ReaperEndpoint(host = "host.docker.internal", port = hostPort, label = "docker host alias"))
+            // Works from sibling containers on the default bridge network.
+            if (!containerIp.isNullOrBlank()) {
+                add(ReaperEndpoint(host = containerIp, port = port8080.containerPort, label = "container bridge IP"))
             }
+        }.distinctBy { it.host to it.port }
 
-            // Consumer coroutine: drains the channel and sends container IDs to reaper.
-            // Filters out the reaper's own container ID — the reaper exits on its own after cleanup.
-            // On cancellation: closes the socket (triggers reaper cleanup) and the lifetime.
-            scope.launch {
+        // Connect to the reaper socket with retries.
+        val socket = connectWithRetry(endpoints)
+        val writer = PrintWriter(socket.getOutputStream(), true)
+        val writeLock = Any()
+
+        val sendLine: (String) -> Unit = { line ->
+            synchronized(writeLock) {
                 try {
-                    for (containerId in containerChannel) {
-                        if (containerId == reaperContainerId) continue
-                        sendLine("container=$containerId")
-                    }
-                } finally {
-                    withContext(NonCancellable) {
-                        try {
-                            socket.close()
-                        } catch (_: Exception) {
-                            // Ignore socket close errors
-                        }
-                        // Give reaper time to detect connection loss and clean up
-                        delay(1000)
-                        try {
-                            runningLifetime.closeAllStacks()
-                        } catch (_: Exception) {
-                            // Ignore cleanup errors
-                        }
-                    }
+                    writer.println(line)
+                } catch (e: Exception) {
+                    println("[REAPER] Failed to send '$line': ${e.message}")
                 }
             }
-
-            // Ping loop: sends "ping" every 1 second to keep the reaper alive
-            scope.launch {
-                while (isActive) {
-                    delay(1000)
-                    sendLine("ping")
-                }
-            }
-
-            println("[REAPER] Ready.")
-        } catch (e: Exception) {
-            started.set(false)
-            try {
-                lifetime?.closeAllStacks()
-            } catch (_: Exception) {
-                // Ignore cleanup errors after startup failure.
-            }
-            throw e
         }
+
+        // Consumer coroutine: drains the channel and sends container IDs to reaper.
+        // Filters out the reaper's own container ID — the reaper exits on its own after cleanup.
+        // On cancellation: closes the socket (triggers reaper cleanup) and the lifetime.
+        scope.launch {
+            try {
+                for (containerId in containerChannel) {
+                    if (containerId == containerDriver.containerId) continue
+                    sendLine("container=$containerId")
+                }
+            } finally {
+                withContext(NonCancellable) {
+                    runCatching { socket.close() }
+                    // Give reaper time to detect connection loss and clean up
+                    delay(1000)
+                    containerDriver.killContainer()
+                }
+            }
+        }
+
+        // Ping loop: sends "ping" every 1 second to keep the reaper alive
+        scope.launch {
+            while (isActive) {
+                delay(1000)
+                sendLine("ping")
+            }
+        }
+
+        println("[REAPER] Ready.")
     }
 
     /**
@@ -174,10 +140,11 @@ object DockerReaper {
      * Container IDs are buffered in a [Channel] with capacity 128 —
      * safe to call before the reaper connection is established.
      */
-    fun registerContainer(containerId: String, workDir: File) {
-        containerChannel.trySend(containerId)
+    fun registerContainer(container: ContainerDriver) {
+        containerChannel.trySend(container.containerId)
+
         if (!started.get()) {
-            scope.launch { start(workDir) }
+            scope.launch { start() }
         }
     }
 
@@ -187,6 +154,8 @@ object DockerReaper {
      * Uses [cancelChildren] so the scope stays usable for subsequent [start] calls.
      */
     fun shutdown() {
+        //TODO: Shutdown must kill all containers registered
+
         println("[REAPER] Shutting down...")
         scope.coroutineContext.cancelChildren()
         started.set(false)
@@ -211,5 +180,4 @@ object DockerReaper {
         val targets = endpoints.joinToString { "${it.host}:${it.port}" }
         error("Failed to connect to reaper after retries (targets: $targets): ${lastException?.message}")
     }
-
 }

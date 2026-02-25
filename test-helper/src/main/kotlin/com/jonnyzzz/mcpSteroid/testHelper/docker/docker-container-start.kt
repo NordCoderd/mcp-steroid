@@ -19,29 +19,30 @@ data class StartContainerRequest private constructor(
     val ports: List<ContainerPort> = emptyList(),
     val entryPoint: List<String> = emptyList(),
     val autoRemove: Boolean = true,
+    val quietly: Boolean = false,
     val timeout: Duration = Duration.ofMinutes(5),
 ) {
     companion object {
-        operator fun invoke() : StartContainerRequest = StartContainerRequest()
+        operator fun invoke(): StartContainerRequest = StartContainerRequest()
     }
 
     fun logPrefix(logPrefix: String) = copy(logPrefix = logPrefix)
-    fun image(image : String) = copy(image = image)
-    fun extraEnvVars(extraEnvVars : Map<String, String>) = copy(extraEnvVars = extraEnvVars)
-    fun volumes(volumes : List<ContainerVolume>) = copy(volumes = volumes)
-    fun volumes(vararg volumes : ContainerVolume) = volumes(volumes.asList())
-    fun ports(ports : List<ContainerPort>) = copy(ports = ports)
-    fun ports(vararg ports : ContainerPort) = ports(ports.asList())
+    fun image(image: String) = copy(image = image)
+    fun extraEnvVars(extraEnvVars: Map<String, String>) = copy(extraEnvVars = extraEnvVars)
+    fun volumes(volumes: List<ContainerVolume>) = copy(volumes = volumes)
+    fun volumes(vararg volumes: ContainerVolume) = volumes(volumes.asList())
+    fun ports(ports: List<ContainerPort>) = copy(ports = ports)
+    fun ports(vararg ports: ContainerPort) = ports(ports.asList())
     fun entryPoint(args: List<String>) = copy(entryPoint = args)
     fun entryPoint(vararg args: String) = entryPoint(args.toList())
-    fun autoRemove(autoRemove : Boolean) = copy(autoRemove = autoRemove)
-    fun timeout(timeout : Duration) = copy(timeout = timeout)
+    fun autoRemove(autoRemove: Boolean) = copy(autoRemove = autoRemove)
+    fun timeout(timeout: Duration) = copy(timeout = timeout)
+    fun quietly() = copy(quietly = true)
 }
 
-
-fun startDockerContainer(
+fun startDockerContainerAndForget(
     request: StartContainerRequest,
-): String {
+): ContainerDriver {
     val imageId = request.image ?: error("No image name")
     val logPrefix = request.logPrefix ?: error("No log prefix")
 
@@ -78,6 +79,7 @@ fun startDockerContainer(
         .logPrefix(logPrefix)
         .description("Start container from $imageId with ${request.entryPoint}")
         .withTimeout(request.timeout)
+        .quietly(request.quietly)
         .startProcess()
         .assertExitCode(0) {
             "Failed to start Docker container: $stderr"
@@ -89,5 +91,9 @@ fun startDockerContainer(
     }
 
     println("[$logPrefix] Container started: $containerId")
-    return containerId
+    return ContainerDriver(
+        logPrefix = logPrefix,
+        containerId = containerId,
+        startRequest = request,
+    )
 }
