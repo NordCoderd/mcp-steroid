@@ -68,10 +68,6 @@ dependencies {
             JetBrainsIdeProduct.WebStorm,
             -> error("Plugin build targets IntelliJ IDEA or PyCharm only. GoLand/WebStorm are for integration tests.")
         }
-        //TODO: Drop
-        bundledPlugin("org.jetbrains.kotlin")
-        //TODO: Drop
-        bundledPlugin("JUnit")
         testFramework(TestFrameworkType.Platform)
     }
 
@@ -167,6 +163,9 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
+        doFirst {
+            systemProperty("mcp.steroid.full.intellij", intellijPlatform.platformPath)
+        }
     }
 
     patchPluginXml {
