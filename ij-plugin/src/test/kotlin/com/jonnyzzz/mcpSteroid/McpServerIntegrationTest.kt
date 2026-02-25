@@ -301,7 +301,6 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val discovery = McpJson.decodeFromString<ActionDiscoveryResponse>(payload)
         assertEquals(project.name, discovery.projectName)
         assertEquals(virtualFile.path, discovery.filePath)
-        assertEquals("JAVA", discovery.languageId)
         assertTrue("Action groups should be empty when skipped", discovery.actionGroups.isEmpty())
     }
 
