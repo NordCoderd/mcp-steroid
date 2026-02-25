@@ -25,6 +25,21 @@ abstract class PromptBase {
 
     open val mimeType: String = "text/plain"
 
+    /**
+     * Returns a [PromptBase] whose content is the body of the [index]-th ` ```kotlin ``` `
+     * block found in this prompt's content. Extraction happens at call time from [readPrompt].
+     *
+     * Used by article classes so that `ktBlock*` properties are derived from [payload] at
+     * runtime rather than storing duplicate encoded content.
+     */
+    fun ktBlock(index: Int): PromptBase {
+        val parent = this
+        return object : PromptBase() {
+            override val mimeType = "text/x-kotlin"
+            override fun readPromptInternal() = extractKotlinBlock(parent.readPrompt(), index)
+        }
+    }
+
     protected inline fun decodePromptChunks(crossinline chunks: suspend SequenceScope<Sequence<String>>.() -> Unit): String =
         sequence { chunks() }
             .flatMap {
@@ -35,6 +50,28 @@ abstract class PromptBase {
                 }
             }
             .joinToString("") { it.toChar().toString() }
+}
+
+private fun extractKotlinBlock(content: String, index: Int): String {
+    val lines = content.lines()
+    var blockIndex = 0
+    var inBlock = false
+    val current = StringBuilder()
+    for (line in lines) {
+        when {
+            !inBlock && line.trimStart().startsWith("```kotlin") -> {
+                inBlock = true
+                current.clear()
+            }
+            inBlock && line.trimStart() == "```" -> {
+                if (blockIndex == index) return current.toString()
+                blockIndex++
+                inBlock = false
+            }
+            inBlock -> current.appendLine(line)
+        }
+    }
+    error("Kotlin block #$index not found in prompt content (found $blockIndex blocks)")
 }
 
 abstract class PromptIndexBase {

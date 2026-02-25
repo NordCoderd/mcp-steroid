@@ -30,8 +30,10 @@ data class GeneratedPromptClazz(
 /**
  * Build the encoded readPromptN() helper functions and readPromptInternal() override
  * for a given text content. The content is chunked and obfuscated using a random factor.
+ *
+ * @param sourcePath Optional source path to embed as KDoc on each helper method (for readability).
  */
-fun buildEncodedReadFunctions(content: String): Pair<List<FunSpec>, FunSpec> {
+fun buildEncodedReadFunctions(content: String, sourcePath: String? = null): Pair<List<FunSpec>, FunSpec> {
     val readFn = content.chunked(1024).mapIndexed { index, chunk ->
         val factor = Random.nextInt(1000).absoluteValue + 11234
 
@@ -42,6 +44,11 @@ fun buildEncodedReadFunctions(content: String): Pair<List<FunSpec>, FunSpec> {
 
         FunSpec.builder("readPrompt" + index)
             .addModifiers(KModifier.PRIVATE)
+            .apply {
+                if (sourcePath != null) {
+                    addKdoc("Source: %L, chunk %L", sourcePath, index)
+                }
+            }
             .returns(Sequence::class.asClassName().parameterizedBy(String::class.asTypeName()))
             .addCode(buildCodeBlock {
                 controlFlow("return sequence") {
@@ -168,13 +175,16 @@ fun PromptGenerationContext.generateSectionDelegatePayloadClazz(
 /**
  * Generate a PromptBase subclass that holds an inline string content.
  * Used for generated content like descriptions, see-also, and TOC.
+ *
+ * @param sourcePath When provided, added as KDoc to the class and each encoded chunk method.
  */
 fun PromptGenerationContext.generateStringPromptClazz(
     content: String,
     classType: ClassName,
     mimeType: String = "text/markdown",
+    sourcePath: String? = null,
 ) {
-    val (readFn, readResourceFun) = buildEncodedReadFunctions(content)
+    val (readFn, readResourceFun) = buildEncodedReadFunctions(content, sourcePath)
 
     val mimeTypeProp = PropertySpec.builder("mimeType", String::class)
         .addModifiers(KModifier.OVERRIDE)
@@ -182,6 +192,7 @@ fun PromptGenerationContext.generateStringPromptClazz(
         .build()
 
     val typeSpec = TypeSpec.classBuilder(classType)
+        .apply { if (sourcePath != null) addKdoc("Content from: %L", sourcePath) }
         .superclass(promptBaseClass)
         .addProperty(mimeTypeProp)
         .addFunction(readResourceFun)
