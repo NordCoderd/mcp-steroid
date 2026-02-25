@@ -84,7 +84,6 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
                 putJsonArray("required") {
                     add("project_name")
                     add("task_id")
-                    add("execution_id")
                     add("success_rating")
                     add("explanation")
                 }
@@ -101,8 +100,7 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
             ?: return errorResult("Missing required parameter: project_name")
         val taskId = args["task_id"]?.jsonPrimitive?.contentOrNull
             ?: return errorResult("Missing required parameter: task_id")
-        args["execution_id"]?.jsonPrimitive?.contentOrNull
-            ?: return errorResult("Missing required parameter: execution_id")
+        // execution_id is optional — noted for context but value is not currently used
         val successRating = args["success_rating"]?.jsonPrimitive?.doubleOrNull
             ?: return errorResult("Missing required parameter: success_rating")
         val explanation = args["explanation"]?.jsonPrimitive?.contentOrNull
