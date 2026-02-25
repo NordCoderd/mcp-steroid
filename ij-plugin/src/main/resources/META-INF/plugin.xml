@@ -72,10 +72,6 @@
     </extensions>
 
     <extensions defaultExtensionNs="com.intellij">
-        <applicationService
-            serviceInterface="com.jonnyzzz.mcpSteroid.koltinc.ScriptClassLoaderFactory"
-            serviceImplementation="com.jonnyzzz.mcpSteroid.koltinc.DefaultScriptClassLoaderFactory"/>
-
         <!-- Update checker notification group -->
         <notificationGroup id="jonnyzzz.mcp.steroid.updates"
                            displayType="BALLOON"/>

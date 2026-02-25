@@ -18,13 +18,8 @@ import java.util.concurrent.ConcurrentMap
 
 inline val scriptClassLoaderFactory get(): ScriptClassLoaderFactory = service()
 
-interface ScriptClassLoaderFactory {
-    fun ideClasspath(): List<Path>
-    fun execCodeClassloader(jar: Path): ClassLoader
-}
-
 @Service(Service.Level.APP)
-class DefaultScriptClassLoaderFactory : ScriptClassLoaderFactory {
+class ScriptClassLoaderFactory {
     private fun orderedPluginDescriptors(): List<IdeaPluginDescriptor> {
         return PluginManagerCore.loadedPlugins
             .filter {
@@ -33,12 +28,12 @@ class DefaultScriptClassLoaderFactory : ScriptClassLoaderFactory {
             }
     }
 
-    override fun execCodeClassloader(jar: Path): ClassLoader {
+    fun execCodeClassloader(jar: Path): ClassLoader {
         //we cannot keep the newIdeClassloader to enforce classes GC
         return URLClassLoader(arrayOf(jar.toUri().toURL()), newIdeClassloader())
     }
 
-    override fun ideClasspath(): List<Path> {
+    fun ideClasspath(): List<Path> {
         return orderedPluginDescriptors()
             .asSequence()
             .mapNotNull { it.pluginClassLoader as UrlClassLoader? }
