@@ -18,14 +18,15 @@ class DockerGeminiProgressTest {
 
     @Test
     fun `test Gemini shows progress events with stream-json`() = runWithCloseableStack { stack ->
-        val geminiSession = createLightweightGeminiSession(stack)
+        val geminiSession = DockerGeminiSession.create(stack)
         val result = geminiSession.runPrompt(
             prompt = """
                 List files in current directory.
                 You must use a tool call (for example, a shell command) to get the result.
             """.trimIndent(),
             timeoutSeconds = 30
-        ).assertExitCode(0) { "Gemini command should succeed" }
+        ).awaitForProcessFinishRaw()
+            .assertExitCode(0) { "Gemini command should succeed" }
 
         val events = parseNdjsonEvents(result.stdout)
         assertTrue(events.isNotEmpty(), "Raw output should contain stream-json NDJSON events")
@@ -35,35 +36,6 @@ class DockerGeminiProgressTest {
         assertTrue(eventTypes.contains("tool_use"), "Raw output should contain tool_use events: $eventTypes")
         assertTrue(eventTypes.contains("tool_result"), "Raw output should contain tool_result events: $eventTypes")
         assertTrue(eventTypes.contains("result"), "Raw output should contain result events: $eventTypes")
-
-        assertNotEquals(
-            result.stdout.trim(),
-            result.stdout.trim(),
-            "Processed output should not be identical to raw NDJSON"
-        )
-        assertTrue(result.stdout.contains(">> "), "Processed output should contain start progress markers")
-        assertTrue(result.stdout.contains("<< "), "Processed output should contain completion progress markers")
-    }
-
-    private fun createLightweightGeminiSession(stack: CloseableStack): DockerGeminiSession {
-        val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory().toFile()
-        val dockerfile = projectHome.resolve("test-helper/src/main/docker/agents/gemini/Dockerfile")
-        require(dockerfile.isFile) { "Gemini Dockerfile must exist: $dockerfile" }
-
-        val workDir = createTempDirectory("gemini-progress")
-        stack.registerCleanupAction { workDir.deleteRecursively() }
-
-        val imageId = buildDockerImage(
-            logPrefix = "GEMINI",
-            dockerfilePath = dockerfile,
-            timeoutSeconds = 600,
-        )
-
-        val container = startDockerContainerAndDispose(
-            lifetime = stack,
-            StartContainerRequest().image(imageId),
-        )
-        return DockerGeminiSession.create(container)
     }
 
     private fun parseNdjsonEvents(rawOutput: String): List<JsonObject> {

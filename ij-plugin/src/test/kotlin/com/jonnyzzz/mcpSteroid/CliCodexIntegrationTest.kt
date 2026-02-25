@@ -1,4 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+@file:Suppress("RedundantOverride")
+
 package com.jonnyzzz.mcpSteroid
 
 import com.intellij.testFramework.common.timeoutRunBlocking
@@ -143,7 +145,7 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
                 """.trimIndent(),
                 timeoutSeconds = 300
             )
-                .assertExitCode(0, "prompt #1")
+                .assertExitCode(0){ "prompt #1" }
                 .assertOutputContains("RESULT1:", "EXEC1_OK", message = "exec #1 should run before restart")
                 .assertOutputContains("RESULT2:", "RESET_CONNECTION_BROKEN", message = "exec #2 must report connection broken (server restart kills the HTTP connection)")
 
@@ -167,7 +169,7 @@ class CliCodexIntegrationTest : CliIntegrationTestBase() {
                 """.trimIndent(),
                 timeoutSeconds = 300
             )
-                .assertExitCode(0, "prompt #2")
+                .assertExitCode(0) { "prompt #2" }
                 .assertNoErrorsInOutput("prompt #2")
                 .assertOutputContains("RESULT3:", "EXEC2_OK", message = "exec #3 should run on the restarted server")
                 .assertOutputContains("sessions=1", message = "restarted server should have exactly 1 fresh session (old sessions were closed, this is a new session)")

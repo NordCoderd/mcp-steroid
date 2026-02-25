@@ -68,7 +68,7 @@ class KeycloakArchitectureTest {
             appendLine("FILE_PATHS: <at least one file path ending in .java or .kt that you found>")
         }
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         result.assertExitCode(0, message = "authentication flow investigation")
 
         val combined = result.stdout + "\n" + result.stderr
@@ -118,7 +118,7 @@ class KeycloakArchitectureTest {
             appendLine("TOKEN_MODULE: <name of the module handling token generation>")
         }
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         result.assertExitCode(0, message = "module structure investigation")
 
         val combined = result.stdout + "\n" + result.stderr
@@ -175,7 +175,7 @@ class KeycloakArchitectureTest {
             appendLine("FILE_PATHS: <at least one file path ending in .java or .kt that you found>")
         }
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         result.assertExitCode(0, message = "SPI architecture investigation")
 
         val combined = result.stdout + "\n" + result.stderr

@@ -9,6 +9,16 @@ import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import kotlin.io.path.createTempFile
 
+data class ImageDriver(
+    val imageId: String,
+    val logPrefix: String,
+) {
+    val imageIdToLog get() = imageId.take(10)
+    override fun toString(): String {
+        return "ImageDriver(imageId='$imageIdToLog', logPrefix='$logPrefix')"
+    }
+}
+
 /**
  * Build a Docker image and return its content-addressable image ID (sha256:...).
  *
@@ -21,7 +31,7 @@ fun buildDockerImage(
     timeoutSeconds: Long,
     buildArgs: Map<String, String> = emptyMap(),
     quietly: Boolean = false,
-): String {
+): ImageDriver {
     require(dockerfilePath.exists() && dockerfilePath.isFile) {
         "File does not exist: $dockerfilePath"
     }
@@ -62,7 +72,10 @@ fun buildDockerImage(
         }
 
         println("[$logPrefix] Docker image built $imageId")
-        return imageId.removePrefix("sha256:").trim()
+        return ImageDriver(
+            imageId = imageId.removePrefix("sha256:").trim(),
+            logPrefix = logPrefix,
+        )
     } finally {
         iidFile.delete()
     }

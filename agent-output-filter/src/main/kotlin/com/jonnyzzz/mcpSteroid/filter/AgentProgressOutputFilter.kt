@@ -11,7 +11,7 @@ import java.io.OutputStream
  *
  * Filters read NDJSON from stdin, parse events, and output human-readable text to stdout.
  */
-interface OutputFilter {
+interface AgentProgressOutputFilter {
     /**
      * Process input stream and write filtered output.
      *
@@ -23,9 +23,9 @@ interface OutputFilter {
 
 
 /**
- * Pipe a string through an [OutputFilter] and return the filtered result.
+ * Pipe a string through an [AgentProgressOutputFilter] and return the filtered result.
  */
-fun OutputFilter.filterText(input: String): String {
+fun AgentProgressOutputFilter.filterText(input: String): String {
     val bais = ByteArrayInputStream(input.toByteArray())
     val baos = ByteArrayOutputStream()
     process(bais, baos)

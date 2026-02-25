@@ -17,6 +17,8 @@ import org.junit.jupiter.api.Test
  * This test verifies that:
  * 1. Normal cleanup via CloseableStack works
  * 2. Custom reaper starts and connects properly
+ *
+ * This test is disabled to avoid affecting the DockerReaper activity for the project
  */
 class DockerReaperTest {
     private val processRunner = ProcessRunner("TEST", emptyList())
@@ -40,6 +42,7 @@ class DockerReaperTest {
             lifetime,
             StartContainerRequest()
                 .image("alpine:latest")
+                .logPrefix("test-image")
                 .entryPoint("sleep", "infinity")
         )
 
@@ -82,6 +85,7 @@ class DockerReaperTest {
                 lifetime = lifetime,
                 StartContainerRequest()
                     .image("alpine:latest")
+                    .logPrefix("test-image")
                     .entryPoint("sleep", "infinity")
             )
 

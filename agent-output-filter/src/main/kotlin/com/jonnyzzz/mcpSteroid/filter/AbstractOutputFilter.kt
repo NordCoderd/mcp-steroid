@@ -13,7 +13,7 @@ import java.io.OutputStream
  * Provides the common read-parse-dispatch loop. Subclasses implement
  * [processEvent] to handle parsed JSON events.
  */
-abstract class AbstractOutputFilter : OutputFilter {
+abstract class AbstractOutputFilter : AgentProgressOutputFilter {
 
     override fun process(input: InputStream, output: OutputStream) {
         val writer = output.bufferedWriter()

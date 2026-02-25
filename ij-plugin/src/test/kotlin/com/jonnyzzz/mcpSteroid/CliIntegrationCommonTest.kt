@@ -6,16 +6,10 @@ import com.intellij.testFramework.common.timeoutRunBlocking
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
-import com.jonnyzzz.mcpSteroid.testHelper.createTempDirectory
+import com.jonnyzzz.mcpSteroid.testHelper.docker.*
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
-import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
-import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerContainerAndDispose
-import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import kotlin.time.Duration.Companion.seconds
 
 class CliIntegrationCommonTest : BasePlatformTestCase() {
@@ -31,18 +25,13 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
 
     private fun llmSession(): ContainerDriver {
         val dockerfilePath = ProjectHomeDirectory.requireProjectHomeDirectory()
-            .resolve("src/test/docker/${"ubuntu-cli"}/Dockerfile")
+            .resolve("test-helper/src/main/docker/ubuntu-cli/Dockerfile")
             .toFile()
 
         require(dockerfilePath.isFile) { "Docker file $dockerfilePath must exist" }
-        val logPrefix = "ubuntu-cli"
-        val workDir = createTempDirectory(logPrefix.lowercase())
-        lifetime.registerCleanupAction {
-            workDir.deleteRecursively()
-        }
 
         val imageId = buildDockerImage(
-            logPrefix = logPrefix,
+            logPrefix = "ubuntu-cli",
             dockerfilePath,
             timeoutSeconds = 600,
         )

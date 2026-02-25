@@ -3,6 +3,7 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
+import com.jonnyzzz.mcpSteroid.testHelper.AiStartedProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
@@ -19,9 +20,6 @@ import java.util.concurrent.atomic.AtomicInteger
  *
  * Before running a prompt, the prompt text is shown in bright ANSI color.
  * After completion, a success/error summary is written.
- *
- * Real-time output pumping is handled by [ConsolePumpingContainerDriver]
- * which wraps the underlying container used by the agent session.
  */
 class ConsoleAwareAgentSession(
     private val delegate: AiAgentSession,
@@ -31,30 +29,22 @@ class ConsoleAwareAgentSession(
     override val displayName: String
         get() = delegate.displayName
 
-    override fun runPrompt(prompt: String, timeoutSeconds: Long): ProcessResult {
+    override fun runPrompt(prompt: String, timeoutSeconds: Long): AiStartedProcess {
         console.writePrompt(agentName, prompt)
         console.writeInfo("Running $agentName...")
 
-        val result = delegate.runPrompt(prompt, timeoutSeconds)
+        //TODO: subscribe to output, pumt to console
 
-        if (result.exitCode == 0) {
-            console.writeSuccess("$agentName finished (exit 0)")
-        } else {
-            console.writeError("$agentName finished (exit ${result.exitCode})")
-        }
-
-        return result
+        return delegate.runPrompt(prompt, timeoutSeconds)
     }
 
-    override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
-        return ConsoleAwareAgentSession(
-            delegate.registerHttpMcp(mcpUrl, mcpName),
-            console, agentName,
-        )
+    override fun registerHttpMcp(mcpUrl: String, mcpName: String) {
+        delegate.registerHttpMcp(mcpUrl, mcpName)
     }
 
-    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String) =
-        ConsoleAwareAgentSession(delegate.registerNpxMcp(npxCommand, mcpName), console, agentName)
+    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String) {
+        delegate.registerNpxMcp(npxCommand, mcpName)
+    }
 }
 
 //private const val FILTER_BIN = "/opt/agent-output-filter/bin/agent-output-filter"

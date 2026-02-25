@@ -45,10 +45,7 @@ class DockerClaudeProgressTest {
         val result = claudeSession.runPrompt(
             prompt = "List all files in the current directory using bash commands. Show me the full output.",
             timeoutSeconds = 60
-        )
-
-        // Verify command succeeded
-        result.assertExitCode(0) { "Claude command should succeed" }
+        ).assertExitCode(0) { "Claude command should succeed" }
 
         // Verify raw output contains NDJSON progress events
         assertTrue(

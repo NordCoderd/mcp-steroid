@@ -38,7 +38,7 @@ class WhatYouSeeTest {
                     "If you have no MCP tools, respond with the word NO_MCP_TOOLS_FOUND.",
             timeoutSeconds = 180
         )
-            .assertExitCode(0)
+            .assertExitCode(0) { "Prompt failed" }
             .assertNoErrorsInOutput("describeMcp must have no errors")
             .assertNoMessageInOutput("NO_MCP_TOOLS_FOUND")
 
@@ -55,7 +55,7 @@ class WhatYouSeeTest {
                     "If you cannot access IDE information, respond with the word NO_IDE_ACCESS.",
             timeoutSeconds = 180
         )
-            .assertExitCode(0)
+            .assertExitCode(0) { "Prompt failed" }
             .assertNoErrorsInOutput("checkWhatYouSee must have no errors")
             .assertNoMessageInOutput("NO_IDE_ACCESS")
     }
@@ -67,7 +67,7 @@ class WhatYouSeeTest {
                     "If the code execution fails, respond with the word CODE_EXECUTION_FAILED.",
             timeoutSeconds = 180
         )
-            .assertExitCode(0)
+            .assertExitCode(0) { "Prompt failed" }
             .assertNoErrorsInOutput("executeCodeViaMcp must have no errors")
             .assertNoMessageInOutput("CODE_EXECUTION_FAILED")
 
@@ -87,7 +87,7 @@ class WhatYouSeeTest {
             TOOL_PREFERENCE_PROMPT,
             timeoutSeconds = 300
         )
-            .assertExitCode(0)
+            .assertExitCode(0) { "Prompt failed" }
             .assertNoErrorsInOutput("toolPreference must have no errors")
 
         // Parse preferred tools from output

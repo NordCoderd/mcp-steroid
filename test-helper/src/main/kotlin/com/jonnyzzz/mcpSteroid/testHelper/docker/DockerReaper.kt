@@ -52,8 +52,9 @@ object DockerReaper {
 
         println("[REAPER] Starting custom reaper container...")
         // Build the reaper image from the docker/reaper directory
-        val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory().toFile()
-        val reaperDockerfile = projectHome.resolve("test-helper/src/main/docker/reaper/Dockerfile")
+        val reaperDockerfile = ProjectHomeDirectory.requireProjectHomeDirectory()
+            .resolve("test-helper/src/main/docker/reaper/Dockerfile")
+            .toFile()
         require(reaperDockerfile.isFile) { "Reaper Dockerfile must exist: $reaperDockerfile" }
 
         val reaperImageId = buildDockerImage(
@@ -66,7 +67,6 @@ object DockerReaper {
         val port8080 = ContainerPort(8080)
         val containerDriver = startDockerContainerAndForget(
             StartContainerRequest()
-                .logPrefix("REAPER")
                 .image(reaperImageId)
                 .volumes(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock"))
                 .ports(port8080)
@@ -76,7 +76,6 @@ object DockerReaper {
         // Map the container port to host port using ContainerDriver
         val hostPort = containerDriver.mapGuestPortToHostPort(port8080)
         val containerIp = containerDriver.queryContainerIp()
-        containerDriver.log("Listening on host port: $hostPort")
 
         val endpoints = buildList {
             // Works for tests running directly on host.
@@ -116,9 +115,6 @@ object DockerReaper {
             } finally {
                 withContext(NonCancellable) {
                     runCatching { socket.close() }
-                    // Give reaper time to detect connection loss and clean up
-                    delay(1000)
-                    containerDriver.killContainer()
                 }
             }
         }
@@ -154,8 +150,6 @@ object DockerReaper {
      * Uses [cancelChildren] so the scope stays usable for subsequent [start] calls.
      */
     fun shutdown() {
-        //TODO: Shutdown must kill all containers registered
-
         println("[REAPER] Shutting down...")
         scope.coroutineContext.cancelChildren()
         started.set(false)

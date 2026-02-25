@@ -255,7 +255,7 @@ class ArenaTestRunner(
         // Step 4: Run agent (START MEASURING)
         println("[ARENA] Running agent (timeout: ${timeoutSeconds}s) ...")
         val agentStartMs = System.currentTimeMillis()
-        val agentResult = agent.runPrompt(prompt, timeoutSeconds = timeoutSeconds)
+        val agentResult = agent.runPrompt(prompt, timeoutSeconds = timeoutSeconds).awaitForProcessFinish()
         val agentDurationMs = System.currentTimeMillis() - agentStartMs
 
         // Step 5: Evaluate

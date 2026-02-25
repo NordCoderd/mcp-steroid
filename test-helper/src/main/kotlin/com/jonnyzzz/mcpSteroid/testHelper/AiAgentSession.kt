@@ -2,7 +2,9 @@
 package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
+import com.jonnyzzz.mcpSteroid.filter.AgentProgressOutputFilter
 import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 
 interface AiAgentSession {
     val displayName: String
@@ -13,9 +15,19 @@ interface AiAgentSession {
     fun runPrompt(
         prompt: String,
         timeoutSeconds: Long = 120
-    ): ProcessResult
+    ): AiStartedProcess
 
-    fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession
+    fun registerHttpMcp(mcpUrl: String, mcpName: String)
 
-    fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String): AiAgentSession
+    fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String)
+}
+
+
+interface AiStartedProcess : StartedProcess {
+    val outputFilter: AgentProgressOutputFilter
+
+    /**
+     * Returns unprocessed messages
+     */
+    fun awaitForProcessFinishRaw(): ProcessResult
 }

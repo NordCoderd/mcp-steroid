@@ -127,7 +127,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         val output = result.stdout
         // Use rawOutput for evidence checks: Claude's stream-json mode puts
         // execution IDs in NDJSON tool_result events, not in the final extracted text.
@@ -396,7 +396,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         val output = result.stdout
         val combined = result.stdout + "\n" + result.stderr
 
@@ -520,7 +520,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         val output = result.stdout
         val combined = result.stdout + "\n" + result.stderr
 
@@ -625,7 +625,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         val output = result.stdout
         val combined = result.stdout + "\n" + result.stderr
 
@@ -749,7 +749,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         val output = result.stdout
         val combined = result.stdout + "\n" + result.stderr
 
@@ -845,7 +845,7 @@ class DebuggerDemoTest {
 
         console.writeStep(2, "Running agent prompt")
 
-        val result = agent.runPrompt(prompt, timeoutSeconds = 600)
+        val result = agent.runPrompt(prompt, timeoutSeconds = 600).awaitForProcessFinish()
         val output = result.stdout
         val combined = result.stdout + "\n" + result.stderr
 

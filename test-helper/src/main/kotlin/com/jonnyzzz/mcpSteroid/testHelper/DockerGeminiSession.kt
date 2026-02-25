@@ -22,20 +22,16 @@ class DockerGeminiSession(
 ) : AiAgentSession {
     override val displayName: String = Companion.displayName
 
-    override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
+    override fun registerHttpMcp(mcpUrl: String, mcpName: String) {
         runInContainer(args = geminiMcpAddArgs(mcpUrl, mcpName))
             .assertExitCode(0) { "MCP server registration" }
             .assertNoErrorsInOutput(message = "MCP server registration")
-
-        return this
     }
 
-    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String): AiAgentSession {
+    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String) {
         runInContainer(args = geminiMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0) { "NPX MCP server registration" }
             .assertNoErrorsInOutput(message = "NPX MCP server registration")
-
-        return this
     }
 
     fun runInContainer(args: List<String>, timeoutSeconds: Long = 120): StartedProcess {
@@ -47,7 +43,7 @@ class DockerGeminiSession(
             addAll(args.toList())
         }
         val env = buildMap {
-            put("GOOGLE_API_KEY", apiKey)
+            put("GEMINI_API_KEY", apiKey)
             if (debug) {
                 put("GEMINI_DEBUG", "1")
                 put("MCP_DEBUG", "1")
@@ -78,27 +74,19 @@ class DockerGeminiSession(
      * The raw NDJSON output is post-processed via [GeminiOutputFilter] to produce
      * human-readable text.
      */
-    override fun runPrompt(prompt: String, timeoutSeconds: Long): ProcessResult {
-        val effectiveResult = runInContainer(
-            args = listOf(
-                "--screen-reader", "true",
-                "--sandbox-mode", "none",
-                "--approval-mode", "yolo",
-                "--output-format", "stream-json",
-                "--prompt", prompt,
-            ),
-            timeoutSeconds = timeoutSeconds
-        ).awaitForProcessFinish()
-
-        //TODO: looks like the case for specific interface to return the JSON output VS the processed output
-        //TODO: should be a common interface all AI Agents implement
-        return ProcessResultValue(
-            exitCode = effectiveResult.exitCode ?: -1,
-            stdout = outputFilter.filterText(effectiveResult.stdout),
-            stderr = effectiveResult.stderr,
+    override fun runPrompt(prompt: String, timeoutSeconds: Long): AiStartedProcess {
+        val args = listOf(
+            "--screen-reader", "true",
+            "--approval-mode", "yolo",
+            "--output-format", "stream-json",
+            "--prompt", prompt,
         )
-    }
 
+        return runInContainer(
+            args = args,
+            timeoutSeconds = timeoutSeconds
+        ).toAiStartedProcess()
+    }
 
     companion object : AIAgentCompanion<DockerGeminiSession>("gemini-cli") {
         override val displayName = "Gemini"
@@ -106,7 +94,6 @@ class DockerGeminiSession(
 
         override fun readApiKey(): String {
             System.getenv("GEMINI_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
-            System.getenv("GOOGLE_API_KEY")?.takeIf { it.isNotBlank() }?.let { return it }
             val keyFile = File(System.getProperty("user.home"), ".vertex")
             if (keyFile.exists()) {
                 val content = keyFile.readText().trim()

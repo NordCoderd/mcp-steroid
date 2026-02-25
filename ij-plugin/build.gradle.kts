@@ -68,7 +68,9 @@ dependencies {
             JetBrainsIdeProduct.WebStorm,
             -> error("Plugin build targets IntelliJ IDEA or PyCharm only. GoLand/WebStorm are for integration tests.")
         }
+        //TODO: Drop
         bundledPlugin("org.jetbrains.kotlin")
+        //TODO: Drop
         bundledPlugin("JUnit")
         testFramework(TestFrameworkType.Platform)
     }
@@ -123,9 +125,8 @@ val generateMetadata by tasks.registering(GenerateMetadataTask::class) {
     description = "Generate plugin metadata with encoded version"
 
     versionString.set(version.toString())
+    inputs.property("version", version)
     outputFile.set(generatedSourcesPath.map { it.file("PluginMetadata.kt") })
-
-    outputs.upToDateWhen { false }
 }
 
 // Add generated sources to main source set and make kotlin compilation depend on it
@@ -498,22 +499,6 @@ val verifyBundledLibraries by tasks.registering {
 tasks.verifyPlugin {
     dependsOn(verifyBundledKotlinCompatibility)
     dependsOn(verifyBundledLibraries)
-}
-
-// Exclude Docker/API-key-dependent CLI tests from the default 'test' run.
-// These tests require a Docker daemon and LLM API keys (ANTHROPIC_API_KEY etc.).
-// Run them explicitly when infrastructure is available:
-//   ./gradlew :ij-plugin:test --tests '*CliClaudeIntegrationTest*'
-//   ./gradlew :ij-plugin:test --tests '*CliCodexIntegrationTest*'
-//   ./gradlew :ij-plugin:test --tests '*CliGeminiIntegrationTest*'
-//   ./gradlew :ij-plugin:test --tests '*CliIntegrationCommonTest*'
-tasks.test {
-    filter {
-        excludeTestsMatching("*CliClaudeIntegrationTest*")
-        excludeTestsMatching("*CliCodexIntegrationTest*")
-        excludeTestsMatching("*CliGeminiIntegrationTest*")
-        excludeTestsMatching("*CliIntegrationCommonTest*")
-    }
 }
 
 // Deploy plugin to running IDEs with hot-reload support

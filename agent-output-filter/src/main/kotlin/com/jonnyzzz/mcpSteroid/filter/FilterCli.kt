@@ -4,7 +4,7 @@ package com.jonnyzzz.mcpSteroid.filter
 fun main(args: Array<String>) {
     val agentType = args.firstOrNull()
         ?: error("Usage: agent-output-filter <claude|codex|gemini>")
-    val filter: OutputFilter = when (agentType.lowercase()) {
+    val filter: AgentProgressOutputFilter = when (agentType.lowercase()) {
         "claude" -> ClaudeOutputFilter()
         "codex" -> CodexOutputFilter()
         "gemini" -> GeminiOutputFilter()

@@ -28,6 +28,7 @@ data class StartContainerRequest private constructor(
 
     fun logPrefix(logPrefix: String) = copy(logPrefix = logPrefix)
     fun image(image: String) = copy(image = image)
+    fun image(image: ImageDriver) = copy(image = image.imageId, logPrefix = image.logPrefix)
     fun extraEnvVars(extraEnvVars: Map<String, String>) = copy(extraEnvVars = extraEnvVars)
     fun volumes(volumes: List<ContainerVolume>) = copy(volumes = volumes)
     fun volumes(vararg volumes: ContainerVolume) = volumes(volumes.asList())

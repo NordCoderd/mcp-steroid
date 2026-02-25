@@ -29,20 +29,16 @@ class DockerClaudeSession(
 ) : AiAgentSession {
     override val displayName: String = Companion.displayName
 
-    override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
+    override fun registerHttpMcp(mcpUrl: String, mcpName: String) {
         runInContainer(args = claudeMcpAddArgs(mcpUrl, mcpName))
             .assertExitCode(0) { "MCP server registration" }
             .assertNoErrorsInOutput("MCP server registration")
-
-        return this
     }
 
-    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String): AiAgentSession {
+    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String) {
         runInContainer(args = claudeMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0) { "NPX MCP server registration" }
             .assertNoErrorsInOutput("NPX MCP server registration")
-
-        return this
     }
 
     /**
@@ -92,7 +88,7 @@ class DockerClaudeSession(
     override fun runPrompt(
         prompt: String,
         timeoutSeconds: Long,
-    ): ProcessResult {
+    ): AiStartedProcess {
         val claudeArgs = buildList {
             add("--permission-mode")
             add("bypassPermissions")
@@ -107,17 +103,10 @@ class DockerClaudeSession(
             add(prompt)
         }
 
-        val rawResult = runInContainer(
+        return runInContainer(
             args = claudeArgs,
             timeoutSeconds = timeoutSeconds
-        ).awaitForProcessFinish()
-
-        val resultText = outputFilter.filterText(rawResult.stdout)
-        return ProcessResultValue(
-            exitCode = rawResult.exitCode ?: -1,
-            stdout = resultText,
-            stderr = rawResult.stderr,
-        )
+        ).toAiStartedProcess()
     }
 
     companion object : AIAgentCompanion<DockerClaudeSession>("claude-cli") {

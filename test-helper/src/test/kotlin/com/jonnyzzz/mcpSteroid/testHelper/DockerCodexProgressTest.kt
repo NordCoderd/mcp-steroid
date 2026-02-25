@@ -20,16 +20,12 @@ class DockerCodexProgressTest {
 
     @Test
     fun `test Codex shows progress events`() = runWithCloseableStack { stack ->
-        assumeTrue(
-            hasCodexApiKey(),
-            "Requires OPENAI_API_KEY or a key in ~/.openai"
-        )
-
-        val codexSession = createLightweightCodexSession(stack)
+        val codexSession = DockerCodexSession.create(stack)
         val result = codexSession.runPrompt(
             prompt = "List files in current directory. You must use a tool call (for example, run a shell command) to get the result.",
             timeoutSeconds = 30
-        ).assertExitCode(0) { "Codex command should succeed" }
+        ).awaitForProcessFinishRaw()
+            .assertExitCode(0) { "Codex command should succeed" }
 
         val events = parseNdjsonEvents(result.stdout)
         assertTrue(events.isNotEmpty(), "Raw output should contain NDJSON events")
@@ -38,42 +34,6 @@ class DockerCodexProgressTest {
         val eventTypes = events.mapNotNull { it.stringField("type") }
         assertTrue(eventTypes.contains("item.started"), "Raw output should contain item.started events: $eventTypes")
         assertTrue(eventTypes.contains("item.completed"), "Raw output should contain item.completed events: $eventTypes")
-
-        assertNotEquals(
-            result.stdout.trim(),
-            result.stdout.trim(),
-            "Processed output should not be identical to raw NDJSON"
-        )
-        assertTrue(result.stdout.contains(">> "), "Processed output should contain progress markers")
-    }
-
-    private fun createLightweightCodexSession(stack: CloseableStack): DockerCodexSession {
-        val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory().toFile()
-        val dockerfile = projectHome.resolve("test-helper/src/main/docker/agents/codex/Dockerfile")
-        require(dockerfile.isFile) { "Codex Dockerfile must exist: $dockerfile" }
-
-        val workDir = createTempDirectory("codex-progress")
-        stack.registerCleanupAction { workDir.deleteRecursively() }
-
-        val imageId = buildDockerImage(
-            "CODEX-PROGRESS",
-            dockerfilePath = dockerfile,
-            timeoutSeconds = 600,
-        )
-
-        val container = startDockerContainerAndDispose(
-            lifetime = stack,
-            StartContainerRequest().image(imageId),
-        )
-        return DockerCodexSession.create(container)
-    }
-
-    private fun hasCodexApiKey(): Boolean {
-        if (!System.getenv("OPENAI_API_KEY").isNullOrBlank()) return true
-
-        val home = System.getProperty("user.home")
-        val keyFile = File(home, ".openai")
-        return keyFile.isFile && keyFile.readText().trim().isNotBlank()
     }
 
     private fun parseNdjsonEvents(rawOutput: String): List<JsonObject> {

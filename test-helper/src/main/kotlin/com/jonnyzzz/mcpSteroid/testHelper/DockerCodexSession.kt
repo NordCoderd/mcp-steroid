@@ -30,20 +30,16 @@ class DockerCodexSession(
 ) : AiAgentSession {
     override val displayName: String = Companion.displayName
 
-    override fun registerHttpMcp(mcpUrl: String, mcpName: String): AiAgentSession {
+    override fun registerHttpMcp(mcpUrl: String, mcpName: String) {
         runInContainer(args = codexMcpAddArgs(mcpUrl, mcpName))
             .assertExitCode(0) { "MCP server registration" }
             .assertNoErrorsInOutput("MCP server registration")
-
-        return this
     }
 
-    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String): AiAgentSession {
+    override fun registerNpxMcp(npxCommand: StdioMcpCommand, mcpName: String) {
         runInContainer(args = codexMcpAddStdioArgs(npxCommand, mcpName))
             .assertExitCode(0) { "NPX MCP server registration" }
             .assertNoErrorsInOutput("NPX MCP server registration")
-
-        return this
     }
 
     /**
@@ -90,7 +86,7 @@ class DockerCodexSession(
     override fun runPrompt(
         prompt: String,
         timeoutSeconds: Long,
-    ): ProcessResult {
+    ): AiStartedProcess {
         val codexArgs = buildList {
             add("exec")
             add("--dangerously-bypass-approvals-and-sandbox")
@@ -99,17 +95,10 @@ class DockerCodexSession(
             add(prompt)
         }
 
-        val rawResult = runInContainer(
+        return runInContainer(
             args = codexArgs,
             timeoutSeconds = timeoutSeconds
-        ).awaitForProcessFinish()
-
-        val resultText = outputFilter.filterText(rawResult.stdout)
-        return ProcessResultValue(
-            exitCode = rawResult.exitCode ?: -1,
-            stdout = resultText,
-            stderr = rawResult.stderr,
-        )
+        ).toAiStartedProcess()
     }
 
     companion object : AIAgentCompanion<DockerCodexSession>("codex-cli") {

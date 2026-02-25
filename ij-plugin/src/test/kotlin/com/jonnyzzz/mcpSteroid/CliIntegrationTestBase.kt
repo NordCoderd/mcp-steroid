@@ -29,7 +29,9 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
     protected abstract fun createAiSession(): AiAgentSession
 
     protected open fun newAiSession(): AiAgentSession {
-        return createAiSession().registerHttpMcp(resolveDockerUrl(), "intellij")
+        val ai = createAiSession()
+        ai.registerHttpMcp(resolveDockerUrl(), "intellij")
+        return ai
     }
 
     protected open fun newAiSessionViaNpx(): AiAgentSession {
@@ -85,7 +87,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             Do not skip any step. If a step fails, print ERROR: <reason>.
             """,
         )
-            .assertExitCode(0, "prompt")
+            .assertExitCode(0) { "prompt failed" }
             .assertNoErrorsInOutput(message = "prompt")
 
         val combinedOutput = buildString {
@@ -309,7 +311,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
                 """,
             timeoutSeconds = 240
         )
-            .assertExitCode(0, "prompt")
+            .assertExitCode(0) { "prompt failed" }
             .assertNoErrorsInOutput(message = "prompt")
             .assertOutputContains(
                 randomValue,
@@ -369,7 +371,7 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             """.trimIndent(),
             timeoutSeconds = 300
         )
-            .assertExitCode(0, "prompt")
+            .assertExitCode(0) { "prompt failed" }
 
         val combinedOutput = buildString {
             appendLine(result.stdout)

@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.docker.DockerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ImageDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
 import com.jonnyzzz.mcpSteroid.testHelper.docker.tagDockerImage
 import java.io.File
@@ -16,11 +17,6 @@ private const val BASE_DOCKER_CONTEXT = "ide-base"
 @Volatile private var baseImageId: String? = null
 private val baseImageLock = Any()
 
-
-data class IdeImage(
-    val imageId: String,
-)
-
 /**
  * Builds the IDE Docker image for [dockerFileBase] and returns the [DockerDriver]
  * scoped to its build context together with the image ID (sha256:...).
@@ -33,7 +29,7 @@ data class IdeImage(
  * references the exact base image built in this JVM run, preventing collisions
  * when multiple test processes build the base image concurrently.
  */
-fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): IdeImage {
+fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): ImageDriver {
     val resolvedBaseImageId = buildSharedBaseImage()
     // Derive a per-build context dir from the full image name.
     // Since imageName already carries a unique suffix (e.g. "ide-agent-test-a1b2c3d4"),
@@ -46,7 +42,7 @@ fun buildIdeImage(dockerFileBase: String, imageName: String, ideArchive: File): 
         timeoutSeconds = 900,
         buildArgs = mapOf("BASE_IMAGE" to resolvedBaseImageId),
     )
-    return IdeImage(imageId)
+    return imageId
 }
 
 private fun buildSharedBaseImage(): String {
