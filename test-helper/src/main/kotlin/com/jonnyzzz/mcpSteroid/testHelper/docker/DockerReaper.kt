@@ -13,17 +13,17 @@ import java.util.concurrent.atomic.AtomicBoolean
 /**
  * Custom Docker resource reaper that automatically cleans up containers
  * when the JVM process crashes or is killed with SIGKILL.
- * - Builds and starts a custom reaper container (Docker CLI + socat)
- * - Uses [DockerDriver] to build the image and [startDockerContainerAndDispose] to start the container
- * - Uses [ContainerDriver] to map ports
+ * - Builds and starts a custom reaper container (Docker CLI + socat) via [buildDockerImage]
+ *   and [startDockerContainerAndForget] — the reaper container is NOT registered in any
+ *   lifetime; it exits by itself once the socket closes and cleanup is done.
  * - Connects via TCP socket and sends line-based commands
  * - Protocol: `container=<id>` registers a container, `ping` keeps alive
  * - Reaper kills all registered containers if no ping for 3 seconds or connection lost
  * - Container IDs are buffered in a [Channel] with capacity 128 before connection is established
- * - The reaper's own container ID is filtered out of the channel (it exits on its own after cleanup)
+ * - The reaper's own container ID is filtered out of the channel
  *
- * No mutable fields: socket, writer, lifetime are all local to [start] and captured by coroutines.
- * [shutdown] cancels child coroutines, whose `finally` blocks close the socket and lifetime.
+ * No mutable fields: socket and writer are local to [start] and captured by coroutines.
+ * [shutdown] cancels child coroutines, whose `finally` blocks close the socket.
  * All background work runs on [Dispatchers.IO] (daemon threads).
  */
 object DockerReaper {
@@ -51,8 +51,9 @@ object DockerReaper {
      * Start the custom reaper container and establish connection.
      * Idempotent — only the first call performs actual work.
      *
-     * Uses [DockerDriver] to build the image and [startDockerContainerAndDispose] to start the container.
-     * Uses [ContainerDriver.mapGuestPortToHostPort] for port mapping.
+     * Builds the reaper image via [buildDockerImage] and starts the container via
+     * [startDockerContainerAndForget] (no lifetime, no explicit kill — the reaper exits
+     * by itself after the socket closes and registered containers are cleaned up).
      * Container IDs registered before the connection is established are buffered
      * in a [Channel] with capacity 128.
      */
@@ -75,8 +76,6 @@ object DockerReaper {
 
         val port8080 = ContainerPort(8080)
         val containerDriver = startDockerContainerAndForget(
-            // Note: the reaper container is NOT registered in a lifetime and is NOT killed explicitly.
-            // It exits by itself after the socket closes and it finishes cleaning up registered containers.
             StartContainerRequest()
                 .image(reaperImageId)
                 .volumes(ContainerVolume(File("/var/run/docker.sock"), "/var/run/docker.sock"))
@@ -118,7 +117,8 @@ object DockerReaper {
 
         // Consumer coroutine: drains the channel and sends container IDs to reaper.
         // Filters out the reaper's own container ID — the reaper exits on its own after cleanup.
-        // On cancellation: closes the socket (triggers reaper cleanup) and the lifetime.
+        // On cancellation: closes the socket, which signals the reaper to kill all registered
+        // containers and exit.
         scope.launch {
             try {
                 for (containerId in containerChannel) {
@@ -158,8 +158,9 @@ object DockerReaper {
     }
 
     /**
-     * Shutdown the reaper (for testing).
-     * Cancels child coroutines; their `finally` blocks close the socket and lifetime.
+     * Shutdown the reaper.
+     * Cancels child coroutines; their `finally` blocks close the socket, which signals the
+     * reaper container to kill all registered containers and exit by itself.
      * Uses [cancelChildren] so the scope stays usable for subsequent [start] calls.
      */
     fun shutdown() {
