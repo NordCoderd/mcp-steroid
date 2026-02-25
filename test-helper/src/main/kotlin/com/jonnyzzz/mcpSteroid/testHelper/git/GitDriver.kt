@@ -46,26 +46,7 @@ class GitDriver(
                 .args(args)
                 .timeoutSeconds(timeoutSeconds)
                 .description("git clone $repoUrl into $targetDir"),
-        ).awaitForProcessFinish().assertExitCode(0, "git clone $repoUrl")
-    }
-
-    /**
-     * Clone a repository and checkout a specific commit.
-     * Uses full clone (not shallow) since the commit may not be at HEAD.
-     *
-     * @param repoUrl repository URL
-     * @param targetDir guest path for the cloned repository
-     * @param commit commit SHA or ref to checkout
-     * @param timeoutSeconds timeout for the clone operation
-     */
-    fun cloneAndCheckout(
-        repoUrl: String,
-        targetDir: String,
-        commit: String,
-        timeoutSeconds: Long = 300,
-    ) {
-        clone(repoUrl, targetDir, shallow = false, timeoutSeconds = timeoutSeconds)
-        checkout(targetDir, commit)
+        ).assertExitCode(0) { "git clone $repoUrl failed" }
     }
 
     /**
@@ -78,7 +59,7 @@ class GitDriver(
                 .args("git", "-C", repoDir, "checkout", ref)
                 .timeoutSeconds(30)
                 .description("git checkout $ref in $repoDir"),
-        ).awaitForProcessFinish().assertExitCode(0, "git checkout $ref")
+        ).assertExitCode(0) { "git checkout $ref failed" }
     }
 
     /**
