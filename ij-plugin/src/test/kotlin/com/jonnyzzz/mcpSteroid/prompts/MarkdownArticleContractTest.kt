@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.prompts
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.mcpSteroid.prompts.generated.ResourcesIndex
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -112,6 +113,76 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
 
         assertTrue(
             "Description format violations in new-format articles:\n${violations.joinToString("\n")}",
+            violations.isEmpty()
+        )
+    }
+
+    /**
+     * For each new-format article, verifies that `payload.readPrompt()` equals the expected body:
+     * - Lines 5+ of the source file (after title, blank, description, blank)
+     * - `# See also` section removed
+     * - Directive lines (`###_NO_AUTO_TOC_###`, `###_EXCLUDE_FROM_AUTO_TOC_###`) stripped
+     *
+     * This catches bugs where the payload encoder or directive-stripping logic diverges
+     * from what the source file contains.
+     */
+    fun testArticlePayloadMatchesSourceBody() {
+        val articles = newFormatArticles()
+        if (articles.isEmpty()) return
+
+        val violations = mutableListOf<String>()
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("ij-plugin/src/main/prompts")
+
+        // Build URI → ArticleBase map from ResourcesIndex
+        val articlesByUri = ResourcesIndex().roots
+            .flatMap { it.value.articles.values }
+            .associateBy { it.uri }
+
+        val directives = setOf("###_NO_AUTO_TOC_###", "###_EXCLUDE_FROM_AUTO_TOC_###")
+
+        for (file in articles) {
+            val relPath = promptsRoot.relativize(file)
+            val content = Files.readString(file)
+            val lines = content.lines()
+            if (lines.size < 4) continue
+
+            // Derive URI: same logic as buildArticleUri in buildSrc
+            val folderPath = promptsRoot.relativize(file.parent).toString()
+                .replace('\\', '/')
+                .trimEnd('/')
+            val stem = file.fileName.toString().removeSuffix(".md")
+            val uri = if (folderPath.isEmpty()) "mcp-steroid://$stem" else "mcp-steroid://$folderPath/$stem"
+
+            val article = articlesByUri[uri]
+            if (article == null) {
+                violations.add("$relPath: no article found for URI $uri (available: ${articlesByUri.keys.take(5)})")
+                continue
+            }
+
+            // Extract body: lines 5+ joined, then strip # See also section
+            val bodyAndSeeAlso = lines.drop(4).joinToString("\n")
+            val seeAlsoMarker = "\n\n# See also\n"
+            val seeAlsoIdx = bodyAndSeeAlso.indexOf(seeAlsoMarker)
+            val body = if (seeAlsoIdx >= 0) bodyAndSeeAlso.substring(0, seeAlsoIdx) else bodyAndSeeAlso
+
+            // Strip directive lines (same logic as generateNewFormatParts.stripDirective)
+            val expectedPayload = if (directives.any { body.contains(it) }) {
+                body.lines().filter { it !in directives }.joinToString("\n")
+            } else body
+
+            val actualPayload = article.payload.readPrompt()
+            if (actualPayload != expectedPayload) {
+                val firstDiff = expectedPayload.zip(actualPayload).indexOfFirst { (a, b) -> a != b }
+                violations.add(
+                    "$relPath: payload mismatch. " +
+                        "expected length=${expectedPayload.length}, actual=${actualPayload.length}. " +
+                        "First diff at char $firstDiff"
+                )
+            }
+        }
+
+        assertTrue(
+            "Article payload mismatch for new-format articles:\n${violations.joinToString("\n")}",
             violations.isEmpty()
         )
     }

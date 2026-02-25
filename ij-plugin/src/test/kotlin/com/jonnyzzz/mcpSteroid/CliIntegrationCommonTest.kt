@@ -44,6 +44,7 @@ class CliIntegrationCommonTest : BasePlatformTestCase() {
 
         session.startProcessInContainer {
             this
+                .description("Test MCP from the container with CURL")
                 .args(
                     "curl",
                     "-v", "-X", "POST",

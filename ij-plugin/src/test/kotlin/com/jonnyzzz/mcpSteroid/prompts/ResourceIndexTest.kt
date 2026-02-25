@@ -14,4 +14,5 @@ class ResourceIndexTest : BasePlatformTestCase() {
 
         Assert.assertEquals(allUris, allUris.distinct())
     }
+
 }
