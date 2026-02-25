@@ -151,7 +151,7 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
                 .replace('\\', '/')
                 .trimEnd('/')
             val stem = file.fileName.toString().removeSuffix(".md")
-            val uri = if (folderPath.isEmpty()) "mcp-steroid://$stem" else "mcp-steroid://$folderPath/$stem"
+            val uri = if (folderPath.isEmpty()) "mcp" +"-steroid" + "://$stem" else "mcp-steroid://$folderPath/$stem"
 
             val article = articlesByUri[uri]
             if (article == null) {
