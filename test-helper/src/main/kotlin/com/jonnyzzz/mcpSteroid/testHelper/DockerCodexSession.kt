@@ -5,11 +5,8 @@ import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.codexMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.CodexOutputFilter
-import com.jonnyzzz.mcpSteroid.filter.filterText
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
@@ -26,7 +23,6 @@ class DockerCodexSession(
     private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
-    private val workdirInContainer: String,
 ) : AiAgentSession {
     override val displayName: String = Companion.displayName
 
@@ -68,7 +64,6 @@ class DockerCodexSession(
                 .timeoutSeconds(timeoutSeconds)
                 .description("Codex: " + codexArgs.joinToString(" ").take(80))
                 .secretPatterns(apiKey)
-                .workingDirInContainer(workdirInContainer)
                 .extraEnv(extraEnvVars)
         }
     }
@@ -116,7 +111,7 @@ class DockerCodexSession(
         }
 
         override fun createImpl(session: ContainerDriver, apiKey: String): DockerCodexSession {
-            return DockerCodexSession(session, apiKey, workdirInContainer = workdirInContainerDefault)
+            return DockerCodexSession(session, apiKey)
         }
     }
 }

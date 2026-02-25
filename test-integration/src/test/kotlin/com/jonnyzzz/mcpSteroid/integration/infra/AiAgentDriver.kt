@@ -42,20 +42,19 @@ sealed class McpConnectionMode {
  * - [McpConnectionMode.Npx]   — NPX stdio proxy ([AiMode.AI_NPX])
  */
 class AiAgentDriver(
-    private val container: ContainerDriver,
+    container: ContainerDriver,
     private val intellijDriver: IntelliJDriver,
     private val mcp: McpSteroidDriver,
     private val console: ConsoleDriver,
-    private val agentsGuestDir: String,
     private val mcpConnection: McpConnectionMode = McpConnectionMode.Http,
 ) {
     init {
         deployAgentOutputFilter()
     }
 
-    private val scope by lazy {
+    private val container by lazy {
         //TODO: Workdir in the container is not set for the agents!
-        container
+        container.configureContainerExec { this.workingDirInContainer(intellijDriver.getGuestProjectDir()) }
     }
 
     val mcpSteroidHostUrl by mcp::hostMcpUrl
@@ -95,14 +94,14 @@ class AiAgentDriver(
         println("[AiAgentDriver] agent-output-filter deployed to /opt/agent-output-filter")
     }
 
-    private fun <R : AiAgentSession> prepareAIAgent(factory: AIAgentCompanion<R>, filterType: String): AiAgentSession {
+    private fun <R : AiAgentSession> prepareAIAgent(factory: AIAgentCompanion<R>): AiAgentSession {
         val agent: AiAgentSession = factory.create(container)
         val displayName: String = factory.displayName
 
         when (val conn = mcpConnection) {
             is McpConnectionMode.None -> { /* no MCP registered */ }
             is McpConnectionMode.Http -> agent.registerHttpMcp(mcpSteroidGuestUrl, mcpSteroidName)
-            is McpConnectionMode.Npx  -> agent.registerNpxMcp(conn.driver.npxCommand, mcpSteroidName)
+            is McpConnectionMode.Npx -> agent.registerNpxMcp(conn.driver.npxCommand, mcpSteroidName)
         }
 
         // Wrap with console-aware session for real-time UI feedback
@@ -111,29 +110,21 @@ class AiAgentDriver(
 
     val aiAgents: Map<String, AiAgentSession> by lazy {
         buildMap {
-            fun tryAdd(name: String, init: () -> AiAgentSession) {
-                try {
-                    put(name, init())
-                } catch (e: Exception) {
-                    System.err.println("[AiAgentDriver] WARNING: $name registration failed: ${e.message} — excluding from run")
-                    System.err.println("[AiAgentDriver] WARNING: Remaining agents will still run")
-                }
-            }
-            tryAdd("claude") { claude }
-            tryAdd("codex") { codex }
-            tryAdd("gemini") { gemini }
+            put("claude", claude)
+            put("codex", codex)
+            put("gemini", gemini)
         }
     }
 
     val claude by lazy {
-        prepareAIAgent(DockerClaudeSession, "claude")
+        prepareAIAgent(DockerClaudeSession)
     }
 
     val codex by lazy {
-        prepareAIAgent(DockerCodexSession, "codex")
+        prepareAIAgent(DockerCodexSession)
     }
 
     val gemini by lazy {
-        prepareAIAgent(DockerGeminiSession, "gemini")
+        prepareAIAgent(DockerGeminiSession)
     }
 }

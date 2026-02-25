@@ -5,12 +5,8 @@ import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.claudeMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
-import com.jonnyzzz.mcpSteroid.filter.filterText
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
@@ -25,7 +21,6 @@ class DockerClaudeSession(
     private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
-    private val workdirInContainer: String,
 ) : AiAgentSession {
     override val displayName: String = Companion.displayName
 
@@ -69,7 +64,6 @@ class DockerClaudeSession(
                 .timeoutSeconds(timeoutSeconds)
                 .description("Claude: " + claudeArgs.joinToString(" ").take(80))
                 .secretPatterns(apiKey)
-                .workingDirInContainer(workdirInContainer)
                 .extraEnv(env)
         }
     }
@@ -124,7 +118,7 @@ class DockerClaudeSession(
         }
 
         override fun createImpl(session: ContainerDriver, apiKey: String): DockerClaudeSession {
-            return DockerClaudeSession(session, apiKey, workdirInContainer = workdirInContainerDefault)
+            return DockerClaudeSession(session, apiKey)
         }
     }
 }

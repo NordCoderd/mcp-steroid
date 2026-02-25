@@ -5,10 +5,11 @@ import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddArgs
 import com.jonnyzzz.mcpSteroid.aiAgents.geminiMcpAddStdioArgs
 import com.jonnyzzz.mcpSteroid.filter.GeminiOutputFilter
-import com.jonnyzzz.mcpSteroid.filter.filterText
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
-import com.jonnyzzz.mcpSteroid.testHelper.process.*
+import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertNoErrorsInOutput
 import java.io.File
 
 /**
@@ -18,7 +19,6 @@ class DockerGeminiSession(
     private val session: ContainerDriver,
     private val apiKey: String,
     private val debug: Boolean = false,
-    private val workdirInContainer: String,
 ) : AiAgentSession {
     override val displayName: String = Companion.displayName
 
@@ -58,7 +58,6 @@ class DockerGeminiSession(
                 .description(geminiArgs.joinToString(" ").take(80))
                 .secretPatterns(apiKey)
                 .extraEnv(env)
-                .workingDirInContainer(workdirInContainer)
         }
     }
 
@@ -103,7 +102,7 @@ class DockerGeminiSession(
         }
 
         override fun createImpl(session: ContainerDriver, apiKey: String): DockerGeminiSession {
-            return DockerGeminiSession(session, apiKey, workdirInContainer = workdirInContainerDefault)
+            return DockerGeminiSession(session, apiKey)
         }
     }
 }

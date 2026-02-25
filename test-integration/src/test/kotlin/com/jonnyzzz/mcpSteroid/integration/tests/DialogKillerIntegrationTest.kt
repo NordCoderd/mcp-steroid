@@ -3,9 +3,11 @@ package com.jonnyzzz.mcpSteroid.integration.tests
 
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.create
+import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
 import com.jonnyzzz.mcpSteroid.testHelper.runWithCloseableStack
+import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
@@ -26,10 +28,19 @@ import java.util.concurrent.TimeUnit
 class DialogKillerIntegrationTest {
     private val testDialogTitle = "MCP Steroid Test Modal Dialog"
 
-    private fun doTest(modeName: String, closeAction: (IntelliJContainer) -> Unit) = runWithCloseableStack { lifetime ->
-        val session = IntelliJContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer")
-        val console = session.console
+    companion object {
+        val lifetime by lazy { CloseableStackHost(this::class.java.simpleName) }
+        val session by lazy { IntelliJContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer") }
+        val console get() = session.console
 
+        @AfterAll
+        @JvmStatic
+        fun cleanup() {
+            lifetime.closeAllStacks()
+        }
+    }
+
+    private fun doTest(modeName: String, closeAction: (IntelliJContainer) -> Unit) {
         console.writeInfo("Mode: $modeName")
 
         // Step 1: Open a custom modal DialogWrapper and leave it open (dialog killer disabled)
@@ -150,23 +161,20 @@ class DialogKillerIntegrationTest {
 
     @Test
     @Timeout(value = 15, unit = TimeUnit.MINUTES)
-    fun `screenshot tool works in IDE`() = runWithCloseableStack { lifetime ->
-        val session = IntelliJContainer.create(lifetime, "ide-agent", consoleTitle = "Dialog Killer")
-        val console = session.console
-
+    fun `screenshot tool works in IDE`() {
         console.writeStep(1, "Taking screenshot of IDE via execute_code")
         val result = session.mcpSteroid.mcpExecuteCode(
-            code = """
+            code = $$"""
                 import com.jonnyzzz.mcpSteroid.vision.VisionService
                 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 
                 val executionId = ExecutionId("screenshot-tool-test")
                 val artifacts = VisionService.capture(project, executionId)
-                println("Screenshot captured: ${'$'}{artifacts.imagePath}")
-                println("Image size: ${'$'}{artifacts.meta.imageSize.width}x${'$'}{artifacts.meta.imageSize.height}")
-                println("Component tree: ${'$'}{artifacts.treePath}")
-                println("Screenshot metadata: ${'$'}{artifacts.metaPath}")
-                println("Screenshot bytes: ${'$'}{artifacts.imageBytes.size}")
+                println("Screenshot captured: ${artifacts.imagePath}")
+                println("Image size: ${artifacts.meta.imageSize.width}x${artifacts.meta.imageSize.height}")
+                println("Component tree: ${artifacts.treePath}")
+                println("Screenshot metadata: ${artifacts.metaPath}")
+                println("Screenshot bytes: ${artifacts.imageBytes.size}")
             """.trimIndent(),
             taskId = "screenshot-tool-test",
             reason = "Verify VisionService.capture works in IDE",

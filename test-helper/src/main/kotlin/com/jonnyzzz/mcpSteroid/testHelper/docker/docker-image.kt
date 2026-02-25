@@ -14,9 +14,15 @@ data class ImageDriver(
     val logPrefix: String,
 ) {
     val imageIdToLog get() = imageId.take(10)
+
+    val imageSha256 get() = "sha256:$imageId"
+
     override fun toString(): String {
         return "ImageDriver(imageId='$imageIdToLog', logPrefix='$logPrefix')"
     }
+
+    fun newRunProcessRequest() = RunProcessRequest()
+        .logPrefix(logPrefix)
 }
 
 /**
@@ -85,18 +91,16 @@ fun buildDockerImage(
 /**
  * Tag an existing Docker image with a new name.
  *
- * @param imageId Source image reference (e.g. `sha256:<hex>` or existing tag)
  * @param tag Target tag (e.g. `mcp-steroid-ide-base-test:latest`)
  */
-fun tagDockerImage(imageId: String, tag: String) {
-    RunProcessRequest()
-        .logPrefix("tag")
-        .command("docker", "tag", imageId, tag)
-        .description("Tag Docker image as $tag")
+fun ImageDriver.tagDockerImage(tag: String) : ImageDriver {
+    newRunProcessRequest()
+        .command("docker", "tag", imageSha256, tag)
+        .description("Tag Docker image $imageIdToLog as $tag")
         .quietly()
         .startProcess()
-        .assertExitCode(0) { "Failed to tag Docker image $imageId as $tag: $stderr" }
+        .assertExitCode(0) { "Failed to tag Docker image $imageIdToLog as $tag: $stderr" }
 
     println("Tagged image $imageId → $tag")
+    return copy(imageId = tag)
 }
-

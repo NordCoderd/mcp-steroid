@@ -27,8 +27,6 @@ abstract class AIAgentCompanion<T : Any>(val dockerFileBase: String) {
     abstract val displayName: String
     abstract val outputFilter: AgentProgressOutputFilter
 
-    val workdirInContainerDefault = "/home/agent" //TODO
-
     protected abstract fun readApiKey(): String
 
     fun create(lifetime: CloseableStack): T {

@@ -99,7 +99,7 @@ fun IntelliJContainer.Companion.create(
     var container = startDockerContainerAndDispose(
         lifetime,
         StartContainerRequest()
-            .image(imageId.imageId)
+            .image(imageId)
             .volumes(volumes)
             .ports(
                 XcvbVideoDriver.VIDEO_STREAMING_PORT,
@@ -240,7 +240,6 @@ fun IntelliJContainer.Companion.create(
         intellijDriver = ijDriver,
         console = console,
         mcp = mcpSteroidDriver,
-        agentsGuestDir = "$containerMountedPath/agents",
         mcpConnection = mcpConnectionMode,
     )
 

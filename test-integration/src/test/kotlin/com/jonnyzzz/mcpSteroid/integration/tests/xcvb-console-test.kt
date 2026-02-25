@@ -21,7 +21,7 @@ class XcvbConsoleTest {
         var container = startDockerContainerAndDispose(
             lifetime,
             StartContainerRequest()
-                .image(imageId.imageId)
+                .image(imageId)
                 .ports(
                     XcvbVideoDriver.VIDEO_STREAMING_PORT
                 )
