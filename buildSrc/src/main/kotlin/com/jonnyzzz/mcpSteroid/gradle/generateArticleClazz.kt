@@ -10,12 +10,21 @@ import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.buildCodeBlock
 
 /**
+ * Directives that can appear as standalone lines in the body of a new-format `.md` article.
+ * When either is present:
+ * - The article is excluded from the auto-generated folder TOC and from sibling see-also links.
+ * - The directive line is stripped from the payload output (not visible to MCP clients).
+ *
+ * Both forms are supported as aliases; prefer [EXCLUDE_FROM_AUTO_TOC_MARKER].
+ */
+const val NO_AUTO_TOC_MARKER = "###_NO_AUTO_TOC_###"
+const val EXCLUDE_FROM_AUTO_TOC_MARKER = "###_EXCLUDE_FROM_AUTO_TOC_###"
+
+private val AUTO_TOC_DIRECTIVES = setOf(NO_AUTO_TOC_MARKER, EXCLUDE_FROM_AUTO_TOC_MARKER)
+
+/**
  * Returns true if [path] looks like a section file: the filename contains `-section-`
  * and ends with `.md` or `.kt`.
- *
- * Section files are the building blocks of multi-section articles. They are named like
- * `<article-stem>-section-<id>.(md|kt)` and are merged (in alphabetical order) to form
- * the article's payload content.
  */
 fun isSectionFile(path: String): Boolean {
     val name = path.substringAfterLast("/")
@@ -24,10 +33,6 @@ fun isSectionFile(path: String): Boolean {
 
 /**
  * Derives the article stem path from a section file path.
- *
- * Examples:
- * - `skill/foo-bar-section-0001.md`  →  `skill/foo-bar`
- * - `coding-with-intellij-section-0002.kt`  →  `coding-with-intellij`
  */
 fun articleStemFromSection(path: String): String {
     val dir = path.substringBeforeLast("/", missingDelimiterValue = "")
@@ -38,15 +43,11 @@ fun articleStemFromSection(path: String): String {
 
 fun groupByArticle(promptClasses: List<GeneratedPromptClazz>): List<PromptArticle> {
     val headerExt = "-header.md"
-    val seeAlsoExt = "-see-also.md"
 
-    // Group all files by their article stem.
-    // Section files have their -section-XXXX.(md|kt) suffix stripped to find the stem.
     val grouped = promptClasses.groupBy { clazz ->
         val path = clazz.path
         when {
             path.endsWith(headerExt) -> path.removeSuffix(headerExt)
-            path.endsWith(seeAlsoExt) -> path.removeSuffix(seeAlsoExt)
             isSectionFile(path) -> articleStemFromSection(path)
             else -> path.removeSuffix(".kts").removeSuffix(".md").removeSuffix(".kt")
         }
@@ -54,47 +55,36 @@ fun groupByArticle(promptClasses: List<GeneratedPromptClazz>): List<PromptArticl
 
     return grouped.mapNotNull { (stem, group) ->
         val header = group.singleOrNull { it.path.endsWith(headerExt) }
-        val seeAlso = group.singleOrNull { it.path.endsWith(seeAlsoExt) }
         val sections = group.filter { isSectionFile(it.path) }.sortedBy { it.path }
         val singlePayload = group.singleOrNull {
-            !it.path.endsWith(headerExt) && !it.path.endsWith(seeAlsoExt) && !isSectionFile(it.path)
+            !it.path.endsWith(headerExt) && !isSectionFile(it.path)
         }
 
         if (header == null) {
-            // New single-file format: one .md file acts as both header and payload.
-            // Only applies to files in subdirectories (stem contains '/') — root-level standalone
-            // files like mcp-steroid-info.md are not articles.
             val mainFile = singlePayload ?: return@mapNotNull null
             if (mainFile.fileType != "md") return@mapNotNull null
             if (!stem.contains("/")) return@mapNotNull null
             require(sections.isEmpty()) {
                 "Article '$stem' has no '-header.md' but has section files. Unsupported combination."
             }
-            PromptArticle(header = mainFile, seeAlso = seeAlso, payload = mainFile, sections = emptyList(), newFormat = true)
+            PromptArticle(header = mainFile, payload = mainFile, sections = emptyList(), newFormat = true)
         } else if (sections.isNotEmpty()) {
             require(singlePayload == null) {
                 "Article '$stem' has both section files and a single payload file '${singlePayload?.path}'. " +
                     "Remove the single payload file or the section files."
             }
-            PromptArticle(header = header, seeAlso = seeAlso, payload = null, sections = sections)
+            PromptArticle(header = header, payload = null, sections = sections)
         } else {
             val payload = singlePayload ?: return@mapNotNull null
-            PromptArticle(header = header, seeAlso = seeAlso, payload = payload, sections = emptyList())
+            PromptArticle(header = header, payload = payload, sections = emptyList())
         }
     }
 }
 
 data class PromptArticle(
     val header: GeneratedPromptClazz,
-    val seeAlso: GeneratedPromptClazz?,
-    /** Non-null for single-file articles; null when the article uses section files. */
     val payload: GeneratedPromptClazz?,
-    /** Non-empty for multi-section articles; empty when the article uses a single payload file. */
     val sections: List<GeneratedPromptClazz> = emptyList(),
-    /**
-     * True for new single-file format articles where one `.md` file serves as both header and payload.
-     * Format: title (line 1), blank (line 2), description (line 3), blank (line 4), content (line 5+).
-     */
     val newFormat: Boolean = false,
 ) {
     init {
@@ -104,13 +94,6 @@ data class PromptArticle(
         }
     }
 
-    /**
-     * The canonical payload path used for URI and class-name derivation.
-     *
-     * - Single-file articles: the actual payload file path.
-     * - Section articles: a virtual `<stem>.md` path derived from the first section filename
-     *   (same as if the payload existed as a single file with that name).
-     */
     val canonicalPayloadPath: String
         get() = when {
             payload != null -> payload.path
@@ -123,25 +106,134 @@ data class PromptArticle(
             }
         }
 
-    /**
-     * For new-format articles, the payload content is lines 5+ of the single file
-     * (skipping title, blank, description, blank).
-     */
-    val newFormatPayloadContent: String
-        get() = payload!!.content.lines().drop(4).joinToString("\n").trimStart('\n')
-
-    /** The primary element for naming purposes (payload or first section). */
     val mainElement: GeneratedPromptClazz get() = payload ?: sections.first()
 
-    /** All non-null generated classes in this article (header, optional see-also, payload or sections). */
-    val allClasses: List<GeneratedPromptClazz>
-        get() = if (newFormat) {
-            // header == payload in new-format; deduplicate by including payload only once
-            listOfNotNull(payload, seeAlso)
-        } else {
-            listOfNotNull(payload, header, seeAlso) + sections
+    /**
+     * True if the article body contains either `###_NO_AUTO_TOC_###` or `###_EXCLUDE_FROM_AUTO_TOC_###`.
+     * Such articles are excluded from the auto-generated folder TOC and from sibling see-also links.
+     */
+    val noAutoToc: Boolean
+        get() = newFormat && AUTO_TOC_DIRECTIVES.any { directive ->
+            payload?.content?.contains(directive) == true
         }
 
+    val allClasses: List<GeneratedPromptClazz>
+        get() = if (newFormat) {
+            listOfNotNull(payload)
+        } else {
+            listOfNotNull(payload, header) + sections
+        }
+}
+
+/**
+ * Parsed parts of a new-format `.md` article.
+ *
+ * The file format is:
+ * ```
+ * Title
+ *
+ * Short description (≤200 chars)
+ *
+ * ...body content (markdown + ```kotlin``` blocks)...
+ *
+ * # See also        ← optional section
+ *
+ * - links...
+ * ```
+ *
+ * Invariant: [assembleFullContent] produces the exact original file content.
+ */
+data class NewFormatParts(
+    val title: String,
+    val description: String,
+    /** Markdown segments interleaved with kotlin blocks; length = ktBodyParts.size + 1 */
+    val mdBodyParts: List<String>,
+    /** Kotlin code blocks (without fence lines), in order */
+    val ktBodyParts: List<String>,
+    /**
+     * Content after `# See also\n\n`, preserving trailing newlines from the source file.
+     * Null if the file has no `# See also` section.
+     */
+    val seeAlsoManual: String?,
+)
+
+/**
+ * Parses a new-format `.md` article content into its constituent parts.
+ */
+fun parseNewFormatArticleParts(content: String): NewFormatParts {
+    val lines = content.lines()
+    require(lines.size >= 4) { "Article must have at least 4 lines, got ${lines.size}" }
+
+    val title = lines[0].trim()
+    require(lines[1].isBlank()) { "Line 2 must be blank, got: '${lines[1]}'" }
+    val description = lines[2].trim()
+    require(lines[3].isBlank()) { "Line 4 must be blank, got: '${lines[3]}'" }
+
+    // lines().joinToString("\n") round-trips correctly:
+    // "text\n".lines() = ["text", ""] → joinToString → "text\n"
+    // "text".lines()   = ["text"]     → joinToString → "text"
+    val bodyAndSeeAlso = lines.drop(4).joinToString("\n")
+
+    val seeAlsoMarker = "\n\n# See also\n"
+    val seeAlsoIdx = bodyAndSeeAlso.indexOf(seeAlsoMarker)
+    val body: String
+    val seeAlsoManual: String?
+    if (seeAlsoIdx >= 0) {
+        body = bodyAndSeeAlso.substring(0, seeAlsoIdx)
+        val afterMarker = bodyAndSeeAlso.substring(seeAlsoIdx + seeAlsoMarker.length)
+        // Skip the blank line after "# See also" header; keep trailing newlines as-is
+        // (they are part of the file content and must be preserved for round-trip equality)
+        seeAlsoManual = afterMarker.removePrefix("\n")
+    } else {
+        body = bodyAndSeeAlso
+        seeAlsoManual = null
+    }
+
+    val mdParts = mutableListOf<String>()
+    val ktParts = mutableListOf<String>()
+
+    var remaining = body
+    while (true) {
+        val ktStart = remaining.indexOf("```kotlin\n")
+        if (ktStart < 0) {
+            mdParts.add(remaining)
+            break
+        }
+        mdParts.add(remaining.substring(0, ktStart))
+        val codeStart = ktStart + "```kotlin\n".length
+        val closingIdx = remaining.indexOf("\n```", codeStart)
+        require(closingIdx >= 0) { "Unclosed ```kotlin block in article body" }
+        ktParts.add(remaining.substring(codeStart, closingIdx + 1))
+        remaining = remaining.substring(closingIdx + "\n```".length)
+    }
+
+    return NewFormatParts(title, description, mdParts, ktParts, seeAlsoManual)
+}
+
+/**
+ * Assembles the full file content from [NewFormatParts].
+ * Used at build time to assert [parseNewFormatArticleParts] round-trips correctly.
+ */
+fun assembleFullContent(parts: NewFormatParts): String = buildString {
+    append(parts.title)
+    append("\n\n")
+    append(parts.description)
+    append("\n\n")
+    for (i in parts.mdBodyParts.indices) {
+        val md = parts.mdBodyParts[i]
+        if (md.isNotEmpty()) append(md)
+        if (i < parts.ktBodyParts.size) {
+            append("```kotlin\n")
+            append(parts.ktBodyParts[i])
+            append("```")
+        }
+    }
+    if (parts.seeAlsoManual != null) {
+        append("\n\n# See also\n\n")
+        append(parts.seeAlsoManual)
+    }
+    // Trailing newlines are preserved inside mdBodyParts (no-see-also case) or
+    // inside seeAlsoManual (see-also case) — no extra append needed.
 }
 
 data class GeneratedArticleClazz(
@@ -150,22 +242,15 @@ data class GeneratedArticleClazz(
     override val clazzName: ClassName,
     val article: PromptArticle?,
     val uri: String,
+    val hasDescription: Boolean = false,
+    val hasSeeAlso: Boolean = false,
 ) : Generated {
     override val entryName: String
         get() = path.substringAfterLast("/").toPromptIdentifierName()
 }
 
-/**
- * Derive the URI prefix from a folder name.
- * After the folder rename (removing `-examples` suffix), this is now just the folder name.
- */
-fun folderToUriPrefix(folder: String): String {
-    return folder
-}
+fun folderToUriPrefix(folder: String): String = folder
 
-/**
- * Derive the display name for a folder (used for TOC headers and resource naming).
- */
 fun folderToDisplayName(folder: String): String {
     return when (folder) {
         "lsp" -> "LSP"
@@ -180,37 +265,18 @@ fun folderToDisplayName(folder: String): String {
     }
 }
 
-/**
- * Derive the file stem (filename without extension) from a payload path, kebab-cased.
- * Converts UPPER_CASE names to lower-kebab-case.
- */
 fun payloadFileStem(payloadPath: String): String {
     val fileName = payloadPath.substringAfterLast("/")
     val stem = fileName.removeSuffix(".kts").removeSuffix(".md").removeSuffix(".kt")
-    // Convert UPPER_CASE_NAME to lower-kebab-case: replace _ with -, lowercase
     return stem.replace('_', '-').lowercase()
 }
 
-/**
- * Build the resource URI for an article.
- */
 fun buildArticleUri(folder: String, payloadPath: String): String {
     val prefix = folderToUriPrefix(folder)
     val stem = payloadFileStem(payloadPath)
-    return if (prefix.isEmpty()) {
-        "mcp-steroid://$stem"
-    } else {
-        "mcp-steroid://$prefix/$stem"
-    }
+    return if (prefix.isEmpty()) "mcp-steroid://$stem" else "mcp-steroid://$prefix/$stem"
 }
 
-/**
- * Compute the generated article class name for a [PromptArticle].
- *
- * The name is derived from the article's [PromptArticle.canonicalPayloadPath] stem,
- * so it is the same regardless of whether the article uses a single file or multiple sections.
- * This matches the class name that [generateArticleClazz] will create.
- */
 fun articleClassName(article: PromptArticle): ClassName {
     val packageName = article.allClasses.map { it.clazzName.packageName }.distinct().single()
     val stem = article.canonicalPayloadPath
@@ -222,12 +288,6 @@ fun articleClassName(article: PromptArticle): ClassName {
     return ClassName(packageName, className)
 }
 
-/**
- * Extract the article name (title) from an article.
- *
- * - New-format: first line of the single `.md` file.
- * - Old-format: first line of the `-header.md` file.
- */
 fun articleName(article: PromptArticle): String {
     return if (article.newFormat) {
         article.payload!!.content.trim().lineSequence().first().trim()
@@ -236,56 +296,50 @@ fun articleName(article: PromptArticle): String {
     }
 }
 
-/**
- * Extract the full description from an article.
- *
- * - New-format: single description line (line 3 of the `.md` file, after title+blank).
- * - Old-format: all lines after the title in the `-header.md` file, joined.
- */
 fun articleDescription(article: PromptArticle): String {
     return if (article.newFormat) {
         article.payload!!.content.trim().lineSequence()
-            .drop(1)
-            .dropWhile { it.isBlank() }
-            .firstOrNull()?.trim() ?: ""
+            .drop(1).dropWhile { it.isBlank() }.firstOrNull()?.trim() ?: ""
     } else {
         article.header.content.trim().lineSequence()
-            .drop(1)
-            .dropWhile { it.isBlank() }
-            .joinToString("\n")
-            .trim()
+            .drop(1).dropWhile { it.isBlank() }.joinToString("\n").trim()
     }
 }
 
-/**
- * Extract the first line of description from an article.
- *
- * - New-format: the single description line (line 3 of the `.md` file).
- * - Old-format: first line after the title in the `-header.md` file.
- */
 fun articleDescriptionFirstLine(article: PromptArticle): String {
     return if (article.newFormat) {
         article.payload!!.content.trim().lineSequence()
-            .drop(1)
-            .dropWhile { it.isBlank() }
-            .firstOrNull()?.trim() ?: ""
+            .drop(1).dropWhile { it.isBlank() }.firstOrNull()?.trim() ?: ""
     } else {
         article.header.content.trim().lineSequence()
-            .drop(1)
-            .dropWhile { it.isBlank() }
-            .firstOrNull()?.trim() ?: ""
+            .drop(1).dropWhile { it.isBlank() }.firstOrNull()?.trim() ?: ""
     }
 }
 
-/**
- * Build a see-also markdown entry for an article.
- */
 fun buildSeeAlsoLine(folder: String, article: PromptArticle): String {
     val uri = buildArticleUri(folder, article.canonicalPayloadPath)
     val name = articleName(article)
     val desc = articleDescriptionFirstLine(article)
     val suffix = if (desc.isNotEmpty()) " - $desc" else ""
     return "- [$name]($uri)$suffix"
+}
+
+/**
+ * Combines the manual see-also content (from the file's `# See also` section) with the
+ * auto-generated sibling links into a single string for the `seeAlso` property.
+ *
+ * Both inputs may be absent independently:
+ * - [manual] is null if the file has no `# See also` section.
+ * - [generated] is empty if all siblings are already covered by the manual section.
+ */
+private fun buildCombinedSeeAlso(manual: String?, generated: String): String {
+    val m = manual?.trimEnd('\n')
+    return when {
+        m != null && generated.isNotEmpty() -> "$m\n\n$generated"
+        m != null -> m
+        generated.isNotEmpty() -> generated
+        else -> ""
+    }
 }
 
 fun PromptGenerationContext.generateArticleClazz(
@@ -301,51 +355,48 @@ fun PromptGenerationContext.generateArticleClazz(
     val pkg = classType.packageName
 
     val props = mutableListOf<PropertySpec>()
-
     val nullablePromptBase = promptBaseClass.copy(nullable = true)
 
-    // Determine the payload class:
-    // - New-format articles: generate an inline class holding lines 5+ (skipping title+desc header).
-    // - Single-file articles (old format): use the already-generated class for that file.
-    // - Section articles: generate a new inline class holding the merged content.
-    val payloadClassName: ClassName = when {
-        article.newFormat -> {
-            val mergedClass = ClassName(pkg, classType.simpleName + "Payload")
-            generateStringPromptClazz(article.newFormatPayloadContent, mergedClass)
-            mergedClass
-        }
-        article.sections.isNotEmpty() -> {
-            val mergedClass = ClassName(pkg, classType.simpleName + "Payload")
-            generateSectionDelegatePayloadClazz(article.sections, mergedClass)
-            mergedClass
-        }
-        else -> article.payload!!.clazzName
+    // Description holder class
+    val descHolderClass = ClassName(pkg, classType.simpleName + "Description")
+    if (description.isNotEmpty()) {
+        generateStringPromptClazz(description, descHolderClass, sourcePath = article.header.path)
     }
 
-    // payload property
-    props += PropertySpec.builder("payload", promptBaseClass)
-        .addModifiers(KModifier.OVERRIDE)
-        .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-            addStatement("return %T()", payloadClassName)
-        }).build())
-        .build()
+    // Effective see-also: for new-format, merge manual (from file) + generated siblings
+    val effectiveSeeAlsoContent: String
+    if (article.newFormat) {
+        val content = article.payload!!.content
+        val parts = parseNewFormatArticleParts(content)
 
-    // uri property
+        // Build-time assertion: assembled parts must equal source file content
+        val assembled = assembleFullContent(parts)
+        require(assembled == content) {
+            "Build-time assertion failed for ${article.payload.path}: " +
+                "assembled parts differ from source file content.\n" +
+                "Expected length=${content.length}, assembled length=${assembled.length}.\n" +
+                "First diff at char ${content.zip(assembled).indexOfFirst { (a, b) -> a != b }}"
+        }
+
+        generateNewFormatParts(article, parts, classType, pkg, props)
+        effectiveSeeAlsoContent = buildCombinedSeeAlso(parts.seeAlsoManual, seeAlsoContent)
+    } else {
+        generateOldFormatPayload(article, classType, pkg, props)
+        effectiveSeeAlsoContent = seeAlsoContent
+    }
+
+    // uri, name, description, seeAlso properties — same for all formats
     props += PropertySpec.builder("uri", String::class)
         .addModifiers(KModifier.OVERRIDE)
         .initializer("%S", uri)
         .build()
 
-    // name property (short, pre-defined string constant)
     props += PropertySpec.builder("name", String::class)
         .addModifiers(KModifier.OVERRIDE)
         .initializer("%S", name)
         .build()
 
-    // description property - PromptBase? holder for non-empty content
     if (description.isNotEmpty()) {
-        val descHolderClass = ClassName(pkg, classType.simpleName + "Description")
-        generateStringPromptClazz(description, descHolderClass)
         props += PropertySpec.builder("description", nullablePromptBase)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
@@ -359,10 +410,9 @@ fun PromptGenerationContext.generateArticleClazz(
             .build()
     }
 
-    // seeAlso property - PromptBase? holder for non-empty content
-    if (seeAlsoContent.isNotEmpty()) {
+    if (effectiveSeeAlsoContent.isNotEmpty()) {
         val seeAlsoHolderClass = ClassName(pkg, classType.simpleName + "SeeAlso")
-        generateStringPromptClazz(seeAlsoContent, seeAlsoHolderClass)
+        generateStringPromptClazz(effectiveSeeAlsoContent, seeAlsoHolderClass, sourcePath = article.canonicalPayloadPath)
         props += PropertySpec.builder("seeAlso", nullablePromptBase)
             .addModifiers(KModifier.OVERRIDE)
             .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
@@ -376,23 +426,6 @@ fun PromptGenerationContext.generateArticleClazz(
             .build()
     }
 
-    // ktBlock{NNN} properties - PromptBase getters for each ```kotlin``` block in new-format articles.
-    // Lets tests (and callers) access raw Kotlin code via .readPrompt(), consistent with payload/description/seeAlso.
-    if (article.newFormat) {
-        val blocks = extractKotlinBlocks(article.newFormatPayloadContent)
-        blocks.forEachIndexed { index, blockContent ->
-            val blockIndex = index.toString().padStart(3, '0')
-            val holderClass = ClassName(pkg, classType.simpleName + "KtBlock${blockIndex}")
-            generateStringPromptClazz(blockContent.trimEnd(), holderClass, "text/x-kotlin")
-            props += PropertySpec.builder("ktBlock${blockIndex}", promptBaseClass)
-                .addKdoc("Raw Kotlin content of block #%L from %L", index, article.canonicalPayloadPath)
-                .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
-                    addStatement("return %T()", holderClass)
-                }).build())
-                .build()
-        }
-    }
-
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptArticleClass)
         .addProperties(props)
@@ -404,7 +437,164 @@ fun PromptGenerationContext.generateArticleClazz(
         .build()
 
     writeClazz(fileSpec, classType)
-    return GeneratedArticleClazz(folder, article.canonicalPayloadPath, classType, article, uri)
+    return GeneratedArticleClazz(
+        folder = folder,
+        path = article.canonicalPayloadPath,
+        clazzName = classType,
+        article = article,
+        uri = uri,
+        hasDescription = description.isNotEmpty(),
+        hasSeeAlso = effectiveSeeAlsoContent.isNotEmpty(),
+    )
+}
+
+/**
+ * Generates payload and ktBlock* properties for a new-format article using the parts architecture.
+ *
+ * Parts generated:
+ * - `{Stem}PromptArticleKtPart{NNN}` — each kotlin code block (without fences)
+ * - `{Stem}PromptArticleMdPart{NNN}` — each non-empty markdown segment
+ * - `{Stem}PromptArticlePayload` — assembles body (lines 5+, without `# See also`) via buildString
+ *
+ * The `payload` property returns `{Stem}PromptArticlePayload()`.
+ * The `ktBlock{NNN}` properties directly reference `{Stem}PromptArticleKtPart{NNN}`.
+ *
+ * The description part class is assumed to be generated by the caller before this function.
+ */
+private fun PromptGenerationContext.generateNewFormatParts(
+    article: PromptArticle,
+    parts: NewFormatParts,
+    classType: ClassName,
+    pkg: String,
+    props: MutableList<PropertySpec>,
+) {
+    val sourcePath = article.payload!!.path
+
+    // Strip any directive lines from md content — directives are not user-visible output
+    fun stripDirective(s: String): String {
+        if (AUTO_TOC_DIRECTIVES.none { s.contains(it) }) return s
+        return s.lines().filter { it !in AUTO_TOC_DIRECTIVES }.joinToString("\n")
+    }
+
+    // Generate md body part classes (non-empty only)
+    val mdPartClasses = parts.mdBodyParts.mapIndexed { i, md ->
+        val stripped = stripDirective(md)
+        if (stripped.isNotEmpty()) {
+            val idx = i.toString().padStart(3, '0')
+            val cls = ClassName(pkg, "${classType.simpleName}MdPart$idx")
+            generateStringPromptClazz(stripped, cls, sourcePath = sourcePath)
+            cls
+        } else null
+    }
+
+    // Generate kt body part classes
+    val ktPartClasses = parts.ktBodyParts.mapIndexed { i, code ->
+        val idx = i.toString().padStart(3, '0')
+        val cls = ClassName(pkg, "${classType.simpleName}KtPart$idx")
+        generateStringPromptClazz(code, cls, mimeType = "text/x-kotlin", sourcePath = sourcePath)
+        cls
+    }
+
+    // Generate a payload class that assembles the body via buildString (no see-also)
+    val payloadClass = ClassName(pkg, "${classType.simpleName}Payload")
+    generateNewFormatPayloadClass(payloadClass, mdPartClasses, ktPartClasses, sourcePath)
+
+    props += PropertySpec.builder("payload", promptBaseClass)
+        .addModifiers(KModifier.OVERRIDE)
+        .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
+            addStatement("return %T()", payloadClass)
+        }).build())
+        .build()
+
+    // ktBlock{NNN} properties — direct references to kt part classes (single source of truth)
+    ktPartClasses.forEachIndexed { index, ktClass ->
+        val blockIndex = index.toString().padStart(3, '0')
+        props += PropertySpec.builder("ktBlock$blockIndex", promptBaseClass)
+            .addKdoc("Kotlin block #%L from %L.", index, sourcePath)
+            .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
+                addStatement("return %T()", ktClass)
+            }).build())
+            .build()
+    }
+}
+
+/**
+ * Generates a [PromptBase] subclass that assembles the article body (lines 5+, without `# See also`)
+ * by calling each part's `readPrompt()` and concatenating with proper fence markers.
+ *
+ * Using explicit `buildString` rather than wrapping parts in a list keeps the generated code
+ * readable and avoids the need for [ConstPromptBase].
+ */
+private fun PromptGenerationContext.generateNewFormatPayloadClass(
+    classType: ClassName,
+    mdPartClasses: List<ClassName?>,
+    ktPartClasses: List<ClassName>,
+    sourcePath: String,
+) {
+    val readFun = FunSpec.builder("readPromptInternal")
+        .addModifiers(KModifier.OVERRIDE)
+        .returns(String::class)
+        .addCode(buildCodeBlock {
+            controlFlow("return buildString") {
+                for (i in mdPartClasses.indices) {
+                    val mdClass = mdPartClasses[i]
+                    if (mdClass != null) {
+                        addStatement("append(%T().readPrompt())", mdClass)
+                    }
+                    if (i < ktPartClasses.size) {
+                        addStatement("append(%S)", "```kotlin\n")
+                        addStatement("append(%T().readPrompt())", ktPartClasses[i])
+                        addStatement("append(%S)", "```")
+                    }
+                }
+            }
+        })
+        .build()
+
+    val mimeTypeProp = PropertySpec.builder("mimeType", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", "text/markdown")
+        .build()
+
+    val typeSpec = TypeSpec.classBuilder(classType)
+        .addKdoc("Payload body (lines 5+, without `# See also`) assembled from parts of %L.", sourcePath)
+        .superclass(promptBaseClass)
+        .addProperty(mimeTypeProp)
+        .addFunction(readFun)
+        .build()
+
+    val fileSpec = FileSpec.builder(classType)
+        .addFileComment("GENERATED FILE - DO NOT EDIT")
+        .addType(typeSpec)
+        .build()
+
+    writeClazz(fileSpec, classType)
+}
+
+/**
+ * Generates payload property for old-format articles (header + single payload file or sections).
+ */
+private fun PromptGenerationContext.generateOldFormatPayload(
+    article: PromptArticle,
+    classType: ClassName,
+    pkg: String,
+    props: MutableList<PropertySpec>,
+) {
+    val payloadClassName: ClassName = when {
+        article.sections.isNotEmpty() -> {
+            val mergedClass = ClassName(pkg, classType.simpleName + "Payload")
+            generateSectionDelegatePayloadClazz(article.sections, mergedClass)
+            mergedClass
+        }
+        else -> article.payload!!.clazzName
+    }
+
+    props += PropertySpec.builder("payload", promptBaseClass)
+        .addModifiers(KModifier.OVERRIDE)
+        .getter(FunSpec.getterBuilder().addCode(buildCodeBlock {
+            addStatement("return %T()", payloadClassName)
+        }).build())
+        .build()
 }
 
 /**
@@ -426,12 +616,10 @@ fun PromptGenerationContext.generateTocArticleClazz(
 
     val classType = ClassName(packageName, displayName.replace(" ", "") + "TocArticle")
 
-    // Generate payload holder with TOC content
     val payloadHolderClass = ClassName(packageName, classType.simpleName + "Payload")
     generateStringPromptClazz(tocContent, payloadHolderClass)
 
     val nullablePromptBase = promptBaseClass.copy(nullable = true)
-
     val props = mutableListOf<PropertySpec>()
 
     props += PropertySpec.builder("payload", promptBaseClass)
@@ -451,7 +639,6 @@ fun PromptGenerationContext.generateTocArticleClazz(
         .initializer("%S", tocName)
         .build()
 
-    // description - PromptBase holder for TOC description
     val descHolderClass = ClassName(packageName, classType.simpleName + "Description")
     generateStringPromptClazz(tocDescription, descHolderClass)
     props += PropertySpec.builder("description", nullablePromptBase)

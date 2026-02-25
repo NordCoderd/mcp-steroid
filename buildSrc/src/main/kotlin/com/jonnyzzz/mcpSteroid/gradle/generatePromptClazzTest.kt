@@ -138,67 +138,99 @@ fun PromptGenerationContext.generateKtSectionCompilationTest(
 }
 
 /**
- * Generates a single compilation test class per new-format `.md` article file, with one
+ * Generates a test class for an article that verifies [payload], [description], and [seeAlso]
+ * can all be read without error and produce non-empty content.
+ *
+ * A separate test method is generated for each non-null field so tests can be run individually.
+ */
+fun PromptGenerationContext.generateArticleReadTest(
+    article: GeneratedArticleClazz,
+) {
+    val articleClassName = article.clazzName
+    val baseStem = articleClassName.simpleName.removeSuffix("PromptArticle")
+    val classType = ClassName(articleClassName.packageName, "${baseStem}PromptArticleReadTest")
+
+    val methods = mutableListOf<FunSpec>()
+
+    methods += FunSpec.builder("testPayloadReadable")
+        .addKdoc("Verifies %T().payload.readPrompt() returns non-empty content.", articleClassName)
+        .returns(Unit::class)
+        .addCode(buildCodeBlock {
+            addStatement("val payload = %T().payload.readPrompt()", articleClassName)
+            addStatement("assertTrue(%S, payload.isNotEmpty())", "payload must not be empty for ${article.path}")
+        })
+        .build()
+
+    if (article.hasDescription) {
+        methods += FunSpec.builder("testDescriptionReadable")
+            .addKdoc("Verifies %T().description!!.readPrompt() returns non-empty content.", articleClassName)
+            .returns(Unit::class)
+            .addCode(buildCodeBlock {
+                addStatement("val desc = %T().description!!.readPrompt()", articleClassName)
+                addStatement("assertTrue(%S, desc.isNotEmpty())", "description must not be empty for ${article.path}")
+            })
+            .build()
+    }
+
+    if (article.hasSeeAlso) {
+        methods += FunSpec.builder("testSeeAlsoReadable")
+            .addKdoc("Verifies %T().seeAlso!!.readPrompt() returns non-empty content.", articleClassName)
+            .returns(Unit::class)
+            .addCode(buildCodeBlock {
+                addStatement("val seeAlso = %T().seeAlso!!.readPrompt()", articleClassName)
+                addStatement("assertTrue(%S, seeAlso.isNotEmpty())", "seeAlso must not be empty for ${article.path}")
+            })
+            .build()
+    }
+
+    val testTypeSpec = TypeSpec.classBuilder(classType)
+        .superclass(ClassName.bestGuess("com.intellij.testFramework.fixtures.BasePlatformTestCase"))
+        .addFunctions(methods)
+        .build()
+
+    val testFileSpec = FileSpec.builder(classType)
+        .addFileComment("GENERATED FILE - DO NOT EDIT")
+        .addType(testTypeSpec)
+        .build()
+
+    writeTestClazz(testFileSpec, classType)
+}
+
+/**
+ * Generates a single compilation test class per new-format `.md` article, with one
  * test method per ` ```kotlin ``` ` block.
  *
- * Only called for `.md` files that are NOT `-header.md`, NOT `-see-also.md`, and NOT section files.
- * Generates a class named `{FileStemPascalCase}KtBlocksCompilationTest` with methods:
- *   `testBlock000Compiles()`, `testBlock001Compiles()`, ...
+ * Called after [generateArticleClazz] so the article's generated class (with its
+ * `ktBlock000`, `ktBlock001`, … properties) already exists. Each test method simply
+ * instantiates that class and passes the corresponding block to
+ * [com.jonnyzzz.mcpSteroid.koltinc.BaseKtBlocksCompilationTest.compileKtBlock].
  *
- * Each method wraps the block content via [CodeButcher.wrapToKotlinClass], compiles it with
- * `-Werror`, and fails if the kotlinc exit code is non-zero.
+ * Generates a class named `{ArticleStem}KtBlocksCompilationTest` with methods:
+ *   `testBlock000Compiles()`, `testBlock001Compiles()`, …
  */
 fun PromptGenerationContext.generateMdKtBlockCompilationTests(
-    clazz: GeneratedPromptClazz,
+    article: GeneratedArticleClazz,
 ) {
-    // Only process .md files that are not header, see-also, or section files
-    if (clazz.fileType != "md") return
-    val name = clazz.path.substringAfterLast("/")
-    if (name.endsWith("-header.md")) return
-    if (name.endsWith("-see-also.md")) return
-    if (isSectionFile(clazz.path)) return
+    val promptArticle = article.article ?: return
+    require(promptArticle.newFormat)
 
-    val blocks = extractKotlinBlocks(clazz.content)
-    if (blocks.isEmpty()) return
+    val parts = parseNewFormatArticleParts(promptArticle.payload!!.content)
+    val blockCount = parts.ktBodyParts.size
+    if (blockCount == 0) return
 
-    val filesClass = ClassName("java.nio.file", "Files")
-    val standardCharsetsClass = ClassName("java.nio.charset", "StandardCharsets")
-    val codeButcherClass = ClassName("com.jonnyzzz.mcpSteroid.execution", "CodeButcher")
-    val kotlincCommandLineBuilderClass = ClassName("com.jonnyzzz.mcpSteroid.koltinc", "KotlincCommandLineBuilder")
-
-    val baseStem = clazz.clazzName.simpleName.removeSuffix("Prompt")
+    val articleClassName = article.clazzName
+    val baseStem = articleClassName.simpleName.removeSuffix("PromptArticle")
     val classType = ClassName(
-        clazz.clazzName.packageName,
+        articleClassName.packageName,
         "${baseStem}KtBlocksCompilationTest",
     )
 
-    val testMethods = blocks.mapIndexed { index, blockContent ->
+    val testMethods = (0 until blockCount).map { index ->
         val blockIndex = index.toString().padStart(3, '0')
         FunSpec.builder("testBlock${blockIndex}Compiles")
-            .addKdoc("Source: %L, block #%L", clazz.path, index)
+            .addKdoc("Source: %L, block #%L", article.path, index)
             .returns(Unit::class)
-            .addCode(buildCodeBlock {
-                controlFlow("timeoutRunBlocking(120.seconds)") {
-                    addStatement("val content = %S", blockContent)
-                    addStatement("val wrapped = %T().wrapToKotlinClass(%S, content)", codeButcherClass, "MdKtBlock")
-                    addStatement("val tempDir = %T.createTempDirectory(%S)", filesClass, "md-kt-block-compile")
-                    addStatement("val sourceFile = tempDir.resolve(%S)", "Script.kt")
-                    addStatement("%T.writeString(sourceFile, wrapped.code, %T.UTF_8)", filesClass, standardCharsetsClass)
-                    addStatement("val outputJar = tempDir.resolve(%S)", "out.jar")
-                    addStatement("val classpath = scriptClassLoaderFactory.ideClasspath()")
-                    addStatement(
-                        "val cmd = %T(outputJar).withNoStdLib(true).withExtraParameters(listOf(%S)).addClasspathEntries(classpath).addSource(sourceFile).build()",
-                        kotlincCommandLineBuilderClass,
-                        "-Werror",
-                    )
-                    addStatement("val result = kotlincProcessClient.kotlinc(cmd.args, tempDir)")
-                    addStatement("val output = (result.stdout + %S + result.stderr).trim()", "\n")
-                    addStatement(
-                        "assertEquals(%S + output, 0, result.exitCode)",
-                        "Compilation failed or has warnings (-Werror) for ${clazz.src.name} block #$index:\n",
-                    )
-                }
-            })
+            .addStatement("compileKtBlock(%T().ktBlock${blockIndex})", articleClassName)
             .build()
     }
 
@@ -209,10 +241,6 @@ fun PromptGenerationContext.generateMdKtBlockCompilationTests(
 
     val testFileSpec = FileSpec.builder(classType)
         .addFileComment("GENERATED FILE - DO NOT EDIT")
-        .addImport("com.jonnyzzz.mcpSteroid.koltinc", "scriptClassLoaderFactory")
-        .addImport("com.jonnyzzz.mcpSteroid.koltinc", "kotlincProcessClient")
-        .addImport("com.intellij.testFramework.common", "timeoutRunBlocking")
-        .addImport("kotlin.time.Duration.Companion", "seconds")
         .addType(testTypeSpec)
         .build()
 

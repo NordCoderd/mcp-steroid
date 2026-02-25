@@ -38,7 +38,6 @@ abstract class CompilePromptsTask : DefaultTask() {
             if (isSectionFile(clazz.path) && clazz.fileType == "kt") {
                 ctx.generateKtSectionCompilationTest(clazz)
             }
-            ctx.generateMdKtBlockCompilationTests(clazz)
         }
 
         // First pass: group articles per folder
@@ -53,7 +52,10 @@ abstract class CompilePromptsTask : DefaultTask() {
 
                 val articleClasses = articles.map { article ->
                     val seeAlsoContent = buildSeeAlsoContent(folder, article, folderArticles)
-                    ctx.generateArticleClazz(folder, article, seeAlsoContent)
+                    val articleClazz = ctx.generateArticleClazz(folder, article, seeAlsoContent)
+                    ctx.generateArticleReadTest(articleClazz)
+                    if (article.newFormat) ctx.generateMdKtBlockCompilationTests(articleClazz)
+                    articleClazz
                 }
 
                 val tocContent = buildTocContent(folder, articles)
@@ -77,59 +79,72 @@ abstract class CompilePromptsTask : DefaultTask() {
 }
 
 /**
- * Build the see-also content for an article.
- * Prepends manual cross-folder content from the see-also file, then auto-generates
- * links to all other articles in the same folder.
+ * Extracts all `mcp-steroid://...` URIs mentioned in the article's `# See also` section
+ * (the manual content embedded in the new-format `.md` file).
+ *
+ * Used to avoid duplicating links in the auto-generated sibling list.
+ */
+private fun extractManualSeeAlsoUris(article: PromptArticle): Set<String> {
+    if (!article.newFormat || article.payload == null) return emptySet()
+    val content = article.payload.content
+    val seeAlsoMarker = "\n\n# See also\n"
+    val idx = content.indexOf(seeAlsoMarker)
+    if (idx < 0) return emptySet()
+    val seeAlsoSection = content.substring(idx)
+    return Regex("mcp-steroid://[a-zA-Z0-9/_-]+").findAll(seeAlsoSection).map { it.value }.toSet()
+}
+
+/**
+ * Build the auto-generated see-also content for an article.
+ *
+ * Returns a list of sibling article links that are NOT already mentioned in the
+ * article's manual `# See also` section (embedded in the `.md` file).
+ *
+ * Returns empty string if there are no new sibling links to add.
+ * Articles with `###_NO_AUTO_TOC_###` are excluded from sibling lists.
  */
 private fun buildSeeAlsoContent(
     folder: String,
     article: PromptArticle,
     folderArticles: Map<String, List<PromptArticle>>,
 ): String {
-    val siblings = folderArticles[folder]?.filter { it !== article } ?: emptyList()
+    val siblings = folderArticles[folder]?.filter { it !== article && !it.noAutoToc } ?: emptyList()
+    if (siblings.isEmpty()) return ""
 
-    // Read manual cross-folder content from the see-also file
-    val manualContent = article.seeAlso?.content?.trim() ?: ""
+    // Exclude siblings already referenced in the file's manual # See also section
+    val manualUris = extractManualSeeAlsoUris(article)
+    val newSiblings = siblings.filter {
+        buildArticleUri(folder, it.canonicalPayloadPath) !in manualUris
+    }
+    if (newSiblings.isEmpty()) return ""
 
-    if (siblings.isEmpty() && manualContent.isEmpty()) return ""
-
+    val displayName = folderToDisplayName(folder)
+    val folderLabel = displayName.ifEmpty { "related" }
     return buildString {
-        appendLine("## See Also")
-        appendLine()
-
-        // Prepend manual cross-folder references
-        if (manualContent.isNotEmpty()) {
-            appendLine(manualContent)
-            appendLine()
-        }
-
-        // Auto-generated same-folder sibling links
-        if (siblings.isNotEmpty()) {
-            val displayName = folderToDisplayName(folder)
-            val folderLabel = displayName.ifEmpty { "related" }
-            appendLine("Related $folderLabel resources:")
-            for (sibling in siblings) {
-                appendLine(buildSeeAlsoLine(folder, sibling))
-            }
+        appendLine("Related $folderLabel resources:")
+        for (sibling in newSiblings) {
+            appendLine(buildSeeAlsoLine(folder, sibling))
         }
     }.trim()
 }
 
 /**
  * Build the table-of-contents content for a folder, generated at build time.
+ * Articles with `###_NO_AUTO_TOC_###` are excluded from the TOC.
  */
 private fun buildTocContent(
     folder: String,
     articles: List<PromptArticle>,
 ): String {
-    if (articles.isEmpty()) return ""
+    val tocArticles = articles.filter { !it.noAutoToc }
+    if (tocArticles.isEmpty()) return ""
     val displayName = folderToDisplayName(folder)
     val tocName = if (displayName.isNotEmpty()) "$displayName Resources" else "Resources"
 
     return buildString {
         appendLine("# $tocName")
         appendLine()
-        for (article in articles) {
+        for (article in tocArticles) {
             appendLine(buildSeeAlsoLine(folder, article))
         }
     }.trim()
