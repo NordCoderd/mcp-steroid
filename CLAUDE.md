@@ -251,6 +251,8 @@ After deletion, the next test run will rebuild indexes from scratch (adds ~30–
 
 **Prevention**: Avoid killing the Gradle test JVM with SIGKILL (`kill -9`) mid-run — prefer SIGTERM so IntelliJ can flush its index files cleanly.
 
+**Critical**: NEVER run two `./gradlew :ij-plugin:test` tasks concurrently. Both JVMs write to the same `ij-plugin/build/idea-sandbox/` directory and will corrupt each other's `Stubs.storage`. Always wait for a test run to finish before starting another. Also, **never delete `idea-sandbox/` while a test JVM is running** — file handle corruption causes the same result.
+
 ### Live JVM Thread/Coroutine Dumps
 
 When a test run hangs or behaves unexpectedly, **do NOT stop the task** — collect a thread dump first to understand what's happening:
