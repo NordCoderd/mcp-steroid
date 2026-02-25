@@ -3,11 +3,12 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
-import com.jonnyzzz.mcpSteroid.testHelper.docker.ExecContainerProcessRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
 import com.jonnyzzz.mcpSteroid.testHelper.docker.runInContainerDetached
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.consumeAsFlow
 import java.util.concurrent.atomic.AtomicInteger
 
 class PumpHandle(
@@ -28,7 +29,10 @@ class PumpHandle(
  * Provides a visible console window (xterm) on the right 1/3 of the screen
  * that displays test status messages in real-time.
  *
- * Uses `tail -f` to follow a log file; writing text appends to the file.
+ * Uses `tail -f` to follow a log file; text is sent via a Kotlin [Channel] to a
+ * single long-running `docker exec -i` process that reads from stdin and appends to the file.
+ * This avoids a separate docker exec round-trip per [writeLine] call.
+ *
  * ANSI escape codes are supported natively by xterm.
  *
  * Immutable: created via [create] factory, cleanup registered in [CloseableStack].
@@ -36,18 +40,13 @@ class PumpHandle(
 class ConsoleDriver(
     private val container: ContainerDriver,
     private val consoleFile: String,
+    private val lineChannel: Channel<ByteArray>,
 ) {
 
     fun writeLine(text: String) {
         println(text)
-        // Single docker exec call: heredoc append with quoted delimiter to prevent expansion
-        container.startProcessInContainer {
-            this
-                .args("bash", "-c", "cat >> $consoleFile << 'CONSOLE_LINE_END'\n$text\nCONSOLE_LINE_END")
-                .timeoutSeconds(5)
-                .quietly()
-                .description("writeLine to console")
-        }.awaitForProcessFinish()
+        // Channel.UNLIMITED — trySend never fails due to capacity
+        lineChannel.trySend((text + "\n").toByteArray())
     }
 
     // -- ANSI formatting helpers --
@@ -233,7 +232,25 @@ class XcvbConsoleDriver(
         }
 
         windowDriver.updateLayout(consoleWindowId, layoutRect)
-        val driver = ConsoleDriver(container, consoleFile)
+
+        // Start a single long-running process that reads from stdin (line-by-line) and appends
+        // to the console file. This replaces per-writeLine docker exec round-trips with a single
+        // persistent connection driven by a Kotlin Channel.
+        val lineChannel = Channel<ByteArray>(Channel.UNLIMITED)
+        val writerProcess = container.startProcessInContainer {
+            this
+                .args("bash", "-c", "cat >> $consoleFile")
+                .interactive()
+                .stdin(lineChannel.consumeAsFlow())
+                .quietly()
+                .description("console writer for $consoleFile")
+        }
+        lifetime.registerCleanupAction {
+            lineChannel.close()
+            writerProcess.destroyForcibly()
+        }
+
+        val driver = ConsoleDriver(container, consoleFile, lineChannel)
         driver.writeHeader(title)
         return driver
     }
