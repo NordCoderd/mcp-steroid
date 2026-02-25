@@ -1,2 +1,0 @@
-
-### Access Current Editor

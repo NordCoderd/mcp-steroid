@@ -1,2 +1,0 @@
-
-### Get IDE Log Path

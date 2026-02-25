@@ -1,1 +1,0 @@
-### Search Files by Extension

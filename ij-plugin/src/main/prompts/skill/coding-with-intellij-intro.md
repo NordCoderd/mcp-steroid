@@ -1,0 +1,156 @@
+Coding with IntelliJ: Introduction & Execution Model
+
+Introduction to steroid_execute_code, execution model, script structure, coroutine context, and helper function rules.
+
+## Introduction
+
+### What is steroid_execute_code?
+
+`steroid_execute_code` is an MCP tool that executes Kotlin code directly inside IntelliJ IDEA's JVM. Your code runs with full access to:
+
+- **Project model** - modules, dependencies, source roots
+- **PSI (Program Structure Interface)** - parsed code representation
+- **VFS (Virtual File System)** - file access layer
+- **IntelliJ indices** - fast code search and navigation
+- **Editor APIs** - document manipulation, caret position
+- **Refactoring APIs** - automated code transformations
+- **Inspection APIs** - code quality analysis
+
+### Why Use IntelliJ APIs Over File Operations?
+
+| Instead of... | Use IntelliJ API | Why? |
+|--------------|------------------|------|
+| `grep`, `find` | PSI search, Find Usages | Understands code structure, not just text |
+| Reading files with `cat` | VFS and PSI APIs | Respects IDE's caching and encoding |
+| Manual text replacement | Refactoring APIs | Maintains code correctness and formatting |
+| Guessing code structure | Query project model | IDE has already indexed everything |
+
+**The IDE knows the code better than any file search tool.**
+
+### Learning Curve
+
+**Important**: Writing IntelliJ API code may require several attempts. This is normal! The API surface is vast and powerful. Keep trying - each attempt teaches you more about the available APIs.
+
+- Use `printException(msg, throwable)` to see full stack traces
+- Check return types and nullability
+- Use reflection to discover available methods
+- Consult the [IntelliJ Platform SDK docs](https://plugins.jetbrains.com/docs/intellij/)
+
+---
+
+## Execution Model
+
+### Script Structure
+
+Your code is the **suspend function body**. You do NOT need an `execute { }` wrapper.
+```kotlin
+// ✓ CORRECT - This is your script
+println("Hello from IntelliJ!")
+val projectName = project.name
+println("Project: $projectName")
+
+// ✗ WRONG - Do not wrap in execute { }
+execute {
+    println("Hello")  // ERROR: execute is not defined
+}
+```
+
+### Script is a Coroutine
+
+The script body runs as a **suspend function**. This means:
+
+- Use coroutine APIs directly (no `runBlocking` needed)
+- Call suspend functions without special wrappers
+- Use `delay()` instead of `Thread.sleep()`
+```kotlin
+// ✓ CORRECT - Direct coroutine usage
+delay(1000)
+progress("Step 1 complete")
+
+// ✗ WRONG - Never use runBlocking
+runBlocking {  // ERROR: Causes deadlocks!
+    delay(1000)
+}
+```
+
+### ⚠️ Helper Functions Must Be `suspend` When Calling Suspend APIs
+
+If you define a local helper function inside your script that calls any suspend API (`runInspectionsDirectly`, `readAction`, `writeAction`, `smartReadAction`, etc.), the helper **must be declared `suspend fun`**. Omitting `suspend` causes a compile error: `"suspension functions can only be called within coroutine body"`.
+
+```text
+// ✗ WRONG — non-suspend helper calling a suspend API
+fun checkFile(vf: VirtualFile) {
+    val problems = runInspectionsDirectly(vf)  // ERROR: suspend call in non-suspend fun
+    println(if (problems.isEmpty()) "OK" else "ERRORS: $problems")
+}
+
+// ✓ CORRECT — declare the helper as suspend
+suspend fun checkFile(vf: VirtualFile) {
+    val problems = runInspectionsDirectly(vf)  // OK: suspend call in suspend fun
+    println(if (problems.isEmpty()) "OK" else "ERRORS: $problems")
+}
+
+// ✓ ALTERNATIVE — inline the call directly in the script body (no helper needed):
+val problems = runInspectionsDirectly(vf)
+println(if (problems.isEmpty()) "OK" else "ERRORS: $problems")
+```
+
+This applies to ALL suspend context APIs: `readAction { }`, `writeAction { }`, `smartReadAction { }`, `waitForSmartMode()`, `runInspectionsDirectly()`, `findPsiFile()`, `findProjectPsiFile()`.
+
+### Automatic Smart Mode
+
+`waitForSmartMode()` is called **automatically before your script starts**. You only need to call it again if you trigger indexing mid-script.
+```kotlin
+// Smart mode already waited - safe to use indices immediately
+val classes = readAction {
+    JavaPsiFacade.getInstance(project)
+        .findClass("com.example.MyClass", allScope())
+}
+
+// Only call again if you trigger re-indexing
+// (rare - most operations don't trigger indexing)
+```
+
+> **Bulk file creation triggers re-indexing**: Writing new files via `writeAction { VfsUtil.saveText(...) }` causes IntelliJ to re-index those files.
+> - **In a subsequent exec_code call**: Safe — `waitForSmartMode()` runs automatically at script start, so PSI is up-to-date by the time your code runs.
+> - **In the same exec_code call** (create files then immediately inspect them): call `waitForSmartMode()` explicitly after the `writeAction` block and before any `runInspectionsDirectly` / `ReferencesSearch` / `JavaPsiFacade.findClass()` calls on the new files.
+>
+> ```text
+> // Pattern: create files AND inspect in the SAME exec_code call
+> writeAction {
+>     val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+>     val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example")
+>     val f = dir.findChild("MyService.java") ?: dir.createChildData(this, "MyService.java")
+>     VfsUtil.saveText(f, "package com.example;\npublic class MyService {}")
+> }
+> waitForSmartMode()  // ← flush PSI index before inspecting the newly created file
+> val vf = findProjectFile("src/main/java/com/example/MyService.java")!!
+> val problems = runInspectionsDirectly(vf)
+> println(if (problems.isEmpty()) "OK" else problems.toString())
+> ```
+>
+> **Best practice**: Create files in one exec_code call, then inspect in a separate exec_code call — `waitForSmartMode()` runs automatically between calls.
+>
+> **⚠️ Create one file per exec_code call** when possible. Bundling multiple file creations in a single call makes error attribution hard: if the call throws an exception midway, it's unclear which files were created and which failed. Create files one at a time, verify existence (`findProjectFile(path) != null`), then proceed to the next.
+
+### Execution Flow
+
+1. **Submit code** via `steroid_execute_code`
+2. **Review phase** (if enabled) - human approval
+3. **Compilation** - Kotlin script engine compiles your code
+   - Fast failure if compilation errors occur
+4. **Execution** - Your script body runs with timeout
+   - Progress messages throttled to 1/second
+   - Context disposed when complete
+5. **Response** - Output returned to MCP client
+
+### Fast Failure
+
+Errors are reported immediately (no waiting for timeout):
+
+- **Script engine not available** → ERROR immediately
+- **Compilation errors** → ERROR with details immediately
+- **Runtime errors** → ERROR with stack trace
+- **Timeout** → Execution cancelled, resources cleaned up
+
+---
