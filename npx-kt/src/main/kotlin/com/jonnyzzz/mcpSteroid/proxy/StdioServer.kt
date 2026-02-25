@@ -1,0 +1,193 @@
+/* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
+package com.jonnyzzz.mcpSteroid.proxy
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import java.io.OutputStream
+
+private val prettyJson = Json { prettyPrint = true }
+
+class StdioServer(
+    private val registry: ServerRegistry,
+    private val traffic: TrafficLogger,
+    private val beacon: NpxBeacon?
+) {
+    private val json = Json { ignoreUnknownKeys = true }
+    private var outputMode: String? = null  // "framed" | "ndjson"
+    private val stdout: OutputStream = System.out
+
+    private fun writeResponse(payload: JsonObject) {
+        val text = Json.encodeToString(JsonObject.serializer(), payload)
+        val message = when (outputMode) {
+            "ndjson" -> encodeNdjsonMessage(text)
+            else -> encodeFramedMessage(text)
+        }
+        synchronized(stdout) {
+            stdout.write(message.toByteArray(Charsets.UTF_8))
+            stdout.flush()
+        }
+    }
+
+    private suspend fun handleSingle(request: JsonObject): JsonObject? {
+        val idElement = request["id"]
+        val method = request["method"]?.jsonPrimitive?.contentOrNull
+
+        // Notification — no id, no response
+        if (idElement == null || idElement is kotlinx.serialization.json.JsonNull) {
+            return null
+        }
+
+        val id = idElement.jsonPrimitive.contentOrNull ?: return null
+
+        if (method == null) {
+            return jsonRpcError(id, -32600, "Missing method")
+        }
+
+        return try {
+            val params = request["params"] as? JsonObject ?: JsonObject(emptyMap())
+            val result = handleRpc(
+                method = method,
+                params = params,
+                registry = registry,
+                beacon = beacon,
+                notify = { notifyMethod, notifyParams ->
+                    writeResponse(buildJsonObject {
+                        put("jsonrpc", JSONRPC_VERSION)
+                        put("method", notifyMethod)
+                        put("params", notifyParams)
+                    })
+                }
+            )
+            jsonRpcResult(id, result)
+        } catch (e: RpcException) {
+            jsonRpcError(id, e.code, e.message ?: "RPC error")
+        } catch (e: Exception) {
+            jsonRpcError(id, -32603, e.message ?: "Internal error")
+        }
+    }
+
+    private suspend fun handlePayload(payload: Any?) {
+        if (payload == null) {
+            writeResponse(jsonRpcError(null, -32600, "Empty request body"))
+            return
+        }
+
+        if (payload is JsonArray) {
+            val responses = mutableListOf<JsonObject>()
+            for (item in payload) {
+                val obj = item as? JsonObject
+                    ?: continue
+                val response = handleSingle(obj)
+                if (response != null) responses += response
+            }
+            if (responses.isNotEmpty()) {
+                // Batch response: write as JSON array
+                val text = Json.encodeToString(JsonArray.serializer(), JsonArray(responses))
+                val message = when (outputMode) {
+                    "ndjson" -> encodeNdjsonMessage(text)
+                    else -> encodeFramedMessage(text)
+                }
+                synchronized(stdout) {
+                    stdout.write(message.toByteArray(Charsets.UTF_8))
+                    stdout.flush()
+                }
+            }
+            return
+        }
+
+        if (payload !is JsonObject) {
+            writeResponse(jsonRpcError(null, -32600, "Invalid request"))
+            return
+        }
+
+        traffic.log(TrafficRecord(
+            ts = nowIso(),
+            direction = "proxy-in",
+            payload = payload
+        ))
+
+        val response = handleSingle(payload)
+        if (response != null) {
+            traffic.log(TrafficRecord(
+                ts = nowIso(),
+                direction = "proxy-out",
+                payload = response
+            ))
+            writeResponse(response)
+        }
+    }
+
+    suspend fun run() {
+        val frameChannel = Channel<FrameResult>(Channel.UNLIMITED)
+        val buffer = FramingBuffer()
+
+        // Stdin reader — blocks on Dispatchers.IO
+        val readerJob = kotlinx.coroutines.coroutineScope {
+            launch(Dispatchers.IO) {
+                val buf = ByteArray(8192)
+                try {
+                    while (true) {
+                        val n = System.`in`.read(buf)
+                        if (n < 0) break  // EOF
+                        buffer.append(buf, n)
+                        while (true) {
+                            val frame = buffer.readNextFrame() ?: break
+                            if (outputMode == null) outputMode = frame.mode
+                            frameChannel.send(frame)
+                        }
+                    }
+                } finally {
+                    frameChannel.close()
+                }
+            }
+        }
+
+        // Sequential frame processor
+        for (frame in frameChannel) {
+            if (frame.payloadText.isBlank()) continue
+
+            val parsed = try {
+                json.parseToJsonElement(frame.payloadText)
+            } catch (e: Exception) {
+                writeResponse(jsonRpcError(null, -32700, "Parse error: ${e.message}"))
+                continue
+            }
+
+            try {
+                handlePayload(parsed)
+            } catch (e: Exception) {
+                writeResponse(jsonRpcError(null, -32603, e.message ?: "Internal error"))
+            }
+        }
+    }
+}
+
+suspend fun runCliMode(args: CliArgs, registry: ServerRegistry, traffic: TrafficLogger, beacon: NpxBeacon?) {
+    val (method, params) = buildCliRequest(args)
+
+    traffic.log(TrafficRecord(
+        ts = nowIso(),
+        direction = "cli-in",
+        payload = params
+    ))
+
+    val result = handleRpc(method, params, registry, beacon)
+
+    traffic.log(TrafficRecord(
+        ts = nowIso(),
+        direction = "cli-out",
+        payload = result
+    ))
+
+    val text = prettyJson.encodeToString(JsonObject.serializer(), result)
+    System.out.write("$text\n".toByteArray(Charsets.UTF_8))
+    System.out.flush()
+}
