@@ -12,8 +12,6 @@ import kotlin.io.path.walk
 /**
  * A [ScriptClassLoaderFactory] for tests that includes ALL jars from the IDE home
  * (plugins/ and lib/ directories), ensuring that plugin-specific classes like
- *
- * Register via [useFullIdeClasspathForCompilation] in test setUp().
  */
 class FullIdeClasspathScriptClassLoaderFactory : ScriptClassLoaderFactory {
     private val delegate = DefaultScriptClassLoaderFactory()
