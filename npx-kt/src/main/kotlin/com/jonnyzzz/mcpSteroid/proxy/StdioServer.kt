@@ -11,6 +11,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
+import java.io.InputStream
 import java.io.OutputStream
 
 private val prettyJson = Json { prettyPrint = true }
@@ -18,11 +19,12 @@ private val prettyJson = Json { prettyPrint = true }
 class StdioServer(
     private val registry: ServerRegistry,
     private val traffic: TrafficLogger,
-    private val beacon: NpxBeacon?
+    private val beacon: NpxBeacon?,
+    private val inputStream: InputStream = System.`in`,
+    private val outputStream: OutputStream = System.out
 ) {
     private val json = Json { ignoreUnknownKeys = true }
     private var outputMode: String? = null  // "framed" | "ndjson"
-    private val stdout: OutputStream = System.out
 
     private fun writeResponse(payload: JsonObject) {
         val text = Json.encodeToString(JsonObject.serializer(), payload)
@@ -30,9 +32,9 @@ class StdioServer(
             "ndjson" -> encodeNdjsonMessage(text)
             else -> encodeFramedMessage(text)
         }
-        synchronized(stdout) {
-            stdout.write(message.toByteArray(Charsets.UTF_8))
-            stdout.flush()
+        synchronized(outputStream) {
+            outputStream.write(message.toByteArray(Charsets.UTF_8))
+            outputStream.flush()
         }
     }
 
@@ -95,9 +97,9 @@ class StdioServer(
                     "ndjson" -> encodeNdjsonMessage(text)
                     else -> encodeFramedMessage(text)
                 }
-                synchronized(stdout) {
-                    stdout.write(message.toByteArray(Charsets.UTF_8))
-                    stdout.flush()
+                synchronized(outputStream) {
+                    outputStream.write(message.toByteArray(Charsets.UTF_8))
+                    outputStream.flush()
                 }
             }
             return
@@ -135,7 +137,7 @@ class StdioServer(
                 val buf = ByteArray(8192)
                 try {
                     while (true) {
-                        val n = System.`in`.read(buf)
+                        val n = inputStream.read(buf)
                         if (n < 0) break  // EOF
                         buffer.append(buf, n)
                         while (true) {
