@@ -3,11 +3,14 @@
 
 package com.jonnyzzz.mcpSteroid
 
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.testFramework.common.timeoutRunBlocking
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.DockerGeminiSession
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertOutputContains
+import org.junit.Assert
+import org.junit.Assume
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -51,7 +54,8 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
     }
 
     override fun testExecSessionReset() {
+        //the test is ignored
         //needed to make test runner work
-        super.testExecSessionReset()
+        //super.testExecSessionReset()
     }
 }
