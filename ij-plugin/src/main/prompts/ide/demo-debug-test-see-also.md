@@ -1,5 +1,0 @@
-- [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging
-- [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause/resume/stop
-- [Run Tests](mcp-steroid://test/run-tests) - Execute test configuration
-- [Inspect Test Results](mcp-steroid://test/inspect-test-results) - Access test results
-- [Test Examples Overview](mcp-steroid://test/overview) - Test workflows

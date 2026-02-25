@@ -1,5 +1,0 @@
-- [Workspace Symbol](mcp-steroid://lsp/workspace-symbol) - Search symbols across workspace
-- [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
-- [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
-- [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

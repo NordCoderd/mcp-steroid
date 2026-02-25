@@ -60,3 +60,12 @@ val result = readAction {
 
 println(result)
 ```
+
+# See also
+
+- [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
+- [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
+- [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
+- [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
+- [Workspace Symbol](mcp-steroid://lsp/workspace-symbol) - Search symbols across workspace
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

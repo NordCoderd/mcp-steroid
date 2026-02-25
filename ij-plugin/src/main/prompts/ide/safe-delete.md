@@ -65,3 +65,9 @@ writeIntentReadAction { processor.run() }
 writeAction { FileDocumentManager.getInstance().saveAllDocuments() }
 println("Safely deleted: $targetName")
 ```
+
+# See also
+
+- [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
+- [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

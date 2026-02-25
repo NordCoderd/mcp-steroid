@@ -1,2 +1,0 @@
-- [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

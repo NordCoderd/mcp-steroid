@@ -90,3 +90,10 @@ writeAction {
 
 println("Applied quick fix: $fixName")
 ```
+
+# See also
+
+- [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
+- [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
+- [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

@@ -91,3 +91,9 @@ writeIntentReadAction { processor.run() }
 
 println("Changed signature for: ${methodData.name}")
 ```
+
+# See also
+
+- [Signature Help](mcp-steroid://lsp/signature-help) - Parameter hints for function calls
+- [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

@@ -72,3 +72,8 @@ writeIntentReadAction {
 
 println("Pushed down member '${plan.member.name}' from ${plan.sourceFqn}")
 ```
+
+# See also
+
+- [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns

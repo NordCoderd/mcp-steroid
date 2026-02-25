@@ -76,3 +76,10 @@ WriteCommandAction.runWriteCommandAction(project) {
 
 println("Optimized imports for: $filePath")
 ```
+
+# See also
+
+- [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
+- [Formatting](mcp-steroid://lsp/formatting) - Format entire document
+- [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
+- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
