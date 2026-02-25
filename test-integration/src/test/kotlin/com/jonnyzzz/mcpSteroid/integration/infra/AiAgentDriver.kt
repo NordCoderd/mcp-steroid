@@ -48,13 +48,15 @@ class AiAgentDriver(
     private val console: ConsoleDriver,
     private val mcpConnection: McpConnectionMode = McpConnectionMode.Http,
 ) {
-    init {
-        deployAgentOutputFilter()
-    }
-
+    // Must be declared BEFORE the init block so the lazy delegate is set up
+    // before deployAgentOutputFilter() accesses it via the container property.
     private val container by lazy {
         //TODO: Workdir in the container is not set for the agents!
         container.configureContainerExec { this.workingDirInContainer(intellijDriver.getGuestProjectDir()) }
+    }
+
+    init {
+        deployAgentOutputFilter()
     }
 
     val mcpSteroidHostUrl by mcp::hostMcpUrl
