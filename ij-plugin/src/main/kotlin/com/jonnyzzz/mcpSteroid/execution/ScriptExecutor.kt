@@ -131,7 +131,8 @@ class ScriptExecutor(
                     }
                 }
             }
-
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: TimeoutCancellationException) {
             // Timeout - report as error
             log.warn("Execution $executionId timed out: ${e.message}")
