@@ -15,14 +15,7 @@ import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallContext
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
 import com.jonnyzzz.mcpSteroid.updates.analyticsBeacon
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.CodingWithIntelliJPromptArticle
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeFeedbackPromptArticle
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeFileOpsPromptArticle
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeOverviewPromptArticle
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodePsiPromptArticle
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeSpringPromptArticle
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeTestingPromptArticle
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeThreadingPromptArticle
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeToolDescriptionPromptArticle
 import kotlinx.serialization.json.*
 
 data class ExecCodeParams(
@@ -44,58 +37,7 @@ data class ExecCodeParams(
  * Handler for the steroid_execute_code MCP tool.
  */
 class ExecuteCodeToolHandler : McpRegistrar {
-    private val toolDescription get() = buildString {
-        val overviewUri    = ExecuteCodeOverviewPromptArticle().uri
-        val threadingUri   = ExecuteCodeThreadingPromptArticle().uri
-        val fileOpsUri     = ExecuteCodeFileOpsPromptArticle().uri
-        val psiUri         = ExecuteCodePsiPromptArticle().uri
-        val springUri      = ExecuteCodeSpringPromptArticle().uri
-        val testingUri     = ExecuteCodeTestingPromptArticle().uri
-        val feedbackUri    = ExecuteCodeFeedbackPromptArticle().uri
-        val codingGuideUri = CodingWithIntelliJPromptArticle().uri
-
-        appendLine("WHAT: Finally SEE IntelliJ-based IDEs - not just read code. The only MCP server with visual understanding and full IDE control.")
-        appendLine("HOW: Execute Kotlin code directly in IntelliJ's runtime with full API access.")
-        appendLine()
-
-        appendLine("📖 **Guides** (read these first):")
-        appendLine("- [$overviewUri] — Overview, sandbox bypass, key rules")
-        appendLine("- [$threadingUri] — Threading: readAction/writeAction requirements")
-        appendLine("- [$fileOpsUri] — File operations: VFS read/write, batch reads")
-        appendLine("- [$psiUri] — PSI: structural queries, find usages")
-        appendLine("- [$springUri] — Spring/Maven: sync, @Component patterns")
-        appendLine("- [$testingUri] — Testing: IDE runner, Docker, compilation")
-        appendLine("- [$feedbackUri] — Feedback & duplicate submission rules")
-        appendLine("- [$codingGuideUri] — Complete reference guide")
-        appendLine()
-
-        appendLine("**Quick Start:**")
-        appendLine("- Your code is a suspend function body (never use runBlocking)")
-        appendLine("- Use readAction { } for PSI/VFS reads, writeAction { } for modifications")
-        appendLine("- ⚠️ Helper functions calling readAction/writeAction MUST be `suspend fun` — omitting `suspend` causes compile error: \"suspension functions can only be called within coroutine body\"")
-        appendLine("- waitForSmartMode() runs automatically before your script")
-        appendLine("- Available: project, println(), printJson(), printException(), progress()")
-        append("\n")
-        appendLine("**After a compile error**: fix and retry — do NOT switch to Bash/Read/Write. Common fixes:")
-        appendLine("- `suspension functions can only be called within coroutine body` → mark your helper as `suspend fun`")
-        appendLine("- `unresolved reference` → add the missing import explicitly")
-        appendLine("- `Write access is allowed from write thread only` → wrap in `writeAction { }`")
-        appendLine("- `Read access is allowed from inside read-action only` → wrap the PSI/VFS call in `readAction { }`. Example: `val vf = readAction { FilenameIndex.getVirtualFilesByName(\"Foo.java\", GlobalSearchScope.projectScope(project)).firstOrNull() }`")
-        appendLine()
-        appendLine("**NEVER use exec_code just to read existing files**: Use the native Read/Glob/Grep tools — they have zero compilation overhead (~0s vs ~8s per exec_code call). Reserve exec_code for: writing files via VFS, PSI queries, test execution, compile checks. The only exception is reading files that were modified in this session via writeAction — in that case use VfsUtil.loadText() to see in-memory VFS state.")
-        appendLine()
-        appendLine("**Prefer VfsUtil over native Read tool** (only when you already have an exec_code call for other work): use `VfsUtil.loadText(findProjectFile(\"path/File.java\")!!)` to see unsaved modifications from prior writeAction calls. Native Read bypasses VFS and may return stale content.")
-        appendLine()
-        appendLine("**VFS path conflict** (file exists where a directory is expected): check `vf.isDirectory`, delete the blocking file, then recreate:")
-        append("```kotlin\n")
-        appendLine("writeAction {")
-        appendLine("    val parent = LocalFileSystem.getInstance().findFileByPath(\"\$basePath/src/main/java/com/example\")!!")
-        appendLine("    var dir = parent.findChild(\"security\")")
-        appendLine("    if (dir != null && !dir.isDirectory) { dir.delete(this); dir = null }")
-        appendLine("    dir ?: parent.createChildDirectory(this, \"security\")")
-        appendLine("}")
-        appendLine("```")
-    }
+    private val toolDescription get() = ExecuteCodeToolDescriptionPromptArticle().payload.readPrompt()
 
     override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
