@@ -4,7 +4,6 @@ package com.jonnyzzz.mcpSteroid.testHelper
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.filter.ClaudeOutputFilter
 import com.jonnyzzz.mcpSteroid.filter.filterText
-import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable
@@ -40,22 +39,26 @@ class DockerClaudeProgressTest {
         // Create Claude session with lightweight container
         val claudeSession = DockerClaudeSession.create(stack)
 
-        // Run a simple prompt that will trigger tool usage
-        // Using bash commands to list files - this should show tool_use events
-        val result = claudeSession.runPrompt(
+        // Run a simple prompt that will trigger tool usage.
+        // awaitForProcessFinishRaw() returns the raw NDJSON stream-json output,
+        // before ClaudeOutputFilter post-processing. We need it to assert on the
+        // protocol-level events. assertExitCode(0) on the raw result validates success.
+        val aiProcess = claudeSession.runPrompt(
             prompt = "List all files in the current directory using bash commands. Show me the full output.",
             timeoutSeconds = 60
-        ).assertExitCode(0) { "Claude command should succeed" }
+        )
+        val rawResult = aiProcess.awaitForProcessFinishRaw()
+            .assertExitCode(0) { "Claude command should succeed: $stderr" }
 
         // Verify raw output contains NDJSON progress events
         assertTrue(
-            result.stdout.contains("\"type\""),
+            rawResult.stdout.contains("\"type\""),
             "Raw output should contain NDJSON events with 'type' field"
         )
 
         // Verify tool_use events are present in raw output
         // Claude stream-json emits events like {"type":"content_block_start","content_block":{"type":"tool_use",...}}
-        val hasToolUse = result.stdout.contains("tool_use")
+        val hasToolUse = rawResult.stdout.contains("tool_use")
         assertTrue(
             hasToolUse,
             "Raw output should contain tool_use events showing tool calls in progress"
@@ -63,7 +66,7 @@ class DockerClaudeProgressTest {
 
         // Verify we get actual progress events, not just the final result
         // The raw output should have multiple JSON lines (NDJSON)
-        val jsonLineCount = result.stdout.lines().count { line ->
+        val jsonLineCount = rawResult.stdout.lines().count { line ->
             line.trim().startsWith("{") && line.trim().endsWith("}")
         }
         assertTrue(
@@ -71,23 +74,17 @@ class DockerClaudeProgressTest {
             "Raw output should contain multiple NDJSON events (found $jsonLineCount), not just final result"
         )
 
-        // Verify the processed output is meaningful (not just raw NDJSON)
-        assertNotEquals(
-            result.stdout,
-            result.stdout,
-            "Processed output should be extracted from NDJSON, not identical to raw output"
-        )
-
-        // Verify we get some text output (the actual answer)
+        // Verify the filtered output is human-readable text (not raw NDJSON)
+        val filteredOutput = aiProcess.outputFilter.filterText(rawResult.stdout)
         assertTrue(
-            result.stdout.isNotBlank(),
-            "Processed output should contain the final answer text"
+            filteredOutput.isNotBlank(),
+            "Filtered output should contain the final answer text"
         )
 
         println("✓ Claude progress test passed")
         println("  - Raw output had $jsonLineCount NDJSON events")
         println("  - Tool use events detected: $hasToolUse")
-        println("  - Processed output length: ${result.stdout.length} chars")
+        println("  - Filtered output length: ${filteredOutput.length} chars")
     }
 
     @Test
