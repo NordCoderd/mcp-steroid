@@ -97,6 +97,35 @@ internal fun toolDetail(toolName: String, input: JsonObject?): String {
             if (pattern.isNotEmpty()) " ($pattern)" else ""
         }
 
-        else -> ""
+        simpleName == "steroid_execute_feedback" || toolName == "steroid_execute_feedback" -> {
+            val rating = input["success_rating"]?.jsonPrimitive?.contentOrNull ?: ""
+            val explanation = input["explanation"]?.jsonPrimitive?.contentOrNull
+                ?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim() ?: ""
+            val parts = buildList {
+                if (rating.isNotEmpty()) add("rating=$rating")
+                if (explanation.isNotEmpty()) add(explanation.take(60))
+            }
+            if (parts.isNotEmpty()) " (${parts.joinToString(", ")})" else ""
+        }
+
+        simpleName == "steroid_open_project" || toolName == "steroid_open_project" -> {
+            val path = input["project_path"]?.jsonPrimitive?.contentOrNull
+                ?: input["project_name"]?.jsonPrimitive?.contentOrNull ?: ""
+            if (path.isNotEmpty()) " ($path)" else ""
+        }
+
+        else -> {
+            // Generic fallback: show the first short, non-multiline primitive value
+            // so tool calls for unrecognised tools still carry useful context.
+            val firstVal = input.entries
+                .mapNotNull { (_, v) ->
+                    if (v is JsonPrimitive) {
+                        val s = v.contentOrNull ?: return@mapNotNull null
+                        if (s.isBlank() || s.contains('\n') || s.length > 80) null else s
+                    } else null
+                }
+                .firstOrNull()
+            if (firstVal != null) " ($firstVal)" else ""
+        }
     }
 }

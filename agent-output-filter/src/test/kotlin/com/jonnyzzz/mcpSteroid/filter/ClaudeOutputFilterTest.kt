@@ -193,6 +193,23 @@ class ClaudeOutputFilterTest {
     }
 
     @Test
+    fun `new format - steroid_execute_feedback shows rating and explanation`() {
+        val input = """{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__mcp-steroid__steroid_execute_feedback","input":{"project_name":"my-project","task_id":"t1","success_rating":0.9,"explanation":"Code compiled and ran correctly"}}]}}"""
+        val output = runFilter(input)
+        assertTrue(output.contains(">> mcp__mcp-steroid__steroid_execute_feedback"), "Should show tool name: $output")
+        assertTrue(output.contains("rating=0.9"), "Should show success_rating: $output")
+        assertTrue(output.contains("Code compiled"), "Should show explanation: $output")
+    }
+
+    @Test
+    fun `new format - unknown tool with params shows first param value`() {
+        val input = """{"type":"assistant","message":{"content":[{"type":"tool_use","name":"SomeFutureTool","input":{"target":"my-file.txt","extra":"ignored"}}]}}"""
+        val output = runFilter(input)
+        assertTrue(output.contains(">> SomeFutureTool"), "Should show tool name: $output")
+        assertTrue(output.contains("my-file.txt"), "Generic fallback should show first param value: $output")
+    }
+
+    @Test
     fun `new format - assistant thinking block is skipped`() {
         val input = """{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"Internal reasoning"}]}}"""
         val output = runFilter(input)
