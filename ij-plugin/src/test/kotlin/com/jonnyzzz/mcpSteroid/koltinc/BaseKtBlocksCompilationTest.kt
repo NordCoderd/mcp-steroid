@@ -28,7 +28,7 @@ abstract class BaseKtBlocksCompilationTest : BasePlatformTestCase() {
             val sourceFile = tempDir.resolve("Script.kt")
             Files.writeString(sourceFile, wrapped.code, StandardCharsets.UTF_8)
             val outputJar = tempDir.resolve("out.jar")
-            val classpath = FullIdeClasspathScriptClassLoaderFactory().ideClasspath()
+            val classpath = FullIdeClasspathScriptClassLoaderFactory.ideClasspath()
             val cmd = KotlincCommandLineBuilder(outputJar)
                 .withNoStdLib(true)
                 .withExtraParameters(listOf("-Werror"))
@@ -37,6 +37,10 @@ abstract class BaseKtBlocksCompilationTest : BasePlatformTestCase() {
                 .build()
             val result = kotlincProcessClient.kotlinc(cmd.args, tempDir)
             val output = (result.stdout + "\n" + result.stderr).trim()
+
+            /// this test depends on the classes on the disk
+            /// parallel execution of tests can break it
+            /// re-run usually is enough to fix that
             assertEquals(
                 "Compilation failed or has warnings (-Werror):\n$output",
                 0, result.exitCode,
