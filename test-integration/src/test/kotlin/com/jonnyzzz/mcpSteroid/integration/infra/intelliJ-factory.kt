@@ -273,6 +273,7 @@ fun IntelliJContainer.Companion.create(
         aiAgents = aiAgentDriver,
         intellij = ijProcess,
         windows = windowsDriver,
+        windowLayout = windowsLayout,
     )
 
     println("[IDE-AGENT] Session ready: $runDir")

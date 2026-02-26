@@ -65,6 +65,7 @@ class IntelliJContainer(
     val aiAgents: AiAgentDriver,
 
     val windows: XcvbWindowDriver,
+    private val windowLayout: WindowLayoutManager,
 ) {
     val pid by intellij::pid
 
@@ -104,6 +105,14 @@ class IntelliJContainer(
         }
         console.writeSuccess("Project import and indexing complete")
 
+        // Re-apply IDE window layout as early as possible: IntelliJ restores its own saved window
+        // bounds during project import/indexing, overriding the initial xdotool positioning.
+        // Apply immediately after indexing so the IDE is correctly positioned before any further
+        // setup steps (plugin install, JDK setup, README open) which can take several minutes.
+        console.writeStep(0, "Applying IDE window layout...")
+        repositionIdeWindow()
+        console.writeSuccess("Window layout applied")
+
         // Install required IDE plugins (e.g. Kafka) detected from project dependencies.
         // Must happen before JDK/Maven setup so Maven re-sync benefits from fresh plugin support.
         console.writeStep(0, "Installing required IDE plugins...")
@@ -123,6 +132,27 @@ class IntelliJContainer(
         console.writeSuccess("Project UX ready")
 
         return this
+    }
+
+    /**
+     * Re-apply the IDE window layout by finding the IntelliJ window by PID and calling
+     * [XcvbWindowDriver.updateLayout] with the target rect from [windowLayout].
+     *
+     * IntelliJ restores its own saved window bounds after project load, overriding the
+     * initial xdotool positioning. This must be called after project initialization completes.
+     */
+    private fun repositionIdeWindow() {
+        val ideWindow = windows.listWindows().firstOrNull { it.pid == pid }
+        if (ideWindow == null) {
+            println("[IDE-AGENT] repositionIdeWindow: no window found for PID=$pid, skipping")
+            return
+        }
+        val targetRect = windowLayout.layoutIntelliJWindow()
+        windows.updateLayout(ideWindow, targetRect)
+        // Nudge the window size by 1px then restore: IntelliJ AWT may not notice the external
+        // move and keeps rendering at the old position (50px gap at top, status bar clipped).
+        // A second ConfigureNotify with a different size forces AWT to re-layout correctly.
+        windows.forceRelayout(ideWindow, targetRect)
     }
 
     companion object

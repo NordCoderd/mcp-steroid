@@ -31,7 +31,6 @@ private fun ContainerDriver.startProcessInContainer(
     }
 
     return newRunOnHost(request)
-        .timeoutSeconds(30)
         .command(command)
         .description(request.description ?: error("Missing description in $request"))
         .startProcess()

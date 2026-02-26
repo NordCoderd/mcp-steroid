@@ -21,7 +21,7 @@ import java.io.BufferedWriter
  */
 class ClaudeOutputFilter : AbstractOutputFilter() {
 
-    override fun processEvent(event: JsonObject, writer: BufferedWriter) {
+    override fun processEvent(rawLine: String, event: JsonObject, writer: BufferedWriter) {
         val type = event["type"]?.jsonPrimitive?.contentOrNull ?: return
 
         when (type) {
@@ -44,7 +44,12 @@ class ClaudeOutputFilter : AbstractOutputFilter() {
                 writer.writeLine(msg)
             }
             "system" -> handleSystem(event, writer)
-            // Silently skip: ping, content_block_stop, message_stop
+
+            // Explicitly known no-op events — intentionally silenced
+            "ping", "content_block_stop", "message_stop" -> { /* known, no output */ }
+
+            // Unknown event type — pass through raw JSON so no data is lost
+            else -> writer.writeLine(rawLine)
         }
     }
 
@@ -85,34 +90,55 @@ class ClaudeOutputFilter : AbstractOutputFilter() {
             if (itemObj["type"]?.jsonPrimitive?.contentOrNull != "tool_result") continue
 
             val isError = itemObj["is_error"]?.jsonPrimitive?.booleanOrNull ?: false
-            val summary = extractContentSummary(itemObj["content"])
-
+            val fullContent = extractFullContent(itemObj["content"])
             val prefix = if (isError) "<< ERROR" else "<<"
-            val parts = mutableListOf(prefix)
-            if (summary.isNotEmpty()) parts.add(summary)
-            writer.writeLine(parts.joinToString(" "))
+            writeToolResult(writer, prefix, fullContent)
         }
     }
 
     /**
-     * Extract the first non-blank line from a tool result content element.
-     * Content may be a plain string or an array of text blocks.
+     * Write a tool result to [writer] with the [prefix] (`<<` or `<< ERROR`) on the same line
+     * as the first content line. Any subsequent lines are written as-is so that multi-line
+     * debugger output (e.g. "=== Breakpoint hit at: File.kt:7 ===") is visible in the
+     * filtered output and available to test assertions via [combined].
      */
-    private fun extractContentSummary(content: JsonElement?): String {
-        return when (content) {
-            is JsonPrimitive -> {
-                val text = content.contentOrNull ?: return ""
-                text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() } ?: ""
+    private fun writeToolResult(writer: BufferedWriter, prefix: String, fullContent: String) {
+        if (fullContent.isEmpty()) {
+            writer.writeLine(prefix)
+            writer.flush()
+            return
+        }
+        val firstNewline = fullContent.indexOf('\n')
+        if (firstNewline < 0) {
+            // Single-line content: keep on the same line as the prefix (backward-compatible)
+            writer.writeLine("$prefix $fullContent")
+        } else {
+            val firstLine = fullContent.substring(0, firstNewline)
+            val rest = fullContent.substring(firstNewline + 1)
+            writer.writeLine("$prefix $firstLine")
+            if (rest.isNotEmpty()) {
+                writer.write(rest)
+                if (!rest.endsWith("\n")) writer.newLine()
             }
-            is JsonArray -> {
+        }
+        writer.flush()
+    }
+
+    /**
+     * Extract all text content from a tool result content element.
+     * Content may be a plain string or an array of text blocks.
+     * Returns the full multi-line content so that debugger suspension evidence
+     * (e.g. "=== Breakpoint hit at: File.kt:7 ===") is visible in filtered output.
+     */
+    private fun extractFullContent(content: JsonElement?): String {
+        return when (content) {
+            is JsonPrimitive -> content.contentOrNull ?: ""
+            is JsonArray -> buildString {
                 for (block in content) {
                     if (block is JsonObject && block["type"]?.jsonPrimitive?.contentOrNull == "text") {
-                        val text = block["text"]?.jsonPrimitive?.contentOrNull ?: continue
-                        val firstLine = text.lineSequence().map { it.trim() }.firstOrNull { it.isNotEmpty() }
-                        if (firstLine != null) return firstLine
+                        block["text"]?.jsonPrimitive?.contentOrNull?.let { append(it) }
                     }
                 }
-                ""
             }
             else -> ""
         }
@@ -155,15 +181,9 @@ class ClaudeOutputFilter : AbstractOutputFilter() {
 
     private fun handleToolResult(event: JsonObject, writer: BufferedWriter) {
         val isError = event["is_error"]?.jsonPrimitive?.booleanOrNull ?: false
-        val summary = toolResultSummary(event)
-
+        val fullContent = extractFullContent(event["content"])
         val prefix = if (isError) "<< ERROR" else "<<"
-        val parts = mutableListOf(prefix)
-        if (summary.isNotEmpty()) {
-            parts.add(summary)
-        }
-
-        writer.writeLine(parts.joinToString(" "))
+        writeToolResult(writer, prefix, fullContent)
     }
 
     private fun handleMessageStart(event: JsonObject, writer: BufferedWriter) {
@@ -229,5 +249,4 @@ class ClaudeOutputFilter : AbstractOutputFilter() {
         }
     }
 
-    private fun toolResultSummary(event: JsonObject): String = extractContentSummary(event["content"])
 }

@@ -12,7 +12,7 @@ import java.io.BufferedWriter
  */
 class CodexOutputFilter : AbstractOutputFilter() {
 
-    override fun processEvent(event: JsonObject, writer: BufferedWriter) {
+    override fun processEvent(rawLine: String, event: JsonObject, writer: BufferedWriter) {
         val type = event["type"]?.jsonPrimitive?.contentOrNull ?: return
         val item = event["item"] as? JsonObject
         val itemType = item?.get("type")?.jsonPrimitive?.contentOrNull ?: ""
@@ -30,7 +30,11 @@ class CodexOutputFilter : AbstractOutputFilter() {
                 val msg = formatErrorMessage(event) ?: return
                 writer.writeLine(msg)
             }
-            // Silently skip: thread.started, turn.started, item.started/agent_message, etc.
+            // Explicitly known no-op events — intentionally silenced
+            type in setOf("thread.started", "turn.started") ||
+                    (type == "item.started" && itemType == "agent_message") -> { /* known, no output */ }
+            // Unknown event type — pass through raw JSON so no data is lost
+            else -> writer.writeLine(rawLine)
         }
     }
 

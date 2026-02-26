@@ -37,7 +37,7 @@ class GeminiOutputFilter : AbstractOutputFilter() {
         super.onMalformedJson(line, writer)
     }
 
-    override fun processEvent(event: JsonObject, writer: BufferedWriter) {
+    override fun processEvent(rawLine: String, event: JsonObject, writer: BufferedWriter) {
         val type = event["type"]?.jsonPrimitive?.contentOrNull ?: return
 
         when (type) {
@@ -75,6 +75,15 @@ class GeminiOutputFilter : AbstractOutputFilter() {
                 flushAssistantText(writer)
                 val msg = formatErrorMessage(event) ?: return
                 writer.writeLine(msg)
+            }
+
+            // Explicitly known no-op events — intentionally silenced
+            "init" -> { /* Gemini session init: no user-visible content */ }
+
+            // Unknown event type — pass through raw JSON so no data is lost
+            else -> {
+                flushAssistantText(writer)
+                writer.writeLine(rawLine)
             }
         }
     }

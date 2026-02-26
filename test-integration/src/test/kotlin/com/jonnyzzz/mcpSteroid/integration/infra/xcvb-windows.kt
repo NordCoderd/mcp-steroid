@@ -162,4 +162,32 @@ class XcvbWindowDriver(
                 .description("xdotool windowraise $windowId")
         }.assertExitCode(0) { "xdotool windowraise failed" }
     }
+
+    /**
+     * Force AWT to re-layout by nudging the window width by 1px then restoring it.
+     *
+     * When a window is moved externally via xdotool, IntelliJ's AWT may not update its
+     * internal rendering origin. Symptom: ~50px blank gap at top, status bar clipped at
+     * bottom (AWT renders as if still at the old position). Sending a second ConfigureNotify
+     * with a slightly different size forces AWT to process the new window origin correctly.
+     *
+     * Only use this for AWT windows (IntelliJ). Do NOT call for xterm — xterm does not
+     * use size hints and a nudge there is unnecessary.
+     */
+    fun forceRelayout(window: WindowInfo, rect: WindowRect) {
+        val windowId = window.id
+        driver.startProcessInContainer {
+            this
+                .args("xdotool", "windowsize", windowId, (rect.width - 1).toString(), rect.height.toString())
+                .timeoutSeconds(5)
+                .description("xdotool windowsize nudge $windowId")
+        }.assertExitCode(0) { "xdotool windowsize nudge failed" }
+
+        driver.startProcessInContainer {
+            this
+                .args("xdotool", "windowsize", windowId, rect.width.toString(), rect.height.toString())
+                .timeoutSeconds(5)
+                .description("xdotool windowsize restore $windowId")
+        }.assertExitCode(0) { "xdotool windowsize restore failed" }
+    }
 }

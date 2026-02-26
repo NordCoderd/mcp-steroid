@@ -51,7 +51,8 @@ class ClaudeOutputFilterTest {
     fun `test tool_result with array content`() {
         val input = """{"type":"tool_result","is_error":false,"content":[{"type":"text","text":"First line\nSecond line"}]}"""
         val output = runFilter(input)
-        assertEquals("<< First line\n", output)
+        // Full content is now included so debugger suspension evidence is visible in test assertions
+        assertEquals("<< First line\nSecond line\n", output)
     }
 
     @Test
@@ -137,6 +138,13 @@ class ClaudeOutputFilterTest {
     }
 
     @Test
+    fun `test unknown event type passes through raw JSON`() {
+        val input = """{"type":"future_unknown_event","data":"some_value"}"""
+        val output = runFilter(input)
+        assertEquals("$input\n", output)
+    }
+
+    @Test
     fun `test message_delta with end_turn is skipped`() {
         val input = """{"type":"message_delta","delta":{"stop_reason":"end_turn"}}"""
         val output = runFilter(input)
@@ -195,14 +203,16 @@ class ClaudeOutputFilterTest {
     fun `new format - user tool_result string content`() {
         val input = """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_x","content":"Execution ID: eid_123\nDone"}]}}"""
         val output = runFilter(input)
-        assertTrue(output.contains("<< Execution ID: eid_123"), "Should show first line of result: $output")
+        assertTrue(output.contains("<< Execution ID: eid_123"), "Should show first line of result on << line: $output")
+        assertTrue(output.contains("Done"), "Should include all content lines: $output")
     }
 
     @Test
     fun `new format - user tool_result array content`() {
         val input = """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_x","content":[{"type":"text","text":"Line one\nLine two"}]}]}}"""
         val output = runFilter(input)
-        assertTrue(output.contains("<< Line one"), "Should show first line: $output")
+        assertTrue(output.contains("<< Line one"), "Should show first line on << line: $output")
+        assertTrue(output.contains("Line two"), "Should include all content lines: $output")
     }
 
     @Test

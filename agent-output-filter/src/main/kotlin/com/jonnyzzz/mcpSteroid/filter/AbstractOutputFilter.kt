@@ -31,7 +31,7 @@ abstract class AbstractOutputFilter : AgentProgressOutputFilter {
 
                 try {
                     val event = filterJson.parseToJsonElement(trimmed).jsonObject
-                    processEvent(event, writer)
+                    processEvent(trimmed, event, writer)
                 } catch (_: Exception) {
                     onMalformedJson(line, writer)
                 }
@@ -42,8 +42,13 @@ abstract class AbstractOutputFilter : AgentProgressOutputFilter {
         writer.flush()
     }
 
-    /** Handle a single parsed JSON event. */
-    protected abstract fun processEvent(event: JsonObject, writer: BufferedWriter)
+    /**
+     * Handle a single parsed JSON event.
+     *
+     * @param rawLine the original unparsed JSON line, available for pass-through on unknown events
+     * @param event the parsed JSON object
+     */
+    protected abstract fun processEvent(rawLine: String, event: JsonObject, writer: BufferedWriter)
 
     /** Called before the first line is read. */
     protected open fun beforeProcessing(writer: BufferedWriter) {}

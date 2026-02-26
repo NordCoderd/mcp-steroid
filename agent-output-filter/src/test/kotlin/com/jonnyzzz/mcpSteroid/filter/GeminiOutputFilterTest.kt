@@ -118,6 +118,13 @@ class GeminiOutputFilterTest {
         assertEquals("""{"type":"message","broken""" + "\n", output)
     }
 
+    @Test
+    fun `test unknown event type passes through raw JSON`() {
+        val input = """{"type":"future_unknown_event","data":"some_value"}"""
+        val output = runFilter(input)
+        assertEquals("$input\n", output)
+    }
+
     private fun runFilter(input: String): String {
         val inputStream = ByteArrayInputStream(input.toByteArray())
         val outputStream = ByteArrayOutputStream()
