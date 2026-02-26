@@ -181,13 +181,61 @@ Each agent is invoked with specific flags to produce NDJSON output piped through
 
 The `--verbose` flag is **required** for Claude — without it, tool call details are not emitted.
 
-#### Agent Output Format (ClaudeOutputFilter)
+#### Agent Output Filters
+
+**Design principle**: The goal of output filters is to **render NDJSON as human-readable text**, NOT to filter or suppress events. Every event must produce some output. The only legitimate exceptions are structural lifecycle events where content arrives in the corresponding completed event:
+- `thread.started`, `turn.started` — no content, silenced
+- `item.started` for `agent_message` — content arrives in `item.completed`
+
+Unknown/future event types always fall through as raw JSON so no information is lost.
+
+**`toolDetail()` in `FilterUtils.kt`**: Extracts human-readable summary for `>> tool_name (detail)` lines. Handles: `steroid_execute_code` (reason), `steroid_execute_feedback` (rating + explanation first line), `steroid_open_project` (path), `Read`/`Glob`/`Write` (path), `Grep` (pattern). Generic fallback: first short (<80 chars, no newlines) primitive value from the input JSON object.
+
+**Agent log files**: `ConsoleAwareAgentSession` writes two log files per `runPrompt()` call into `logDir` (always = `runDir`):
+- `agent-{name}-{N}-raw.ndjson` — raw NDJSON lines from STDOUT (unfiltered)
+- `agent-{name}-{N}-decoded.txt` — human-readable decoded output + stderr/info lines
+
+##### ClaudeOutputFilter
 
 Claude Code 2.1.x changed from streaming events (`content_block_delta`, `tool_use`, `tool_result`) to structured events (`assistant`/`user` with full `message.content` arrays). The `result.result` field is empty in new format; actual output is in `assistant.message.content[].type=text` blocks.
 
 `ClaudeOutputFilter` handles **both formats** simultaneously for backward/forward compatibility.
 
 MCP tool names in new format are fully qualified: `mcp__mcp-steroid__steroid_execute_code`. `toolDetail()` strips the prefix with `substringAfterLast("__")`.
+
+##### CodexOutputFilter
+
+Codex `--json` output uses different field names than Claude. Key differences:
+
+**`mcp_tool_call` items** (Codex actual format):
+```json
+{
+  "type": "item.started",
+  "item": {
+    "id": "item_5",
+    "type": "mcp_tool_call",
+    "server": "mcp-steroid",
+    "tool": "steroid_execute_code",      ← "tool", NOT "name"
+    "arguments": { "reason": "...", ... } ← "arguments", NOT "input"
+  }
+}
+```
+Completed `mcp_tool_call` result is a structured object, NOT a primitive:
+```json
+"result": {
+  "content": [{"type": "text", "text": "..."}, ...],
+  "structured_content": null
+}
+```
+
+**`reasoning` items** (Codex emits thinking steps):
+```json
+{"type": "item.completed", "item": {"type": "reasoning", "text": "Planning to..."}}
+```
+Rendered as `[thinking] first-non-blank-line`.
+
+`resolveToolName()` checks `item["name"]` → `item["function"]["name"]` → `item["tool"]` (covers all variants).
+`resolveInputObject()` checks `item["input"]` → `item["arguments"]` → `item["function"]["arguments"]`.
 
 #### Integration Test Strategy
 
@@ -211,7 +259,9 @@ Agents (especially Gemini) may find the right answer internally but not include 
 #### Known Agent Quirks
 
 - **Gemini exit 137** (SIGKILL): Treat as success when NDJSON confirms success — `DockerGeminiSession` handles this automatically
-- **Codex MCP prefix**: Tool names are not MCP-prefixed in Codex output (no `mcp__` prefix)
+- **Codex exit 137** (SIGKILL): Same pattern as Gemini — exit code 137 can be treated as success if the required output markers were emitted before the kill. Tests already check for markers before checking exit code.
+- **Codex MCP prefix**: Tool names are NOT MCP-prefixed in Codex output (no `mcp__` prefix). Codex uses bare tool names like `steroid_execute_code`.
+- **Codex `mcp_tool_call` field names**: Different from `tool_call` — uses `"tool"` (not `"name"`), `"arguments"` (not `"input"`), result in `result.content[]` array (not a primitive). See `resolveToolName()` / `resolveInputObject()` in `CodexOutputFilter`.
 - **Claude new NDJSON**: Since Claude Code 2.1.x, use structured `assistant`/`user` events; filter handles both old and new formats
 
 ### Test naming
