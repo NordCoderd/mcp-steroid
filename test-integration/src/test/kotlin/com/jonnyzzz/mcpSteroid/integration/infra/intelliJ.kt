@@ -70,8 +70,23 @@ class IntelliJDriver(
                 .description("ls -la $intelliJGuestHomeDir/bin")
         }.awaitForProcessFinish()
 
+        // Rider requires the .sln file path (not the directory) to skip the
+        // "Select a Solution to Open" dialog that blocks the main window from appearing.
+        val launchTarget = if (ideProduct == IdeProduct.Rider) {
+            val slnFile = findSlnFile(projectGuestDir)
+            if (slnFile != null) {
+                driver.log("Rider: opening solution file $slnFile")
+                slnFile
+            } else {
+                driver.log("Rider: no .sln file found, falling back to directory")
+                projectGuestDir
+            }
+        } else {
+            projectGuestDir
+        }
+
         val idea = driver.runInContainerDetached(
-            listOf(launcherPath, projectGuestDir),
+            listOf(launcherPath, launchTarget),
         )
 
         val logFile = ideaLogsFile()
@@ -293,6 +308,25 @@ class IntelliJDriver(
             "$configGuestDir/options/trusted-paths.xml",
             trustedPathsXml,
         )
+    }
+
+    /**
+     * Find a .sln file in the guest project directory.
+     * Lists files in the container and returns the first .sln path found, or null.
+     */
+    private fun findSlnFile(guestProjectDir: String): String? {
+        val result = driver.startProcessInContainer {
+            this
+                .args("bash", "-c", "ls $guestProjectDir/*.sln 2>/dev/null")
+                .timeoutSeconds(5)
+                .quietly()
+                .description("find .sln in $guestProjectDir")
+        }.awaitForProcessFinish()
+
+        if (result.exitCode != 0) return null
+        return result.stdout.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.endsWith(".sln") }
     }
 
     fun deployPluginToContainer(pluginZipPath: File) {
