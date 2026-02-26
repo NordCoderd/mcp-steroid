@@ -55,46 +55,9 @@ class AiAgentDriver(
         container.configureContainerExec { this.workingDirInContainer(intellijDriver.getGuestProjectDir()) }
     }
 
-    init {
-        deployAgentOutputFilter()
-    }
-
     val mcpSteroidHostUrl by mcp::hostMcpUrl
     val mcpSteroidGuestUrl by mcp::guestMcpUrl
     val mcpSteroidName: String = "mcp-steroid"
-
-    private fun deployAgentOutputFilter() {
-        val filterZip = IdeTestFolders.agentOutputFilterZip
-        println("[AiAgentDriver] Deploying agent-output-filter from ${filterZip.absolutePath}")
-
-        container.copyToContainer(filterZip, "/tmp/agent-output-filter.zip")
-
-        val deployScript = buildString {
-            appendLine("#!/bin/bash")
-            appendLine("set -e")
-            appendLine("EXTRACT_TMP=\$(mktemp -d)")
-            appendLine("unzip -q /tmp/agent-output-filter.zip -d \"\$EXTRACT_TMP\"")
-            appendLine("TOP_DIR=\$(ls \"\$EXTRACT_TMP\" | head -1)")
-            appendLine("mkdir -p /opt")
-            appendLine("mv \"\$EXTRACT_TMP/\$TOP_DIR\" /opt/agent-output-filter")
-            appendLine("rm -rf \"\$EXTRACT_TMP\"")
-            appendLine("chmod +x /opt/agent-output-filter/bin/*")
-        }
-        container.writeFileInContainer("/tmp/deploy-filter.sh", deployScript, executable = true)
-        emptyMap<String, String>()
-
-        container.startProcessInContainer {
-            this
-                .args(listOf("bash", "/tmp/deploy-filter.sh"))
-                .workingDirInContainer(null)
-                .timeoutSeconds(timeoutSeconds = 60)
-                .description("Deploying agent output-filter")
-        }.assertExitCode(0) {
-            "agent-output-filter deployment failed:\n$stdout\n$stderr"
-        }
-
-        println("[AiAgentDriver] agent-output-filter deployed to /opt/agent-output-filter")
-    }
 
     private fun <R : AiAgentSession> prepareAIAgent(factory: AIAgentCompanion<R>): AiAgentSession {
         val agent: AiAgentSession = factory.create(container)

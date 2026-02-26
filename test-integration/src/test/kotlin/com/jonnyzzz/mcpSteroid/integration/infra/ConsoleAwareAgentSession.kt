@@ -40,19 +40,19 @@ class ConsoleAwareAgentSession(
         // STDERR lines are forwarded as-is.
         scope.launch {
             aiProcess.messagesFlow.collect { streamLine ->
-                when (streamLine.type) {
+                val ignore = when (streamLine.type) {
                     ProcessStreamType.STDOUT -> {
                         val filtered = aiProcess.outputFilter.filterText(streamLine.line)
-                        if (filtered.isNotBlank()) {
-                            filtered.lines().filter { it.isNotBlank() }.forEach { console.writeLine(it) }
-                        }
+                        filtered.lines().forEach { console.writeLine(it) }
                     }
+
                     ProcessStreamType.STDERR -> {
-                        if (streamLine.line.isNotBlank()) {
-                            console.writeLine("[stderr] ${streamLine.line}")
-                        }
+                        console.writeLine("[stderr] ${streamLine.line}")
                     }
-                    ProcessStreamType.INFO -> { /* skip internal messages */ }
+
+                    ProcessStreamType.INFO -> {
+                        console.writeLine("[INFO] ${streamLine.line}")
+                    }
                 }
             }
         }
