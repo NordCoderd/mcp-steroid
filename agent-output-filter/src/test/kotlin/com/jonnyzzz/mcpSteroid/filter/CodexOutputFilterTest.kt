@@ -95,11 +95,11 @@ class CodexOutputFilterTest {
     }
 
     @Test
-    fun `test reasoning item is silently skipped`() {
-        // Codex emits reasoning items that should not appear in console output
+    fun `test reasoning item shows thinking indicator`() {
+        // Codex emits reasoning items — they should appear as [thinking] lines, not raw JSON
         val input = """{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"**Planning to use skill debugger**"}}"""
         val output = runFilter(input)
-        assertEquals("", output)
+        assertEquals("[thinking] **Planning to use skill debugger**\n", output)
     }
 
     @Test

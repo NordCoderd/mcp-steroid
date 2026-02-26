@@ -241,6 +241,7 @@ fun IntelliJContainer.Companion.create(
         console = console,
         mcp = mcpSteroidDriver,
         mcpConnection = mcpConnectionMode,
+        logDir = runDir,
     )
 
     console.writeSuccess("MCP Steroid server ready")

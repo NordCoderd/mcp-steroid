@@ -5,10 +5,14 @@ import kotlinx.serialization.json.*
 import java.io.BufferedWriter
 
 /**
- * Filter for Codex CLI NDJSON output (--json flag).
+ * Renders Codex CLI NDJSON output (--json flag) as human-readable text.
  *
- * Converts Codex NDJSON events to human-readable console text.
- * Handles item.completed, item.started, turn.completed, and error events.
+ * Every event is rendered as text — tool calls as `>> name (detail)`,
+ * tool results as `<< name [id]: output`, agent text line-by-line,
+ * reasoning as `[thinking] first-line`, lifecycle events that carry no content
+ * (thread.started, turn.started, item.started for agent_message) produce no
+ * output since their content arrives in the corresponding completed event.
+ * Unknown event types fall through as raw JSON so no information is lost.
  */
 class CodexOutputFilter : AbstractOutputFilter() {
 
@@ -25,16 +29,19 @@ class CodexOutputFilter : AbstractOutputFilter() {
             type == "item.started" && itemType == "command_execution" && item != null -> handleCommandStarted(item, writer)
             type == "item.started" && itemType in setOf("tool_call", "function_call", "mcp_tool_call") && item != null ->
                 handleToolStarted(item, writer)
+            type == "item.completed" && itemType == "reasoning" && item != null -> handleReasoningItem(item, writer)
             type == "turn.completed" -> handleTurnCompleted(event, writer)
             type == "error" -> {
                 val msg = formatErrorMessage(event) ?: return
                 writer.writeLine(msg)
             }
-            // Explicitly known no-op events — intentionally silenced
+            // These are lifecycle / structural events with no text representation.
+            // Their content is conveyed by corresponding "completed" events (e.g. agent_message
+            // content arrives in item.completed, not item.started), so rendering them as text
+            // produces nothing meaningful.
             type in setOf("thread.started", "turn.started") ||
-                    (type == "item.started" && itemType == "agent_message") ||
-                    (type == "item.completed" && itemType == "reasoning") -> { /* known, no output */ }
-            // Unknown event type — pass through raw JSON so no data is lost
+                    (type == "item.started" && itemType == "agent_message") -> { /* no text representation */ }
+            // Unknown event type — render as raw JSON so no information is lost
             else -> writer.writeLine(rawLine)
         }
     }
@@ -161,6 +168,14 @@ class CodexOutputFilter : AbstractOutputFilter() {
         val inputObj = resolveInputObject(item)
         val detail = if (inputObj != null) toolDetail(name, inputObj) else ""
         writer.writeLine(">> $name$detail")
+    }
+
+    private fun handleReasoningItem(item: JsonObject, writer: BufferedWriter) {
+        val text = item["text"]?.jsonPrimitive?.contentOrNull ?: return
+        if (text.isBlank()) return
+        // Show first non-blank line of reasoning as a compact thinking indicator
+        val firstLine = text.lineSequence().firstOrNull { it.isNotBlank() }?.trim() ?: return
+        writer.writeLine("[thinking] $firstLine")
     }
 
     private fun handleTurnCompleted(event: JsonObject, writer: BufferedWriter) {

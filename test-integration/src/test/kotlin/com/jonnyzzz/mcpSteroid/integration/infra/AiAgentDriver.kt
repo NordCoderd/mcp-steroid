@@ -11,6 +11,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.copyToContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.writeFileInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import java.io.File
 import kotlin.getValue
 
 /**
@@ -47,6 +48,7 @@ class AiAgentDriver(
     private val mcp: McpSteroidDriver,
     private val console: ConsoleDriver,
     private val mcpConnection: McpConnectionMode = McpConnectionMode.Http,
+    private val logDir: File,
 ) {
     // Must be declared BEFORE the init block so the lazy delegate is set up
     // before deployAgentOutputFilter() accesses it via the container property.
@@ -69,8 +71,8 @@ class AiAgentDriver(
             is McpConnectionMode.Npx -> agent.registerNpxMcp(conn.driver.npxCommand, mcpSteroidName)
         }
 
-        // Wrap with console-aware session for real-time UI feedback
-        return ConsoleAwareAgentSession(agent, console, displayName)
+        // Wrap with console-aware session for real-time UI feedback and log file writing
+        return ConsoleAwareAgentSession(agent, console, displayName, logDir)
     }
 
     val aiAgents: Map<String, AiAgentSession> by lazy {

@@ -10,6 +10,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileWriter
+import java.io.PrintWriter
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Wraps an [AiAgentSession] to display agent activity in the [ConsoleDriver].
@@ -18,42 +22,65 @@ import kotlinx.coroutines.launch
  * During execution, agent output is pumped to the console in real-time:
  * STDOUT lines are decoded through the agent-specific output filter (NDJSON → readable text);
  * STDERR lines are forwarded directly.
+ *
+ * Each [runPrompt] call writes two log files into [logDir]:
+ *  - `agent-{agentName}-{N}-raw.ndjson`    — raw NDJSON lines from STDOUT (unfiltered)
+ *  - `agent-{agentName}-{N}-decoded.txt`   — the human-readable decoded output
  */
 class ConsoleAwareAgentSession(
     private val delegate: AiAgentSession,
     private val console: ConsoleDriver,
     private val agentName: String,
+    private val logDir: File,
 ) : AiAgentSession {
     override val displayName: String
         get() = delegate.displayName
 
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val promptCounter = AtomicInteger(0)
 
     override fun runPrompt(prompt: String, timeoutSeconds: Long): AiStartedProcess {
         console.writePrompt(agentName, prompt)
         console.writeInfo("Running $agentName...")
 
         val aiProcess = delegate.runPrompt(prompt, timeoutSeconds)
+        val promptIndex = promptCounter.incrementAndGet()
 
-        // Pump process output to the console in real-time.
+        // Pump process output to the console in real-time and optionally persist log files.
         // Each STDOUT line is decoded through the agent-specific NDJSON filter;
         // STDERR lines are forwarded as-is.
         scope.launch {
-            aiProcess.messagesFlow.collect { streamLine ->
-                val ignore = when (streamLine.type) {
-                    ProcessStreamType.STDOUT -> {
-                        val filtered = aiProcess.outputFilter.filterText(streamLine.line)
-                        filtered.lines().forEach { console.writeLine(it) }
-                    }
+            val safeName = agentName.replace(' ', '-').lowercase()
+            val rawWriter = PrintWriter(FileWriter(File(logDir, "agent-$safeName-$promptIndex-raw.ndjson")), true)
+            val decodedWriter = PrintWriter(FileWriter(File(logDir, "agent-$safeName-$promptIndex-decoded.txt")), true)
+            try {
+                aiProcess.messagesFlow.collect { streamLine ->
+                    val ignore = when (streamLine.type) {
+                        ProcessStreamType.STDOUT -> {
+                            rawWriter.println(streamLine.line)
+                            val filtered = aiProcess.outputFilter.filterText(streamLine.line)
+                            filtered.lines().forEach { line ->
+                                console.writeLine(line)
+                                decodedWriter.println(line)
+                            }
+                        }
 
-                    ProcessStreamType.STDERR -> {
-                        console.writeLine("[stderr] ${streamLine.line}")
-                    }
+                        ProcessStreamType.STDERR -> {
+                            val text = "[stderr] ${streamLine.line}"
+                            console.writeLine(text)
+                            decodedWriter.println(text)
+                        }
 
-                    ProcessStreamType.INFO -> {
-                        console.writeLine("[INFO] ${streamLine.line}")
+                        ProcessStreamType.INFO -> {
+                            val text = "[INFO] ${streamLine.line}"
+                            console.writeLine(text)
+                            decodedWriter.println(text)
+                        }
                     }
                 }
+            } finally {
+                rawWriter.close()
+                decodedWriter.close()
             }
         }
 
