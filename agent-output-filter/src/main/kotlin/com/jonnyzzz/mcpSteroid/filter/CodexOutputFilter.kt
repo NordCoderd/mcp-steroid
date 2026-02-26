@@ -32,10 +32,58 @@ class CodexOutputFilter : AbstractOutputFilter() {
             }
             // Explicitly known no-op events — intentionally silenced
             type in setOf("thread.started", "turn.started") ||
-                    (type == "item.started" && itemType == "agent_message") -> { /* known, no output */ }
+                    (type == "item.started" && itemType == "agent_message") ||
+                    (type == "item.completed" && itemType == "reasoning") -> { /* known, no output */ }
             // Unknown event type — pass through raw JSON so no data is lost
             else -> writer.writeLine(rawLine)
         }
+    }
+
+    /**
+     * Resolve tool name from an item object.
+     * - Checks "name" (tool_call / function_call format)
+     * - Then "function.name" (function_call variant)
+     * - Then "tool" (mcp_tool_call format used by Codex for MCP calls)
+     */
+    private fun resolveToolName(item: JsonObject): String =
+        item["name"]?.jsonPrimitive?.contentOrNull
+            ?: (item["function"] as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
+            ?: item["tool"]?.jsonPrimitive?.contentOrNull
+            ?: "?"
+
+    /**
+     * Resolve input parameters from an item object.
+     * Checks "input", "arguments" (mcp_tool_call), and "function.arguments" fields.
+     * Also handles string-encoded JSON.
+     */
+    private fun resolveInputObject(item: JsonObject): JsonObject? {
+        var inputObj = (item["input"] as? JsonObject)
+            ?: (item["arguments"] as? JsonObject)
+            ?: ((item["function"] as? JsonObject)?.get("arguments") as? JsonObject)
+
+        if (inputObj == null) {
+            val inputStr = item["input"]?.jsonPrimitive?.contentOrNull
+                ?: item["arguments"]?.jsonPrimitive?.contentOrNull
+            if (inputStr != null) {
+                inputObj = try {
+                    filterJson.parseToJsonElement(inputStr) as? JsonObject
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
+        return inputObj
+    }
+
+    /**
+     * Extract human-readable text from an mcp_tool_call result object.
+     * The result has structure: {"content": [{"type": "text", "text": "..."}], ...}
+     */
+    private fun extractMcpResultText(result: JsonObject): String {
+        val contentArray = result["content"] as? JsonArray ?: return ""
+        return contentArray.mapNotNull { el ->
+            (el as? JsonObject)?.get("text")?.jsonPrimitive?.contentOrNull
+        }.joinToString(" | ")
     }
 
     private fun handleAgentMessage(item: JsonObject, writer: BufferedWriter) {
@@ -73,14 +121,19 @@ class CodexOutputFilter : AbstractOutputFilter() {
     }
 
     private fun handleToolCompleted(item: JsonObject, writer: BufferedWriter) {
-        val name = item["name"]?.jsonPrimitive?.contentOrNull
-            ?: (item["function"] as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
-            ?: "?"
+        val name = resolveToolName(item)
+        val itemType = item["type"]?.jsonPrimitive?.contentOrNull ?: ""
 
-        // Extract output - handle both string primitives and complex objects
-        val output = when (val out = item["output"] ?: item["result"]) {
-            is JsonPrimitive -> out.contentOrNull ?: out.toString()
-            else -> out?.toString() ?: ""
+        // Extract output — for mcp_tool_call, result is a structured object; for others it's a primitive
+        val output = when {
+            itemType == "mcp_tool_call" -> {
+                val result = item["result"] as? JsonObject
+                if (result != null) extractMcpResultText(result) else ""
+            }
+            else -> when (val out = item["output"] ?: item["result"]) {
+                is JsonPrimitive -> out.contentOrNull ?: out.toString()
+                else -> out?.toString() ?: ""
+            }
         }
 
         val execId = item["id"]?.jsonPrimitive?.contentOrNull ?: ""
@@ -104,25 +157,8 @@ class CodexOutputFilter : AbstractOutputFilter() {
     }
 
     private fun handleToolStarted(item: JsonObject, writer: BufferedWriter) {
-        val name = item["name"]?.jsonPrimitive?.contentOrNull
-            ?: (item["function"] as? JsonObject)?.get("name")?.jsonPrimitive?.contentOrNull
-            ?: "?"
-
-        var inputObj = (item["input"] as? JsonObject) ?: (item["arguments"] as? JsonObject)
-
-        // Handle string-encoded JSON
-        if (inputObj == null) {
-            val inputStr = item["input"]?.jsonPrimitive?.contentOrNull
-                ?: item["arguments"]?.jsonPrimitive?.contentOrNull
-            if (inputStr != null) {
-                inputObj = try {
-                    filterJson.parseToJsonElement(inputStr) as? JsonObject
-                } catch (_: Exception) {
-                    null
-                }
-            }
-        }
-
+        val name = resolveToolName(item)
+        val inputObj = resolveInputObject(item)
         val detail = if (inputObj != null) toolDetail(name, inputObj) else ""
         writer.writeLine(">> $name$detail")
     }

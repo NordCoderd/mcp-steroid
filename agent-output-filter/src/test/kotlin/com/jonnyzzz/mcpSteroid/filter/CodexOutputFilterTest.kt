@@ -70,10 +70,36 @@ class CodexOutputFilterTest {
     }
 
     @Test
-    fun `test mcp_tool_call variant`() {
+    fun `test mcp_tool_call variant with name and input fields`() {
+        // Some Codex versions use "name"+"input" for mcp_tool_call
         val input = """{"type":"item.started","item":{"type":"mcp_tool_call","name":"read_mcp_resource","input":{"uri":"file:///test"}}}"""
         val output = runFilter(input)
         assertEquals(">> read_mcp_resource (file:///test)\n", output)
+    }
+
+    @Test
+    fun `test mcp_tool_call actual Codex format - item started`() {
+        // Actual Codex output uses "tool" and "arguments" fields for mcp_tool_call
+        val input = """{"type":"item.started","item":{"id":"item_5","type":"mcp_tool_call","server":"mcp-steroid","tool":"steroid_execute_code","arguments":{"project_name":"demo","task_id":"t1","reason":"Test the feature","code":"println(1)"}}}"""
+        val output = runFilter(input)
+        assertEquals(">> steroid_execute_code (Test the feature)\n", output)
+    }
+
+    @Test
+    fun `test mcp_tool_call actual Codex format - item completed`() {
+        // Actual Codex output for mcp_tool_call completed: result has content array
+        val input = """{"type":"item.completed","item":{"id":"item_5","type":"mcp_tool_call","server":"mcp-steroid","tool":"steroid_execute_code","arguments":{"project_name":"demo","task_id":"t1","reason":"Test the feature","code":"println(1)"},"result":{"content":[{"type":"text","text":"Execution ID: eid_123"},{"type":"text","text":"Result: 1"}],"structured_content":null},"error":null,"status":"completed"}}"""
+        val output = runFilter(input)
+        assertTrue(output.contains("<< steroid_execute_code [item_5]"), "Should show tool name: $output")
+        assertTrue(output.contains("Execution ID: eid_123"), "Should extract content text: $output")
+    }
+
+    @Test
+    fun `test reasoning item is silently skipped`() {
+        // Codex emits reasoning items that should not appear in console output
+        val input = """{"type":"item.completed","item":{"id":"item_0","type":"reasoning","text":"**Planning to use skill debugger**"}}"""
+        val output = runFilter(input)
+        assertEquals("", output)
     }
 
     @Test
