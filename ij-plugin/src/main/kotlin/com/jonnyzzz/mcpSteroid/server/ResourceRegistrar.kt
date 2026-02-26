@@ -46,7 +46,7 @@ class ResourceRegistrar : McpRegistrar {
                             ResourceContent(
                                 uri = article.uri,
                                 mimeType = payload.mimeType,
-                                text = payload.readPrompt()
+                                text = ProductConditionals.process(payload.readPrompt())
                             )
                         )
                         val seeAlso = article.seeAlso
@@ -55,7 +55,7 @@ class ResourceRegistrar : McpRegistrar {
                                 ResourceContent(
                                     uri = article.uri,
                                     mimeType = seeAlso.mimeType,
-                                    text = seeAlso.readPrompt()
+                                    text = ProductConditionals.process(seeAlso.readPrompt())
                                 )
                             )
                         }
@@ -72,7 +72,7 @@ class ResourceRegistrar : McpRegistrar {
         for ((_, article) in index.articles) {
             if (article.payload.mimeType != "text/markdown") continue
 
-            val content = article.payload.readPrompt()
+            val content = ProductConditionals.process(article.payload.readPrompt())
             val parsed = parseSkillFrontmatter(content)
             val frontmatter = parsed.frontmatter ?: continue
             val promptName = frontmatter.name?.takeIf { it.isNotBlank() } ?: continue

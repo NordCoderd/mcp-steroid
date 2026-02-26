@@ -1,4 +1,5 @@
 using DemoRider;
+using NUnit.Framework;
 
 namespace DemoRider.Tests;
 
