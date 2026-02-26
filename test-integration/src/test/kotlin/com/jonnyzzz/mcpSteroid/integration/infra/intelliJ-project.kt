@@ -24,6 +24,7 @@ sealed class IntelliJProject{
     object PyCharmTestProject : ProjectFromRepository("test-project-pycharm")
     object GoLandTestProject : ProjectFromRepository("test-project-goland")
     object WebStormTestProject : ProjectFromRepository("test-project-webstorm")
+    object RiderTestProject : ProjectFromRepository("test-project-rider")
 
     object KeycloakProject : ProjectFromRemoteGit("https://github.com/keycloak/keycloak.git")
 

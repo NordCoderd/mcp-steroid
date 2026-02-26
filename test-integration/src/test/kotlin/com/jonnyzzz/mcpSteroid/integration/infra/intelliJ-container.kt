@@ -121,6 +121,9 @@ class IntelliJContainer(
 
         // Set up project JDK (if missing) and wait for Maven/Gradle sync to finish.
         // No-op when JDK is already set and no import is pending.
+        // For Rider: the JavaSdk import will fail to compile, but the try/catch in
+        // mcpSetupJdkAndWaitForImport handles this gracefully. Rider handles NuGet
+        // restore during its own indexing phase — no JDK setup is needed.
         console.writeStep(0, "Configuring project JDK and waiting for build tool sync...")
         mcpSteroid.mcpSetupJdkAndWaitForImport(guestProjectDir)
         console.writeSuccess("Build tool sync complete")

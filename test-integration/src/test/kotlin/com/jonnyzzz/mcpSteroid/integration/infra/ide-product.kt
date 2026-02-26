@@ -35,6 +35,13 @@ enum class IdeProduct(
         launcherExecutable = "webstorm",
         displayName = "WebStorm",
         jetbrainsProductCode = "WS",
+    ),
+    Rider(
+        id = "rider",
+        dockerImageBase = "rider-agent",
+        launcherExecutable = "rider",
+        displayName = "Rider",
+        jetbrainsProductCode = "RD",
     );
 
     companion object {
@@ -43,7 +50,8 @@ enum class IdeProduct(
             "pycharm", "pcp", "python" -> PyCharm
             "goland", "go" -> GoLand
             "webstorm", "ws" -> WebStorm
-            else -> error("Unsupported test.integration.ide.product='$rawValue'. Use one of: idea, pycharm, goland, webstorm.")
+            "rider", "rd", "dotnet" -> Rider
+            else -> error("Unsupported test.integration.ide.product='$rawValue'. Use one of: idea, pycharm, goland, webstorm, rider.")
         }
     }
 }
