@@ -433,3 +433,61 @@ Use `run-agent.sh` from `~/Work/jonnyzzz-ai-coder/` to launch AI agents for rese
 ## AI Tests
 
 Deploy fresh plugin (`./gradlew deployPlugin`), run prompts from `ai-tests/*.md`, validate outcomes. See `ai-tests/_INSTRUCTIONS.md`.
+
+## Playground Tests for Interactive IDE Debugging
+
+Use playground tests to start an IDE in Docker and keep it running indefinitely for manual
+experimentation via MCP, screenshots, video, and CLI.
+
+### How It Works
+
+A playground test calls `IntelliJContainer.create().waitForProjectReady()` then blocks
+the test thread. The IDE container stays running with MCP Steroid server, live video
+stream, screenshot capture, and a loaded test project.
+
+### Available Playgrounds
+
+| Test | IDE | Command |
+|------|-----|---------|
+| `RiderPlaygroundTest` | Rider (.NET) | `./gradlew :test-integration:test --tests '*RiderPlaygroundTest*' -Dtest.integration.ide.product=rider` |
+
+To create a playground for another IDE, copy `RiderPlaygroundTest.kt` and change `IdeProduct.Rider` to the desired product.
+
+### Connecting
+
+After startup the test prints:
+
+```
+MCP:   http://localhost:<PORT>/mcp
+```
+
+**Claude Code CLI:**
+```bash
+claude --mcp-config '{"mcpServers":{"mcp-steroid":{"url":"http://localhost:<PORT>/mcp"}}}'
+```
+
+**Video stream:** `http://localhost:<PORT>/video.mp4`
+
+**Container shell:** `docker exec -it <CONTAINER_ID> bash`
+
+**Artifacts:** `run-<timestamp>-<name>/` — `video/`, `screenshot/`, `intellij/` (IDE logs), `session-info.txt`
+
+### Use Cases
+
+- API discovery: explore IDE APIs interactively via `steroid_execute_code`
+- Prompt testing: verify prompt resource content works in the target IDE
+- Debugging: set breakpoints, evaluate expressions, step through code via MCP
+- Action discovery: use `steroid_action_discovery` to find available actions
+
+### Rider/.NET Test Execution Architecture
+
+Rider uses a fundamentally different test execution model from IntelliJ IDEA:
+
+- **No standard RunConfigurationType** for NUnit/xUnit/MSTest — `RiderUnitTestRunConfigurationType`
+  is `VirtualConfigurationType` (cannot be manually instantiated)
+- **Test execution is backend-driven** via RD protocol to the ReSharper engine
+- **Frontend entry point**: `project.solution.rdUnitTestHost`
+- **SMTRunnerConsoleView is NOT used** — Rider has its own `RiderUnitTestTreeSessionDescriptor`
+
+To run .NET tests programmatically, use `dotnet test` CLI or fire
+`RiderUnitTestRunSolutionAction` / `RiderUnitTestRunContextAction` actions.
