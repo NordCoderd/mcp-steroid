@@ -63,6 +63,7 @@ Each step should be a separate `steroid_execute_code` call. Do NOT combine steps
 - If `steroid_execute_code` returns `Project not found`, call `steroid_list_projects` and reuse the exact `project_name`.
 - Do not hardcode line numbers; locate the target statement by text (for example, the `sortedByDescending` call) before placing breakpoints.
 - **Breakpoints**: Use the idempotent `findBreakpointsAtLine` + `addLineBreakpoint` pattern from `mcp-steroid://debugger/set-line-breakpoint`. Do NOT use `toggleLineBreakpoint` for "ensure breakpoint exists" — it REMOVES an existing breakpoint (toggle semantics).
+- **Breakpoint type cast**: Cast to `XLineBreakpointType<XBreakpointProperties<*>>`, NOT to `Nothing?` or `Void`. Rider uses `DotNetLineBreakpointProperties` — casting to `Nothing?`/`Void` causes ClassCastException in Rider.
 - Use `mcp-steroid://debugger/debug-run-configuration` for debug launch (uses `com.intellij.execution.ProgramRunnerUtil`).
 - **For variable evaluation, always copy the `eval()` helper from `mcp-steroid://debugger/evaluate-expression`**. Do NOT write your own evaluation code -- the callback API is tricky and easy to get wrong.
 - **Callback overrides**: Always use block bodies `{ }`, NOT expression bodies `=`. Example: `override fun evaluated(value: XValue) { deferred.complete(value) }`. Expression body `= deferred.complete(value)` causes a type mismatch (`Boolean` vs `Unit`).
@@ -81,7 +82,7 @@ Each step should be a separate `steroid_execute_code` call. Do NOT combine steps
 - Run/debug launch: use `ProgramRunnerUtil.executeConfiguration(settings, executor)` with a real `Executor` (`DefaultDebugExecutor.getDebugExecutorInstance()` or `ExecutorRegistry.getInstance().getExecutorById(...)`).
 - For `ApplicationConfiguration`, set entry point via `mainClassName = "..."` (avoid `setMainClassName(...)`).
 - Run config creation: prefer `RunManager.createConfiguration(name, factory)` then `RunManager.addConfiguration(settings)`; choose storage via `settings.storeInDotIdeaFolder()` or `settings.storeInLocalWorkspace()` before add.
-- Breakpoints: use the idempotent `findBreakpointsAtLine` + `addLineBreakpoint` pattern. See `mcp-steroid://debugger/set-line-breakpoint` for the complete script.
+- Breakpoints: use the idempotent `findBreakpointsAtLine` + `addLineBreakpoint` pattern. Cast type to `XLineBreakpointType<XBreakpointProperties<*>>` (not `Nothing?`). See `mcp-steroid://debugger/set-line-breakpoint` for the complete script.
 - Session control: use `XDebuggerManager.getInstance(project).currentSession`, then `pause()`, `resume()`, `stepOver(...)`, `stop()`.
 - Expression evaluation is callback-based. **Copy the complete `eval()` helper from `mcp-steroid://debugger/evaluate-expression`.**
   Key types: `XDebuggerEvaluator.XEvaluationCallback` (nested, not top-level), callback receives `XValue` (from `com.intellij.xdebugger.frame`), presentation via `XValuePresentationUtil.computeValueText()`.

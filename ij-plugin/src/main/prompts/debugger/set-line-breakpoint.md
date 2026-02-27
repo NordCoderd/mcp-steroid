@@ -11,7 +11,7 @@ if one is already present (toggle semantics).
 ```kotlin
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerUtil
-import com.intellij.xdebugger.breakpoints.XLineBreakpoint
+import com.intellij.xdebugger.breakpoints.XBreakpointProperties
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import java.nio.file.Paths
 
@@ -32,16 +32,18 @@ val breakpointType = readAction {
         .firstOrNull { it.canPutAt(virtualFile, lineIndex, project) }
 } ?: error("No breakpoint type available for $filePath:$lineNumberInEditor")
 
-// Check if breakpoint already exists (idempotent — safe to call repeatedly)
+// Cast to star-projection — works for ALL IDEs (Java, Kotlin, C#/Rider, etc.)
+// Do NOT cast to Nothing? — Rider uses DotNetLineBreakpointProperties, not Void
 @Suppress("UNCHECKED_CAST")
-val bpType = breakpointType as XLineBreakpointType<Nothing?>
+val bpType = breakpointType as XLineBreakpointType<XBreakpointProperties<*>>
+
+// Check if breakpoint already exists (idempotent — safe to call repeatedly)
 val existing = breakpointManager.findBreakpointsAtLine(bpType, virtualFile, lineIndex)
 if (existing.isNotEmpty()) {
     println("Breakpoint already exists at $filePath:$lineNumberInEditor")
     println("Breakpoint:", existing.first())
 } else {
-    // Create breakpoint properties and add it
-    val properties = readAction { breakpointType.createBreakpointProperties(virtualFile, lineIndex) }
+    val properties = readAction { bpType.createBreakpointProperties(virtualFile, lineIndex) }
     val breakpoint = breakpointManager.addLineBreakpoint(bpType, virtualFile.url, lineIndex, properties)
     println("Created breakpoint at $filePath:$lineNumberInEditor")
     println("Breakpoint:", breakpoint)

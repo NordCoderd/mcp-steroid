@@ -46,6 +46,8 @@ Use event-driven `XDebugSessionListener` + `CompletableDeferred` instead of poll
 **Breakpoints** (idempotent — safe to call repeatedly)
 - `XDebuggerManager.getInstance(project).breakpointManager`
 - Use `findBreakpointsAtLine(type, file, line)` to check if breakpoint exists, then `addLineBreakpoint(type, url, line, props)` if absent
+- Cast breakpoint type to `XLineBreakpointType<XBreakpointProperties<*>>` — works across ALL IDEs (Java, Kotlin, C#/Rider)
+- Do NOT cast to `Nothing?` or `Void` — Rider uses `DotNetLineBreakpointProperties`, not Void
 - Do NOT use `toggleLineBreakpoint` — it REMOVES existing breakpoints (toggle semantics)
 
 **Sessions**
