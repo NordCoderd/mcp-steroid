@@ -444,7 +444,7 @@ val verifyBundledLibraries by tasks.registering {
 
             //our binaires
             "lib/ai-agents-${project.version}.jar",
-            "lib/mcp-steroid-${project.version}.jar",
+            "lib/ij-plugin-${project.version}.jar",
             "lib/ocr-common-${project.version}.jar",
 
             //libraries
