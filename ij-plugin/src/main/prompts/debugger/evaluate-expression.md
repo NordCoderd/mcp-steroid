@@ -143,6 +143,9 @@ val sizeValue = evaluateExpression(evaluator, "players.size", pos)
 println("players.size =", sizeValue)
 
 // Evaluate complex expressions
+// NOTE: Use the language of the project being debugged:
+//   Kotlin/Java: players.sortedByDescending { it.score }
+//   C#/.NET:     players.OrderByDescending(p => p.Score).ToList()
 val sortedValue = evaluateExpression(evaluator, "players.sortedByDescending { it.score }", pos)
 println("sorted result =", sortedValue)
 ```

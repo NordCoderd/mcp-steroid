@@ -32,12 +32,23 @@ withContext(Dispatchers.EDT) {
     XDebuggerUtil.getInstance().toggleLineBreakpoint(project, virtualFile, lineIndex)
 }
 
-val breakpoint = breakpointManager.allBreakpoints
-    .filterIsInstance<XLineBreakpoint<*>>()
-    .firstOrNull { it.fileUrl == virtualFile.url && it.line == lineIndex }
-    ?: error("Breakpoint was not created for line $lineNumberInEditor")
+// Verify: poll briefly — in Rider, breakpoint creation is async (RD protocol to backend)
+var breakpoint: com.intellij.xdebugger.breakpoints.XBreakpoint<*>? = null
+repeat(10) {
+    breakpoint = breakpointManager.allBreakpoints
+        .filterIsInstance<XLineBreakpoint<*>>()
+        .firstOrNull { it.fileUrl == virtualFile.url && it.line == lineIndex }
+    if (breakpoint != null) return@repeat
+    delay(200)
+}
 
-println("Created breakpoint:", breakpoint)
+if (breakpoint != null) {
+    println("Created breakpoint:", breakpoint)
+} else {
+    println("WARNING: Breakpoint not confirmed for line $lineNumberInEditor (may still be pending)")
+    println("Existing breakpoints:")
+    breakpointManager.allBreakpoints.forEach { println("  ${it.javaClass.simpleName}: ${it}") }
+}
 ```
 
 # See also
