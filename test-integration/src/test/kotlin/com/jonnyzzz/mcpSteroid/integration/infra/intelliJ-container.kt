@@ -267,12 +267,27 @@ class IntelliJContainer(
             timeout = 14_400,
             code = """
 import com.intellij.task.ProjectTaskManager
+import java.util.concurrent.TimeUnit
 
-println("[SNAPSHOT-PREBUILD] Starting IntelliJ buildAllModules() ...")
-val result = ProjectTaskManager.getInstance(project).buildAllModules().get()
-println("[SNAPSHOT-PREBUILD] IntelliJ build finished: errors=${'$'}{result.hasErrors()}, warnings=${'$'}{result.hasWarnings()}, aborted=${'$'}{result.isAborted()}")
-check(!result.isAborted()) { "IntelliJ build was aborted" }
-check(!result.hasErrors()) { "IntelliJ build reported compile errors" }
+val changedFilesScanProperty = "idea.indexes.pretendNoFiles"
+val oldChangedFilesScanProperty = System.getProperty(changedFilesScanProperty)
+System.setProperty(changedFilesScanProperty, "true")
+println("[SNAPSHOT-PREBUILD] Temporarily set ${'$'}changedFilesScanProperty=true to skip changed-files scan")
+
+try {
+    println("[SNAPSHOT-PREBUILD] Starting IntelliJ buildAllModules() ...")
+    val result = ProjectTaskManager.getInstance(project).buildAllModules().get(4, TimeUnit.HOURS)
+    println("[SNAPSHOT-PREBUILD] IntelliJ build finished: errors=${'$'}{result.hasErrors()}, warnings=${'$'}{result.hasWarnings()}, aborted=${'$'}{result.isAborted()}")
+    check(!result.isAborted()) { "IntelliJ build was aborted" }
+    check(!result.hasErrors()) { "IntelliJ build reported compile errors" }
+} finally {
+    if (oldChangedFilesScanProperty == null) {
+        System.clearProperty(changedFilesScanProperty)
+    } else {
+        System.setProperty(changedFilesScanProperty, oldChangedFilesScanProperty)
+    }
+    println("[SNAPSHOT-PREBUILD] Restored ${'$'}changedFilesScanProperty to ${'$'}{oldChangedFilesScanProperty ?: "<unset>"}")
+}
 """.trimIndent(),
         )
         ideBuild.assertExitCode(0) {
