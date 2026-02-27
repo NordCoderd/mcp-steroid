@@ -20,15 +20,31 @@ sealed class IntelliJProject{
      */
     open fun getRepoUrlForCache(): String? = null
 
-    object TestProject : ProjectFromRepository("test-project")
-    object PyCharmTestProject : ProjectFromRepository("test-project-pycharm")
-    object GoLandTestProject : ProjectFromRepository("test-project-goland")
-    object WebStormTestProject : ProjectFromRepository("test-project-webstorm")
-    object RiderTestProject : ProjectFromRepository("test-project-rider")
+    /**
+     * Relative path (from project root) of the file to open when the IDE starts.
+     * When null, the default README.md / first source file fallback is used.
+     */
+    open val openFileOnStart: String? = null
+
+    object TestProject : ProjectFromRepository(
+        "test-project",
+        openFile = "src/test/kotlin/com/jonnyzzz/mcpSteroid/demo/DemoByJonnyzzzTest.kt",
+    )
+    object PyCharmTestProject : ProjectFromRepository("test-project-pycharm", openFile = "main.py")
+    object GoLandTestProject : ProjectFromRepository("test-project-goland", openFile = "main.go")
+    object WebStormTestProject : ProjectFromRepository("test-project-webstorm", openFile = "index.js")
+    object RiderTestProject : ProjectFromRepository(
+        "test-project-rider",
+        openFile = "DemoRider.Tests/LeaderboardTests.cs",
+    )
 
     object KeycloakProject : ProjectFromRemoteGit("https://github.com/keycloak/keycloak.git")
 
-    open class ProjectFromRepository protected constructor(val projectName: String) : IntelliJProject() {
+    open class ProjectFromRepository protected constructor(
+        val projectName: String,
+        private val openFile: String? = null,
+    ) : IntelliJProject() {
+        override val openFileOnStart: String? get() = openFile
         override fun IntelliJProjectDriver.deploy() {
             console.writeInfo("Moving project $projectName files...")
 

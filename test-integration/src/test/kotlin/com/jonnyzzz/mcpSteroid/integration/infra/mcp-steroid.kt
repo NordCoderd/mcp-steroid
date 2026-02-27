@@ -447,7 +447,7 @@ if (configured == null) {
      *
      * @param projectPath Guest project directory path.
      */
-    fun mcpOpenReadmeAndBuildToolWindow(projectPath: String) {
+    fun mcpOpenFileAndBuildToolWindow(projectPath: String, openFileOnStart: String? = null) {
         val projectName = try {
             mcpListProjects().firstOrNull { it.path == projectPath }?.name
         } catch (e: Exception) {
@@ -459,6 +459,13 @@ if (configured == null) {
             return
         }
 
+        // Escape the openFileOnStart path for embedding in Kotlin string template
+        val filePathLiteral = if (openFileOnStart != null) {
+            "\"$openFileOnStart\""
+        } else {
+            "null"
+        }
+
         val code = """
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -468,24 +475,32 @@ import com.intellij.ide.projectView.ProjectView
 import com.intellij.openapi.application.EDT
 import kotlinx.coroutines.withContext
 
-// 1. Open README.md (or fallback to first .java/.kt source file)
+// 1. Open the configured file, or fall back to README.md / first source file.
 // Use refreshAndFindFileByPath so VFS content is loaded from disk —
 // git clone happened outside IntelliJ's file watcher, so findFileByPath
 // may return a VirtualFile whose content cache is empty (black editor).
 val basePath = project.basePath ?: ""
-val readmePath = "${'$'}basePath/README.md"
-val readmeFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(readmePath)
-val fileToOpen = if (readmeFile != null && readmeFile.exists()) {
-    readmeFile
+val openFileRelPath: String? = $filePathLiteral
+
+val fileToOpen = if (openFileRelPath != null) {
+    val targetPath = "${'$'}basePath/${'$'}openFileRelPath"
+    LocalFileSystem.getInstance().refreshAndFindFileByPath(targetPath)
 } else {
-    val baseDir = java.io.File(basePath)
-    val sourceFile = baseDir.walkTopDown()
-        .filter { it.isFile && (it.extension == "java" || it.extension == "kt") }
-        .firstOrNull()
-    if (sourceFile != null) {
-        LocalFileSystem.getInstance().refreshAndFindFileByPath(sourceFile.absolutePath)
+    // Fallback: README.md or first .java/.kt source file
+    val readmePath = "${'$'}basePath/README.md"
+    val readmeFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(readmePath)
+    if (readmeFile != null && readmeFile.exists()) {
+        readmeFile
     } else {
-        null
+        val baseDir = java.io.File(basePath)
+        val sourceFile = baseDir.walkTopDown()
+            .filter { it.isFile && (it.extension == "java" || it.extension == "kt") }
+            .firstOrNull()
+        if (sourceFile != null) {
+            LocalFileSystem.getInstance().refreshAndFindFileByPath(sourceFile.absolutePath)
+        } else {
+            null
+        }
     }
 }
 
@@ -495,7 +510,7 @@ if (fileToOpen != null) {
         println("[UX-SETUP] Opened file: ${'$'}{fileToOpen.path}")
     }
 } else {
-    println("[UX-SETUP] No README.md or source file found to open")
+    println("[UX-SETUP] No file found to open (configured=${'$'}openFileRelPath)")
 }
 
 // 2. Show Maven or Gradle tool window depending on what build file exists
@@ -538,7 +553,7 @@ try {
             mcpExecuteCode(
                 code = code,
                 projectName = projectName,
-                reason = "Open README.md and build tool window for agent orientation",
+                reason = "Open project file and build tool window for agent orientation",
                 timeout = 30,
             )
         } catch (e: Exception) {

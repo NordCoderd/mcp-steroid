@@ -276,6 +276,7 @@ fun IntelliJContainer.Companion.create(
         intellij = ijProcess,
         windows = windowsDriver,
         windowLayout = windowsLayout,
+        openFileOnStart = selectedProject.openFileOnStart,
     )
 
     println("[IDE-AGENT] Session ready: $runDir")

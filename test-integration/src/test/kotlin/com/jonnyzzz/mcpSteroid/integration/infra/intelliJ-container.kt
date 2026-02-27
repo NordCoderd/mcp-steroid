@@ -66,6 +66,12 @@ class IntelliJContainer(
 
     val windows: XcvbWindowDriver,
     private val windowLayout: WindowLayoutManager,
+
+    /**
+     * Relative path (from project root) of the file to open when the IDE starts.
+     * When null, the default README.md / first source file fallback is used.
+     */
+    private val openFileOnStart: String? = null,
 ) {
     val pid by intellij::pid
 
@@ -128,10 +134,10 @@ class IntelliJContainer(
         mcpSteroid.mcpSetupJdkAndWaitForImport(guestProjectDir)
         console.writeSuccess("Build tool sync complete")
 
-        // Open README.md (or fallback source file) and show build tool window so agents can orient
-        // themselves from the IDE view immediately.
-        console.writeStep(0, "Opening README.md and build tool window...")
-        mcpSteroid.mcpOpenReadmeAndBuildToolWindow(guestProjectDir)
+        // Open the configured file (or README.md fallback) and show build tool window so agents
+        // can orient themselves from the IDE view immediately.
+        console.writeStep(0, "Opening project file and build tool window...")
+        mcpSteroid.mcpOpenFileAndBuildToolWindow(guestProjectDir, openFileOnStart)
         console.writeSuccess("Project UX ready")
 
         return this
