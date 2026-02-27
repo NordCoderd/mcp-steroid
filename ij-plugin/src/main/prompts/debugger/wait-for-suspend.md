@@ -1,37 +1,76 @@
 Wait for Debugger Suspend
 
-Poll until the debugger suspends at a breakpoint. Use this after starting a debug session
+Wait until the debugger suspends at a breakpoint or after a step. Uses XDebugSessionListener for event-driven detection (no polling).
 
 ```kotlin
 import com.intellij.xdebugger.XDebuggerManager
+import com.intellij.xdebugger.XDebugSessionListener
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.seconds
 
 val debuggerManager = XDebuggerManager.getInstance(project)
+val session = debuggerManager.currentSession
 
-// Poll up to 15 seconds for the debugger to suspend at a breakpoint
-var suspended = false
-repeat(30) { attempt ->
-    val session = debuggerManager.currentSession
-    if (session != null && session.isSuspended) {
-        val frame = session.currentStackFrame
-        val pos = frame?.sourcePosition
-        val fileName = pos?.file?.name ?: "?"
-        val line = (pos?.line ?: -1) + 1  // API is 0-indexed, display as 1-indexed
-        println("Debugger suspended at: $fileName:$line (attempt ${attempt + 1})")
-        suspended = true
-        return
-    }
-    delay(500)
+if (session == null) {
+    println("No debug session found. Did the debug configuration start correctly?")
+    return
 }
 
-if (!suspended) {
-    val session = debuggerManager.currentSession
-    if (session == null) {
-        println("No debug session found. Did the debug configuration start correctly?")
-    } else {
-        println("Debug session exists but not suspended after 15 seconds.")
-        println("Session: ${session.sessionName}, stopped: ${session.isStopped}")
+// Check if already suspended (handles race where breakpoint was hit before this script runs)
+if (session.isSuspended) {
+    val frame = session.currentStackFrame
+    val pos = frame?.sourcePosition
+    val fileName = pos?.file?.name ?: "?"
+    val line = (pos?.line ?: -1) + 1
+    println("Already suspended at: $fileName:$line")
+    return
+}
+
+// Event-driven: use XDebugSessionListener + CompletableDeferred
+// sessionPaused() fires for both breakpoint hits and step completions
+val suspendedDeferred = CompletableDeferred<Unit>()
+val listener = object : XDebugSessionListener {
+    override fun sessionPaused() {
+        suspendedDeferred.complete(Unit)
+    }
+    override fun sessionStopped() {
+        suspendedDeferred.completeExceptionally(Exception("Debug session stopped before suspension"))
     }
 }
+
+session.addSessionListener(listener)
+try {
+    withTimeout(30.seconds) { suspendedDeferred.await() }
+
+    val frame = session.currentStackFrame
+    val pos = frame?.sourcePosition
+    val fileName = pos?.file?.name ?: "?"
+    val line = (pos?.line ?: -1) + 1
+    println("Debugger suspended at: $fileName:$line")
+} catch (e: kotlinx.coroutines.TimeoutCancellationException) {
+    println("Debugger did not suspend within 30 seconds.")
+    println("Session: ${session.sessionName}, stopped: ${session.isStopped}")
+} finally {
+    session.removeSessionListener(listener)
+}
+```
+
+## How it works
+
+```text
+XDebugSessionListener.sessionPaused() fires when the debugger suspends for ANY reason:
+- Breakpoint hit (process calls session.breakpointReached())
+- Step completion (step-over/step-into/step-out calls session.positionReached())
+- Manual pause (session.pause())
+
+This is more efficient than polling session.isSuspended in a loop —
+the listener fires immediately when suspension occurs, with no delay.
+
+Always check isSuspended BEFORE registering the listener to handle the race
+where the breakpoint was hit between launching the debug session and running this script.
+
+Always handle sessionStopped() to avoid hanging if the debug process terminates.
 ```
 
 # See also

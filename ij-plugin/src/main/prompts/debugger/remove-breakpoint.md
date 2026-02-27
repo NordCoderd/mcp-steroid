@@ -1,0 +1,48 @@
+Remove Line Breakpoint
+
+Remove all breakpoints at a specific file/line.
+
+```kotlin
+import com.intellij.xdebugger.XDebuggerManager
+import com.intellij.xdebugger.breakpoints.XLineBreakpoint
+import java.nio.file.Paths
+
+val filePath = "src/main/kotlin/com/example/MyClass.kt"
+val lineNumberInEditor = 49  // TODO: Set your value
+
+val projectRoot = project.basePath ?: error("Project basePath is null")
+val absolutePath = Paths.get(projectRoot, filePath).toString()
+val virtualFile = LocalFileSystem.getInstance().findFileByPath(absolutePath)
+    ?: error("File not found: $absolutePath")
+
+val breakpointManager = XDebuggerManager.getInstance(project).breakpointManager
+val lineIndex = lineNumberInEditor - 1
+
+// Find and remove all breakpoints at this line
+val removed = breakpointManager.allBreakpoints
+    .filterIsInstance<XLineBreakpoint<*>>()
+    .filter { it.fileUrl == virtualFile.url && it.line == lineIndex }
+
+if (removed.isEmpty()) {
+    println("No breakpoint at $filePath:$lineNumberInEditor")
+} else {
+    removed.forEach { breakpointManager.removeBreakpoint(it) }
+    println("Removed ${removed.size} breakpoint(s) at $filePath:$lineNumberInEditor")
+}
+```
+
+```text
+- fileUrl is VirtualFile.getUrl() format (e.g., "file:///path/to/File.java")
+- Line numbers are 0-indexed in the API (editor line 7 = API line 6)
+- Default breakpoints (like "Any Exception") are just disabled, not actually removed
+```
+
+# See also
+
+Related debugger operations:
+- [Add Breakpoint](mcp-steroid://debugger/add-breakpoint) - Add breakpoint idempotently
+- [Set Line Breakpoint](mcp-steroid://debugger/set-line-breakpoint) - Combined add/remove reference
+- [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Stop debug session
+
+Overview resources:
+- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge

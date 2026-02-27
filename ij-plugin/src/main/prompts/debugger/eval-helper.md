@@ -1,9 +1,8 @@
-Evaluate Expression at Breakpoint
+Reusable Expression Evaluation Helper
 
-Evaluate a variable or expression when the debugger is suspended at a breakpoint.
+Copy this eval() function into your debugger scripts to evaluate expressions at a breakpoint.
 
 ```kotlin
-import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
 import com.intellij.xdebugger.frame.XFullValueEvaluator
 import com.intellij.xdebugger.frame.XValue
@@ -18,19 +17,16 @@ import kotlinx.coroutines.withTimeout
 import javax.swing.Icon
 import kotlin.time.Duration.Companion.seconds
 
-// --- Reusable helper: copy this into your scripts ---
-
 /**
  * Evaluates a debugger expression and returns its formatted string value.
  *
- * Uses CompletableDeferred to bridge three async callback APIs:
- * 1. XDebuggerEvaluator.evaluate() -> XValue via XEvaluationCallback
- * 2. XValue.isReady (CompletableFuture) -> ensures value descriptor is initialized
- * 3. XValue.computePresentation() -> formatted text via XValueNode callback
+ * Bridges three async callback APIs using CompletableDeferred:
+ * 1. XDebuggerEvaluator.evaluate() -> XValue
+ * 2. XValue.isReady (CompletableFuture) -> ensures value is initialized
+ * 3. XValue.computePresentation() -> formatted text
  *
  * IMPORTANT: All callback overrides use block bodies { }, NOT expression bodies.
- * Expression bodies like `= deferred.complete(value)` cause type mismatch errors
- * because CompletableDeferred.complete() returns Boolean, not Unit.
+ * Expression body `= deferred.complete(value)` causes type mismatch (Boolean vs Unit).
  */
 suspend fun eval(
     evaluator: XDebuggerEvaluator,
@@ -38,12 +34,10 @@ suspend fun eval(
     pos: com.intellij.xdebugger.XSourcePosition? = null,
     timeout: Long = 30
 ): String {
-    // Phase 1: Evaluate expression -> XValue
     val valueDeferred = CompletableDeferred<XValue>()
     evaluator.evaluate(
         XExpressionImpl.fromText(expr),
         object : XDebuggerEvaluator.XEvaluationCallback {
-            // IMPORTANT: Use block body { }, not expression body =
             override fun evaluated(value: XValue) { valueDeferred.complete(value) }
             override fun errorOccurred(msg: String) { valueDeferred.completeExceptionally(Exception(msg)) }
         },
@@ -55,15 +49,12 @@ suspend fun eval(
         return "ERR: ${e.message}"
     }
 
-    // Phase 2: Wait for value descriptor to be fully initialized
-    // Without this, computePresentation may return "Collecting data..."
     try {
         withTimeout(timeout.seconds) { value.isReady.await() }
     } catch (e: Exception) {
         return "ERR: Value not ready - ${e.message}"
     }
 
-    // Phase 3: Get formatted text via computePresentation callback
     val presDeferred = CompletableDeferred<String>()
     value.computePresentation(object : XValueNode {
         override fun setPresentation(icon: Icon?, type: String?, text: String, hasChildren: Boolean) {
@@ -82,7 +73,6 @@ suspend fun eval(
         return "ERR: Presentation timeout - ${e.message}"
     }
 
-    // Phase 4: Retry if "Collecting data..." (async toString() in progress)
     if (result.contains("Collecting data")) {
         repeat(10) {
             delay(200)
@@ -103,62 +93,32 @@ suspend fun eval(
     }
     return result
 }
-// --- End of helper ---
-
-val session = XDebuggerManager.getInstance(project).currentSession
-    ?: error("No debug session. Start one first.")
-check(session.isSuspended) { "Session is not suspended. Wait for breakpoint hit." }
-
-val frame = session.currentStackFrame ?: error("No current stack frame")
-val evaluator = frame.evaluator ?: error("No evaluator for current frame")
-val pos = frame.sourcePosition
-
-// Evaluate variables at the current breakpoint
-val playersValue = eval(evaluator, "players", pos)
-println("players =", playersValue)
-
-val sizeValue = eval(evaluator, "players.size", pos)
-println("players.size =", sizeValue)
-
-// Evaluate complex expressions
-// NOTE: Use the language of the project being debugged:
-//   Kotlin/Java: players.sortedByDescending { it.score }
-//   C#/.NET:     players.OrderByDescending(p => p.Score).ToList()
-val sortedValue = eval(evaluator, "players.sortedByDescending { it.score }", pos)
-println("sorted result =", sortedValue)
 ```
 
-## Common mistakes to avoid
-
 ```text
-1. Expression body type mismatch:
-   BAD:  override fun evaluated(value: XValue) = valueDeferred.complete(value)
-   GOOD: override fun evaluated(value: XValue) { valueDeferred.complete(value) }
+Usage: Copy this eval() function into your script, then call it:
 
-   complete() returns Boolean; the override expects Unit. With -Werror this is a hard error.
+  val session = XDebuggerManager.getInstance(project).currentSession ?: error("No session")
+  val frame = session.currentStackFrame ?: error("No frame")
+  val evaluator = frame.evaluator ?: error("No evaluator")
+  val pos = frame.sourcePosition
 
-2. Missing isReady await:
-   Without awaiting isReady, computePresentation may return "Collecting data..."
-   because the JDI/RD value descriptor hasn't finished loading.
+  val result = eval(evaluator, "myVariable", pos)
+  println("myVariable =", result)
 
-3. Wrong XValuePresentation import:
-   WRONG: com.intellij.xdebugger.frame.XValuePresentation
-   RIGHT: com.intellij.xdebugger.frame.presentation.XValuePresentation
+Language-specific expressions:
+  Kotlin/Java: players.sortedByDescending { it.score }
+  C#/.NET:     players.OrderByDescending(p => p.Score).ToList()
 
-4. Scope after stepping:
-   After step-over, old XValue instances are invalidated. Get fresh evaluator
-   from session.currentStackFrame after each step. Variables from the calling
-   scope may not be accessible if the debugger is inside a different method —
-   use `this.fieldName` to access instance state at method boundaries.
+After step-over, get fresh evaluator from session.currentStackFrame.
 ```
 
 # See also
 
 Related debugger operations:
-- [Wait for Suspend](mcp-steroid://debugger/wait-for-suspend) - Wait for breakpoint hit before evaluating
-- [Step Over](mcp-steroid://debugger/step-over) - Step to next line and re-evaluate
-- [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause, resume, stop
+- [Evaluate Expression](mcp-steroid://debugger/evaluate-expression) - Full evaluation example with helper
+- [Step Over](mcp-steroid://debugger/step-over) - Step then re-evaluate
+- [Wait for Suspend](mcp-steroid://debugger/wait-for-suspend) - Wait for breakpoint hit
 
 Overview resources:
 - [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge
-- [Debugger Overview](mcp-steroid://debugger/overview) - All debugger examples

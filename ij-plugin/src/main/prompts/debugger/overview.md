@@ -25,7 +25,7 @@ adapt the parameters, and pass the code to `steroid_execute_code`.
 
 Follow this sequence of resources for a complete debug session:
 
-1. `mcp-steroid://debugger/set-line-breakpoint` - set breakpoint on target line
+1. `mcp-steroid://debugger/add-breakpoint` - set breakpoint on target line
 2. `mcp-steroid://debugger/create-application-config` - create run config (if needed)
 3. `mcp-steroid://debugger/debug-run-configuration` - start debug session
 4. `mcp-steroid://debugger/wait-for-suspend` - wait for breakpoint hit
@@ -38,13 +38,16 @@ Each step should be a separate `steroid_execute_code` call. Do NOT combine steps
 ## Available resources
 
 ### Setup
-- `mcp-steroid://debugger/set-line-breakpoint` - create a line breakpoint
+- `mcp-steroid://debugger/add-breakpoint` - add a line breakpoint (idempotent, safe to call repeatedly)
+- `mcp-steroid://debugger/remove-breakpoint` - remove breakpoints from a line
+- `mcp-steroid://debugger/set-line-breakpoint` - combined add/remove reference
 - `mcp-steroid://debugger/create-application-config` - create Application run configuration
 - `mcp-steroid://debugger/debug-run-configuration` - start a run configuration in Debug
 
 ### Inspection (the essential ones for finding bugs)
-- `mcp-steroid://debugger/wait-for-suspend` - wait for debugger to suspend at breakpoint
-- `mcp-steroid://debugger/evaluate-expression` - evaluate variables/expressions at breakpoint
+- `mcp-steroid://debugger/wait-for-suspend` - wait for debugger to suspend (event-driven, no polling)
+- `mcp-steroid://debugger/eval-helper` - reusable eval() function (copy into your scripts)
+- `mcp-steroid://debugger/evaluate-expression` - full evaluation example with helper
 - `mcp-steroid://debugger/step-over` - step over current line and observe changes
 
 ### Session management
@@ -59,9 +62,12 @@ Each step should be a separate `steroid_execute_code` call. Do NOT combine steps
 
 - If `steroid_execute_code` returns `Project not found`, call `steroid_list_projects` and reuse the exact `project_name`.
 - Do not hardcode line numbers; locate the target statement by text (for example, the `sortedByDescending` call) before placing breakpoints.
-- Use `mcp-steroid://debugger/set-line-breakpoint` for breakpoint setup (preferred API: `toggleLineBreakpoint` on EDT).
+- **Breakpoints**: Use the idempotent `findBreakpointsAtLine` + `addLineBreakpoint` pattern from `mcp-steroid://debugger/set-line-breakpoint`. Do NOT use `toggleLineBreakpoint` for "ensure breakpoint exists" — it REMOVES an existing breakpoint (toggle semantics).
 - Use `mcp-steroid://debugger/debug-run-configuration` for debug launch (uses `com.intellij.execution.ProgramRunnerUtil`).
-- **For variable evaluation, always copy the `evaluateExpression()` helper from `mcp-steroid://debugger/evaluate-expression`**. Do NOT write your own evaluation code -- the callback API is tricky and easy to get wrong.
+- **For variable evaluation, always copy the `eval()` helper from `mcp-steroid://debugger/evaluate-expression`**. Do NOT write your own evaluation code -- the callback API is tricky and easy to get wrong.
+- **Callback overrides**: Always use block bodies `{ }`, NOT expression bodies `=`. Example: `override fun evaluated(value: XValue) { deferred.complete(value) }`. Expression body `= deferred.complete(value)` causes a type mismatch (`Boolean` vs `Unit`).
+- **Waiting for suspension**: Use `XDebugSessionListener` + `CompletableDeferred` (event-driven, no polling). See `mcp-steroid://debugger/wait-for-suspend`.
+- **Scope after stepping**: After step-over, the debugger may land in a different method scope. Local variables from the caller are NOT accessible. Use `this.fieldName` to access instance state. Always get fresh `evaluator` from `session.currentStackFrame`.
 - UI calls like `FileEditorManager.openFile(...)` must run on EDT (`withContext(Dispatchers.EDT)`).
 - Stop debug sessions when done: use debug-session-control or
   withContext(Dispatchers.EDT) { XDebuggerManager.getInstance(project).debugSessions.forEach { it.stop() } }
@@ -75,11 +81,11 @@ Each step should be a separate `steroid_execute_code` call. Do NOT combine steps
 - Run/debug launch: use `ProgramRunnerUtil.executeConfiguration(settings, executor)` with a real `Executor` (`DefaultDebugExecutor.getDebugExecutorInstance()` or `ExecutorRegistry.getInstance().getExecutorById(...)`).
 - For `ApplicationConfiguration`, set entry point via `mainClassName = "..."` (avoid `setMainClassName(...)`).
 - Run config creation: prefer `RunManager.createConfiguration(name, factory)` then `RunManager.addConfiguration(settings)`; choose storage via `settings.storeInDotIdeaFolder()` or `settings.storeInLocalWorkspace()` before add.
-- Breakpoints: use `XDebuggerUtil.getInstance().toggleLineBreakpoint(project, file, line)` instead of internal/impl helpers.
+- Breakpoints: use the idempotent `findBreakpointsAtLine` + `addLineBreakpoint` pattern. See `mcp-steroid://debugger/set-line-breakpoint` for the complete script.
 - Session control: use `XDebuggerManager.getInstance(project).currentSession`, then `pause()`, `resume()`, `stepOver(...)`, `stop()`.
-- Expression evaluation is callback-based. **Do NOT write your own callback implementation -- copy the complete `evaluateExpression()` helper from `mcp-steroid://debugger/evaluate-expression`.**
+- Expression evaluation is callback-based. **Copy the complete `eval()` helper from `mcp-steroid://debugger/evaluate-expression`.**
   Key types: `XDebuggerEvaluator.XEvaluationCallback` (nested, not top-level), callback receives `XValue` (from `com.intellij.xdebugger.frame`), presentation via `XValuePresentationUtil.computeValueText()`.
-- Step over: `session.stepOver(false)` on EDT, then wait for re-suspension.
+- Step over: `session.stepOver(false)` on EDT, then wait for re-suspension via `XDebugSessionListener.sessionPaused()`.
 - PSI/VFS lookups (for example `FilenameIndex`, `PsiManager`, documents) must run in `readAction { ... }`.
 
 ## Failure-Recovery Pattern
@@ -102,11 +108,14 @@ When a debugger script fails with unresolved imports/APIs or runtime setup error
 
 ### Debugger Examples
 - [Debugger Overview](mcp-steroid://debugger/overview) - This document
-- [Set Line Breakpoint](mcp-steroid://debugger/set-line-breakpoint) - Create and manage breakpoints
+- [Add Breakpoint](mcp-steroid://debugger/add-breakpoint) - Add breakpoint idempotently
+- [Remove Breakpoint](mcp-steroid://debugger/remove-breakpoint) - Remove breakpoints from a line
+- [Set Line Breakpoint](mcp-steroid://debugger/set-line-breakpoint) - Combined add/remove reference
 - [Create Application Config](mcp-steroid://debugger/create-application-config) - Create run configuration
 - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging
 - [Wait for Suspend](mcp-steroid://debugger/wait-for-suspend) - Wait for breakpoint hit
-- [Evaluate Expression](mcp-steroid://debugger/evaluate-expression) - Evaluate variables at breakpoint
+- [Eval Helper](mcp-steroid://debugger/eval-helper) - Reusable eval() function
+- [Evaluate Expression](mcp-steroid://debugger/evaluate-expression) - Full evaluation example
 - [Step Over](mcp-steroid://debugger/step-over) - Step through code
 - [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause, resume, stop
 - [Demo Debug Test](mcp-steroid://debugger/demo-debug-test) - End-to-end debug + test results demo
