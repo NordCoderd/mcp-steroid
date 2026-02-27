@@ -35,8 +35,9 @@
   <ellipse cx="2880" cy="920" rx="1080" ry="680" fill="url(#glowRight)"/>
 
   <g transform="translate(960, 200) scale(2.0)">
-    <!-- Logo Circle with Shadow -->
-    <circle cx="480" cy="400" r="280" fill="white" filter="url(#logoShadow)"/>
+    <!-- Logo Circle with shadow fallback for SVG delegates that ignore filter effects -->
+    <circle cx="480" cy="408" r="286" fill="#A994C3" fill-opacity="0.14"/>
+    <circle cx="480" cy="400" r="280" fill="white" stroke="#E8E2EE" stroke-width="2" filter="url(#logoShadow)"/>
 
     <!-- Lightning Bolt -->
     <g transform="translate(160, 80) scale(16)">
@@ -47,9 +48,9 @@
     <text x="480" y="780" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="700" font-size="48" fill="url(#brandGradient)" letter-spacing="-0.5">MCP Steroid</text>
 
     <!-- Tagline Text -->
-    <text x="480" y="830" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="400" font-size="20" fill="#666666">Give AI the whole IDE, not just the files</text>
+    <text x="480" y="830" text-anchor="middle" font-family="'JetBrains Mono', 'JetBrains-Mono-Regular', monospace" font-weight="400" font-size="20" fill="#666666">Give AI the whole IDE, not just the files</text>
   
     <!-- Social Text -->
-    <text x="480" y="870" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="400" font-size="16" fill="#888888">follow @jonnyzzz and https://linkedin.com/in/jonnyzzz</text>
+    <text x="480" y="955" text-anchor="middle" font-family="'JetBrains Mono', 'JetBrains-Mono-Regular', monospace" font-weight="400" font-size="16" fill="#888888">follow @jonnyzzz and https://linkedin.com/in/jonnyzzz</text>
   </g>
 </svg>
