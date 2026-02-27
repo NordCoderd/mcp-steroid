@@ -10,10 +10,22 @@ import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.seconds
 
 val debuggerManager = XDebuggerManager.getInstance(project)
-val session = debuggerManager.currentSession
+
+// Wait for the debug session to appear — the JVM/runtime process needs time to start.
+// ProgramRunnerUtil.executeConfiguration() returns immediately; the session is registered later.
+var session = debuggerManager.currentSession
+if (session == null) {
+    println("Waiting for debug session to start...")
+    repeat(40) {
+        if (debuggerManager.currentSession != null) return@repeat
+        delay(500)
+    }
+    session = debuggerManager.currentSession
+}
 
 if (session == null) {
-    println("No debug session found. Did the debug configuration start correctly?")
+    println("No debug session found after 20s. Check that the run configuration started correctly.")
+    println("Active sessions: ${debuggerManager.debugSessions.map { it.sessionName }}")
     return
 }
 

@@ -12,7 +12,6 @@ import com.intellij.xdebugger.frame.presentation.XValuePresentation
 import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValuePresentationUtil
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withTimeout
 import javax.swing.Icon
 import kotlin.time.Duration.Companion.seconds
@@ -20,10 +19,14 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Evaluates a debugger expression and returns its formatted string value.
  *
- * Bridges three async callback APIs using CompletableDeferred:
- * 1. XDebuggerEvaluator.evaluate() -> XValue
- * 2. XValue.isReady (CompletableFuture) -> ensures value is initialized
- * 3. XValue.computePresentation() -> formatted text
+ * Bridges two async callback APIs using CompletableDeferred:
+ * 1. XDebuggerEvaluator.evaluate() -> XValue via XEvaluationCallback
+ * 2. XValue.computePresentation() -> formatted text via XValueNode callback
+ *
+ * IMPORTANT: Do NOT await value.isReady before computePresentation.
+ * In Rider/DotNetValue, isReady only completes INSIDE computePresentation's async
+ * coroutine — awaiting it first causes a 30-second timeout deadlock.
+ * The retry loop below handles JVM "Collecting data..." cases instead.
  *
  * IMPORTANT: All callback overrides use block bodies { }, NOT expression bodies.
  * Expression body `= deferred.complete(value)` causes type mismatch (Boolean vs Unit).
@@ -49,12 +52,7 @@ suspend fun eval(
         return "ERR: ${e.message}"
     }
 
-    try {
-        withTimeout(timeout.seconds) { value.isReady.await() }
-    } catch (e: Exception) {
-        return "ERR: Value not ready - ${e.message}"
-    }
-
+    // Call computePresentation directly — do NOT await value.isReady first (see above).
     val presDeferred = CompletableDeferred<String>()
     value.computePresentation(object : XValueNode {
         override fun setPresentation(icon: Icon?, type: String?, text: String, hasChildren: Boolean) {

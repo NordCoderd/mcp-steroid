@@ -40,7 +40,7 @@ Each step should be a separate `steroid_execute_code` call. Do NOT combine steps
 ### Setup
 - `mcp-steroid://debugger/add-breakpoint` - add a line breakpoint (idempotent, safe to call repeatedly)
 - `mcp-steroid://debugger/remove-breakpoint` - remove breakpoints from a line
-- `mcp-steroid://debugger/set-line-breakpoint` - combined add/remove reference
+- `mcp-steroid://debugger/set-line-breakpoint` - toggle breakpoint on EDT (add/remove reference)
 - `mcp-steroid://debugger/create-application-config` - create Application run configuration
 - `mcp-steroid://debugger/debug-run-configuration` - start a run configuration in Debug
 
@@ -66,6 +66,7 @@ Each step should be a separate `steroid_execute_code` call. Do NOT combine steps
 - **Breakpoint type cast**: Cast to `XLineBreakpointType<XBreakpointProperties<*>>`, NOT to `Nothing?` or `Void`. Rider uses `DotNetLineBreakpointProperties` — casting to `Nothing?`/`Void` causes ClassCastException in Rider.
 - Use `mcp-steroid://debugger/debug-run-configuration` for debug launch (uses `com.intellij.execution.ProgramRunnerUtil`).
 - **For variable evaluation, always copy the `eval()` helper from `mcp-steroid://debugger/evaluate-expression`**. Do NOT write your own evaluation code -- the callback API is tricky and easy to get wrong.
+- **Do NOT await `value.isReady` before calling `computePresentation`** in Rider. In Rider/DotNetValue, `isReady` only completes INSIDE `computePresentation`'s async coroutine. Awaiting `isReady` first deadlocks for 30 seconds and crashes the MCP server. The `eval()` helper already handles this correctly.
 - **Callback overrides**: Always use block bodies `{ }`, NOT expression bodies `=`. Example: `override fun evaluated(value: XValue) { deferred.complete(value) }`. Expression body `= deferred.complete(value)` causes a type mismatch (`Boolean` vs `Unit`).
 - **Waiting for suspension**: Use `XDebugSessionListener` + `CompletableDeferred` (event-driven, no polling). See `mcp-steroid://debugger/wait-for-suspend`.
 - **Scope after stepping**: After step-over, the debugger may land in a different method scope. Local variables from the caller are NOT accessible. Use `this.fieldName` to access instance state. Always get fresh `evaluator` from `session.currentStackFrame`.

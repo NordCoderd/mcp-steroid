@@ -68,6 +68,7 @@ Common mistakes:
 - `com.intellij.xdebugger.frame.XValuePresentation` (wrong package) → use `com.intellij.xdebugger.frame.presentation.XValuePresentation`
 - `XDebugValue` or `XDebuggerEvaluationResult` (do NOT exist) → the correct type is `XValue`
 - Expression body `= deferred.complete(value)` → causes type mismatch (`Boolean` vs `Unit`). Use block body `{ deferred.complete(value) }`
+- **Awaiting `value.isReady` BEFORE `computePresentation` in Rider** → 30-second deadlock that crashes MCP server. In Rider/DotNetValue, `isReady` only completes INSIDE `computePresentation`'s async coroutine. The `eval()` helper is already correct — do NOT add an `isReady.await()` call.
 
 The callback receives `XValue` (from `com.intellij.xdebugger.frame`), NOT `XDebugValue`.
 The helper uses `XValuePresentationUtil.computeValueText()` to avoid complex callback implementations.

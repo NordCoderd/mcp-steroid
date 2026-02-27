@@ -13,7 +13,6 @@ import com.intellij.xdebugger.frame.presentation.XValuePresentation
 import com.intellij.xdebugger.impl.breakpoints.XExpressionImpl
 import com.intellij.xdebugger.impl.ui.tree.nodes.XValuePresentationUtil
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.future.await
 import kotlinx.coroutines.withTimeout
 import javax.swing.Icon
 import kotlin.time.Duration.Companion.seconds
@@ -23,10 +22,14 @@ import kotlin.time.Duration.Companion.seconds
 /**
  * Evaluates a debugger expression and returns its formatted string value.
  *
- * Uses CompletableDeferred to bridge three async callback APIs:
+ * Uses CompletableDeferred to bridge two async callback APIs:
  * 1. XDebuggerEvaluator.evaluate() -> XValue via XEvaluationCallback
- * 2. XValue.isReady (CompletableFuture) -> ensures value descriptor is initialized
- * 3. XValue.computePresentation() -> formatted text via XValueNode callback
+ * 2. XValue.computePresentation() -> formatted text via XValueNode callback
+ *
+ * IMPORTANT: Do NOT await value.isReady before computePresentation.
+ * In Rider/DotNetValue, isReady only completes INSIDE computePresentation's async
+ * coroutine — awaiting it first causes a 30-second timeout deadlock that crashes
+ * the MCP server. The retry loop handles JVM "Collecting data..." cases instead.
  *
  * IMPORTANT: All callback overrides use block bodies { }, NOT expression bodies.
  * Expression bodies like `= deferred.complete(value)` cause type mismatch errors
@@ -55,15 +58,10 @@ suspend fun eval(
         return "ERR: ${e.message}"
     }
 
-    // Phase 2: Wait for value descriptor to be fully initialized
-    // Without this, computePresentation may return "Collecting data..."
-    try {
-        withTimeout(timeout.seconds) { value.isReady.await() }
-    } catch (e: Exception) {
-        return "ERR: Value not ready - ${e.message}"
-    }
-
-    // Phase 3: Get formatted text via computePresentation callback
+    // Phase 2: Get formatted text via computePresentation callback.
+    // Do NOT await value.isReady first — in Rider/DotNetValue, isReady only completes
+    // INSIDE this call's async coroutine, so awaiting it first deadlocks for 30 seconds.
+    // The retry loop handles JVM "Collecting data..." cases instead.
     val presDeferred = CompletableDeferred<String>()
     value.computePresentation(object : XValueNode {
         override fun setPresentation(icon: Icon?, type: String?, text: String, hasChildren: Boolean) {
@@ -82,7 +80,7 @@ suspend fun eval(
         return "ERR: Presentation timeout - ${e.message}"
     }
 
-    // Phase 4: Retry if "Collecting data..." (async toString() in progress)
+    // Phase 3: Retry if "Collecting data..." (async JDI value loading in JVM debugger)
     if (result.contains("Collecting data")) {
         repeat(10) {
             delay(200)
@@ -137,9 +135,15 @@ println("sorted result =", sortedValue)
 
    complete() returns Boolean; the override expects Unit. With -Werror this is a hard error.
 
-2. Missing isReady await:
-   Without awaiting isReady, computePresentation may return "Collecting data..."
-   because the JDI/RD value descriptor hasn't finished loading.
+2. Awaiting value.isReady BEFORE computePresentation (Rider deadlock):
+   BAD:  value.isReady.await()       // blocks forever in Rider!
+         value.computePresentation(...)
+   GOOD: value.computePresentation(...)   // triggers isReady completion in Rider
+         // retry loop handles JVM "Collecting data..." cases
+
+   In Rider/DotNetValue, readyFuture.complete() is called INSIDE computePresentation's
+   async coroutine. Awaiting isReady first deadlocks — it waits 30 seconds then crashes
+   the MCP server. The retry loop in eval() already handles JVM placeholder text.
 
 3. Wrong XValuePresentation import:
    WRONG: com.intellij.xdebugger.frame.XValuePresentation

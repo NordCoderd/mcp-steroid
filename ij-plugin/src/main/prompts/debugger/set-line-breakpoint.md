@@ -1,18 +1,15 @@
 Set Line Breakpoint
 
-Create or remove a line breakpoint for a file/line in the current project.
+Toggle or remove a line breakpoint for a file/line in the current project.
 
-## Add breakpoint (idempotent)
+## Toggle breakpoint
 
-Uses `findBreakpointsAtLine` + `addLineBreakpoint` to ensure exactly one breakpoint exists.
-Do NOT use `toggleLineBreakpoint` for "ensure breakpoint exists" — it removes an existing breakpoint
-if one is already present (toggle semantics).
+Toggles a breakpoint using `toggleLineBreakpoint` on EDT — adds if absent, removes if present.
+`toggleLineBreakpoint` MUST run on `Dispatchers.EDT`.
+For idempotent "ensure breakpoint exists" (never removes), use `add-breakpoint.md` instead.
 
 ```kotlin
-import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.XDebuggerUtil
-import com.intellij.xdebugger.breakpoints.XBreakpointProperties
-import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import java.nio.file.Paths
 
 val filePath = "src/main/kotlin/com/example/MyClass.kt"
@@ -23,31 +20,16 @@ val absolutePath = Paths.get(projectRoot, filePath).toString()
 val virtualFile = LocalFileSystem.getInstance().findFileByPath(absolutePath)
     ?: error("File not found: $absolutePath")
 
-val breakpointManager = XDebuggerManager.getInstance(project).breakpointManager
 val lineIndex = lineNumberInEditor - 1  // API is 0-indexed
 
-// Find the correct breakpoint type for this file+line (Java, Kotlin, C#, etc.)
-val breakpointType = readAction {
-    XDebuggerUtil.getInstance().lineBreakpointTypes
-        .firstOrNull { it.canPutAt(virtualFile, lineIndex, project) }
-} ?: error("No breakpoint type available for $filePath:$lineNumberInEditor")
-
-// Cast to star-projection — works for ALL IDEs (Java, Kotlin, C#/Rider, etc.)
-// Do NOT cast to Nothing? — Rider uses DotNetLineBreakpointProperties, not Void
-@Suppress("UNCHECKED_CAST")
-val bpType = breakpointType as XLineBreakpointType<XBreakpointProperties<*>>
-
-// Check if breakpoint already exists (idempotent — safe to call repeatedly)
-val existing = breakpointManager.findBreakpointsAtLine(bpType, virtualFile, lineIndex)
-if (existing.isNotEmpty()) {
-    println("Breakpoint already exists at $filePath:$lineNumberInEditor")
-    println("Breakpoint:", existing.first())
-} else {
-    val properties = readAction { bpType.createBreakpointProperties(virtualFile, lineIndex) }
-    val breakpoint = breakpointManager.addLineBreakpoint(bpType, virtualFile.url, lineIndex, properties)
-    println("Created breakpoint at $filePath:$lineNumberInEditor")
-    println("Breakpoint:", breakpoint)
+// toggleLineBreakpoint MUST run on Dispatchers.EDT.
+// It ADDS if absent, REMOVES if present (toggle semantics).
+// WARNING: If a breakpoint already exists, toggleLineBreakpoint will REMOVE it.
+// For idempotent "ensure breakpoint exists", use add-breakpoint.md instead.
+withContext(Dispatchers.EDT) {
+    XDebuggerUtil.getInstance().toggleLineBreakpoint(project, virtualFile, lineIndex)
 }
+println("Toggled breakpoint at $filePath:$lineNumberInEditor")
 ```
 
 ## Remove breakpoint
@@ -86,25 +68,23 @@ if (removed.isEmpty()) {
 ## Important notes
 
 ```text
-WARNING: toggleLineBreakpoint() is a TOGGLE — it adds if absent, REMOVES if present.
-Never use it for "ensure breakpoint exists". Use the idempotent pattern above instead.
+toggleLineBreakpoint() is a TOGGLE — it adds if absent, REMOVES if present.
+It MUST run on Dispatchers.EDT.
+
+For idempotent "ensure breakpoint exists" (never removes an existing one),
+use add-breakpoint.md which uses findBreakpointsAtLine + addLineBreakpoint.
 
 - Line numbers are 0-indexed in the API (editor line 7 = API line 6)
-- fileUrl is VirtualFile.getUrl() format (e.g., "file:///path/to/File.java")
-- addLineBreakpoint does NOT deduplicate — calling it twice creates two breakpoints
-- Always use findBreakpointsAtLine first to check for existing breakpoints
-- In Rider, breakpoint creation is async (RD protocol to backend) — the breakpoint
-  object is returned immediately but may take a moment to become fully active
+- In Rider, breakpoint creation is async (RD protocol to backend)
 ```
 
 # See also
 
-Related IDE operations:
-- [Run Configuration](mcp-steroid://ide/run-configuration) - List and execute run configs
-
-Related test operations:
-- [Run Tests](mcp-steroid://test/run-tests) - Execute test configuration
-- [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll test status
+Related debugger operations:
+- [Add Breakpoint](mcp-steroid://debugger/add-breakpoint) - Idempotent add (never removes existing)
+- [Remove Breakpoint](mcp-steroid://debugger/remove-breakpoint) - Remove breakpoints from a line
+- [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debug session
 
 Overview resources:
 - [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge
+- [Debugger Overview](mcp-steroid://debugger/overview) - All debugger examples
