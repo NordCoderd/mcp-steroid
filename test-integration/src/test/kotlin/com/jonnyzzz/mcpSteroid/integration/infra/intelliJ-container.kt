@@ -148,10 +148,11 @@ class IntelliJContainer(
     }
 
     /**
-     * Wait until indexing/import completes and commit a Docker snapshot image.
+     * Wait until indexing/import completes, pre-build the project (Bazel + IntelliJ),
+     * and commit a Docker snapshot image.
      *
-     * Snapshot includes IntelliJ system directory because it lives on container-local FS
-     * (not a host-mounted volume).
+     * The committed image is a full Docker container filesystem snapshot.
+     * (Docker mounted volumes are preserved externally and are not embedded in committed layers.)
      */
     fun createIndexedSnapshot(imageTag: String): ImageDriver {
         waitForProjectReady()
@@ -159,6 +160,8 @@ class IntelliJContainer(
         val systemDir = intellijDriver.getGuestSystemDir()
         val configDir = intellijDriver.getGuestConfigDir()
         val pluginsDir = intellijDriver.getGuestPluginsDir()
+
+        runSnapshotPrebuild(projectDir)
 
         scope.startProcessInContainer {
             this
@@ -215,9 +218,84 @@ class IntelliJContainer(
         val snapshot = scope.commitContainerToImage(imageTag)
         console.writeSuccess(
             "Docker snapshot created: ${snapshot.imageIdToLog} " +
-                    "(includes checkout + ide-system; ide-config/ide-plugins preserved via mounted volume)"
+                    "(full container filesystem committed; mounted ide-config/ide-plugins remain on host volume)"
         )
         return snapshot
+    }
+
+    private fun runSnapshotPrebuild(projectDir: String) {
+        runBazelBuildForSnapshot(projectDir)
+        runIntelliJBuildForSnapshot(projectDir)
+    }
+
+    private fun runBazelBuildForSnapshot(projectDir: String) {
+        console.writeStep(0, "Running Bazel build before snapshot...")
+        val bazelBuildScript = """
+            set -euo pipefail
+            projectDir="$projectDir"
+
+            if [ ! -f "${'$'}projectDir/MODULE.bazel" ] && [ ! -f "${'$'}projectDir/WORKSPACE" ] && [ ! -f "${'$'}projectDir/WORKSPACE.bazel" ]; then
+              echo "[SNAPSHOT-PREBUILD] No Bazel workspace files found at ${'$'}projectDir, skipping Bazel build."
+              exit 0
+            fi
+
+            if command -v bazelisk >/dev/null 2>&1; then
+              bazelCmd="$(command -v bazelisk)"
+            elif command -v bazel >/dev/null 2>&1; then
+              bazelCmd="$(command -v bazel)"
+            else
+              mkdir -p /home/agent/.local/bin
+              arch="$(uname -m)"
+              case "${'$'}arch" in
+                x86_64) bazeliskArch="amd64" ;;
+                aarch64|arm64) bazeliskArch="arm64" ;;
+                *)
+                  echo "Unsupported architecture for Bazelisk bootstrap: ${'$'}arch" >&2
+                  exit 1
+                  ;;
+              esac
+              bazelCmd="/home/agent/.local/bin/bazel"
+              curl -fsSL "https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-${'$'}bazeliskArch" -o "${'$'}bazelCmd"
+              chmod +x "${'$'}bazelCmd"
+            fi
+
+            cd "${'$'}projectDir"
+            "${'$'}bazelCmd" --output_user_root=/home/agent/.cache/bazel build //...
+        """.trimIndent()
+
+        scope.startProcessInContainer {
+            this
+                .args("bash", "-lc", bazelBuildScript)
+                .timeoutSeconds(14_400)
+                .description("Run Bazel build for snapshot prebuild")
+        }.assertExitCode(0) {
+            "Bazel build failed before snapshot"
+        }
+        console.writeSuccess("Bazel build complete")
+    }
+
+    private fun runIntelliJBuildForSnapshot(projectDir: String) {
+        console.writeStep(0, "Running IntelliJ build before snapshot...")
+        val projectName = mcpSteroid.mcpListProjects().singleOrNull { it.path == projectDir }?.name
+            ?: error("No IntelliJ project found at $projectDir for pre-snapshot IntelliJ build")
+        val ideBuild = mcpSteroid.mcpExecuteCode(
+            projectName = projectName,
+            reason = "Pre-snapshot IntelliJ build for warmed compile/index caches",
+            timeout = 14_400,
+            code = """
+import com.intellij.task.ProjectTaskManager
+
+println("[SNAPSHOT-PREBUILD] Starting IntelliJ buildAllModules() ...")
+val result = ProjectTaskManager.getInstance(project).buildAllModules().get()
+println("[SNAPSHOT-PREBUILD] IntelliJ build finished: errors=${'$'}{result.hasErrors()}, warnings=${'$'}{result.hasWarnings()}, aborted=${'$'}{result.isAborted()}")
+check(!result.isAborted()) { "IntelliJ build was aborted" }
+check(!result.hasErrors()) { "IntelliJ build reported compile errors" }
+""".trimIndent(),
+        )
+        ideBuild.assertExitCode(0) {
+            "IntelliJ build failed before snapshot"
+        }
+        console.writeSuccess("IntelliJ build complete")
     }
 
     /**
