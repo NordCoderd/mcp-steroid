@@ -26,6 +26,41 @@ data class ImageDriver(
 }
 
 /**
+ * Create a Docker image snapshot from a running container.
+ *
+ * @param imageTag optional target tag (e.g. "mcp-steroid-indexed:latest")
+ * @return [ImageDriver] referencing the committed image ID
+ */
+fun ContainerDriver.commitContainerToImage(imageTag: String? = null): ImageDriver {
+    val command = buildList {
+        add("docker")
+        add("commit")
+        add(containerId)
+        if (imageTag != null) {
+            add(imageTag)
+        }
+    }
+
+    val result = newRunOnHost()
+        .command(command)
+        .description(
+            if (imageTag != null) "Commit container $containerIdForLog as $imageTag"
+            else "Commit container $containerIdForLog",
+        )
+        .timeoutSeconds(120L)
+        .quietly()
+        .startProcess()
+        .assertExitCode(0) { "Failed to commit container $containerIdForLog: $stderr" }
+
+    val rawId = result.stdout.trim()
+    require(rawId.isNotBlank()) { "docker commit returned empty image ID for $containerIdForLog" }
+    val normalizedId = rawId.removePrefix("sha256:").trim()
+
+    println("[$logPrefix] Snapshot image created: $rawId${if (imageTag != null) " ($imageTag)" else ""}")
+    return ImageDriver(imageId = normalizedId, logPrefix = logPrefix)
+}
+
+/**
  * Build a Docker image and return its content-addressable image ID (sha256:...).
  *
  * @param buildArgs Extra `--build-arg KEY=VALUE` entries (e.g. `BASE_IMAGE` for derived images)

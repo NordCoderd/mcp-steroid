@@ -3,7 +3,6 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.*
-import com.jonnyzzz.mcpSteroid.testHelper.git.BareRepoCache
 import java.io.File
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
@@ -13,6 +12,7 @@ import kotlin.collections.List
 import kotlin.collections.MutableList
 import kotlin.collections.Set
 import kotlin.collections.asSequence
+import kotlin.collections.buildMap
 import kotlin.collections.buildList
 import kotlin.collections.emptyList
 import kotlin.collections.filter
@@ -52,6 +52,11 @@ fun IntelliJContainer.Companion.create(
      * will fail with "Could not find a valid Docker environment" unless this is enabled).
      */
     mountDockerSocket: Boolean = false,
+    /**
+     * When true, forwards the host SSH agent socket into the container and sets SSH_AUTH_SOCK.
+     * Required for git operations that use SSH remotes/private keys from inside the container.
+     */
+    mountSshAgent: Boolean = true,
 ): IntelliJContainer {
     val ideArchive = distribution.resolveAndDownload()
     val ideProduct = distribution.product
@@ -83,6 +88,24 @@ fun IntelliJContainer.Companion.create(
     val containerMountedPath = "/mcp-run-dir"
 
     val dockerSocketFile = File("/var/run/docker.sock")
+    val sshAgentGuestPath = "/tmp/ssh-agent.sock"
+    val sshAgentSocketFile = if (mountSshAgent) {
+        val sshAuthSock = System.getenv("SSH_AUTH_SOCK")
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: error(
+                "mountSshAgent=true but SSH_AUTH_SOCK is not set. " +
+                        "Start ssh-agent on host and export SSH_AUTH_SOCK."
+            )
+        File(sshAuthSock).also { socket ->
+            require(socket.exists()) {
+                "mountSshAgent=true but SSH_AUTH_SOCK does not exist: ${socket.absolutePath}"
+            }
+        }
+    } else {
+        null
+    }
+
     if (mountDockerSocket) {
         require(dockerSocketFile.exists()) {
             "mountDockerSocket=true but Docker socket not found at ${dockerSocketFile.absolutePath}. " +
@@ -90,17 +113,27 @@ fun IntelliJContainer.Companion.create(
         }
         println("[IDE-AGENT] Docker socket mount enabled: ${dockerSocketFile.absolutePath}")
     }
+    if (sshAgentSocketFile != null) {
+        println("[IDE-AGENT] SSH agent mount enabled: ${sshAgentSocketFile.absolutePath} -> $sshAgentGuestPath")
+    }
 
     val volumes = buildList {
         add(ContainerVolume(runDir, containerMountedPath, "rw"))
         if (repoCacheDir != null) add(ContainerVolume(repoCacheDir, "/repo-cache", "ro"))
         if (mountDockerSocket) add(ContainerVolume(dockerSocketFile, "/var/run/docker.sock", "rw"))
+        if (sshAgentSocketFile != null) add(ContainerVolume(sshAgentSocketFile, sshAgentGuestPath, "rw"))
+    }
+    val containerEnv = buildMap {
+        if (sshAgentSocketFile != null) {
+            put("SSH_AUTH_SOCK", sshAgentGuestPath)
+        }
     }
 
     var container = startDockerContainerAndDispose(
         lifetime,
         StartContainerRequest()
             .image(imageId)
+            .extraEnvVars(containerEnv)
             .volumes(volumes)
             .ports(
                 XcvbVideoDriver.VIDEO_STREAMING_PORT,
@@ -146,15 +179,14 @@ fun IntelliJContainer.Companion.create(
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
 
 
-    // Warm the bare repo cache on the host before deploying, so the container can clone
-    // from /repo-cache (fast, local) instead of hitting the remote (slow, network).
-    val repoUrlForCache = selectedProject.getRepoUrlForCache()
-    if (repoUrlForCache != null && repoCacheDir != null) {
-        println("[IDE-AGENT] Warming bare repo cache for $repoUrlForCache ...")
+    // Warm project cache artifacts on host before deploying:
+    // bare repos, IntelliJ clone ZIPs, etc. mounted at /repo-cache.
+    if (repoCacheDir != null) {
+        println("[IDE-AGENT] Warming project cache artifacts in ${repoCacheDir.absolutePath} ...")
         try {
-            BareRepoCache.ensureRepo(repoUrlForCache, repoCacheDir)
+            selectedProject.warmRepoCache(repoCacheDir)
         } catch (e: Exception) {
-            println("[IDE-AGENT] WARNING: Failed to warm repo cache for $repoUrlForCache: ${e.message}")
+            println("[IDE-AGENT] WARNING: Failed to warm project cache artifacts: ${e.message}")
         }
     }
 

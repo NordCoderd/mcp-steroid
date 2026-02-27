@@ -3,7 +3,11 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.ImageDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.RunningContainerProcess
+import com.jonnyzzz.mcpSteroid.testHelper.docker.commitContainerToImage
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import java.io.File
 
 /**
@@ -141,6 +145,68 @@ class IntelliJContainer(
         console.writeSuccess("Project UX ready")
 
         return this
+    }
+
+    /**
+     * Wait until indexing/import completes and commit a Docker snapshot image.
+     *
+     * Snapshot includes IntelliJ system directory because it lives on container-local FS
+     * (not a host-mounted volume).
+     */
+    fun createIndexedSnapshot(imageTag: String): ImageDriver {
+        waitForProjectReady()
+        val projectDir = intellijDriver.getGuestProjectDir()
+        val systemDir = intellijDriver.getGuestSystemDir()
+        val configDir = intellijDriver.getGuestConfigDir()
+        val pluginsDir = intellijDriver.getGuestPluginsDir()
+
+        scope.startProcessInContainer {
+            this
+                .args("test", "-d", "$projectDir/.git")
+                .timeoutSeconds(10)
+                .description("Verify IntelliJ checkout exists at $projectDir")
+                .quietly()
+        }.assertExitCode(0) {
+            "IntelliJ checkout is missing before snapshot: $projectDir"
+        }
+
+        scope.startProcessInContainer {
+            this
+                .args("test", "-d", systemDir)
+                .timeoutSeconds(10)
+                .description("Verify IntelliJ system directory exists at $systemDir")
+                .quietly()
+        }.assertExitCode(0) {
+            "IntelliJ system directory not found before snapshot: $systemDir"
+        }
+
+        scope.startProcessInContainer {
+            this
+                .args("test", "-d", configDir)
+                .timeoutSeconds(10)
+                .description("Verify IntelliJ config directory exists at $configDir")
+                .quietly()
+        }.assertExitCode(0) {
+            "IntelliJ config directory not found before snapshot: $configDir"
+        }
+
+        scope.startProcessInContainer {
+            this
+                .args("test", "-d", pluginsDir)
+                .timeoutSeconds(10)
+                .description("Verify IntelliJ plugins directory exists at $pluginsDir")
+                .quietly()
+        }.assertExitCode(0) {
+            "IntelliJ plugins directory not found before snapshot: $pluginsDir"
+        }
+
+        console.writeStep(0, "Creating Docker snapshot: $imageTag ...")
+        val snapshot = scope.commitContainerToImage(imageTag)
+        console.writeSuccess(
+            "Docker snapshot created: ${snapshot.imageIdToLog} " +
+                    "(includes checkout + ide-system; ide-config/ide-plugins preserved via mounted volume)"
+        )
+        return snapshot
     }
 
     /**

@@ -23,7 +23,9 @@ class IntelliJDriver(
     private val ideProduct: IdeProduct,
 ) {
     private val intelliJGuestHomeDir = "/opt/idea"
-    private val projectGuestDir = "$guestDir/project-home"
+    // Keep project sources on container-local filesystem (not host-mounted volume)
+    // so Docker snapshots can capture fully indexed project state consistently.
+    private val projectGuestDir = "/home/agent/project-home"
     private val configGuestDir = "$guestDir/ide-config"
     private val systemGuestDir = "/home/agent/ide-system"
     private val logsGuestDir = "$guestDir/ide-log"
@@ -31,6 +33,9 @@ class IntelliJDriver(
     private val steroidGuestDir = "$guestDir/mcp-steroid"
 
     fun getGuestProjectDir() = projectGuestDir
+    fun getGuestSystemDir() = systemGuestDir
+    fun getGuestConfigDir() = configGuestDir
+    fun getGuestPluginsDir() = pluginsGuestDir
 
     fun readLogs(): List<String> {
         val file = ideaLogsFile()

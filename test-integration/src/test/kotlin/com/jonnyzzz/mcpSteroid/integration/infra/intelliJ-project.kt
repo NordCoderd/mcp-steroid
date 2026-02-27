@@ -3,8 +3,13 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
+import com.jonnyzzz.mcpSteroid.testHelper.docker.copyToContainer
 import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
+import com.jonnyzzz.mcpSteroid.testHelper.git.BareRepoCache
 import com.jonnyzzz.mcpSteroid.testHelper.git.GitDriver
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import java.io.File
 
 
 sealed class IntelliJProject{
@@ -19,6 +24,18 @@ sealed class IntelliJProject{
      * fast local clone path instead of hitting the remote.
      */
     open fun getRepoUrlForCache(): String? = null
+
+    /**
+     * Warm host-side cache artifacts before container startup.
+     *
+     * Default behavior:
+     * - if [getRepoUrlForCache] is non-null: warm bare git cache
+     * - otherwise: no-op
+     */
+    open fun warmRepoCache(cacheDir: File) {
+        val repoUrl = getRepoUrlForCache() ?: return
+        BareRepoCache.ensureRepo(repoUrl, cacheDir)
+    }
 
     /**
      * Relative path (from project root) of the file to open when the IDE starts.
@@ -39,6 +56,9 @@ sealed class IntelliJProject{
     )
 
     object KeycloakProject : ProjectFromRemoteGit("https://github.com/keycloak/keycloak.git")
+    object IntelliJMasterProject : ProjectFromIntelliJMasterZip(
+        openFile = "platform/platform-tests/testSrc/com/intellij/openapi/vfs/newvfs/persistent/PersistentFsTest.java",
+    )
 
     open class ProjectFromRepository protected constructor(
         val projectName: String,
@@ -46,10 +66,22 @@ sealed class IntelliJProject{
     ) : IntelliJProject() {
         override val openFileOnStart: String? get() = openFile
         override fun IntelliJProjectDriver.deploy() {
-            console.writeInfo("Moving project $projectName files...")
+            console.writeInfo("Copying project $projectName files into container-local project-home...")
+            val guestProjectDir = ijDriver.getGuestProjectDir()
+            val hostProjectSourceDir = IdeTestFolders.dockerDir.resolve(projectName)
+            require(hostProjectSourceDir.isDirectory) {
+                "Project source directory does not exist: ${hostProjectSourceDir.absolutePath}"
+            }
 
-            val hostProjectDir = container.mapGuestPathToHostPath(ijDriver.getGuestProjectDir())
-            IdeTestFolders.copyProjectFiles(projectName, hostProjectDir)
+            container.startProcessInContainer {
+                this
+                    .args("rm", "-rf", guestProjectDir)
+                    .timeoutSeconds(30)
+                    .description("Remove stale project directory $guestProjectDir")
+                    .quietly()
+            }.awaitForProcessFinish().assertExitCode(0, "Failed to clean project directory $guestProjectDir")
+
+            container.copyToContainer(hostProjectSourceDir, guestProjectDir)
         }
     }
 
@@ -72,6 +104,85 @@ sealed class IntelliJProject{
                 console.writeInfo("Cache miss for $ownerAndRepo — cloning from $repoUrl ...")
                 git.clone(repoUrl, guestProjectDir)
             }
+        }
+    }
+
+    open class ProjectFromIntelliJMasterZip protected constructor(
+        private val openFile: String? = null,
+        private val zipUrl: String = INTELLIJ_MASTER_GIT_CLONE_LINUX_ZIP_URL,
+        private val repoUrl: String = INTELLIJ_MASTER_REPO_URL,
+        private val branch: String = INTELLIJ_MASTER_BRANCH,
+    ) : IntelliJProject() {
+        override val openFileOnStart: String? get() = openFile
+
+        override fun warmRepoCache(cacheDir: File) {
+            ensureIntelliJGitCloneZipInCache(cacheDir, zipUrl)
+        }
+
+        override fun IntelliJProjectDriver.deploy() {
+            val git = GitDriver(container)
+            val guestProjectDir = ijDriver.getGuestProjectDir()
+            val guestZipInCache = "/repo-cache/intellij-master-git-clone/ultimate-git-clone-linux.zip"
+            val hostZip = container.mapGuestPathToHostPath(guestZipInCache)
+            require(hostZip.isFile) {
+                "Missing IntelliJ git clone ZIP in repo cache: $hostZip. " +
+                        "Warm cache first via ensureIntelliJGitCloneZipInCache()."
+            }
+
+            val guestZipInTmp = "/tmp/ultimate-git-clone-linux.zip"
+            console.writeInfo("Copying IntelliJ repository ZIP to container...")
+            container.copyToContainer(hostZip, guestZipInTmp)
+
+            console.writeInfo("Unpacking IntelliJ repository and syncing $branch...")
+            val setupScript = """
+                set -euo pipefail
+                zipPath="$guestZipInTmp"
+                targetDir="$guestProjectDir"
+                repoUrl="$repoUrl"
+                branch="$branch"
+                unpackDir="/tmp/intellij-master-unpack"
+
+                rm -rf "${'$'}unpackDir" "${'$'}targetDir"
+                mkdir -p "${'$'}unpackDir"
+                unzip -q "${'$'}zipPath" -d "${'$'}unpackDir"
+
+                if [ -d "${'$'}unpackDir/.git" ]; then
+                  repoDir="${'$'}unpackDir"
+                else
+                  gitDir="$(find "${'$'}unpackDir" -mindepth 1 -maxdepth 4 -type d -name .git | head -n 1)"
+                  if [ -z "${'$'}gitDir" ]; then
+                    echo "No .git directory found in unpacked ZIP: ${'$'}zipPath" >&2
+                    exit 1
+                  fi
+                  repoDir="$(dirname "${'$'}gitDir")"
+                fi
+
+                mkdir -p "$(dirname "${'$'}targetDir")"
+                mv "${'$'}repoDir" "${'$'}targetDir"
+
+                if git -C "${'$'}targetDir" remote | grep -qx origin; then
+                  git -C "${'$'}targetDir" remote set-url origin "${'$'}repoUrl"
+                else
+                  git -C "${'$'}targetDir" remote add origin "${'$'}repoUrl"
+                fi
+
+                if git -C "${'$'}targetDir" config --get-all remote.origin.fetch >/dev/null 2>&1; then
+                  git -C "${'$'}targetDir" config --unset-all remote.origin.fetch
+                fi
+                git -C "${'$'}targetDir" config --add remote.origin.fetch "+refs/heads/${'$'}branch:refs/remotes/origin/${'$'}branch"
+                git -C "${'$'}targetDir" fetch --prune --depth 1 origin "${'$'}branch"
+                git -C "${'$'}targetDir" checkout -B "${'$'}branch" --track "origin/${'$'}branch"
+            """.trimIndent()
+
+            container.startProcessInContainer {
+                this
+                    .args("bash", "-lc", setupScript)
+                    .timeoutSeconds(900)
+                    .description("Prepare IntelliJ repository from ZIP and checkout $branch")
+            }.assertExitCode(0) { "Failed to prepare IntelliJ repository from ZIP" }
+
+            // Ensure repository is in a clean state for deterministic indexing/import.
+            git.checkout(guestProjectDir, branch)
         }
     }
 
