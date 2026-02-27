@@ -229,49 +229,32 @@ class IntelliJContainer(
     }
 
     private fun runBazelBuildForSnapshot(projectDir: String) {
-        console.writeStep(0, "Running Bazel build before snapshot...")
+        console.writeStep(0, "Running IntelliJ bazel.cmd build before snapshot...")
         val bazelBuildScript = """
             set -euo pipefail
             projectDir="$projectDir"
+            bazelWrapper="${'$'}projectDir/bazel.cmd"
 
-            if [ ! -f "${'$'}projectDir/MODULE.bazel" ] && [ ! -f "${'$'}projectDir/WORKSPACE" ] && [ ! -f "${'$'}projectDir/WORKSPACE.bazel" ]; then
-              echo "[SNAPSHOT-PREBUILD] No Bazel workspace files found at ${'$'}projectDir, skipping Bazel build."
-              exit 0
+            if [ ! -f "${'$'}bazelWrapper" ]; then
+              echo "[SNAPSHOT-PREBUILD] Missing IntelliJ Bazel wrapper at ${'$'}bazelWrapper" >&2
+              exit 1
             fi
 
-            if command -v bazelisk >/dev/null 2>&1; then
-              bazelCmd="$(command -v bazelisk)"
-            elif command -v bazel >/dev/null 2>&1; then
-              bazelCmd="$(command -v bazel)"
-            else
-              mkdir -p /home/agent/.local/bin
-              arch="$(uname -m)"
-              case "${'$'}arch" in
-                x86_64) bazeliskArch="amd64" ;;
-                aarch64|arm64) bazeliskArch="arm64" ;;
-                *)
-                  echo "Unsupported architecture for Bazelisk bootstrap: ${'$'}arch" >&2
-                  exit 1
-                  ;;
-              esac
-              bazelCmd="/home/agent/.local/bin/bazel"
-              curl -fsSL "https://github.com/bazelbuild/bazelisk/releases/download/v1.27.0/bazelisk-linux-${'$'}bazeliskArch" -o "${'$'}bazelCmd"
-              chmod +x "${'$'}bazelCmd"
-            fi
+            chmod +x "${'$'}bazelWrapper"
 
             cd "${'$'}projectDir"
-            "${'$'}bazelCmd" --output_user_root=/home/agent/.cache/bazel build //...
+            "${'$'}bazelWrapper" build //...
         """.trimIndent()
 
         scope.startProcessInContainer {
             this
                 .args("bash", "-lc", bazelBuildScript)
                 .timeoutSeconds(14_400)
-                .description("Run Bazel build for snapshot prebuild")
+                .description("Run IntelliJ bazel.cmd build for snapshot prebuild")
         }.assertExitCode(0) {
-            "Bazel build failed before snapshot"
+            "IntelliJ bazel.cmd build failed before snapshot"
         }
-        console.writeSuccess("Bazel build complete")
+        console.writeSuccess("IntelliJ bazel.cmd build complete")
     }
 
     private fun runIntelliJBuildForSnapshot(projectDir: String) {
