@@ -200,6 +200,17 @@ class IntelliJContainer(
             "IntelliJ plugins directory not found before snapshot: $pluginsDir"
         }
 
+        // Keep snapshots lean and deterministic even if older setup paths were used.
+        scope.startProcessInContainer {
+            this
+                .args("rm", "-rf", "/tmp/intellij-master-unpack", "/tmp/ultimate-git-clone-linux.zip")
+                .timeoutSeconds(20)
+                .description("Cleanup temporary IntelliJ ZIP/unpack artifacts before snapshot")
+                .quietly()
+        }.assertExitCode(0) {
+            "Failed to cleanup temporary IntelliJ ZIP/unpack artifacts before snapshot"
+        }
+
         console.writeStep(0, "Creating Docker snapshot: $imageTag ...")
         val snapshot = scope.commitContainerToImage(imageTag)
         console.writeSuccess(

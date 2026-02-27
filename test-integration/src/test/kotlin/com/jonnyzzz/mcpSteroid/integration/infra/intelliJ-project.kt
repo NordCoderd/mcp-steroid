@@ -4,7 +4,6 @@ package com.jonnyzzz.mcpSteroid.integration.infra
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStack
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.copyToContainer
-import com.jonnyzzz.mcpSteroid.testHelper.docker.mapGuestPathToHostPath
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
 import com.jonnyzzz.mcpSteroid.testHelper.git.BareRepoCache
 import com.jonnyzzz.mcpSteroid.testHelper.git.GitDriver
@@ -123,20 +122,21 @@ sealed class IntelliJProject{
             val git = GitDriver(container)
             val guestProjectDir = ijDriver.getGuestProjectDir()
             val guestZipInCache = "/repo-cache/intellij-master-git-clone/ultimate-git-clone-linux.zip"
-            val hostZip = container.mapGuestPathToHostPath(guestZipInCache)
-            require(hostZip.isFile) {
-                "Missing IntelliJ git clone ZIP in repo cache: $hostZip. " +
+            container.startProcessInContainer {
+                this
+                    .args("test", "-f", guestZipInCache)
+                    .timeoutSeconds(10)
+                    .description("Verify IntelliJ ZIP exists at $guestZipInCache")
+                    .quietly()
+            }.assertExitCode(0) {
+                "Missing IntelliJ git clone ZIP in repo cache at $guestZipInCache. " +
                         "Warm cache first via ensureIntelliJGitCloneZipInCache()."
             }
-
-            val guestZipInTmp = "/tmp/ultimate-git-clone-linux.zip"
-            console.writeInfo("Copying IntelliJ repository ZIP to container...")
-            container.copyToContainer(hostZip, guestZipInTmp)
 
             console.writeInfo("Unpacking IntelliJ repository and syncing $branch...")
             val setupScript = """
                 set -euo pipefail
-                zipPath="$guestZipInTmp"
+                zipPath="$guestZipInCache"
                 targetDir="$guestProjectDir"
                 repoUrl="$repoUrl"
                 branch="$branch"
@@ -159,6 +159,7 @@ sealed class IntelliJProject{
 
                 mkdir -p "$(dirname "${'$'}targetDir")"
                 mv "${'$'}repoDir" "${'$'}targetDir"
+                rm -rf "${'$'}unpackDir"
 
                 if git -C "${'$'}targetDir" remote | grep -qx origin; then
                   git -C "${'$'}targetDir" remote set-url origin "${'$'}repoUrl"
