@@ -17,12 +17,17 @@ import java.io.BufferedWriter
  * **Old streaming format** — events: `message_start`, `content_block_start`,
  *   `content_block_delta`, `tool_use`, `tool_result`, `message_delta`, `result`.
  *
- * Both formats are handled; unrecognised events are silently skipped.
+ * Both formats are handled; unrecognised events pass through as raw JSON.
  */
 class ClaudeOutputFilter : AbstractOutputFilter() {
 
     override fun processEvent(rawLine: String, event: JsonObject, writer: BufferedWriter) {
-        val type = event["type"]?.jsonPrimitive?.contentOrNull ?: return
+        val type = event["type"]?.jsonPrimitive?.contentOrNull
+        if (type == null) {
+            // No type field — render raw JSON so no data is lost
+            writer.writeLine(rawLine)
+            return
+        }
 
         when (type) {
             // ── New format (Claude Code 2.1.x+) ───────────────────────────
@@ -76,7 +81,13 @@ class ClaudeOutputFilter : AbstractOutputFilter() {
                     val detail = toolDetail(name, input)
                     writer.writeLine("\n>> $name$detail")
                 }
-                // "thinking" → skip (internal reasoning, not shown to users)
+                "thinking" -> {
+                    val text = itemObj["text"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val firstLine = text.lineSequence().firstOrNull { it.isNotBlank() } ?: ""
+                    if (firstLine.isNotEmpty()) {
+                        writer.writeLine("[thinking] $firstLine")
+                    }
+                }
             }
         }
     }

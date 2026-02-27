@@ -326,10 +326,12 @@ class DebuggerDemoTest {
                 ?.takeIf { it.isNotEmpty() }
         }.toList()
 
+        // Filter out template placeholders like <the exact buggy source line>
+        // but allow legitimate code with < > (e.g., C# lambdas: p => p.Score)
+        val templatePlaceholder = Regex("""<[a-zA-Z][^>]*>""")
         return candidates.lastOrNull { value ->
             val lowered = value.lowercase()
-            !value.contains('<') &&
-                    !value.contains('>') &&
+            !templatePlaceholder.containsMatchIn(value) &&
                     !lowered.contains("copy the") &&
                     !lowered.contains("one line description") &&
                     !lowered.contains("exact buggy source line")

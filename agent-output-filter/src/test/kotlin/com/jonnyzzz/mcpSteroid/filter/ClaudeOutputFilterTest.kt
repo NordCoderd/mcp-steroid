@@ -210,10 +210,24 @@ class ClaudeOutputFilterTest {
     }
 
     @Test
-    fun `new format - assistant thinking block is skipped`() {
-        val input = """{"type":"assistant","message":{"content":[{"type":"thinking","thinking":"Internal reasoning"}]}}"""
+    fun `new format - assistant thinking block is rendered`() {
+        val input = """{"type":"assistant","message":{"content":[{"type":"thinking","text":"Internal reasoning about the problem"}]}}"""
         val output = runFilter(input)
-        assertEquals("", output)
+        assertTrue(output.contains("[thinking] Internal reasoning about the problem"), "Should render thinking first line: $output")
+    }
+
+    @Test
+    fun `new format - assistant thinking block with blank lines`() {
+        val input = """{"type":"assistant","message":{"content":[{"type":"thinking","text":"\n\nActual thinking here"}]}}"""
+        val output = runFilter(input)
+        assertTrue(output.contains("[thinking] Actual thinking here"), "Should render first non-blank line: $output")
+    }
+
+    @Test
+    fun `new format - event without type field passes through`() {
+        val input = """{"data":"some orphan event"}"""
+        val output = runFilter(input)
+        assertEquals("$input\n", output)
     }
 
     @Test
@@ -245,7 +259,7 @@ class ClaudeOutputFilterTest {
     fun `new format - mixed assistant events produce correct output`() {
         val input = """
             {"type":"system","subtype":"init","tools":[],"mcp_servers":[]}
-            {"type":"assistant","message":{"content":[{"type":"thinking","thinking":"let me think"},{"type":"tool_use","name":"Glob","input":{"pattern":"*.kt"}}]}}
+            {"type":"assistant","message":{"content":[{"type":"thinking","text":"let me think"},{"type":"tool_use","name":"Glob","input":{"pattern":"*.kt"}}]}}
             {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"id1","content":"src/Main.kt"}]}}
             {"type":"assistant","message":{"content":[{"type":"text","text":"BUG_LINE: var i = 1\n"}]}}
             {"type":"result","result":"","total_cost_usd":0.01,"duration_ms":5000,"num_turns":2}
