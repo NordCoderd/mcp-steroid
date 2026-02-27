@@ -32,6 +32,62 @@ Use IntelliJ test execution APIs from `steroid_execute_code` to run tests and in
 
 Avoid long waits or sleeps inside a single call; prefer multiple short polls.
 
+###_IF_RIDER_###
+## Run .NET Tests in Rider (Native Test Runner)
+
+Rider uses its own test runner via context actions. Do NOT use JUnitConfiguration — it does not exist in Rider.
+Do NOT use `dotnet test` CLI when the native Rider test runner is available — the native runner integrates
+with the debugger and provides better results.
+
+**Run tests from editor context (recommended):**
+Open the test file, position the caret on the test class or method, and invoke the action:
+
+```text
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.ide.DataManager
+
+// 1. Open the test file in editor
+val basePath = project.basePath ?: error("No basePath")
+val testFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath + "/Path/To/MyTests.cs")
+    ?: error("Test file not found")
+val editors = withContext(Dispatchers.EDT) {
+    FileEditorManager.getInstance(project).openFile(testFile, true)
+}
+val textEditor = editors.filterIsInstance<TextEditor>().firstOrNull() ?: error("No text editor")
+val editor = textEditor.editor
+
+// 2. Position caret on test class or method
+val text = editor.document.text
+val offset = text.indexOf("class MyTestClass")  // or a specific test method name
+withContext(Dispatchers.EDT) { editor.caretModel.moveToOffset(offset) }
+
+// 3. Run tests via native Rider action
+val action = ActionManager.getInstance().getAction("RiderUnitTestRunContextAction")
+    ?: error("Action not found")
+withContext(Dispatchers.EDT) {
+    val dataContext = DataManager.getInstance().getDataContext(editor.contentComponent)
+    val presentation = action.templatePresentation.clone()
+    val event = AnActionEvent.createEvent(dataContext, presentation, "EditorPopup", ActionUiKind.NONE, null)
+    ActionUtil.performAction(action, event)
+}
+println("Tests started")
+```
+
+**Key Rider test actions:**
+- `RiderUnitTestRunContextAction` — Run tests at caret position (test class or method)
+- `RiderUnitTestDebugContextAction` — Debug tests at caret position
+- `RiderUnitTestRunSolutionAction` — Run all tests in the solution
+
+**Important**: Rider test results do NOT appear in `RunContentManager` or `SMTRunnerConsoleView`.
+Results appear in Rider's Unit Test tool window. The agent should use the test action,
+then check the debugger for breakpoint hits.
+###_ELSE_###
 ## Run a Specific JUnit Test Class (correct API)
 
 ```text
@@ -65,6 +121,7 @@ val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-q")
 println(process.inputStream.bufferedReader().readText())
 process.waitFor()
 ```
+###_END_IF_###
 
 ## Key APIs to use
 

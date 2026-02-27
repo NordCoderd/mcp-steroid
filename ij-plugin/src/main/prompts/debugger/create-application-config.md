@@ -1,5 +1,47 @@
 Create Application Run Configuration
 
+Create a new Application run configuration for a main class.
+
+###_IF_RIDER_###
+In Rider, use native test runner actions instead of ApplicationConfiguration (which is JVM-specific).
+
+**Run .NET tests from editor context:**
+```text
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.ide.DataManager
+
+// Open test file, position caret, fire action
+val basePath = project.basePath ?: error("No basePath")
+val testFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath + "/Path/To/Tests.cs")
+    ?: error("Test file not found")
+val editors = withContext(Dispatchers.EDT) { FileEditorManager.getInstance(project).openFile(testFile, true) }
+val editor = (editors.filterIsInstance<TextEditor>().firstOrNull() ?: error("No editor")).editor
+val offset = editor.document.text.indexOf("class MyTestFixture")
+withContext(Dispatchers.EDT) { editor.caretModel.moveToOffset(offset) }
+
+// RiderUnitTestRunContextAction = run, RiderUnitTestDebugContextAction = debug
+val action = ActionManager.getInstance().getAction("RiderUnitTestRunContextAction") ?: error("Not found")
+withContext(Dispatchers.EDT) {
+    val ctx = DataManager.getInstance().getDataContext(editor.contentComponent)
+    val event = AnActionEvent.createEvent(ctx, action.templatePresentation.clone(), "EditorPopup", ActionUiKind.NONE, null)
+    ActionUtil.performAction(action, event)
+}
+println("Tests started")
+```
+
+To list existing run configurations:
+```text
+import com.intellij.execution.RunManager
+val runManager = RunManager.getInstance(project)
+runManager.allSettings.forEach { println(it.name + " (" + it.type.displayName + ")") }
+```
+###_ELSE_###
 Create a new Application run configuration for a Kotlin/Java main class.
 
 ```kotlin
@@ -40,6 +82,7 @@ runManager.selectedConfiguration = settings
 
 println("Created run configuration:", configName, "main:", mainClassName)
 ```
+###_END_IF_###
 
 # See also
 

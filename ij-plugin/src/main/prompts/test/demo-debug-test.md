@@ -1,5 +1,52 @@
 Test: Demo Debug Test (End-to-end)
 
+End-to-end demo that runs tests in Debug mode, waits for completion, and prints test results.
+
+###_IF_RIDER_###
+
+```text
+// In Rider, use RiderUnitTestRunContextAction to run tests natively.
+// JUnitConfiguration does NOT exist in Rider.
+
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.ide.DataManager
+
+// 1. Open the test file
+val basePath = project.basePath ?: error("No basePath")
+val testFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath + "/DemoRider.Tests/LeaderboardTests.cs")
+    ?: error("Test file not found")
+val editors = withContext(Dispatchers.EDT) {
+    FileEditorManager.getInstance(project).openFile(testFile, true)
+}
+val textEditor = editors.filterIsInstance<TextEditor>().firstOrNull() ?: error("No text editor")
+val editor = textEditor.editor
+
+// 2. Position caret on test class
+val text = editor.document.text
+val classOffset = text.indexOf("class LeaderboardTests")
+withContext(Dispatchers.EDT) { editor.caretModel.moveToOffset(classOffset) }
+
+// 3. Run tests via Rider action
+val action = ActionManager.getInstance().getAction("RiderUnitTestRunContextAction")
+    ?: error("Action not found")
+withContext(Dispatchers.EDT) {
+    val dataContext = DataManager.getInstance().getDataContext(editor.contentComponent)
+    val presentation = action.templatePresentation.clone()
+    val event = AnActionEvent.createEvent(dataContext, presentation, "EditorPopup", ActionUiKind.NONE, null)
+    ActionUtil.performAction(action, event)
+}
+println("Tests started via RiderUnitTestRunContextAction")
+```
+
+Key actions: `RiderUnitTestRunContextAction` (run), `RiderUnitTestDebugContextAction` (debug).
+Test results appear in Rider's Unit Test tool window (NOT RunContentManager/SMTRunnerConsoleView).
+###_ELSE_###
 This example creates/updates the demo JUnit configuration, starts it in Debug mode, resumes the debugger if it pauses, waits for completion, and prints test results.
 
 ```kotlin
@@ -124,6 +171,7 @@ root.children.forEach { child ->
 
 println("Note: DemoTestByJonnyzzz is intentionally broken; failure is expected.")
 ```
+###_END_IF_###
 
 # See also
 
