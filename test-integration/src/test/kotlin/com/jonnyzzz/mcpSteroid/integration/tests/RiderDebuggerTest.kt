@@ -276,8 +276,9 @@ class RiderDebuggerTest {
         }.toList()
 
         // Filter out template placeholders like <the exact buggy source line>
-        // but allow legitimate code with < > (e.g., C# lambdas: p => p.Score)
-        val templatePlaceholder = Regex("""<[a-zA-Z][^>]*>""")
+        // but allow code type params (<Player>, <T>) and C# lambdas (p => p.Score)
+        // Template placeholders always contain spaces; code type params don't
+        val templatePlaceholder = Regex("""<[a-zA-Z][^>]*\s[^>]*>""")
         return candidates.lastOrNull { value ->
             val lowered = value.lowercase()
             !templatePlaceholder.containsMatchIn(value) &&
