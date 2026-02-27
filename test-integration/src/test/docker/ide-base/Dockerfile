@@ -14,6 +14,7 @@ RUN apt-get update && \
         imagemagick \
         curl \
         git \
+        openssh-client \
         jq \
         ripgrep \
         unzip \

@@ -16,6 +16,10 @@ private fun ContainerDriver.startProcessInContainer(
         add("exec")
         if (request.detach) add("--detach")
         if (request.interactive) add("-i")
+        request.user?.let {
+            add("-u")
+            add(it)
+        }
         request.extraEnvVars.forEach { (key, value) ->
             add("-e")
             add("$key=$value")

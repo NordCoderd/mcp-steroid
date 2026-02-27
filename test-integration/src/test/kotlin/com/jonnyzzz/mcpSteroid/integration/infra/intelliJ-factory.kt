@@ -57,8 +57,17 @@ fun IntelliJContainer.Companion.create(
      * Required for git operations that use SSH remotes/private keys from inside the container.
      */
     mountSshAgent: Boolean = true,
+    /**
+     * Optional prebuilt image to start from (for warm snapshot reuse).
+     * When provided, IDE archive download/build is skipped and this image is used directly.
+     */
+    sourceImage: ImageDriver? = null,
+    /**
+     * Reuse project sources from [sourceImage] instead of re-deploying project files/clone.
+     * Use together with warm snapshot images that already contain project checkout + ide-system.
+     */
+    reuseProjectFromImage: Boolean = false,
 ): IntelliJContainer {
-    val ideArchive = distribution.resolveAndDownload()
     val ideProduct = distribution.product
     val selectedDockerBase = if (dockerFileBase == "ide-agent") ideProduct.dockerImageBase else dockerFileBase
     val selectedProject = when {
@@ -79,11 +88,17 @@ fun IntelliJContainer.Companion.create(
     }
 
     println("[IDE-AGENT] Run directory: $runDir")
-    // Unique suffix ensures parallel test runs each build their own image and context dir,
-    // preventing races in buildIdeImage when multiple tests start concurrently.
-    val uniqueSuffix = UUID.randomUUID().toString().take(8)
-    val imageName = "$selectedDockerBase-test-$uniqueSuffix"
-    val imageId = buildIdeImage(selectedDockerBase, imageName, ideArchive)
+    val imageId = sourceImage ?: run {
+        val ideArchive = distribution.resolveAndDownload()
+        // Unique suffix ensures parallel test runs each build their own image and context dir,
+        // preventing races in buildIdeImage when multiple tests start concurrently.
+        val uniqueSuffix = UUID.randomUUID().toString().take(8)
+        val imageName = "$selectedDockerBase-test-$uniqueSuffix"
+        buildIdeImage(selectedDockerBase, imageName, ideArchive)
+    }
+    if (sourceImage != null) {
+        println("[IDE-AGENT] Using prebuilt image: ${sourceImage.imageIdToLog}")
+    }
 
     val containerMountedPath = "/mcp-run-dir"
 
@@ -179,19 +194,23 @@ fun IntelliJContainer.Companion.create(
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)
 
 
-    // Warm project cache artifacts on host before deploying:
-    // bare repos, IntelliJ clone ZIPs, etc. mounted at /repo-cache.
-    if (repoCacheDir != null) {
-        println("[IDE-AGENT] Warming project cache artifacts in ${repoCacheDir.absolutePath} ...")
-        try {
-            selectedProject.warmRepoCache(repoCacheDir)
-        } catch (e: Exception) {
-            println("[IDE-AGENT] WARNING: Failed to warm project cache artifacts: ${e.message}")
+    if (!reuseProjectFromImage) {
+        // Warm project cache artifacts on host before deploying:
+        // bare repos, IntelliJ clone ZIPs, etc. mounted at /repo-cache.
+        if (repoCacheDir != null) {
+            println("[IDE-AGENT] Warming project cache artifacts in ${repoCacheDir.absolutePath} ...")
+            try {
+                selectedProject.warmRepoCache(repoCacheDir)
+            } catch (e: Exception) {
+                println("[IDE-AGENT] WARNING: Failed to warm project cache artifacts: ${e.message}")
+            }
         }
-    }
 
-    val ijProjectDriver = IntelliJProjectDriver(lifetime, container, ijDriver, console)
-    ijProjectDriver.deployProject(selectedProject)
+        val ijProjectDriver = IntelliJProjectDriver(lifetime, container, ijDriver, console)
+        ijProjectDriver.deployProject(selectedProject)
+    } else {
+        console.writeInfo("Reusing project checkout from source image; skipping project deployment")
+    }
 
     console.writeInfo("Starting ${ideProduct.displayName}...")
     val ijProcess = ijDriver.startIde()
@@ -314,6 +333,32 @@ fun IntelliJContainer.Companion.create(
     println("[IDE-AGENT] Session ready: $runDir")
     return session
 }
+
+fun IntelliJContainer.Companion.createFromSnapshot(
+    lifetime: CloseableStack,
+    snapshotImage: ImageDriver,
+    consoleTitle: String,
+    project: IntelliJProject = IntelliJProject.IntelliJMasterProject,
+    layoutManager: LayoutManager = HorizontalLayoutManager(),
+    distribution: IdeDistribution = IdeDistribution.fromSystemProperties(),
+    aiMode: AiMode = AiMode.AI_MCP,
+    repoCacheDir: File? = IdeTestFolders.repoCacheDirOrNull,
+    mountDockerSocket: Boolean = false,
+    mountSshAgent: Boolean = true,
+): IntelliJContainer = create(
+    lifetime = lifetime,
+    dockerFileBase = "ide-agent",
+    consoleTitle = consoleTitle,
+    project = project,
+    layoutManager = layoutManager,
+    distribution = distribution,
+    aiMode = aiMode,
+    repoCacheDir = repoCacheDir,
+    mountDockerSocket = mountDockerSocket,
+    mountSshAgent = mountSshAgent,
+    sourceImage = snapshotImage,
+    reuseProjectFromImage = true,
+)
 
 private fun pickIdeWindow(
     windows: List<WindowInfo>,

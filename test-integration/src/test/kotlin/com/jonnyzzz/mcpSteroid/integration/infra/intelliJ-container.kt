@@ -148,6 +148,49 @@ class IntelliJContainer(
     }
 
     /**
+     * Wait for a project restored from a warm snapshot.
+     *
+     * Unlike [waitForProjectReady], this method intentionally does not run plugin installation,
+     * JDK setup, or additional import/indexing flows. It fails if indexing restarts.
+     */
+    fun waitForSnapshotReadyWithoutIndexing(timeoutMillis: Long = 180_000L): IntelliJContainer {
+        console.writeStep(0, "Waiting for warm snapshot startup (indexing must stay off)...")
+        val guestProjectDir = intellijDriver.getGuestProjectDir()
+        val startedAt = System.currentTimeMillis()
+        var lastDialogKillMs = 0L
+
+        while (System.currentTimeMillis() - startedAt < timeoutMillis) {
+            val windows = mcpSteroid.mcpListWindows()
+            val projectWindows = windows.filter { it.projectPath == guestProjectDir || it.projectName != null }
+
+            if (projectWindows.isNotEmpty()) {
+                if (projectWindows.any { it.modalDialogShowing }) {
+                    val nowMs = System.currentTimeMillis()
+                    if (nowMs - lastDialogKillMs > 5_000) {
+                        lastDialogKillMs = nowMs
+                        mcpSteroid.killStartupDialogs(guestProjectDir)
+                    }
+                    Thread.sleep(200)
+                    continue
+                }
+
+                if (projectWindows.any { it.indexingInProgress == true }) {
+                    error("Warm snapshot startup triggered indexing for project at $guestProjectDir")
+                }
+
+                if (projectWindows.any { it.projectInitialized == true && it.indexingInProgress == false }) {
+                    console.writeSuccess("Warm snapshot startup complete (no indexing detected)")
+                    return this
+                }
+            }
+
+            Thread.sleep(200)
+        }
+
+        error("Timed out waiting for warm snapshot startup without indexing at $guestProjectDir")
+    }
+
+    /**
      * Wait until indexing/import completes, pre-build the project (Bazel + IntelliJ),
      * and commit a Docker snapshot image.
      *
@@ -229,32 +272,40 @@ class IntelliJContainer(
     }
 
     private fun runBazelBuildForSnapshot(projectDir: String) {
-        console.writeStep(0, "Running IntelliJ bazel.cmd build before snapshot...")
+        console.writeStep(0, "Running IntelliJ Bazel full build before snapshot...")
         val bazelBuildScript = """
             set -euo pipefail
             projectDir="$projectDir"
+            bazelBuildAll="${'$'}projectDir/bazel-build-all.cmd"
             bazelWrapper="${'$'}projectDir/bazel.cmd"
 
-            if [ ! -f "${'$'}bazelWrapper" ]; then
-              echo "[SNAPSHOT-PREBUILD] Missing IntelliJ Bazel wrapper at ${'$'}bazelWrapper" >&2
-              exit 1
+            cd "${'$'}projectDir"
+
+            if [ -f "${'$'}bazelBuildAll" ]; then
+              chmod +x "${'$'}bazelBuildAll"
+              "${'$'}bazelBuildAll"
+              exit 0
             fi
 
-            chmod +x "${'$'}bazelWrapper"
+            if [ -f "${'$'}bazelWrapper" ]; then
+              chmod +x "${'$'}bazelWrapper"
+              "${'$'}bazelWrapper" build //...
+              exit 0
+            fi
 
-            cd "${'$'}projectDir"
-            "${'$'}bazelWrapper" build //...
+            echo "[SNAPSHOT-PREBUILD] Missing Bazel build script: ${'$'}bazelBuildAll (and fallback ${'$'}bazelWrapper)" >&2
+            exit 1
         """.trimIndent()
 
         scope.startProcessInContainer {
             this
                 .args("bash", "-lc", bazelBuildScript)
                 .timeoutSeconds(14_400)
-                .description("Run IntelliJ bazel.cmd build for snapshot prebuild")
+                .description("Run IntelliJ Bazel build for snapshot prebuild")
         }.assertExitCode(0) {
-            "IntelliJ bazel.cmd build failed before snapshot"
+            "IntelliJ Bazel build failed before snapshot"
         }
-        console.writeSuccess("IntelliJ bazel.cmd build complete")
+        console.writeSuccess("IntelliJ Bazel build complete")
     }
 
     private fun runIntelliJBuildForSnapshot(projectDir: String) {

@@ -81,6 +81,18 @@ sealed class IntelliJProject{
             }.awaitForProcessFinish().assertExitCode(0, "Failed to clean project directory $guestProjectDir")
 
             container.copyToContainer(hostProjectSourceDir, guestProjectDir)
+
+            // docker cp on macOS Docker Desktop creates directories owned by root inside the container.
+            // Fix ownership so the agent user can write to the project directory (e.g. create .idea/).
+            // Must run as root (user 0:0) since the files are root-owned and only root can chown them.
+            container.startProcessInContainer {
+                this
+                    .user("0:0")
+                    .args("chown", "-R", "agent:agent", guestProjectDir)
+                    .timeoutSeconds(30)
+                    .description("Fix project directory ownership for agent user")
+                    .quietly()
+            }.awaitForProcessFinish().assertExitCode(0, "Failed to chown project directory $guestProjectDir")
         }
     }
 
@@ -109,7 +121,7 @@ sealed class IntelliJProject{
     open class ProjectFromIntelliJMasterZip protected constructor(
         private val openFile: String? = null,
         private val zipUrl: String = INTELLIJ_MASTER_GIT_CLONE_LINUX_ZIP_URL,
-        private val repoUrl: String = INTELLIJ_MASTER_REPO_URL,
+        private val repoUrlOverride: String? = null,
         private val branch: String = INTELLIJ_MASTER_BRANCH,
     ) : IntelliJProject() {
         override val openFileOnStart: String? get() = openFile
@@ -119,7 +131,6 @@ sealed class IntelliJProject{
         }
 
         override fun IntelliJProjectDriver.deploy() {
-            val git = GitDriver(container)
             val guestProjectDir = ijDriver.getGuestProjectDir()
             val guestZipInCache = "/repo-cache/intellij-master-git-clone/ultimate-git-clone-linux.zip"
             container.startProcessInContainer {
@@ -138,7 +149,7 @@ sealed class IntelliJProject{
                 set -euo pipefail
                 zipPath="$guestZipInCache"
                 targetDir="$guestProjectDir"
-                repoUrl="$repoUrl"
+                repoUrlOverride="${repoUrlOverride ?: ""}"
                 branch="$branch"
                 unpackDir="/tmp/intellij-master-unpack"
 
@@ -161,29 +172,34 @@ sealed class IntelliJProject{
                 mv "${'$'}repoDir" "${'$'}targetDir"
                 rm -rf "${'$'}unpackDir"
 
-                if git -C "${'$'}targetDir" remote | grep -qx origin; then
-                  git -C "${'$'}targetDir" remote set-url origin "${'$'}repoUrl"
-                else
-                  git -C "${'$'}targetDir" remote add origin "${'$'}repoUrl"
+                if ! git -C "${'$'}targetDir" remote | grep -qx origin; then
+                  echo "Expected origin remote in IntelliJ ZIP checkout at ${'$'}targetDir" >&2
+                  exit 1
+                fi
+
+                if [ -n "${'$'}repoUrlOverride" ]; then
+                  git -C "${'$'}targetDir" remote set-url origin "${'$'}repoUrlOverride"
                 fi
 
                 if git -C "${'$'}targetDir" config --get-all remote.origin.fetch >/dev/null 2>&1; then
                   git -C "${'$'}targetDir" config --unset-all remote.origin.fetch
                 fi
                 git -C "${'$'}targetDir" config --add remote.origin.fetch "+refs/heads/${'$'}branch:refs/remotes/origin/${'$'}branch"
-                git -C "${'$'}targetDir" fetch --prune --depth 1 origin "${'$'}branch"
-                git -C "${'$'}targetDir" checkout -B "${'$'}branch" --track "origin/${'$'}branch"
+                GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=accept-new' \
+                  git -C "${'$'}targetDir" fetch --prune --depth 1 origin "${'$'}branch"
+                git -C "${'$'}targetDir" reset --hard
+                git -C "${'$'}targetDir" clean -fdx
+                git -C "${'$'}targetDir" checkout -f -B "${'$'}branch" --track "origin/${'$'}branch"
+                chown -R agent:agent "${'$'}targetDir"
             """.trimIndent()
 
             container.startProcessInContainer {
                 this
+                    .user("0:0")
                     .args("bash", "-lc", setupScript)
                     .timeoutSeconds(900)
                     .description("Prepare IntelliJ repository from ZIP and checkout $branch")
             }.assertExitCode(0) { "Failed to prepare IntelliJ repository from ZIP" }
-
-            // Ensure repository is in a clean state for deterministic indexing/import.
-            git.checkout(guestProjectDir, branch)
         }
     }
 

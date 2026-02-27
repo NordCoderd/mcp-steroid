@@ -7,6 +7,7 @@ import java.time.Duration
 
 data class ExecContainerProcessRequest(
     val workingDirInContainer: String? = null,
+    val user: String? = null,
     val extraEnvVars: Map<String, String> = mapOf(),
     val args: List<String> = listOf(),
     val logPrefix: String? = null,
@@ -19,6 +20,7 @@ data class ExecContainerProcessRequest(
     val secretPatterns: List<String> = listOf(),
 ) {
     fun workingDirInContainer(workingDirInContainer: String?) = copy(workingDirInContainer = workingDirInContainer)
+    fun user(user: String?) = copy(user = user)
     fun extraEnv(extraEnvVars: Map<String, String>) = copy(extraEnvVars = extraEnvVars)
     fun addEnv(key: String, value: String) = extraEnv(this.extraEnvVars + (key to value))
     fun args(args: List<String> = listOf()) = copy(args = args)
