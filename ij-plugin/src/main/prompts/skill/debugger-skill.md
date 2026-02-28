@@ -14,17 +14,17 @@ Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions
 ## Quickstart
 
 1) Set breakpoints: read `mcp-steroid://debugger/add-breakpoint`, adapt the file path and line number
-2) Create run config if needed:
-   - For **JUnit test**: read `mcp-steroid://debugger/demo-debug-test` (contains JUnit config + debug launch)
-   - For **Rider/.NET test**: read `mcp-steroid://debugger/demo-debug-test` (contains `RiderUnitTestDebugContextAction` pattern)
-   - For **Application** (main class): read `mcp-steroid://debugger/create-application-config`
-3) Start debug session: read `mcp-steroid://debugger/debug-run-configuration`
-4) Wait for breakpoint hit: read `mcp-steroid://debugger/wait-for-suspend`
-5) **Evaluate variables**: read `mcp-steroid://debugger/evaluate-expression` (includes the reusable `eval()` helper inline)
+2) Launch the debug session:
+   - For **JUnit/Kotlin test**: read `mcp-steroid://debugger/demo-debug-test` — it opens the file and fires `DebugClass` context action
+   - For **Rider/.NET test**: read `mcp-steroid://debugger/demo-debug-test` — it opens the file and fires `RiderUnitTestDebugContextAction`
+   - For **existing run config** (Application, Gradle): read `mcp-steroid://debugger/debug-run-configuration`
+   - For **new Application config**: read `mcp-steroid://debugger/create-application-config` first
+3) Wait for breakpoint hit: read `mcp-steroid://debugger/wait-for-suspend`
+4) **Evaluate variables**: read `mcp-steroid://debugger/evaluate-expression` (includes the reusable `eval()` helper inline)
    - The `eval()` helper automatically retries on `"Collecting data..."` — just use it as-is.
-6) **Step over** (only if you need to observe state changes across multiple lines):
+5) **Step over** (only if you need to observe state changes across multiple lines):
    read `mcp-steroid://debugger/step-over`. **Skip this step if the bug is already visible from evaluation at the breakpoint.**
-7) Stop the debug session when done.
+6) Stop the debug session when done.
 
 **IMPORTANT**: Read the actual MCP resource content for each step. The resources contain working
 IntelliJ API code with correct imports that you can directly adapt and pass to `steroid_execute_code`.

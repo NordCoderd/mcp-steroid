@@ -18,11 +18,13 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - Available: project, println(), printJson(), printException(), progress()
 
 **Common Operations:**
+- **Debugger:** Set breakpoints, launch debug sessions, suspend at breakpoints, evaluate expressions at any call frame, step over code, inspect thread stacks — read `mcp-steroid://skill/debugger-skill`
 - Code navigation: Find usages, go to definition, symbol search
 - Refactoring: Rename, extract method, move files
 - Inspections: Run code analysis, get warnings/errors
-- Tests: Execute tests, inspect results
+- Tests: Start debug/run via `DebugClass` context action (JUnit/TestNG/Kotlin) or `RiderUnitTestDebugContextAction` (Rider .NET)
 - Actions: Trigger any IDE action programmatically
+- **Reflection:** Access private fields/methods at runtime — `obj.javaClass.getDeclaredField("x").also { it.isAccessible = true }.get(obj)`. Inspect class hierarchies, list all fields, invoke hidden methods.
 
 **After a compile error**: fix and retry — do NOT switch to Bash/Read/Write. Common fixes:
 - `suspension functions can only be called within coroutine body` → mark your helper as `suspend fun`

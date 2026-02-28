@@ -63,6 +63,8 @@ class RiderDebuggerTest {
             appendLine()
             appendLine("Read `mcp-steroid://skill/debugger-skill` for the debugger API workflow.")
             appendLine()
+            appendLine("Do NOT use screenshots or UI input tools.")
+            appendLine()
             appendLine("Print these markers in your final answer:")
             appendLine("BUG_FOUND: yes")
             appendLine("BUG_LINE: <the exact buggy source line>")
