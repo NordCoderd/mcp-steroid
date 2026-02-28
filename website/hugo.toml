@@ -58,6 +58,10 @@ disableKinds = ['taxonomy', 'term']
   version = "0.89.0"
 
 [[params.whatsnew]]
+  date = "2026-02-26"
+  text = "v0.89.0 released — Codex agent support, prompt system overhaul, DPAIA arena testing, settings UI"
+
+[[params.whatsnew]]
   date = "2026-02-15"
   text = "v0.88.0 released — 2026.1 EAP support, Kotlin 2.3.10, integration tests for IDEA/PyCharm/GoLand/WebStorm"
 
