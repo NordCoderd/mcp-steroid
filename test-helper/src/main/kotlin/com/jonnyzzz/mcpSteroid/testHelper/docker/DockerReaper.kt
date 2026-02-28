@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.testHelper.docker
 
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
+import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.launch
@@ -9,6 +11,9 @@ import java.io.File
 import java.io.PrintWriter
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicBoolean
+
+private const val REAPER_IMAGE_BUILD_TIMEOUT_SECONDS = 600L
+private const val REAPER_IMAGE_TAG = "mcp-steroid-reaper:latest"
 
 /**
  * Custom Docker resource reaper that automatically cleans up containers
@@ -67,12 +72,12 @@ object DockerReaper {
             .toFile()
         require(reaperDockerfile.isFile) { "Reaper Dockerfile must exist: $reaperDockerfile" }
 
-        val reaperImageId = buildDockerImage(
+        val reaperImageId = resolveCachedReaperImage() ?: buildDockerImage(
             logPrefix = "REAPER",
             reaperDockerfile,
-            120,
+            REAPER_IMAGE_BUILD_TIMEOUT_SECONDS,
             quietly = true,
-        )
+        ).tagDockerImage(REAPER_IMAGE_TAG)
 
         val port8080 = ContainerPort(8080)
         val containerDriver = startDockerContainerAndForget(
@@ -141,6 +146,29 @@ object DockerReaper {
         }
 
         println("[REAPER] Ready.")
+    }
+
+    private fun resolveCachedReaperImage(): ImageDriver? {
+        val inspectResult = RunProcessRequest()
+            .logPrefix("REAPER")
+            .command("docker", "image", "inspect", "--format", "{{.Id}}", REAPER_IMAGE_TAG)
+            .description("Check cached reaper image")
+            .timeoutSeconds(20L)
+            .quietly()
+            .startProcess()
+            .awaitForProcessFinish()
+
+        if (inspectResult.exitCode != 0) return null
+
+        val rawId = inspectResult.stdout
+            .lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotEmpty() }
+            ?: return null
+
+        val normalizedId = rawId.removePrefix("sha256:")
+        println("[REAPER] Using cached reaper image: $REAPER_IMAGE_TAG (${normalizedId.take(10)})")
+        return ImageDriver(imageId = normalizedId, logPrefix = "REAPER")
     }
 
     /**

@@ -76,7 +76,7 @@ class XcvbWindowDriver(
         // Output format: ID|X|Y|WIDTH|HEIGHT|PID|TITLE
         val d = '$'
         val script = """
-            for id in ${d}(xdotool search --name "" 2>/dev/null); do
+            for id in ${d}(xdotool search --onlyvisible --name "." 2>/dev/null || true); do
               unset X Y WIDTH HEIGHT pid
               name=${d}(xdotool getwindowname "${d}id" 2>/dev/null)
               eval ${d}(xdotool getwindowgeometry --shell "${d}id" 2>/dev/null)
@@ -90,7 +90,7 @@ class XcvbWindowDriver(
         val result = driver.startProcessInContainer {
             this
                 .args("bash", "-c", script)
-                .timeoutSeconds(5)
+                .timeoutSeconds(15)
                 .quietly(quietly)
                 .description("listWindows")
         }.awaitForProcessFinish()

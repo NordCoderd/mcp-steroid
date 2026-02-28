@@ -102,6 +102,21 @@ fun IntelliJContainer.Companion.create(
 
     val containerMountedPath = "/mcp-run-dir"
 
+    fun readHostCredential(propertyName: String, vararg envNames: String): String? {
+        val fromProperty = System.getProperty(propertyName)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+        if (fromProperty != null) return fromProperty
+        return envNames
+            .asSequence()
+            .mapNotNull { envName ->
+                System.getenv(envName)
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() }
+            }
+            .firstOrNull()
+    }
+
     val hostHomeDir = File(System.getProperty("user.home"))
     val dockerSocketFile = File("/var/run/docker.sock")
     val sshAgentHostMountPath = "/tmp/host-ssh-agent.sock"
@@ -110,13 +125,26 @@ fun IntelliJContainer.Companion.create(
     val hostNetrcFile = File(hostHomeDir, ".netrc").takeIf { it.isFile }
     val hostM2SettingsGuestPath = "/tmp/host-m2-settings.xml"
     val hostM2SettingsFile = File(hostHomeDir, ".m2/settings.xml").takeIf { it.isFile }
+    val hostJetBrainsTokensGuestPath = "/tmp/host-jb-tokens"
+    val hostJetBrainsTokensDir = File(hostHomeDir, ".jb/tokens").takeIf { it.isDirectory }
     val hostJetBrainsTeamTokenGuestPath = "/tmp/host-jb-jetbrains-team-token.json"
     val hostJetBrainsTeamTokenFile = File(hostHomeDir, ".jb/tokens/jetbrains.team.json").takeIf { it.isFile }
-    val hostPrivatePackagesTokenExpirationGuestPath = "/tmp/host-private-packages-token-expiration"
-    val hostPrivatePackagesTokenExpirationDir = sequenceOf(
-        File(hostHomeDir, "Library/Caches/JetBrains/private-packages-authorizer/token-expiration"),
-        File(hostHomeDir, ".cache/JetBrains/private-packages-authorizer/token-expiration"),
+    val hostPrivatePackagesAuthCacheGuestPath = "/tmp/host-private-packages-authorizer-cache"
+    val hostPrivatePackagesAuthCacheDir = sequenceOf(
+        File(hostHomeDir, "Library/Caches/JetBrains/private-packages-authorizer"),
+        File(hostHomeDir, ".cache/JetBrains/private-packages-authorizer"),
     ).firstOrNull { it.isDirectory }
+    val hostPackagesClientId = readHostCredential(
+        "test.integration.intellij.packages.client.id",
+        "JB_SPACE_CLIENT_ID",
+        "TEST_INTEGRATION_JB_SPACE_CLIENT_ID",
+    )
+    val hostPackagesClientSecret = readHostCredential(
+        "test.integration.intellij.packages.client.secret",
+        "JB_SPACE_CLIENT_SECRET",
+        "TEST_INTEGRATION_JB_SPACE_CLIENT_SECRET",
+    )
+    val hasPackagesEnvCredentials = hostPackagesClientId != null && hostPackagesClientSecret != null
     val sshAgentSocketFile = if (mountSshAgent) {
         val sshAuthSock = System.getenv("SSH_AUTH_SOCK")
             ?.trim()
@@ -167,11 +195,22 @@ fun IntelliJContainer.Companion.create(
                     "${hostJetBrainsTeamTokenFile.absolutePath} -> $hostJetBrainsTeamTokenGuestPath"
         )
     }
-    if (hostPrivatePackagesTokenExpirationDir != null) {
+    if (hostJetBrainsTokensDir != null) {
         println(
-            "[IDE-AGENT] Host private-packages token cache mount enabled: " +
-                    "${hostPrivatePackagesTokenExpirationDir.absolutePath} -> $hostPrivatePackagesTokenExpirationGuestPath"
+            "[IDE-AGENT] Host jb tokens dir mount enabled: " +
+                    "${hostJetBrainsTokensDir.absolutePath} -> $hostJetBrainsTokensGuestPath"
         )
+    }
+    if (hostPrivatePackagesAuthCacheDir != null) {
+        println(
+            "[IDE-AGENT] Host private-packages auth cache mount enabled: " +
+                    "${hostPrivatePackagesAuthCacheDir.absolutePath} -> $hostPrivatePackagesAuthCacheGuestPath"
+        )
+    }
+    if (hasPackagesEnvCredentials) {
+        println("[IDE-AGENT] JB_SPACE credentials pass-through enabled (source: host env/system properties)")
+    } else if (hostPackagesClientId != null || hostPackagesClientSecret != null) {
+        println("[IDE-AGENT] WARNING: Incomplete JB_SPACE credentials, ignoring host pass-through")
     }
 
     val volumes = buildList {
@@ -181,14 +220,15 @@ fun IntelliJContainer.Companion.create(
         if (sshAgentSocketFile != null) add(ContainerVolume(sshAgentSocketFile, sshAgentHostMountPath, "rw"))
         if (hostNetrcFile != null) add(ContainerVolume(hostNetrcFile, hostNetrcGuestPath, "ro"))
         if (hostM2SettingsFile != null) add(ContainerVolume(hostM2SettingsFile, hostM2SettingsGuestPath, "ro"))
+        if (hostJetBrainsTokensDir != null) add(ContainerVolume(hostJetBrainsTokensDir, hostJetBrainsTokensGuestPath, "ro"))
         if (hostJetBrainsTeamTokenFile != null) {
             add(ContainerVolume(hostJetBrainsTeamTokenFile, hostJetBrainsTeamTokenGuestPath, "ro"))
         }
-        if (hostPrivatePackagesTokenExpirationDir != null) {
+        if (hostPrivatePackagesAuthCacheDir != null) {
             add(
                 ContainerVolume(
-                    hostPrivatePackagesTokenExpirationDir,
-                    hostPrivatePackagesTokenExpirationGuestPath,
+                    hostPrivatePackagesAuthCacheDir,
+                    hostPrivatePackagesAuthCacheGuestPath,
                     "ro",
                 )
             )
@@ -197,6 +237,10 @@ fun IntelliJContainer.Companion.create(
     val containerEnv = buildMap {
         if (sshAgentSocketFile != null) {
             put("SSH_AUTH_SOCK", sshAgentGuestPath)
+        }
+        if (hasPackagesEnvCredentials) {
+            put("JB_SPACE_CLIENT_ID", hostPackagesClientId!!)
+            put("JB_SPACE_CLIENT_SECRET", hostPackagesClientSecret!!)
         }
     }
 
@@ -213,10 +257,12 @@ fun IntelliJContainer.Companion.create(
     )
 
     if (
+        hasPackagesEnvCredentials ||
         hostNetrcFile != null ||
         hostM2SettingsFile != null ||
+        hostJetBrainsTokensDir != null ||
         hostJetBrainsTeamTokenFile != null ||
-        hostPrivatePackagesTokenExpirationDir != null
+        hostPrivatePackagesAuthCacheDir != null
     ) {
         val installHostAuthArtifactsResult = container.startProcessInContainer {
             this
@@ -236,10 +282,116 @@ fun IntelliJContainer.Companion.create(
                     if [ -f "$hostJetBrainsTeamTokenGuestPath" ]; then
                       install -D -m 600 -o agent -g agent "$hostJetBrainsTeamTokenGuestPath" /home/agent/.jb/tokens/jetbrains.team.json
                     fi
-                    if [ -d "$hostPrivatePackagesTokenExpirationGuestPath" ]; then
-                      mkdir -p /home/agent/.cache/JetBrains/private-packages-authorizer
-                      rm -rf /home/agent/.cache/JetBrains/private-packages-authorizer/token-expiration
-                      cp -R "$hostPrivatePackagesTokenExpirationGuestPath" /home/agent/.cache/JetBrains/private-packages-authorizer/token-expiration
+                    if [ -d "$hostJetBrainsTokensGuestPath" ]; then
+                      cp -R "$hostJetBrainsTokensGuestPath"/. /home/agent/.jb/tokens/
+                    fi
+                    read_netrc_field_for_machine() {
+                      machineName="${'$'}1"
+                      field="${'$'}2"
+                      netrcPath="${'$'}3"
+                      awk -v machineName="${'$'}machineName" -v field="${'$'}field" '
+                        BEGIN { in_host = 0 }
+                        ${'$'}1 == "machine" {
+                          if (${ '$'}2 == machineName) {
+                            in_host = 1
+                          } else if (in_host) {
+                            exit
+                          } else {
+                            in_host = 0
+                          }
+                        }
+                        in_host {
+                          for (i = 1; i <= NF; i++) {
+                            if (${ '$'}i == field && i + 1 <= NF) {
+                              print ${ '$'}(i + 1)
+                              exit
+                            }
+                          }
+                        }
+                      ' "${'$'}netrcPath"
+                    }
+
+                    upsert_netrc_machine() {
+                      machineName="${'$'}1"
+                      machineLogin="${'$'}2"
+                      machinePassword="${'$'}3"
+                      netrcFile="/home/agent/.netrc"
+                      tmpNetrc="$(mktemp)"
+                      {
+                        printf "machine %s login %s password %s\n" "${'$'}machineName" "${'$'}machineLogin" "${'$'}machinePassword"
+                        if [ -f "${'$'}netrcFile" ]; then
+                          awk -v machineName="${'$'}machineName" '
+                            BEGIN { skip = 0 }
+                            ${'$'}1 == "machine" {
+                              if (${ '$'}2 == machineName) {
+                                skip = 1
+                                next
+                              }
+                              skip = 0
+                            }
+                            !skip { print }
+                          ' "${'$'}netrcFile"
+                        fi
+                      } > "${'$'}tmpNetrc"
+                      chmod 600 "${'$'}tmpNetrc"
+                      mv "${'$'}tmpNetrc" "${'$'}netrcFile"
+                      chown agent:agent "${'$'}netrcFile"
+                    }
+
+                    packagesNetrc="/home/agent/.netrc"
+                    packagesUser="${'$'}{JB_SPACE_CLIENT_ID:-}"
+                    packagesPassword="${'$'}{JB_SPACE_CLIENT_SECRET:-}"
+                    if [ -z "${'$'}packagesUser" ] || [ -z "${'$'}packagesPassword" ]; then
+                      packagesUser=""
+                      packagesPassword=""
+                    fi
+                    if [ -z "${'$'}packagesUser" ] && [ -f "${'$'}packagesNetrc" ]; then
+                      packagesUser="$(read_netrc_field_for_machine "packages.jetbrains.team" "login" "${'$'}packagesNetrc")"
+                      packagesPassword="$(read_netrc_field_for_machine "packages.jetbrains.team" "password" "${'$'}packagesNetrc")"
+                    fi
+
+                    # Host ~/.m2/settings.xml often contains an expired private packages token.
+                    # Prefer current packages.jetbrains.team credentials from ~/.netrc for all
+                    # IntelliJ private Maven server IDs used during project import/indexing.
+                    if [ -n "${'$'}packagesUser" ] && [ -n "${'$'}packagesPassword" ]; then
+                      touch /home/agent/.netrc
+                      chmod 600 /home/agent/.netrc
+                      upsert_netrc_machine "packages.jetbrains.team" "${'$'}packagesUser" "${'$'}packagesPassword"
+                      upsert_netrc_machine "cache-redirector.jetbrains.com" "${'$'}packagesUser" "${'$'}packagesPassword"
+                      upsert_netrc_machine "ultimate-bazel-cache-http.labs.jb.gg" "${'$'}packagesUser" "${'$'}packagesPassword"
+                      cat > /home/agent/.m2/settings.xml <<EOF
+                    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+                      <servers>
+                        <server>
+                          <id>code-with-me-lobby-server-private</id>
+                          <username>${'$'}packagesUser</username>
+                          <password>${'$'}packagesPassword</password>
+                        </server>
+                        <server>
+                          <id>intellij-private-dependencies</id>
+                          <username>${'$'}packagesUser</username>
+                          <password>${'$'}packagesPassword</password>
+                        </server>
+                        <server>
+                          <id>grazie-platform-private</id>
+                          <username>${'$'}packagesUser</username>
+                          <password>${'$'}packagesPassword</password>
+                        </server>
+                        <server>
+                          <id>jcp-github-mirror-private</id>
+                          <username>${'$'}packagesUser</username>
+                          <password>${'$'}packagesPassword</password>
+                        </server>
+                      </servers>
+                    </settings>
+                    EOF
+                      chown agent:agent /home/agent/.m2/settings.xml
+                      chmod 600 /home/agent/.m2/settings.xml
+                    fi
+                    if [ -d "$hostPrivatePackagesAuthCacheGuestPath" ]; then
+                      mkdir -p /home/agent/.cache/JetBrains
+                      rm -rf /home/agent/.cache/JetBrains/private-packages-authorizer
+                      cp -R "$hostPrivatePackagesAuthCacheGuestPath" /home/agent/.cache/JetBrains/private-packages-authorizer
                     fi
                     if [ -d /home/agent/.cache ]; then
                       chown -R agent:agent /home/agent/.cache
@@ -313,6 +465,7 @@ fun IntelliJContainer.Companion.create(
         container,
         "$containerMountedPath/intellij",
         ideProduct,
+        skipChangedFilesScanOnStartup = reuseProjectFromImage,
     )
     console.writeInfo("Deploying MCP Steroid plugin...")
     ijDriver.deployPluginToContainer(IdeTestFolders.pluginZip)

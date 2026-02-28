@@ -26,6 +26,10 @@ private const val INTELLIJ_CHECKOUT_OVERRIDE_ENV = "MCP_STEROID_INTELLIJ_CHECKOU
 private const val INTELLIJ_GIT_CLONE_ZIP_AUTH_HEADER_PROPERTY = "test.integration.intellij.git.clone.zip.auth.header"
 private const val INTELLIJ_GIT_CLONE_ZIP_AUTH_HEADER_ENV = "MCP_STEROID_INTELLIJ_GIT_CLONE_ZIP_AUTH_HEADER"
 private const val TEAMCITY_UNAUTHORIZED = 401
+private const val DOWNLOAD_CONNECT_TIMEOUT_MS = 30_000
+private const val DOWNLOAD_READ_TIMEOUT_MS = 120_000
+private const val DOWNLOAD_MAX_ATTEMPTS = 3
+private const val DOWNLOAD_RETRY_DELAY_MS = 5_000L
 
 fun intelliJGitCloneZipInCache(cacheDir: File): File =
     File(File(cacheDir, INTELLIJ_REPO_CACHE_SUBDIR), INTELLIJ_GIT_CLONE_ZIP_NAME)
@@ -94,27 +98,62 @@ fun ensureIntelliJGitCloneZipInCache(
 }
 
 private fun downloadFileWithGuestAuthFallback(url: String, destination: File) {
-    try {
-        downloadFile(url, destination)
-        return
-    } catch (e: DownloadFailedException) {
-        if (e.statusCode != TEAMCITY_UNAUTHORIZED) throw e
-    }
-
     val guestAuthUrl = toGuestAuthUrl(url)
-    if (guestAuthUrl == null) {
-        error("Failed downloading $url. HTTP $TEAMCITY_UNAUTHORIZED")
+    val candidateUrls = buildList {
+        add(url)
+        if (!guestAuthUrl.isNullOrBlank() && guestAuthUrl != url) {
+            add(guestAuthUrl)
+        }
     }
 
-    println("[INTELLIJ-GIT] Retrying download via TeamCity guestAuth: $guestAuthUrl")
-    downloadFile(guestAuthUrl, destination)
+    var lastError: Exception? = null
+
+    for ((urlIndex, candidateUrl) in candidateUrls.withIndex()) {
+        if (urlIndex > 0) {
+            println("[INTELLIJ-GIT] Retrying download via TeamCity guestAuth: $candidateUrl")
+        }
+
+        for (attempt in 1..DOWNLOAD_MAX_ATTEMPTS) {
+            try {
+                if (attempt > 1) {
+                    println(
+                        "[INTELLIJ-GIT] Download retry $attempt/$DOWNLOAD_MAX_ATTEMPTS: $candidateUrl"
+                    )
+                }
+                downloadFile(candidateUrl, destination)
+                return
+            } catch (e: DownloadFailedException) {
+                lastError = e
+
+                val isUnauthorizedPrimaryUrl =
+                    e.statusCode == TEAMCITY_UNAUTHORIZED && candidateUrl == url && !guestAuthUrl.isNullOrBlank()
+                if (isUnauthorizedPrimaryUrl) {
+                    break
+                }
+
+                val shouldRetry = shouldRetryStatusCode(e.statusCode)
+                if (!shouldRetry || attempt == DOWNLOAD_MAX_ATTEMPTS) {
+                    break
+                }
+                Thread.sleep(DOWNLOAD_RETRY_DELAY_MS)
+            } catch (e: Exception) {
+                lastError = e
+                if (attempt == DOWNLOAD_MAX_ATTEMPTS) {
+                    break
+                }
+                Thread.sleep(DOWNLOAD_RETRY_DELAY_MS)
+            }
+        }
+    }
+
+    throw (lastError ?: IllegalStateException("Failed downloading IntelliJ git clone ZIP from $url"))
 }
 
 private fun downloadFile(url: String, destination: File) {
     val connection = (URI(url).toURL().openConnection() as HttpURLConnection).apply {
         requestMethod = "GET"
-        connectTimeout = 30_000
-        readTimeout = 30 * 60_000
+        connectTimeout = DOWNLOAD_CONNECT_TIMEOUT_MS
+        readTimeout = DOWNLOAD_READ_TIMEOUT_MS
         instanceFollowRedirects = true
         val authHeader = resolvePropertyOrEnv(
             INTELLIJ_GIT_CLONE_ZIP_AUTH_HEADER_PROPERTY,
@@ -149,6 +188,12 @@ private fun downloadFile(url: String, destination: File) {
     } finally {
         connection.disconnect()
     }
+}
+
+private fun shouldRetryStatusCode(statusCode: Int): Boolean {
+    if (statusCode == 408 || statusCode == 429) return true
+    if (statusCode in 500..599) return true
+    return false
 }
 
 private fun resolveConfiguredZipPath(): File? {

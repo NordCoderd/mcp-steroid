@@ -21,6 +21,7 @@ class IntelliJDriver(
     private val driver: ContainerDriver,
     private val guestDir: String,
     private val ideProduct: IdeProduct,
+    private val skipChangedFilesScanOnStartup: Boolean = false,
 ) {
     private val intelliJGuestHomeDir = "/opt/idea"
     // Keep project sources on container-local filesystem (not host-mounted volume)
@@ -139,15 +140,28 @@ class IntelliJDriver(
     }
 
     private fun generateVmOptions() {
+        val vmXmx = System.getProperty("test.integration.ide.vm.xmx")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: "6g"
+        val vmXms = System.getProperty("test.integration.ide.vm.xms")
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
+            ?: "1g"
+
         val opts = buildString {
-            appendLine("-Xmx2g")
-            appendLine("-Xms512m")
+            appendLine("-Xmx$vmXmx")
+            appendLine("-Xms$vmXms")
 
             appendLine("# Redirect IDE directories to explicit paths")
             appendLine("-Didea.config.path=$configGuestDir")
             appendLine("-Didea.system.path=$systemGuestDir")
             appendLine("-Didea.log.path=$logsGuestDir")
             appendLine("-Didea.plugins.path=$pluginsGuestDir")
+            if (skipChangedFilesScanOnStartup) {
+                appendLine("# Warm snapshot startup: skip changed-files scan to avoid re-indexing")
+                appendLine("-Didea.indexes.pretendNoFiles=true")
+            }
 
             appendLine("# MCP Steroid plugin configuration")
             appendLine("-Dmcp.steroid.server.host=0.0.0.0")

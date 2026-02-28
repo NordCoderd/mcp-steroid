@@ -29,9 +29,12 @@ class McpSteroidDriver(
 ) {
     companion object {
         val MCP_STEROID_PORT = ContainerPort(6754)
+        private const val SESSION_HEADER = "Mcp-Session-Id"
     }
 
     private val json = Json { prettyPrint = true }
+    @Volatile
+    private var mcpSessionId: String? = null
 
     val guestMcpUrl = "http://localhost:${MCP_STEROID_PORT.containerPort}/mcp"
     val hostMcpUrl get() = "http://localhost:${driver.mapGuestPortToHostPort(MCP_STEROID_PORT)}/mcp"
@@ -128,7 +131,7 @@ class McpSteroidDriver(
     /**
      * List all open IDE windows with project/indexing/modal status.
      */
-    fun mcpListWindows(): List<McpWindowInfo> {
+    fun mcpListWindows(timeoutSeconds: Long = 120): List<McpWindowInfo> {
         val sessionId = mcpInitialize()
 
         val request = buildJsonObject {
@@ -141,7 +144,7 @@ class McpSteroidDriver(
             }
         }.toString()
 
-        val run = executeMcpRequest(sessionId, request)
+        val run = executeMcpRequest(sessionId, request, timeoutSeconds = timeoutSeconds)
         val data = json.parseToJsonElement(run)
 
         val text = data.jsonObject["result"]
@@ -691,6 +694,8 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
      * Initialize MCP session and return session ID.
      */
     private fun mcpInitialize(): String {
+        mcpSessionId?.let { return it }
+
         val initRequest = buildJsonObject {
             put("jsonrpc", "2.0")
             put("id", 1)
@@ -705,10 +710,18 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             }
         }.toString()
 
-        executeMcpRequest(null, initRequest)
+        val (responseBody, responseHeaders) = executeMcpRequestRaw(
+            sessionId = null,
+            requestBody = initRequest,
+        )
+        json.parseToJsonElement(responseBody)
 
-        // Return a session ID (the server will manage the actual session)
-        return "test-session-${System.currentTimeMillis()}"
+        val sessionId = responseHeaders[SESSION_HEADER]
+            ?.takeIf { it.isNotBlank() }
+            ?: error("MCP initialize response missing $SESSION_HEADER header")
+
+        mcpSessionId = sessionId
+        return sessionId
     }
 
     /**
@@ -719,10 +732,27 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
         requestBody: String,
         timeoutSeconds: Long = 30,
     ): String {
+        val (responseBody, responseHeaders) = executeMcpRequestRaw(
+            sessionId = sessionId ?: mcpSessionId,
+            requestBody = requestBody,
+            timeoutSeconds = timeoutSeconds,
+        )
+        responseHeaders[SESSION_HEADER]?.takeIf { it.isNotBlank() }?.let { mcpSessionId = it }
+
+        return json.encodeToString(json.parseToJsonElement(responseBody.trim()))
+    }
+
+    private fun executeMcpRequestRaw(
+        sessionId: String?,
+        requestBody: String,
+        timeoutSeconds: Long = 30,
+    ): Pair<String, Map<String, String>> {
         // Create curl command
         val curlCommand = buildList {
             add("curl")
             add("-s")  // Silent
+            add("-D")  // Dump response headers to stdout
+            add("-")
             add("-X")
             add("POST")
             add(guestMcpUrl)
@@ -731,10 +761,10 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
             add("-H")
             add("Accept: application/json")
 
-            // Add session cookie if present
+            // Add MCP session header when available.
             if (sessionId != null) {
                 add("-H")
-                add("Cookie: mcp_session=$sessionId")
+                add("$SESSION_HEADER: $sessionId")
             }
 
             add("-d")
@@ -748,7 +778,29 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
                 .description("curl MCP request")
         }.assertExitCode(0) { "MCP request failed: ${stdout}" }
 
-        val j = result.stdout.trim()
-        return json.encodeToString(json.parseToJsonElement(j))
+        val raw = result.stdout.replace("\r\n", "\n")
+        val splitIndex = raw.indexOf("\n\n")
+        require(splitIndex >= 0) { "Invalid HTTP response from MCP server: missing headers/body separator" }
+
+        val headerLines = raw.substring(0, splitIndex)
+            .lineSequence()
+            .drop(1) // Skip HTTP status line.
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && it.contains(":") }
+            .toList()
+
+        val headers = buildMap {
+            for (line in headerLines) {
+                val idx = line.indexOf(':')
+                if (idx <= 0) continue
+                val name = line.substring(0, idx).trim()
+                val value = line.substring(idx + 1).trim()
+                put(name, value)
+            }
+        }
+
+        val body = raw.substring(splitIndex + 2)
+        return body to headers
     }
+
 }

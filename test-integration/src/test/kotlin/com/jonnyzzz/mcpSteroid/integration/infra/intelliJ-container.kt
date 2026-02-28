@@ -79,6 +79,17 @@ class IntelliJContainer(
 ) {
     val pid by intellij::pid
 
+    private fun latestScreenshotPath(): String? =
+        File(runDirInContainer, "screenshot")
+            .listFiles { file -> file.isFile && file.extension.equals("png", ignoreCase = true) }
+            ?.maxByOrNull { it.lastModified() }
+            ?.absolutePath
+
+    private fun problemDetailsWithScreenshot(baseDetails: String): String {
+        val screenshot = latestScreenshotPath() ?: "<none>"
+        return "$baseDetails; latestScreenshot=$screenshot"
+    }
+
     /**
      * Wait for the IDE project to finish import and indexing.
      * Polls via MCP execute_code until DumbService reports smart mode.
@@ -90,8 +101,11 @@ class IntelliJContainer(
     fun waitForProjectReady(
         timeoutMillis: Long = 600_000L,
         pollIntervalMillis: Long = 1_000L,
+        requireIndexingComplete: Boolean = true,
+        performPostSetup: Boolean = true,
     ) : IntelliJContainer {
-        console.writeStep(0, "Waiting for project import and indexing...")
+        val waitLabel = if (requireIndexingComplete) "project import and indexing" else "project initialization"
+        console.writeStep(0, "Waiting for $waitLabel...")
         val guestProjectDir = intellijDriver.getGuestProjectDir()
         var lastDialogKillMs = 0L
         val startedAt = System.currentTimeMillis()
@@ -99,7 +113,13 @@ class IntelliJContainer(
         var projectReady = false
 
         while (System.currentTimeMillis() - startedAt < timeoutMillis) {
-            val windows = mcpSteroid.mcpListWindows()
+            val windows = try {
+                mcpSteroid.mcpListWindows(timeoutSeconds = 120)
+            } catch (e: Exception) {
+                lastStatus = "mcpListWindows failed: ${e.message}"
+                Thread.sleep(pollIntervalMillis)
+                continue
+            }
             val projectWindows = windows.filter { it.projectPath == guestProjectDir || it.projectName != null }
 
             if (projectWindows.isEmpty()) {
@@ -113,6 +133,10 @@ class IntelliJContainer(
                 val nowMs = System.currentTimeMillis()
                 if (nowMs - lastDialogKillMs > 5_000) {
                     lastDialogKillMs = nowMs
+                    console.writeError(
+                        "Blocking modal dialog detected while waiting for $waitLabel. " +
+                                problemDetailsWithScreenshot("projectWindows=${projectWindows.size}")
+                    )
                     mcpSteroid.killStartupDialogs(guestProjectDir)
                 }
                 lastStatus = "modal dialog present"
@@ -120,10 +144,16 @@ class IntelliJContainer(
                 continue
             }
 
-            if (projectWindows.any { window ->
-                window.projectInitialized == true && window.indexingInProgress == false
-            }) {
-                console.writeSuccess("Project import and indexing complete")
+            val readyWindow = projectWindows.any { window ->
+                val initialized = window.projectInitialized == true
+                val indexingDone = window.indexingInProgress == false
+                initialized && (!requireIndexingComplete || indexingDone)
+            }
+            if (readyWindow) {
+                console.writeSuccess(
+                    if (requireIndexingComplete) "Project import and indexing complete"
+                    else "Project initialized"
+                )
                 projectReady = true
                 break
             }
@@ -136,8 +166,11 @@ class IntelliJContainer(
 
         val elapsed = System.currentTimeMillis() - startedAt
         require(projectReady) {
-            "Failed waiting for project import and indexing after ${elapsed}ms. Last status: $lastStatus"
+            "Failed waiting for $waitLabel after ${elapsed}ms. " +
+                    problemDetailsWithScreenshot("Last status: $lastStatus")
         }
+
+        if (!performPostSetup) return this
 
         // Re-apply IDE window layout as early as possible: IntelliJ restores its own saved window
         // bounds during project import/indexing, overriding the initial xdotool positioning.
@@ -177,14 +210,24 @@ class IntelliJContainer(
      * Unlike [waitForProjectReady], this method intentionally does not run plugin installation,
      * JDK setup, or additional import/indexing flows. It fails if indexing restarts.
      */
-    fun waitForSnapshotReadyWithoutIndexing(timeoutMillis: Long = 180_000L): IntelliJContainer {
+    fun waitForSnapshotReadyWithoutIndexing(
+        timeoutMillis: Long = 180_000L,
+        pollIntervalMillis: Long = 1_000L,
+    ): IntelliJContainer {
         console.writeStep(0, "Waiting for warm snapshot startup (indexing must stay off)...")
         val guestProjectDir = intellijDriver.getGuestProjectDir()
         val startedAt = System.currentTimeMillis()
         var lastDialogKillMs = 0L
+        var lastPollError: String? = null
 
         while (System.currentTimeMillis() - startedAt < timeoutMillis) {
-            val windows = mcpSteroid.mcpListWindows()
+            val windows = try {
+                mcpSteroid.mcpListWindows(timeoutSeconds = 120)
+            } catch (e: Exception) {
+                lastPollError = "mcpListWindows failed: ${e.message}"
+                Thread.sleep(pollIntervalMillis)
+                continue
+            }
             val projectWindows = windows.filter { it.projectPath == guestProjectDir || it.projectName != null }
 
             if (projectWindows.isNotEmpty()) {
@@ -192,14 +235,21 @@ class IntelliJContainer(
                     val nowMs = System.currentTimeMillis()
                     if (nowMs - lastDialogKillMs > 5_000) {
                         lastDialogKillMs = nowMs
+                        console.writeError(
+                            "Blocking modal dialog detected during warm snapshot startup. " +
+                                    problemDetailsWithScreenshot("projectWindows=${projectWindows.size}")
+                        )
                         mcpSteroid.killStartupDialogs(guestProjectDir)
                     }
-                    Thread.sleep(200)
+                    Thread.sleep(pollIntervalMillis)
                     continue
                 }
 
                 if (projectWindows.any { it.indexingInProgress == true }) {
-                    error("Warm snapshot startup triggered indexing for project at $guestProjectDir")
+                    error(
+                        "Warm snapshot startup triggered indexing for project at $guestProjectDir. " +
+                                problemDetailsWithScreenshot("indexingInProgress=true")
+                    )
                 }
 
                 if (projectWindows.any { it.projectInitialized == true && it.indexingInProgress == false }) {
@@ -208,10 +258,14 @@ class IntelliJContainer(
                 }
             }
 
-            Thread.sleep(200)
+            Thread.sleep(pollIntervalMillis)
         }
 
-        error("Timed out waiting for warm snapshot startup without indexing at $guestProjectDir")
+        val details = lastPollError?.let { " Last poll error: $it" } ?: ""
+        error(
+            "Timed out waiting for warm snapshot startup without indexing at $guestProjectDir.$details " +
+                    problemDetailsWithScreenshot("snapshotWaitTimeout=true")
+        )
     }
 
     /**
@@ -225,13 +279,27 @@ class IntelliJContainer(
         val waitTimeoutMillis = System.getProperty("test.integration.snapshot.project.ready.timeout.ms")
             ?.toLongOrNull()
             ?: 5_400_000L
-        waitForProjectReady(timeoutMillis = waitTimeoutMillis, pollIntervalMillis = 1_000L)
+        val waitPollIntervalMillis = System.getProperty("test.integration.snapshot.project.ready.poll.ms")
+            ?.toLongOrNull()
+            ?: 5_000L
+        waitForProjectReady(
+            timeoutMillis = waitTimeoutMillis,
+            pollIntervalMillis = waitPollIntervalMillis,
+            requireIndexingComplete = false,
+            performPostSetup = false,
+        )
         val projectDir = intellijDriver.getGuestProjectDir()
         val systemDir = intellijDriver.getGuestSystemDir()
         val configDir = intellijDriver.getGuestConfigDir()
         val pluginsDir = intellijDriver.getGuestPluginsDir()
 
         runSnapshotPrebuild(projectDir)
+        waitForProjectReady(
+            timeoutMillis = waitTimeoutMillis,
+            pollIntervalMillis = waitPollIntervalMillis,
+            requireIndexingComplete = true,
+            performPostSetup = false,
+        )
 
         scope.startProcessInContainer {
             this
@@ -299,17 +367,22 @@ class IntelliJContainer(
     }
 
     private fun runBazelBuildForSnapshot(projectDir: String) {
-        console.writeStep(0, "Running IntelliJ Bazel full build before snapshot...")
+        console.writeStep(0, "Running IntelliJ Bazel build before snapshot...")
         val bazelBuildScript = """
             set -euo pipefail
             projectDir="$projectDir"
-            bazelBuildAll="${'$'}projectDir/bazel-build-all.cmd"
             bazelWrapper="${'$'}projectDir/bazel.cmd"
+            bazelHostJvmXmx="6g"
+            bazelPrimaryTarget="//:idea-ultimate-main"
             authorizerLastRunFile="${'$'}projectDir/out/.private.packages.auth.last.run.txt"
             authorizerLastMtimeFile="${'$'}projectDir/out/.private.packages.auth.source.mtime.txt"
-            packagesHealthcheckUrl="https://packages.jetbrains.team/maven/p/ij/intellij-private-dependencies/"
+            packagesHealthcheckUrls="
+            https://packages.jetbrains.team/maven/p/ij/intellij-private-dependencies/
+            https://packages.jetbrains.team/maven/p/ij/code-with-me-lobby-server/
+            "
             issuedCredsFile="/tmp/intellij-packages-creds.json"
             jbTokenFile="${'$'}HOME/.jb/tokens/jetbrains.team.json"
+            netrcFile="${'$'}HOME/.netrc"
 
             read_netrc_field_for_machine() {
               machineName="${'$'}1"
@@ -336,11 +409,61 @@ class IntelliJContainer(
               ' "${'$'}HOME/.netrc"
             }
 
+            test_packages_creds_for_url() {
+              username="${'$'}1"
+              password="${'$'}2"
+              healthcheckUrl="${'$'}3"
+              attempts=3
+              attempt=1
+              while [ "${'$'}attempt" -le "${'$'}attempts" ]; do
+                status="$(curl -sS -o /dev/null -w "%{http_code}" -I -u "${'$'}username:${'$'}password" "${'$'}healthcheckUrl" || true)"
+                if [ "${'$'}status" = "200" ]; then
+                  return 0
+                fi
+                echo "[SNAPSHOT-PREBUILD] Credential check HTTP ${'$'}status for ${'$'}healthcheckUrl (attempt ${'$'}attempt/${'$'}attempts)" >&2
+                if [ "${'$'}attempt" -lt "${'$'}attempts" ]; then
+                  sleep "${'$'}attempt"
+                fi
+                attempt=$((attempt + 1))
+              done
+              return 1
+            }
+
             test_packages_creds() {
               username="${'$'}1"
               password="${'$'}2"
-              status="$(curl -sS -o /dev/null -w "%{http_code}" -I -u "${'$'}username:${'$'}password" "${'$'}packagesHealthcheckUrl" || true)"
-              [ "${'$'}status" = "200" ]
+              for healthcheckUrl in ${'$'}packagesHealthcheckUrls; do
+                if ! test_packages_creds_for_url "${'$'}username" "${'$'}password" "${'$'}healthcheckUrl"; then
+                  echo "[SNAPSHOT-PREBUILD] Credential check failed for ${'$'}healthcheckUrl" >&2
+                  return 1
+                fi
+              done
+              return 0
+            }
+
+            upsert_netrc_machine() {
+              machineName="${'$'}1"
+              machineLogin="${'$'}2"
+              machinePassword="${'$'}3"
+              tmpNetrc="$(mktemp)"
+              {
+                printf "machine %s login %s password %s\n" "${'$'}machineName" "${'$'}machineLogin" "${'$'}machinePassword"
+                if [ -f "${'$'}netrcFile" ]; then
+                  awk -v machineName="${'$'}machineName" '
+                    BEGIN { skip = 0 }
+                    ${'$'}1 == "machine" {
+                      if (${ '$'}2 == machineName) {
+                        skip = 1
+                        next
+                      }
+                      skip = 0
+                    }
+                    !skip { print }
+                  ' "${'$'}netrcFile"
+                fi
+              } > "${'$'}tmpNetrc"
+              chmod 600 "${'$'}tmpNetrc"
+              mv "${'$'}tmpNetrc" "${'$'}netrcFile"
             }
 
             issue_packages_credentials_from_jb_oauth_cache() {
@@ -496,20 +619,27 @@ NODE
               echo "[SNAPSHOT-PREBUILD] Rotated JetBrains packages credentials from ~/.jb/tokens/jetbrains.team.json"
             }
 
-            if [ -f "${'$'}HOME/.netrc" ]; then
+            credentialSource=""
+            if [ -n "${'$'}{JB_SPACE_CLIENT_ID:-}" ] && [ -n "${'$'}{JB_SPACE_CLIENT_SECRET:-}" ] && test_packages_creds "${'$'}JB_SPACE_CLIENT_ID" "${'$'}JB_SPACE_CLIENT_SECRET"; then
+              echo "[SNAPSHOT-PREBUILD] Reusing JB_SPACE_CLIENT_* credentials from container environment"
+              credentialSource="container-env"
+            elif [ -f "${'$'}HOME/.netrc" ]; then
               existingUser="$(read_netrc_field_for_machine "packages.jetbrains.team" "login")"
               existingPassword="$(read_netrc_field_for_machine "packages.jetbrains.team" "password")"
               if [ -n "${'$'}existingUser" ] && [ -n "${'$'}existingPassword" ] && test_packages_creds "${'$'}existingUser" "${'$'}existingPassword"; then
                 export JB_SPACE_CLIENT_ID="${'$'}existingUser"
                 export JB_SPACE_CLIENT_SECRET="${'$'}existingPassword"
                 echo "[SNAPSHOT-PREBUILD] Reusing valid JetBrains packages credentials from ~/.netrc"
+                credentialSource="netrc"
               else
                 echo "[SNAPSHOT-PREBUILD] Existing ~/.netrc credentials are missing or invalid, rotating token"
                 issue_packages_credentials_from_jb_oauth_cache
+                credentialSource="oauth-cache"
               fi
             else
               echo "[SNAPSHOT-PREBUILD] ~/.netrc is missing, rotating token from ~/.jb cache"
               issue_packages_credentials_from_jb_oauth_cache
+              credentialSource="oauth-cache"
             fi
 
             if [ -z "${'$'}{JB_SPACE_CLIENT_ID:-}" ] || [ -z "${'$'}{JB_SPACE_CLIENT_SECRET:-}" ]; then
@@ -518,29 +648,70 @@ NODE
             fi
 
             if ! test_packages_creds "${'$'}JB_SPACE_CLIENT_ID" "${'$'}JB_SPACE_CLIENT_SECRET"; then
-              echo "[SNAPSHOT-PREBUILD] Resolved JetBrains packages credentials are not accepted by packages.jetbrains.team" >&2
+              echo "[SNAPSHOT-PREBUILD] Resolved JetBrains packages credentials are not accepted by required packages.jetbrains.team repositories" >&2
               exit 1
             fi
+            echo "[SNAPSHOT-PREBUILD] Using JetBrains packages credentials source: ${'$'}credentialSource"
+
+            # Bazel uses ~/.netrc for authenticated package fetches and remote cache access.
+            # Keep direct packages, cache-redirector, and Bazel HTTP remote cache hosts in sync.
+            touch "${'$'}netrcFile"
+            chmod 600 "${'$'}netrcFile"
+            upsert_netrc_machine "packages.jetbrains.team" "${'$'}JB_SPACE_CLIENT_ID" "${'$'}JB_SPACE_CLIENT_SECRET"
+            upsert_netrc_machine "cache-redirector.jetbrains.com" "${'$'}JB_SPACE_CLIENT_ID" "${'$'}JB_SPACE_CLIENT_SECRET"
+            upsert_netrc_machine "ultimate-bazel-cache-http.labs.jb.gg" "${'$'}JB_SPACE_CLIENT_ID" "${'$'}JB_SPACE_CLIENT_SECRET"
 
             # Force build/private-packages-auth/authorizer.sh to execute in this container run.
             rm -f "${'$'}authorizerLastRunFile" "${'$'}authorizerLastMtimeFile"
 
             cd "${'$'}projectDir"
 
-            if [ -f "${'$'}bazelBuildAll" ]; then
-              chmod +x "${'$'}bazelBuildAll"
-              "${'$'}bazelBuildAll"
-              exit 0
+            if [ ! -f "${'$'}bazelWrapper" ]; then
+              echo "[SNAPSHOT-PREBUILD] Missing Bazel script: ${'$'}bazelWrapper" >&2
+              exit 1
+            fi
+            chmod +x "${'$'}bazelWrapper"
+
+            cpuCount="$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)"
+            case "${'$'}cpuCount" in
+              ''|*[!0-9]*)
+                cpuCount=4
+                ;;
+            esac
+            if [ "${'$'}cpuCount" -lt 2 ]; then
+              bazelJobs=2
+            elif [ "${'$'}cpuCount" -gt 8 ]; then
+              bazelJobs=8
+            else
+              bazelJobs="${'$'}cpuCount"
             fi
 
-            if [ -f "${'$'}bazelWrapper" ]; then
-              chmod +x "${'$'}bazelWrapper"
-              "${'$'}bazelWrapper" build //...
-              exit 0
-            fi
+            run_bazel_build_once() {
+              attempt="${'$'}1"
+              shift || true
+              echo "[SNAPSHOT-PREBUILD] Bazel attempt ${'$'}attempt: ${'$'}bazelPrimaryTarget (jobs=${'$'}bazelJobs, extraFlags='${'$'}*')" >&2
+              "${'$'}bazelWrapper" --host_jvm_args=-Xmx"${'$'}bazelHostJvmXmx" build \
+                --config=ci \
+                --jobs="${'$'}bazelJobs" \
+                --worker_max_multiplex_instances=JvmCompile=1 \
+                "${'$'}@" \
+                "${'$'}bazelPrimaryTarget"
+            }
 
-            echo "[SNAPSHOT-PREBUILD] Missing Bazel build script: ${'$'}bazelBuildAll (and fallback ${'$'}bazelWrapper)" >&2
-            exit 1
+            # Retry once after Bazel server restart. Keep worker mode enabled because
+            # JvmCompile in this setup requires persistent workers.
+            run_bazel_build_once 1 || {
+              bazelExitCode="${'$'}?"
+              echo "[SNAPSHOT-PREBUILD] Bazel build attempt 1 failed with exit code ${'$'}bazelExitCode" >&2
+              "${'$'}bazelWrapper" shutdown || true
+              pkill -9 -f 'bazel\(project-home\)' || true
+              sleep 2
+              run_bazel_build_once 2 || {
+                bazelExitCode="${'$'}?"
+                echo "[SNAPSHOT-PREBUILD] Bazel build attempt 2 failed with exit code ${'$'}bazelExitCode" >&2
+                exit "${'$'}bazelExitCode"
+              }
+            }
         """.trimIndent()
 
         scope.startProcessInContainer {
@@ -566,6 +737,10 @@ NODE
 import com.intellij.task.ProjectTaskManager
 import java.util.concurrent.TimeUnit
 
+// buildAllModules may open modal progress dialogs (e.g. "Resolving SDKs").
+// These are expected and should not cancel the current execution.
+doNotCancelOnModalityStateChange()
+
 val changedFilesScanProperty = "idea.indexes.pretendNoFiles"
 val oldChangedFilesScanProperty = System.getProperty(changedFilesScanProperty)
 System.setProperty(changedFilesScanProperty, "true")
@@ -573,8 +748,9 @@ println("[SNAPSHOT-PREBUILD] Temporarily set ${'$'}changedFilesScanProperty=true
 
 try {
     println("[SNAPSHOT-PREBUILD] Starting IntelliJ buildAllModules() ...")
-    val result = ProjectTaskManager.getInstance(project).buildAllModules().get(4, TimeUnit.HOURS)
-    println("[SNAPSHOT-PREBUILD] IntelliJ build finished: errors=${'$'}{result.hasErrors()}, warnings=${'$'}{result.hasWarnings()}, aborted=${'$'}{result.isAborted()}")
+    val result = ProjectTaskManager.getInstance(project).buildAllModules().blockingGet(4, TimeUnit.HOURS)
+        ?: error("IntelliJ build returned null result")
+    println("[SNAPSHOT-PREBUILD] IntelliJ build finished: errors=${'$'}{result.hasErrors()}, aborted=${'$'}{result.isAborted()}")
     check(!result.isAborted()) { "IntelliJ build was aborted" }
     check(!result.hasErrors()) { "IntelliJ build reported compile errors" }
 } finally {
