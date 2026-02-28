@@ -3,10 +3,7 @@ LSP: textDocument/rename - Rename Symbol
 This example demonstrates how to rename a symbol across the project,
 
 ```kotlin
-import com.intellij.psi.search.LocalSearchScope
-import com.intellij.psi.search.searches.ReferencesSearch
-import com.intellij.psi.util.PsiTreeUtil
-import com.intellij.refactoring.rename.RenamePsiElementProcessor
+import com.intellij.openapi.util.TextRange
 
 // Configuration - modify these for your use case
 val filePath = "/path/to/your/File.kt"  // TODO: Set your file path
@@ -19,8 +16,10 @@ val dryRun = true  // Set to false to actually perform the rename
 // First, analyze what would be renamed (always in read action)
 data class RenamePlan(
     val analysis: String,
-    val element: PsiNamedElement,
-    val references: Collection<PsiReference>
+    val virtualFile: com.intellij.openapi.vfs.VirtualFile,
+    val oldName: String,
+    // Pre-computed absolute ranges in the document, sorted descending for safe replacement
+    val ranges: List<TextRange>
 )
 
 val analysisResult = readAction {
@@ -28,34 +27,31 @@ val analysisResult = readAction {
     val virtualFile = findFile(filePath)
         ?: return@readAction "File not found: $filePath" to null
 
-    // Get PSI file
-    val psiFile = PsiManager.getInstance(project).findFile(virtualFile)
-        ?: return@readAction "Cannot parse file: $filePath" to null
-
     // Get document
     val document = FileDocumentManager.getInstance().getDocument(virtualFile)
         ?: return@readAction "Cannot get document for: $filePath" to null
 
     // Convert line/column to offset
-    val offset = document.getLineStartOffset(line - 1) + (column - 1)
+    val startOffset = document.getLineStartOffset(line - 1) + (column - 1)
+    val text = document.text
 
-    // Find element at position
-    val element = psiFile.findElementAt(offset)
-        ?: return@readAction "No element at position ($line:$column)" to null
+    // Extract the symbol name (word) at the given position
+    var endOffset = startOffset
+    while (endOffset < text.length && (text[endOffset].isLetterOrDigit() || text[endOffset] == '_')) {
+        endOffset++
+    }
+    val oldName = text.substring(startOffset, endOffset)
+    if (oldName.isEmpty()) {
+        return@readAction "No symbol at position ($line:$column)" to null
+    }
 
-    // Find the named element to rename
-    val namedElement = PsiTreeUtil.getParentOfType(element, PsiNamedElement::class.java, false)
-        ?: element.reference?.resolve() as? PsiNamedElement
-        ?: return@readAction "No renameable element found at position" to null
-
-    val oldName = namedElement.name ?: "unknown"
-
-    // Check if rename is possible
-    val processor = RenamePsiElementProcessor.forElement(namedElement)
-    val canRename = processor.canProcessElement(namedElement)
-
-    // Find all usages that would be affected (limit to this file for speed)
-    val references = ReferencesSearch.search(namedElement, LocalSearchScope(psiFile)).findAll()
+    // Find all occurrences of the symbol name using word-boundary matching.
+    // Sort descending so later replacements don't shift earlier offsets.
+    val pattern = Regex("""\b${Regex.escape(oldName)}\b""")
+    val ranges = pattern.findAll(text)
+        .map { TextRange(it.range.first, it.range.last + 1) }
+        .sortedByDescending { it.startOffset }
+        .toList()
 
     val analysis = buildString {
         appendLine("Rename Analysis")
@@ -63,30 +59,22 @@ val analysisResult = readAction {
         appendLine()
         appendLine("Symbol: $oldName")
         appendLine("New name: $newName")
-        appendLine("Element type: ${namedElement.javaClass.simpleName}")
-        appendLine("Can rename: $canRename")
         appendLine()
-        appendLine("References that would be updated: ${references.size}")
+        appendLine("Occurrences that would be updated: ${ranges.size}")
         appendLine()
 
         // List affected locations
-        references.take(20).forEach { ref ->
-            val refElement = ref.element
-            val refFile = refElement.containingFile?.virtualFile?.path ?: "unknown"
-            val refDocument = refElement.containingFile?.let {
-                PsiDocumentManager.getInstance(project).getDocument(it)
-            }
-            val refOffset = refElement.textOffset
-            val refLine = refDocument?.getLineNumber(refOffset)?.plus(1) ?: -1
-
-            appendLine("  - $refFile:$refLine")
+        ranges.take(20).forEach { range ->
+            val rangeLine = document.getLineNumber(range.startOffset) + 1
+            val rangeCol = range.startOffset - document.getLineStartOffset(rangeLine - 1) + 1
+            appendLine("  - $filePath:$rangeLine:$rangeCol")
         }
-        if (references.size > 20) {
-            appendLine("  ... and ${references.size - 20} more")
+        if (ranges.size > 20) {
+            appendLine("  ... and ${ranges.size - 20} more")
         }
     }
 
-    analysis to RenamePlan(analysis, namedElement, references)
+    analysis to RenamePlan(analysis, virtualFile, oldName, ranges)
 }
 
 val (analysis, renamePlan) = analysisResult
@@ -100,16 +88,22 @@ if (renamePlan == null || dryRun) {
     return
 }
 
-// Perform the actual rename
-WriteCommandAction.runWriteCommandAction(project) {
-    val elementToRename = renamePlan.element
-    elementToRename.setName(newName)
-    PsiDocumentManager.getInstance(project).commitAllDocuments()
+// Perform the actual rename via direct document manipulation.
+// Ranges are pre-computed in the read action; get document directly from VirtualFile.
+writeAction {
+    val document = FileDocumentManager.getInstance().getDocument(renamePlan.virtualFile)!!
+    CommandProcessor.getInstance().executeCommand(project, {
+        for (range in renamePlan.ranges) {
+            document.replaceString(range.startOffset, range.endOffset, newName)
+        }
+    }, "Rename ${renamePlan.oldName} to $newName", null)
+    PsiDocumentManager.getInstance(project).commitDocument(document)
+    FileDocumentManager.getInstance().saveDocument(document)
 }
 
 println(analysis)
 println()
-println("Rename completed: $newName")
+println("Rename completed: ${renamePlan.oldName} → $newName")
 ```
 
 # See also

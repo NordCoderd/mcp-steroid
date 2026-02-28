@@ -102,8 +102,21 @@ fun IntelliJContainer.Companion.create(
 
     val containerMountedPath = "/mcp-run-dir"
 
+    val hostHomeDir = File(System.getProperty("user.home"))
     val dockerSocketFile = File("/var/run/docker.sock")
+    val sshAgentHostMountPath = "/tmp/host-ssh-agent.sock"
     val sshAgentGuestPath = "/tmp/ssh-agent.sock"
+    val hostNetrcGuestPath = "/tmp/host-netrc"
+    val hostNetrcFile = File(hostHomeDir, ".netrc").takeIf { it.isFile }
+    val hostM2SettingsGuestPath = "/tmp/host-m2-settings.xml"
+    val hostM2SettingsFile = File(hostHomeDir, ".m2/settings.xml").takeIf { it.isFile }
+    val hostJetBrainsTeamTokenGuestPath = "/tmp/host-jb-jetbrains-team-token.json"
+    val hostJetBrainsTeamTokenFile = File(hostHomeDir, ".jb/tokens/jetbrains.team.json").takeIf { it.isFile }
+    val hostPrivatePackagesTokenExpirationGuestPath = "/tmp/host-private-packages-token-expiration"
+    val hostPrivatePackagesTokenExpirationDir = sequenceOf(
+        File(hostHomeDir, "Library/Caches/JetBrains/private-packages-authorizer/token-expiration"),
+        File(hostHomeDir, ".cache/JetBrains/private-packages-authorizer/token-expiration"),
+    ).firstOrNull { it.isDirectory }
     val sshAgentSocketFile = if (mountSshAgent) {
         val sshAuthSock = System.getenv("SSH_AUTH_SOCK")
             ?.trim()
@@ -112,9 +125,17 @@ fun IntelliJContainer.Companion.create(
                 "mountSshAgent=true but SSH_AUTH_SOCK is not set. " +
                         "Start ssh-agent on host and export SSH_AUTH_SOCK."
             )
-        File(sshAuthSock).also { socket ->
-            require(socket.exists()) {
-                "mountSshAgent=true but SSH_AUTH_SOCK does not exist: ${socket.absolutePath}"
+        val osName = System.getProperty("os.name").orEmpty().lowercase()
+        val isMacHost = osName.contains("mac")
+        if (isMacHost) {
+            // Docker Desktop provides a stable SSH agent socket proxy that is more reliable
+            // than mounting launchd paths like /private/tmp/com.apple.launchd.../Listeners.
+            File("/run/host-services/ssh-auth.sock")
+        } else {
+            File(sshAuthSock).also { socket ->
+                require(socket.exists()) {
+                    "mountSshAgent=true but SSH_AUTH_SOCK does not exist: ${socket.absolutePath}"
+                }
             }
         }
     } else {
@@ -129,14 +150,49 @@ fun IntelliJContainer.Companion.create(
         println("[IDE-AGENT] Docker socket mount enabled: ${dockerSocketFile.absolutePath}")
     }
     if (sshAgentSocketFile != null) {
-        println("[IDE-AGENT] SSH agent mount enabled: ${sshAgentSocketFile.absolutePath} -> $sshAgentGuestPath")
+        println(
+            "[IDE-AGENT] SSH agent mount enabled: ${sshAgentSocketFile.absolutePath} -> $sshAgentHostMountPath " +
+                    "(exported as $sshAgentGuestPath)"
+        )
+    }
+    if (hostNetrcFile != null) {
+        println("[IDE-AGENT] Host netrc mount enabled: ${hostNetrcFile.absolutePath} -> $hostNetrcGuestPath")
+    }
+    if (hostM2SettingsFile != null) {
+        println("[IDE-AGENT] Host Maven settings mount enabled: ${hostM2SettingsFile.absolutePath} -> $hostM2SettingsGuestPath")
+    }
+    if (hostJetBrainsTeamTokenFile != null) {
+        println(
+            "[IDE-AGENT] Host jb token cache mount enabled: " +
+                    "${hostJetBrainsTeamTokenFile.absolutePath} -> $hostJetBrainsTeamTokenGuestPath"
+        )
+    }
+    if (hostPrivatePackagesTokenExpirationDir != null) {
+        println(
+            "[IDE-AGENT] Host private-packages token cache mount enabled: " +
+                    "${hostPrivatePackagesTokenExpirationDir.absolutePath} -> $hostPrivatePackagesTokenExpirationGuestPath"
+        )
     }
 
     val volumes = buildList {
         add(ContainerVolume(runDir, containerMountedPath, "rw"))
         if (repoCacheDir != null) add(ContainerVolume(repoCacheDir, "/repo-cache", "ro"))
         if (mountDockerSocket) add(ContainerVolume(dockerSocketFile, "/var/run/docker.sock", "rw"))
-        if (sshAgentSocketFile != null) add(ContainerVolume(sshAgentSocketFile, sshAgentGuestPath, "rw"))
+        if (sshAgentSocketFile != null) add(ContainerVolume(sshAgentSocketFile, sshAgentHostMountPath, "rw"))
+        if (hostNetrcFile != null) add(ContainerVolume(hostNetrcFile, hostNetrcGuestPath, "ro"))
+        if (hostM2SettingsFile != null) add(ContainerVolume(hostM2SettingsFile, hostM2SettingsGuestPath, "ro"))
+        if (hostJetBrainsTeamTokenFile != null) {
+            add(ContainerVolume(hostJetBrainsTeamTokenFile, hostJetBrainsTeamTokenGuestPath, "ro"))
+        }
+        if (hostPrivatePackagesTokenExpirationDir != null) {
+            add(
+                ContainerVolume(
+                    hostPrivatePackagesTokenExpirationDir,
+                    hostPrivatePackagesTokenExpirationGuestPath,
+                    "ro",
+                )
+            )
+        }
     }
     val containerEnv = buildMap {
         if (sshAgentSocketFile != null) {
@@ -155,6 +211,74 @@ fun IntelliJContainer.Companion.create(
                 McpSteroidDriver.MCP_STEROID_PORT,
             ),
     )
+
+    if (
+        hostNetrcFile != null ||
+        hostM2SettingsFile != null ||
+        hostJetBrainsTeamTokenFile != null ||
+        hostPrivatePackagesTokenExpirationDir != null
+    ) {
+        val installHostAuthArtifactsResult = container.startProcessInContainer {
+            this
+                .user("0:0")
+                .args(
+                    "bash", "-lc",
+                    """
+                    set -euo pipefail
+                    mkdir -p /home/agent/.m2 /home/agent/.jb/tokens
+                    chown -R agent:agent /home/agent/.m2 /home/agent/.jb
+                    if [ -f "$hostNetrcGuestPath" ]; then
+                      install -m 600 -o agent -g agent "$hostNetrcGuestPath" /home/agent/.netrc
+                    fi
+                    if [ -f "$hostM2SettingsGuestPath" ]; then
+                      install -D -m 600 -o agent -g agent "$hostM2SettingsGuestPath" /home/agent/.m2/settings.xml
+                    fi
+                    if [ -f "$hostJetBrainsTeamTokenGuestPath" ]; then
+                      install -D -m 600 -o agent -g agent "$hostJetBrainsTeamTokenGuestPath" /home/agent/.jb/tokens/jetbrains.team.json
+                    fi
+                    if [ -d "$hostPrivatePackagesTokenExpirationGuestPath" ]; then
+                      mkdir -p /home/agent/.cache/JetBrains/private-packages-authorizer
+                      rm -rf /home/agent/.cache/JetBrains/private-packages-authorizer/token-expiration
+                      cp -R "$hostPrivatePackagesTokenExpirationGuestPath" /home/agent/.cache/JetBrains/private-packages-authorizer/token-expiration
+                    fi
+                    if [ -d /home/agent/.cache ]; then
+                      chown -R agent:agent /home/agent/.cache
+                    fi
+                    """.trimIndent()
+                )
+                .timeoutSeconds(30)
+                .description("Install host auth artifacts for agent user")
+                .quietly()
+        }.awaitForProcessFinish()
+        require(installHostAuthArtifactsResult.exitCode == 0) {
+            "Failed installing host auth artifacts for agent user: ${installHostAuthArtifactsResult.stderr}"
+        }
+    }
+
+    if (sshAgentSocketFile != null) {
+        val initSshAgentSocketResult = container.startProcessInContainer {
+            this
+                .user("0:0")
+                .args(
+                    "bash", "-lc",
+                    """
+                    set -euo pipefail
+                    if [ ! -S "$sshAgentHostMountPath" ]; then
+                      echo "Mounted SSH agent socket is missing: $sshAgentHostMountPath" >&2
+                      exit 1
+                    fi
+                    chmod 666 "$sshAgentHostMountPath" || true
+                    ln -sfn "$sshAgentHostMountPath" "$sshAgentGuestPath"
+                    """.trimIndent()
+                )
+                .timeoutSeconds(30)
+                .description("Initialize SSH agent socket path in container")
+                .quietly()
+        }.awaitForProcessFinish()
+        require(initSshAgentSocketResult.exitCode == 0) {
+            "Failed to initialize SSH agent socket in container: ${initSshAgentSocketResult.stderr}"
+        }
+    }
 
     val xcvb = XcvbDriver(
         lifetime,

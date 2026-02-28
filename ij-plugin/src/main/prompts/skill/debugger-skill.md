@@ -16,10 +16,13 @@ Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions
 1) Read `mcp-steroid://debugger/overview` for the complete workflow and resource list.
 2) **Read each individual resource** before using it -- each one contains complete, copy-paste-ready code.
 3) Set breakpoints: read `mcp-steroid://debugger/add-breakpoint`, adapt the file path and line number
-4) Create run config if needed: read `mcp-steroid://debugger/create-application-config`, set the main class
+4) Create run config if needed:
+   - For **Application** (main class): read `mcp-steroid://debugger/create-application-config`
+   - For **JUnit test**: read `mcp-steroid://debugger/demo-debug-test` (contains JUnit config + debug launch)
+   - For **Rider/.NET test**: read `mcp-steroid://debugger/demo-debug-test` (contains `RiderUnitTestDebugContextAction` pattern)
 5) Start debug session: read `mcp-steroid://debugger/debug-run-configuration`
 6) Wait for breakpoint hit: read `mcp-steroid://debugger/wait-for-suspend`
-7) **Evaluate variables**: read `mcp-steroid://debugger/eval-helper` for the helper, then `mcp-steroid://debugger/evaluate-expression` for usage
+7) **Evaluate variables**: read `mcp-steroid://debugger/evaluate-expression` (includes the reusable `eval()` helper inline)
 8) **Step over**: read `mcp-steroid://debugger/step-over`
 9) Evaluate again to see how values change after each line executes.
 

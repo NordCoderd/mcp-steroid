@@ -185,7 +185,11 @@ sealed class IntelliJProject{
                   git -C "${'$'}targetDir" config --unset-all remote.origin.fetch
                 fi
                 git -C "${'$'}targetDir" config --add remote.origin.fetch "+refs/heads/${'$'}branch:refs/remotes/origin/${'$'}branch"
-                GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=accept-new' \
+                if [ ! -S /tmp/ssh-agent.sock ]; then
+                  echo "SSH agent socket missing at /tmp/ssh-agent.sock" >&2
+                  exit 1
+                fi
+                GIT_SSH_COMMAND='ssh -o StrictHostKeyChecking=accept-new -o IdentityAgent=/tmp/ssh-agent.sock' \
                   git -C "${'$'}targetDir" fetch --prune --depth 1 origin "${'$'}branch"
                 git -C "${'$'}targetDir" reset --hard
                 git -C "${'$'}targetDir" clean -fdx

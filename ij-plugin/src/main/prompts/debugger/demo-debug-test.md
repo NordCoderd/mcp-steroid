@@ -43,7 +43,7 @@ println("Debug test execution started")
 ```
 
 For debugging .NET code in Rider:
-1. Set breakpoints using `mcp-steroid://debugger/set-breakpoint` (XDebuggerUtil works in Rider)
+1. Set breakpoints using `mcp-steroid://debugger/set-line-breakpoint` (XDebuggerUtil works in Rider)
 2. Open the test file, position caret on test class, fire `RiderUnitTestDebugContextAction`
 3. Wait for breakpoint hit using `mcp-steroid://debugger/wait-for-suspend`
 4. Evaluate variables using `mcp-steroid://debugger/evaluate-expression`

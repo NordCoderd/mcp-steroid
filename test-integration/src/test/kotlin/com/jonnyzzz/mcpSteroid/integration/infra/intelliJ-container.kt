@@ -87,16 +87,25 @@ class IntelliJContainer(
      * When a modal dialog is detected (e.g. NewUI Onboarding in IntelliJ 2025.3.3+),
      * actively kills it via steroid_execute_code so Gradle import can proceed.
      */
-    fun waitForProjectReady() : IntelliJContainer {
+    fun waitForProjectReady(
+        timeoutMillis: Long = 600_000L,
+        pollIntervalMillis: Long = 1_000L,
+    ) : IntelliJContainer {
         console.writeStep(0, "Waiting for project import and indexing...")
         val guestProjectDir = intellijDriver.getGuestProjectDir()
         var lastDialogKillMs = 0L
-        waitFor(600_000, "Project import and indexing") {
+        val startedAt = System.currentTimeMillis()
+        var lastStatus = "no project windows found"
+        var projectReady = false
+
+        while (System.currentTimeMillis() - startedAt < timeoutMillis) {
             val windows = mcpSteroid.mcpListWindows()
             val projectWindows = windows.filter { it.projectPath == guestProjectDir || it.projectName != null }
 
             if (projectWindows.isEmpty()) {
-                return@waitFor false
+                lastStatus = "no project windows found"
+                Thread.sleep(pollIntervalMillis)
+                continue
             }
 
             val modalDialogPresent = projectWindows.any { it.modalDialogShowing }
@@ -106,14 +115,29 @@ class IntelliJContainer(
                     lastDialogKillMs = nowMs
                     mcpSteroid.killStartupDialogs(guestProjectDir)
                 }
-                return@waitFor false
+                lastStatus = "modal dialog present"
+                Thread.sleep(pollIntervalMillis)
+                continue
             }
 
-            projectWindows.any { window ->
+            if (projectWindows.any { window ->
                 window.projectInitialized == true && window.indexingInProgress == false
+            }) {
+                console.writeSuccess("Project import and indexing complete")
+                projectReady = true
+                break
             }
+
+            val initialized = projectWindows.any { it.projectInitialized == true }
+            val indexing = projectWindows.any { it.indexingInProgress == true }
+            lastStatus = "projectInitialized=$initialized, indexingInProgress=$indexing, windows=${projectWindows.size}"
+            Thread.sleep(pollIntervalMillis)
         }
-        console.writeSuccess("Project import and indexing complete")
+
+        val elapsed = System.currentTimeMillis() - startedAt
+        require(projectReady) {
+            "Failed waiting for project import and indexing after ${elapsed}ms. Last status: $lastStatus"
+        }
 
         // Re-apply IDE window layout as early as possible: IntelliJ restores its own saved window
         // bounds during project import/indexing, overriding the initial xdotool positioning.
@@ -198,7 +222,10 @@ class IntelliJContainer(
      * (Docker mounted volumes are preserved externally and are not embedded in committed layers.)
      */
     fun createIndexedSnapshot(imageTag: String): ImageDriver {
-        waitForProjectReady()
+        val waitTimeoutMillis = System.getProperty("test.integration.snapshot.project.ready.timeout.ms")
+            ?.toLongOrNull()
+            ?: 5_400_000L
+        waitForProjectReady(timeoutMillis = waitTimeoutMillis, pollIntervalMillis = 1_000L)
         val projectDir = intellijDriver.getGuestProjectDir()
         val systemDir = intellijDriver.getGuestSystemDir()
         val configDir = intellijDriver.getGuestConfigDir()
@@ -278,6 +305,225 @@ class IntelliJContainer(
             projectDir="$projectDir"
             bazelBuildAll="${'$'}projectDir/bazel-build-all.cmd"
             bazelWrapper="${'$'}projectDir/bazel.cmd"
+            authorizerLastRunFile="${'$'}projectDir/out/.private.packages.auth.last.run.txt"
+            authorizerLastMtimeFile="${'$'}projectDir/out/.private.packages.auth.source.mtime.txt"
+            packagesHealthcheckUrl="https://packages.jetbrains.team/maven/p/ij/intellij-private-dependencies/"
+            issuedCredsFile="/tmp/intellij-packages-creds.json"
+            jbTokenFile="${'$'}HOME/.jb/tokens/jetbrains.team.json"
+
+            read_netrc_field_for_machine() {
+              machineName="${'$'}1"
+              field="${'$'}2"
+              awk -v machineName="${'$'}machineName" -v field="${'$'}field" '
+                BEGIN { in_host = 0 }
+                ${'$'}1 == "machine" {
+                  if (${ '$'}2 == machineName) {
+                    in_host = 1
+                  } else if (in_host) {
+                    exit
+                  } else {
+                    in_host = 0
+                  }
+                }
+                in_host {
+                  for (i = 1; i <= NF; i++) {
+                    if (${ '$'}i == field && i + 1 <= NF) {
+                      print ${ '$'}(i + 1)
+                      exit
+                    }
+                  }
+                }
+              ' "${'$'}HOME/.netrc"
+            }
+
+            test_packages_creds() {
+              username="${'$'}1"
+              password="${'$'}2"
+              status="$(curl -sS -o /dev/null -w "%{http_code}" -I -u "${'$'}username:${'$'}password" "${'$'}packagesHealthcheckUrl" || true)"
+              [ "${'$'}status" = "200" ]
+            }
+
+            issue_packages_credentials_from_jb_oauth_cache() {
+              command -v node >/dev/null 2>&1 || {
+                echo "[SNAPSHOT-PREBUILD] node is required to use ~/.jb/tokens/jetbrains.team.json" >&2
+                return 1
+              }
+              command -v jq >/dev/null 2>&1 || {
+                echo "[SNAPSHOT-PREBUILD] jq is required to parse rotated credential payload" >&2
+                return 1
+              }
+              [ -f "${'$'}jbTokenFile" ] || {
+                echo "[SNAPSHOT-PREBUILD] Missing jb OAuth token cache: ${'$'}jbTokenFile" >&2
+                return 1
+              }
+
+              export JB_TEAM_TOKEN_FILE="${'$'}jbTokenFile"
+              node <<'NODE' > "${'$'}issuedCredsFile"
+const fs = require('fs');
+const crypto = require('crypto');
+const https = require('https');
+const querystring = require('querystring');
+
+const CLIENT_ID = '40b9a25a-06e8-4d92-a3dd-f87b0bd05fb6';
+const TEAM_HOST = 'code.jetbrains.team';
+const TOKEN_FILE = process.env.JB_TEAM_TOKEN_FILE;
+const PERMANENT_SCOPE = [
+  'project:3fodM13c2SEy:PackageRepository.Read',
+  'project:1xLusQ2GsCxo:PackageRepository.Read',
+  'project:1Tg5UJ1kq836:PackageRepository.Read',
+  'project:4LuZvO4ENXaS:PackageRepository.Read',
+].join(' ');
+
+function request(method, host, path, headers = {}, body = null) {
+  return new Promise((resolve, reject) => {
+    const req = https.request({ method, hostname: host, path, headers }, (res) => {
+      let data = '';
+      res.on('data', (chunk) => data += chunk);
+      res.on('end', () => resolve({ status: res.statusCode || 0, body: data }));
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
+  });
+}
+
+function decryptTokenFile(filePath) {
+  const base64 = fs.readFileSync(filePath, 'utf8').trim();
+  const combined = Buffer.from(base64, 'base64');
+  const iv = combined.subarray(0, 12);
+  const encrypted = combined.subarray(12);
+  const authTag = encrypted.subarray(encrypted.length - 16);
+  const cipherText = encrypted.subarray(0, encrypted.length - 16);
+  const key = crypto.pbkdf2Sync('IntelliJIDEARulezzz!', 'jb-cli-salt-2026', 65536, 32, 'sha256');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(authTag);
+  const plaintext = Buffer.concat([decipher.update(cipherText), decipher.final()]).toString('utf8');
+  return JSON.parse(plaintext);
+}
+
+async function refreshAccessToken(refreshToken) {
+  const body = querystring.stringify({
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    client_id: CLIENT_ID,
+  });
+  const response = await request('POST', TEAM_HOST, '/oauth/token', {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Content-Length': Buffer.byteLength(body),
+  }, body);
+  if (response.status !== 200) {
+    throw new Error('OAuth refresh failed: HTTP ' + response.status);
+  }
+  const json = JSON.parse(response.body);
+  if (!json.access_token) {
+    throw new Error('OAuth refresh response does not contain access_token');
+  }
+  return json.access_token;
+}
+
+async function run() {
+  if (!TOKEN_FILE) {
+    throw new Error('JB_TEAM_TOKEN_FILE is not set');
+  }
+
+  const token = decryptTokenFile(TOKEN_FILE);
+  let accessToken = token.accessToken;
+  const expiresAt = typeof token.expiresAt === 'number' ? token.expiresAt : 0;
+  if (!accessToken || Date.now() + 60_000 >= expiresAt) {
+    if (!token.refreshToken) {
+      throw new Error('Stored jb token has no refreshToken');
+    }
+    accessToken = await refreshAccessToken(token.refreshToken);
+  }
+
+  const meResponse = await request('GET', TEAM_HOST, '/api/http/team-directory/profiles/me', {
+    'Accept': 'application/json',
+    'Authorization': 'Bearer ' + accessToken,
+  });
+  if (meResponse.status !== 200) {
+    throw new Error('Failed to resolve team profile: HTTP ' + meResponse.status);
+  }
+  const profile = JSON.parse(meResponse.body);
+  if (!profile.username) {
+    throw new Error('Team profile response does not contain username');
+  }
+
+  const expirationIso = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString();
+  const tokenName = 'mcp-steroid-snapshot-' + Date.now().toString(16);
+  const issuePayload = JSON.stringify({
+    name: tokenName,
+    scope: PERMANENT_SCOPE,
+    expires: expirationIso,
+  });
+  const issueResponse = await request('POST', TEAM_HOST, '/api/http/team-directory/profiles/me/permanent-tokens', {
+    'Accept': 'application/json',
+    'Authorization': 'Bearer ' + accessToken,
+    'Content-Type': 'application/json',
+    'Content-Length': Buffer.byteLength(issuePayload),
+  }, issuePayload);
+  if (issueResponse.status !== 200) {
+    throw new Error('Failed to issue packages token: HTTP ' + issueResponse.status);
+  }
+
+  const issued = JSON.parse(issueResponse.body);
+  if (!issued.second) {
+    throw new Error('Issued token payload does not contain token secret');
+  }
+
+  process.stdout.write(JSON.stringify({
+    username: profile.username,
+    password: issued.second,
+    tokenName,
+    expires: expirationIso,
+  }));
+}
+
+run().catch((error) => {
+  console.error(error.message);
+  process.exit(1);
+});
+NODE
+
+              rotatedUser="$(jq -r '.username // empty' "${'$'}issuedCredsFile")"
+              rotatedPassword="$(jq -r '.password // empty' "${'$'}issuedCredsFile")"
+              if [ -z "${'$'}rotatedUser" ] || [ -z "${'$'}rotatedPassword" ]; then
+                echo "[SNAPSHOT-PREBUILD] Rotated credential payload is incomplete" >&2
+                return 1
+              fi
+
+              export JB_SPACE_CLIENT_ID="${'$'}rotatedUser"
+              export JB_SPACE_CLIENT_SECRET="${'$'}rotatedPassword"
+              echo "[SNAPSHOT-PREBUILD] Rotated JetBrains packages credentials from ~/.jb/tokens/jetbrains.team.json"
+            }
+
+            if [ -f "${'$'}HOME/.netrc" ]; then
+              existingUser="$(read_netrc_field_for_machine "packages.jetbrains.team" "login")"
+              existingPassword="$(read_netrc_field_for_machine "packages.jetbrains.team" "password")"
+              if [ -n "${'$'}existingUser" ] && [ -n "${'$'}existingPassword" ] && test_packages_creds "${'$'}existingUser" "${'$'}existingPassword"; then
+                export JB_SPACE_CLIENT_ID="${'$'}existingUser"
+                export JB_SPACE_CLIENT_SECRET="${'$'}existingPassword"
+                echo "[SNAPSHOT-PREBUILD] Reusing valid JetBrains packages credentials from ~/.netrc"
+              else
+                echo "[SNAPSHOT-PREBUILD] Existing ~/.netrc credentials are missing or invalid, rotating token"
+                issue_packages_credentials_from_jb_oauth_cache
+              fi
+            else
+              echo "[SNAPSHOT-PREBUILD] ~/.netrc is missing, rotating token from ~/.jb cache"
+              issue_packages_credentials_from_jb_oauth_cache
+            fi
+
+            if [ -z "${'$'}{JB_SPACE_CLIENT_ID:-}" ] || [ -z "${'$'}{JB_SPACE_CLIENT_SECRET:-}" ]; then
+              echo "[SNAPSHOT-PREBUILD] Failed to resolve JetBrains packages credentials for Bazel authorizer" >&2
+              exit 1
+            fi
+
+            if ! test_packages_creds "${'$'}JB_SPACE_CLIENT_ID" "${'$'}JB_SPACE_CLIENT_SECRET"; then
+              echo "[SNAPSHOT-PREBUILD] Resolved JetBrains packages credentials are not accepted by packages.jetbrains.team" >&2
+              exit 1
+            fi
+
+            # Force build/private-packages-auth/authorizer.sh to execute in this container run.
+            rm -f "${'$'}authorizerLastRunFile" "${'$'}authorizerLastMtimeFile"
 
             cd "${'$'}projectDir"
 
