@@ -14,8 +14,9 @@
 
 """Generates updatePlugins.xml for IntelliJ custom plugin repository.
 
-Uses xml.etree.ElementTree for proper XML construction and escaping.
-CDATA sections are used for description and change-notes since they contain HTML.
+Uses xml.dom.minidom for proper XML construction with CDATA sections.
+The download URL is passed in directly from the GitHub release API
+to ensure it always matches the actual asset URL.
 """
 
 import re
@@ -59,6 +60,37 @@ def markdown_to_html(notes_path: Path, version: str) -> str:
     return "\n".join(html_parts)
 
 
+GITHUB_RELEASE_URL_PATTERN = re.compile(
+    r"^https://github\.com/jonnyzzz/mcp-steroid/releases/download/[^/]+/.+\.zip$"
+)
+
+
+def validate_url(zip_url: str, version: str) -> None:
+    """Validate the download URL format before generating XML."""
+    errors = []
+
+    if not zip_url.startswith("https://"):
+        errors.append(f"must start with https://, got: {zip_url}")
+
+    if not zip_url.endswith(".zip"):
+        errors.append(f"must end with .zip, got: {zip_url}")
+
+    if not GITHUB_RELEASE_URL_PATTERN.match(zip_url):
+        errors.append(
+            f"must match GitHub release URL pattern "
+            f"(https://github.com/jonnyzzz/mcp-steroid/releases/download/TAG/FILE.zip), "
+            f"got: {zip_url}"
+        )
+
+    if version not in zip_url:
+        errors.append(f"must contain version '{version}' in the URL, got: {zip_url}")
+
+    if errors:
+        for err in errors:
+            print(f"Error: download URL {err}", file=sys.stderr)
+        sys.exit(1)
+
+
 DESCRIPTION_HTML = """\
 <p><b>MCP Steroid</b> brings the full power of the IntelliJ Platform to AI agents \
 through the Model Context Protocol (MCP).</p>
@@ -81,7 +113,7 @@ WebStorm, GoLand, CLion, Rider, and more.</p>
 for documentation and examples.</p>"""
 
 
-def build_xml(version: str, zip_name: str, notes_path: Path) -> str:
+def build_xml(version: str, zip_url: str, notes_path: Path) -> str:
     """Build the updatePlugins.xml using DOM API with proper CDATA sections."""
     doc = Document()
 
@@ -91,10 +123,7 @@ def build_xml(version: str, zip_name: str, notes_path: Path) -> str:
 
     plugin = doc.createElement("plugin")
     plugin.setAttribute("id", "com.jonnyzzz.mcp-steroid")
-    plugin.setAttribute(
-        "url",
-        f"https://github.com/jonnyzzz/mcp-steroid/releases/download/{version}/{zip_name}",
-    )
+    plugin.setAttribute("url", zip_url)
     plugin.setAttribute("version", version)
     plugins.appendChild(plugin)
 
@@ -125,23 +154,17 @@ def build_xml(version: str, zip_name: str, notes_path: Path) -> str:
 def main() -> None:
     if len(sys.argv) != 4:
         print(
-            f"Usage: {sys.argv[0]} <version> <zip-filename> <notes-file>",
+            f"Usage: {sys.argv[0]} <version> <zip-download-url> <notes-file>",
             file=sys.stderr,
         )
         sys.exit(1)
 
     version = sys.argv[1]
-    zip_name = sys.argv[2]
+    zip_url = sys.argv[2]
     notes_path = Path(sys.argv[3])
 
-    if not zip_name.endswith(".zip"):
-        print(
-            f"Error: zip filename must end with .zip, got: {zip_name}",
-            file=sys.stderr,
-        )
-        sys.exit(1)
-
-    print(build_xml(version, zip_name, notes_path))
+    validate_url(zip_url, version)
+    print(build_xml(version, zip_url, notes_path))
 
 
 if __name__ == "__main__":
