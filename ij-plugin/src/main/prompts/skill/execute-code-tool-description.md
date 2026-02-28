@@ -22,7 +22,7 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - Code navigation: Find usages, go to definition, symbol search
 - Refactoring: Rename, extract method, move files
 - Inspections: Run code analysis, get warnings/errors
-- Tests: Start debug/run via `DebugClass` context action (JUnit/TestNG/Kotlin) or `RiderUnitTestDebugContextAction` (Rider .NET)
+- Tests: Run via JUnitConfiguration (JUnit/TestNG/Kotlin) or `RiderUnitTestDebugContextAction` context action (Rider .NET) — see `mcp-steroid://skill/debugger-skill`
 - Actions: Trigger any IDE action programmatically
 - **Reflection:** Access private fields/methods at runtime — `obj.javaClass.getDeclaredField("x").also { it.isAccessible = true }.get(obj)`. Inspect class hierarchies, list all fields, invoke hidden methods.
 

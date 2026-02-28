@@ -15,7 +15,7 @@ Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions
 
 1) Set breakpoints: read `mcp-steroid://debugger/add-breakpoint`, adapt the file path and line number
 2) Launch the debug session:
-   - For **JUnit/Kotlin test**: read `mcp-steroid://debugger/demo-debug-test` — it opens the file and fires `DebugClass` context action
+   - For **JUnit/Kotlin test**: read `mcp-steroid://debugger/demo-debug-test` — it creates a JUnitConfiguration (with module) and launches it
    - For **Rider/.NET test**: read `mcp-steroid://debugger/demo-debug-test` — it opens the file and fires `RiderUnitTestDebugContextAction`
    - For **existing run config** (Application, Gradle): read `mcp-steroid://debugger/debug-run-configuration`
    - For **new Application config**: read `mcp-steroid://debugger/create-application-config` first
