@@ -15,7 +15,7 @@
 .PHONY: dev build clean setup update-config ensure-public-repo
 
 VERSION := $(shell cat ../VERSION 2>/dev/null || echo "0.0.0")
-RELEASE_ZIP_NAME := $(shell gh release view $(VERSION) --repo jonnyzzz/mcp-steroid --json assets --jq '[.assets[].name | select(endswith(".zip"))][0]' 2>/dev/null || echo "mcp-steroid-$(VERSION).zip")
+RELEASE_ZIP_URL := $(shell gh release view $(VERSION) --repo jonnyzzz/mcp-steroid --json assets --jq '[.assets[] | select(.name | endswith(".zip")) | .url][0]' 2>/dev/null || echo "")
 
 # First time setup - clone the public repository
 setup:
@@ -34,9 +34,17 @@ update-config: ensure-public-repo
 	@sed -i.bak 's/version = ".*"/version = "$(VERSION)"/' hugo.toml && rm -f hugo.toml.bak
 	@echo "Generating version.json"
 	@echo '{"version-base": "$(VERSION)"}' > static/version.json
-	@echo "Generating updatePlugins.xml (zip: $(RELEASE_ZIP_NAME))"
-	@./scripts/generate-update-plugins-xml.sh "$(VERSION)" "$(RELEASE_ZIP_NAME)" > static/updatePlugins.xml
+	@if [ -z "$(RELEASE_ZIP_URL)" ]; then echo "ERROR: Could not find release ZIP for version $(VERSION). Is 'gh' installed and the release published?" >&2; exit 1; fi
+	@echo "Generating updatePlugins.xml (url: $(RELEASE_ZIP_URL))"
+	@./scripts/generate-update-plugins-xml.sh "$(VERSION)" "$(RELEASE_ZIP_URL)" > static/updatePlugins.xml
 	@xmllint --noout static/updatePlugins.xml 2>/dev/null && echo "updatePlugins.xml is valid XML" || echo "WARNING: xmllint not available, skipping XML validation"
+	@echo "Validating download URL..."
+	@HTTP_CODE=$$(curl -sI -o /dev/null -w "%{http_code}" -L "$(RELEASE_ZIP_URL)"); \
+	if [ "$$HTTP_CODE" != "200" ] && [ "$$HTTP_CODE" != "302" ]; then \
+		echo "ERROR: Download URL returned HTTP $$HTTP_CODE: $(RELEASE_ZIP_URL)" >&2; exit 1; \
+	else \
+		echo "Download URL validated (HTTP $$HTTP_CODE)"; \
+	fi
 	@mkdir -p mcp-steroid-public/docs
 
 # Start development server with live reload

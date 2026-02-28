@@ -15,12 +15,12 @@
 # limitations under the License.
 
 # Generates updatePlugins.xml for IntelliJ custom plugin repository.
-# Usage: generate-update-plugins-xml.sh <version> <zip-filename>
+# Usage: generate-update-plugins-xml.sh <version> <zip-download-url>
 set -euo pipefail
 
 VERSION="$1"
-ZIP_NAME="$2"
+ZIP_URL="$2"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NOTES_FILE="$SCRIPT_DIR/../../release/notes/${VERSION}.md"
 
-exec python3 "$SCRIPT_DIR/generate-update-plugins-xml.py" "$VERSION" "$ZIP_NAME" "$NOTES_FILE"
+exec python3 "$SCRIPT_DIR/generate-update-plugins-xml.py" "$VERSION" "$ZIP_URL" "$NOTES_FILE"
