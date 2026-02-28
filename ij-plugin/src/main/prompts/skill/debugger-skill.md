@@ -13,18 +13,18 @@ Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions
 
 ## Quickstart
 
-1) Read `mcp-steroid://debugger/overview` for the complete workflow and resource list.
-2) **Read each individual resource** before using it -- each one contains complete, copy-paste-ready code.
-3) Set breakpoints: read `mcp-steroid://debugger/add-breakpoint`, adapt the file path and line number
-4) Create run config if needed:
-   - For **Application** (main class): read `mcp-steroid://debugger/create-application-config`
+1) Set breakpoints: read `mcp-steroid://debugger/add-breakpoint`, adapt the file path and line number
+2) Create run config if needed:
    - For **JUnit test**: read `mcp-steroid://debugger/demo-debug-test` (contains JUnit config + debug launch)
    - For **Rider/.NET test**: read `mcp-steroid://debugger/demo-debug-test` (contains `RiderUnitTestDebugContextAction` pattern)
-5) Start debug session: read `mcp-steroid://debugger/debug-run-configuration`
-6) Wait for breakpoint hit: read `mcp-steroid://debugger/wait-for-suspend`
-7) **Evaluate variables**: read `mcp-steroid://debugger/evaluate-expression` (includes the reusable `eval()` helper inline)
-8) **Step over**: read `mcp-steroid://debugger/step-over`
-9) Evaluate again to see how values change after each line executes.
+   - For **Application** (main class): read `mcp-steroid://debugger/create-application-config`
+3) Start debug session: read `mcp-steroid://debugger/debug-run-configuration`
+4) Wait for breakpoint hit: read `mcp-steroid://debugger/wait-for-suspend`
+5) **Evaluate variables**: read `mcp-steroid://debugger/evaluate-expression` (includes the reusable `eval()` helper inline)
+   - The `eval()` helper automatically retries on `"Collecting data..."` — just use it as-is.
+6) **Step over** (only if you need to observe state changes across multiple lines):
+   read `mcp-steroid://debugger/step-over`. **Skip this step if the bug is already visible from evaluation at the breakpoint.**
+7) Stop the debug session when done.
 
 **IMPORTANT**: Read the actual MCP resource content for each step. The resources contain working
 IntelliJ API code with correct imports that you can directly adapt and pass to `steroid_execute_code`.
@@ -37,12 +37,18 @@ Do NOT invent your own API calls -- the IntelliJ debugger API has tricky callbac
 - Call #1: set breakpoints
 - Call #2: create run config (if needed) + start debug run
 - Call #3: wait for suspend (event-driven via `XDebugSessionListener`)
-- Call #4: evaluate variables at breakpoint
-- Call #5: step over
-- Call #6: evaluate again to compare before/after
-- Call #7: stop debugger
+- Call #4: evaluate variables at breakpoint — if the bug is visible here, skip to #6
+- Call #5: step over (optional — only if you need to see state changes across lines)
+- Call #6: stop debugger (and evaluate again if you stepped)
 
 Use event-driven `XDebugSessionListener` + `CompletableDeferred` instead of polling loops.
+
+## Efficient Code Discovery
+
+To find implementation files quickly:
+1. Read the test file first — import paths and class names tell you where the implementation is
+2. Use one `Grep` with the function/class name to locate the source — avoid chaining multiple `Glob` calls
+3. Set the breakpoint at the exact suspicious line (filter, sort, map call) — no need to step through from the top
 
 ## Key APIs to use
 
@@ -119,8 +125,7 @@ After `stepOver()`, the debugger may land in a different method scope:
 - [Create Application Config](mcp-steroid://debugger/create-application-config) - Create run configuration
 - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging a run config
 - [Wait for Suspend](mcp-steroid://debugger/wait-for-suspend) - Wait for breakpoint hit (event-driven)
-- [Eval Helper](mcp-steroid://debugger/eval-helper) - Reusable eval() function
-- [Evaluate Expression](mcp-steroid://debugger/evaluate-expression) - Full evaluation example
+- [Evaluate Expression](mcp-steroid://debugger/evaluate-expression) - Full evaluation example with reusable eval() helper
 - [Step Over](mcp-steroid://debugger/step-over) - Step through code (with scope change docs)
 - [Debug Session Control](mcp-steroid://debugger/debug-session-control) - Pause, resume, and stop sessions
 - [List Threads](mcp-steroid://debugger/debug-list-threads) - Inspect execution stacks and threads

@@ -47,7 +47,7 @@ For debugging .NET code in Rider:
 2. Open the test file, position caret on test class, fire `RiderUnitTestDebugContextAction`
 3. Wait for breakpoint hit using `mcp-steroid://debugger/wait-for-suspend`
 4. Evaluate variables using `mcp-steroid://debugger/evaluate-expression`
-5. Step through code using `mcp-steroid://debugger/step-over`
+5. Step through code using `mcp-steroid://debugger/step-over` (only if needed — skip if the bug is visible from evaluation at the breakpoint)
 ###_ELSE_###
 End-to-end demo that configures a JUnit test, runs it in Debug, resumes if paused, waits for completion, and prints test results.
 
