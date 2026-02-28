@@ -38,6 +38,13 @@ update-config: ensure-public-repo
 	@echo "Generating updatePlugins.xml (url: $(RELEASE_ZIP_URL))"
 	@./scripts/generate-update-plugins-xml.sh "$(VERSION)" "$(RELEASE_ZIP_URL)" > static/updatePlugins.xml
 	@xmllint --noout static/updatePlugins.xml 2>/dev/null && echo "updatePlugins.xml is valid XML" || echo "WARNING: xmllint not available, skipping XML validation"
+	@echo "Validating download URL..."
+	@HTTP_CODE=$$(curl -sI -o /dev/null -w "%{http_code}" -L "$(RELEASE_ZIP_URL)"); \
+	if [ "$$HTTP_CODE" != "200" ] && [ "$$HTTP_CODE" != "302" ]; then \
+		echo "ERROR: Download URL returned HTTP $$HTTP_CODE: $(RELEASE_ZIP_URL)" >&2; exit 1; \
+	else \
+		echo "Download URL validated (HTTP $$HTTP_CODE)"; \
+	fi
 	@mkdir -p mcp-steroid-public/docs
 
 # Start development server with live reload

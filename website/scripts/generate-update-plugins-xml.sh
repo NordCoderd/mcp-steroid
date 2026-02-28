@@ -23,4 +23,4 @@ ZIP_URL="$2"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NOTES_FILE="$SCRIPT_DIR/../../release/notes/${VERSION}.md"
 
-exec uv run "$SCRIPT_DIR/generate-update-plugins-xml.py" "$VERSION" "$ZIP_URL" "$NOTES_FILE"
+exec python3 "$SCRIPT_DIR/generate-update-plugins-xml.py" "$VERSION" "$ZIP_URL" "$NOTES_FILE"
