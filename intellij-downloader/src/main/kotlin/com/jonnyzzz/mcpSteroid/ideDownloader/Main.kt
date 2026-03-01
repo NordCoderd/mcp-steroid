@@ -4,7 +4,7 @@ package com.jonnyzzz.mcpSteroid.ideDownloader
 import java.io.File
 
 /**
- * CLI entry point for downloading IDE archives.
+ * CLI entry point for downloading and optionally unpacking IDE archives.
  *
  * Usage:
  *   java -jar intellij-downloader.jar --product idea --channel stable --output-dir /path/to/dir
@@ -14,11 +14,22 @@ import java.io.File
  *   --channel     Release channel: stable, eap (default: stable)
  *   --output-dir  Directory to store downloaded archives (required)
  *   --url         Direct download URL (overrides --product/--channel resolution)
+ *   --os          Target OS: linux, mac, windows (default: auto-detected)
+ *   --unpack-dir  Directory to unpack the archive into (optional, .tar.gz only)
  */
 fun main(args: Array<String>) {
     val argsMap = parseArgs(args)
     val outputDir = File(argsMap["--output-dir"] ?: error("--output-dir is required"))
     val url = argsMap["--url"]
+
+    val os = argsMap["--os"]?.let { raw ->
+        when (raw.trim().lowercase()) {
+            "linux" -> HostOs.LINUX
+            "mac", "macos" -> HostOs.MAC
+            "windows", "win" -> HostOs.WINDOWS
+            else -> error("Unknown OS '$raw'. Use 'linux', 'mac', or 'windows'.")
+        }
+    } ?: resolveHostOs()
 
     val distribution = if (url != null) {
         val productRaw = argsMap["--product"] ?: "idea"
@@ -36,8 +47,14 @@ fun main(args: Array<String>) {
         IdeDistribution.Latest(product = product, channel = channel)
     }
 
-    val archiveFile = distribution.resolveAndDownload(outputDir)
+    val archiveFile = distribution.resolveAndDownload(outputDir, os)
     println("[IDE-DOWNLOAD] Archive: ${archiveFile.absolutePath}")
+
+    val unpackDir = argsMap["--unpack-dir"]
+    if (unpackDir != null) {
+        val unpackDirFile = File(unpackDir)
+        unpackTarGz(archiveFile, unpackDirFile)
+    }
 }
 
 private fun parseArgs(args: Array<String>): Map<String, String> {

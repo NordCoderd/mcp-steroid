@@ -10,12 +10,13 @@ import java.net.URI
  * then downloads the archive (with caching) to the specified directory.
  *
  * @param downloadDir the directory to store downloaded archives
+ * @param os the target operating system (default: auto-detected)
  * @return the local file containing the IDE archive
  */
-fun IdeDistribution.resolveAndDownload(downloadDir: File): File {
+fun IdeDistribution.resolveAndDownload(downloadDir: File, os: HostOs = resolveHostOs()): File {
     downloadDir.mkdirs()
 
-    val (url, fileName) = resolveUrlAndFileName()
+    val (url, fileName) = resolveUrlAndFileName(os)
     val destFile = File(downloadDir, fileName)
 
     if (destFile.exists()) {
@@ -28,14 +29,14 @@ fun IdeDistribution.resolveAndDownload(downloadDir: File): File {
     return destFile
 }
 
-private fun IdeDistribution.resolveUrlAndFileName(): Pair<String, String> {
+private fun IdeDistribution.resolveUrlAndFileName(os: HostOs): Pair<String, String> {
     return when (this) {
         is IdeDistribution.FromUrl -> {
             val resolvedName = fileName ?: archiveFileNameFromUrl(url, "${product.id}.tar.gz")
             url to resolvedName
         }
         is IdeDistribution.Latest -> {
-            val resolvedUrl = resolveArchiveUrl(product, channel)
+            val resolvedUrl = resolveArchiveUrl(product, channel, os)
             val arch = resolveHostArchitecture()
             val fallbackName = if (arch.isArmArch) "${product.id}-${channel.name.lowercase()}-arm.tar.gz"
                                else "${product.id}-${channel.name.lowercase()}-x86.tar.gz"

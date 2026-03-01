@@ -12,16 +12,29 @@ import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 /**
+ * Returns the JetBrains API download key for the given OS and architecture combination.
+ *
+ * @see <a href="https://data.services.jetbrains.com/products">JetBrains Products API</a>
+ */
+fun resolveDownloadKey(os: HostOs, architecture: HostArchitecture): String = when (os) {
+    HostOs.LINUX -> if (architecture.isArmArch) "linuxARM64" else "linux"
+    HostOs.MAC -> if (architecture.isArmArch) "macM1" else "mac"
+    HostOs.WINDOWS -> if (architecture.isArmArch) "windowsARM64" else "windows"
+}
+
+/**
  * Resolves the download URL for the latest IDE archive from JetBrains products API.
  *
  * @param product the IDE product to look up
  * @param channel the release channel (stable or EAP)
+ * @param os the target operating system (default: auto-detected)
  * @param architecture the host architecture for platform-specific archive selection
- * @return the direct download URL for the Linux archive
+ * @return the direct download URL for the archive
  */
 fun resolveArchiveUrl(
     product: IdeProduct,
     channel: IdeChannel,
+    os: HostOs = resolveHostOs(),
     architecture: HostArchitecture = resolveHostArchitecture(),
 ): String {
     val releaseType = URLEncoder.encode(channel.apiValue, StandardCharsets.UTF_8)
@@ -42,7 +55,7 @@ fun resolveArchiveUrl(
 
     val releases = (matchingProduct["releases"] as? JsonArray) ?: JsonArray(emptyList())
 
-    val isArm = architecture.isArmArch
+    val downloadKey = resolveDownloadKey(os, architecture)
     val release = releases
         .filterIsInstance<JsonObject>()
         .firstOrNull { candidate ->
@@ -50,24 +63,21 @@ fun resolveArchiveUrl(
             val version = (candidate["version"] as? JsonPrimitive)?.content
             val build = (candidate["build"] as? JsonPrimitive)?.content
             val downloads = candidate["downloads"] as? JsonObject
-            val linuxLink = (downloads?.get("linux") as? JsonObject)?.get("link")?.let { (it as? JsonPrimitive)?.content }
-            val linuxArmLink = (downloads?.get("linuxARM64") as? JsonObject)?.get("link")?.let { (it as? JsonPrimitive)?.content }
+            val link = (downloads?.get(downloadKey) as? JsonObject)?.get("link")?.let { (it as? JsonPrimitive)?.content }
 
             type.equals(channel.apiValue, ignoreCase = true) &&
                     !version.isNullOrBlank() &&
                     !build.isNullOrBlank() &&
-                    !linuxLink.isNullOrBlank() &&
-                    !linuxArmLink.isNullOrBlank()
+                    !link.isNullOrBlank()
         }
-        ?: error("Unable to resolve latest '${channel.apiValue}' release for product '${product.jetbrainsProductCode}' from $url")
+        ?: error("Unable to resolve latest '${channel.apiValue}' release for product '${product.jetbrainsProductCode}' (download key '$downloadKey') from $url")
 
-    val linuxKey = if (isArm) "linuxARM64" else "linux"
     val downloads = release["downloads"] as? JsonObject
         ?: error("Missing 'downloads' in release")
-    val platformDownload = downloads[linuxKey] as? JsonObject
-        ?: error("Missing '$linuxKey' in downloads")
+    val platformDownload = downloads[downloadKey] as? JsonObject
+        ?: error("Missing '$downloadKey' in downloads")
     return (platformDownload["link"] as? JsonPrimitive)?.content
-        ?: error("Missing 'link' in $linuxKey download")
+        ?: error("Missing 'link' in $downloadKey download")
 }
 
 internal fun readUrlText(url: String): String {
