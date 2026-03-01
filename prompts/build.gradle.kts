@@ -77,43 +77,43 @@ tasks.withType<KotlinCompile>().configureEach {
 val ideDownloadDir = layout.buildDirectory.dir("ide-download")
 val ideUnpackDir = layout.buildDirectory.dir("ide-unpack")
 
-val downloadIde by tasks.registering(JavaExec::class) {
+val downloadAndUnpackIde by tasks.registering(JavaExec::class) {
     group = "verification"
-    description = "Download IDE distribution for KtBlock compilation tests"
+    description = "Download and unpack IDEA distribution for KtBlock compilation tests"
     classpath = ideDownloaderClasspath
     mainClass.set("com.jonnyzzz.mcpSteroid.ideDownloader.MainKt")
     args(
         "--product", "idea",
         "--channel", "stable",
+        "--os", "linux",
         "--output-dir", ideDownloadDir.get().asFile.absolutePath,
+        "--unpack-dir", ideUnpackDir.get().asFile.absolutePath,
     )
-    outputs.dir(ideDownloadDir)
+    outputs.dir(ideUnpackDir)
 }
 
-val unpackIde by tasks.registering(Exec::class) {
+val riderDownloadDir = layout.buildDirectory.dir("rider-download")
+val riderUnpackDir = layout.buildDirectory.dir("rider-unpack")
+
+val downloadAndUnpackRider by tasks.registering(JavaExec::class) {
     group = "verification"
-    description = "Unpack IDE distribution for KtBlock compilation tests"
-    dependsOn(downloadIde)
-    inputs.dir(ideDownloadDir)
-    outputs.dir(ideUnpackDir)
-
-    doFirst {
-        val downloadDir = ideDownloadDir.get().asFile
-        val archive = downloadDir.listFiles()?.firstOrNull { it.name.endsWith(".tar.gz") }
-            ?: error("No .tar.gz archive found in $downloadDir")
-
-        val unpackDir = ideUnpackDir.get().asFile
-        if (unpackDir.exists()) unpackDir.deleteRecursively()
-        unpackDir.mkdirs()
-
-        commandLine("tar", "-xzf", archive.absolutePath, "-C", unpackDir.absolutePath)
-    }
+    description = "Download and unpack Rider distribution for KtBlock compilation tests"
+    classpath = ideDownloaderClasspath
+    mainClass.set("com.jonnyzzz.mcpSteroid.ideDownloader.MainKt")
+    args(
+        "--product", "rider",
+        "--channel", "stable",
+        "--os", "linux",
+        "--output-dir", riderDownloadDir.get().asFile.absolutePath,
+        "--unpack-dir", riderUnpackDir.get().asFile.absolutePath,
+    )
+    outputs.dir(riderUnpackDir)
 }
 
 tasks.test {
     useJUnitPlatform()
 
-    dependsOn(unpackIde, kotlincDist)
+    dependsOn(downloadAndUnpackIde, downloadAndUnpackRider, kotlincDist)
 
     doFirst {
         val unpackDir = ideUnpackDir.get().asFile
@@ -123,6 +123,11 @@ tasks.test {
         }
         // KtBlock tests will fail with a clear error if mcp.steroid.ide.home is missing;
         // non-KtBlock tests don't need it.
+
+        val riderUnpack = riderUnpackDir.get().asFile
+        val riderHome = riderUnpack.listFiles()?.firstOrNull { it.isDirectory }
+            ?: error("No Rider IDE directory found in $riderUnpack. Did downloadAndUnpackRider succeed?")
+        systemProperty("mcp.steroid.rider.home", riderHome.absolutePath)
 
         val kotlincHome = kotlincDist.singleFile
         systemProperty("mcp.steroid.kotlinc.home", kotlincHome.absolutePath)
