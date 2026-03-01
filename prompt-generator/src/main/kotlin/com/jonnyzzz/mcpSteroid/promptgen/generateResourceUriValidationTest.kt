@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.gradle
+package com.jonnyzzz.mcpSteroid.promptgen
 
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
@@ -7,6 +7,9 @@ import com.squareup.kotlinpoet.FunSpec
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.buildCodeBlock
+
+private val junitTestAnnotation = ClassName("org.junit.jupiter.api", "Test")
+private val junitAssertions = ClassName("org.junit.jupiter.api", "Assertions")
 
 /**
  * Generates a test class that validates all `mcp-steroid://` URI references
@@ -25,6 +28,7 @@ fun PromptGenerationContext.generateResourceUriValidationTest(
     val resourcesIndexClass = ClassName(packageName, "ResourcesIndex")
 
     val testFunc = FunSpec.builder("testAllMcpSteroidUriReferencesAreValid")
+        .addAnnotation(junitTestAnnotation)
         .returns(Unit::class)
         .addCode(buildCodeBlock {
             // Collect all known URIs from ResourcesIndex
@@ -84,14 +88,13 @@ fun PromptGenerationContext.generateResourceUriValidationTest(
 
             // Assertion
             controlFlow("if (errors.isNotEmpty())") {
-                add("""fail("Found " + errors.size + " invalid mcp-steroid:// references:\n" + errors.joinToString("\n"))""")
+                add("""%T.fail<Unit>("Found " + errors.size + " invalid mcp-steroid:// references:\n" + errors.joinToString("\n"))""", junitAssertions)
                 add("\n")
             }
         })
         .build()
 
     val typeSpec = TypeSpec.classBuilder(classType)
-        .superclass(ClassName.bestGuess("com.intellij.testFramework.fixtures.BasePlatformTestCase"))
         .addFunction(testFunc)
         .build()
 

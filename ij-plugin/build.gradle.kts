@@ -1,19 +1,16 @@
 @file:Suppress("HasPlatformType")
 
 import com.jonnyzzz.mcpSteroid.gradle.*
-import de.undercouch.gradle.tasks.download.Download
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.HttpURLConnection
 import java.net.URI
-import java.security.MessageDigest
 import java.util.*
 
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
     id("org.jetbrains.intellij.platform")
-    id("de.undercouch.download")
 }
 
 
@@ -59,6 +56,15 @@ configurations.named("implementation") {
     exclude(group = "org.slf4j")
 }
 
+// Consume kotlinc distribution from kotlin-cli subproject
+val kotlincDist by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "kotlinc-dist"))
+    }
+}
+
 dependencies {
     intellijPlatform {
         when (targetIdeProduct) {
@@ -70,6 +76,15 @@ dependencies {
         }
         testFramework(TestFrameworkType.Platform)
     }
+
+    // Prompt base classes + generated prompt code
+    implementation(project(":prompts"))
+
+    // Kotlinc utility classes (KotlincArgFile, KotlincCommandLineBuilder)
+    implementation(project(":kotlin-cli"))
+
+    // Kotlinc binary distribution for plugin sandbox
+    kotlincDist(project(":kotlin-cli"))
 
     // OCR common models shared with ocr-tesseract CLI
     implementation(project(":ocr-common"))
@@ -106,14 +121,6 @@ kotlin {
 }
 
 val generatedSourcesPath = layout.buildDirectory.dir("generated/kotlin")
-val generatedTestSourcesPath = layout.buildDirectory.dir("generated/kotlin-test")
-
-
-val compilePrompts by tasks.registering(CompilePromptsTask::class) {
-    inputDir.set(layout.projectDirectory.dir("src/main/prompts"))
-    outputDir.set(generatedSourcesPath.map { it.dir("prompts") })
-    testOutputDir.set(generatedTestSourcesPath.map { it.dir("prompts") })
-}
 
 // Generate metadata with encoded version
 val generateMetadata by tasks.registering(GenerateMetadataTask::class) {
@@ -125,17 +132,20 @@ val generateMetadata by tasks.registering(GenerateMetadataTask::class) {
     outputFile.set(generatedSourcesPath.map { it.file("PluginMetadata.kt") })
 }
 
+// Generated IJ test sources from prompt-generator (KtBlock compilation tests)
+val promptIjTestSources = rootProject.layout.buildDirectory.dir("generated-ij-tests/prompts")
+
 // Add generated sources to main source set and make kotlin compilation depend on it
 kotlin.sourceSets.main {
     kotlin.srcDir(generatedSourcesPath)
 }
 kotlin.sourceSets.test {
-    kotlin.srcDir(generatedTestSourcesPath)
+    kotlin.srcDir(promptIjTestSources)
 }
 
 tasks.withType<KotlinCompile>().configureEach {
     dependsOn(generateMetadata)
-    dependsOn(compilePrompts)
+    dependsOn(":prompts:generatePrompts")
 }
 
 intellijPlatform {
@@ -237,74 +247,19 @@ tasks.named("check") {
     dependsOn(verifySupportedHostArchitecture)
 }
 
-val kotlincVersion = "2.3.10"
-val kotlincUrl = "https://github.com/JetBrains/kotlin/releases/download/v${kotlincVersion}/kotlin-compiler-${kotlincVersion}.zip"
-val kotlincSha256Url = "$kotlincUrl.sha256"
-val kotlincDownloadDir = layout.buildDirectory.dir("kotlinc-zip")
-val kotlincDir = layout.buildDirectory.dir("kotlinc-unpack")
-
-fun Download.configureReliableDownload() {
-    onlyIfModified(true)
-    connectTimeout(30_000)
-    readTimeout(15 * 60_000)
-    retries(5)
-}
-
-val downloadKotlinc by tasks.registering {
-    group = "kotlinc"
-    outputs.dir(kotlincDir)
-
-    doLast {
-        val zipFileName = "kotlin-compiler-${kotlincVersion}.zip"
-        val shaFileName = "$zipFileName.sha256"
-
-        val zip = kotlincDownloadDir.get().file(zipFileName).asFile
-        val shaFile = kotlincDownloadDir.get().file(shaFileName).asFile
-
-        check(zip.isFile) { "Missing downloaded kotlinc archive: $zip" }
-        check(shaFile.isFile) { "Missing downloaded kotlinc checksum: $shaFile" }
-
-        val sha256 = shaFile
-            .readText()
-            .trim()
-            .substringBefore(' ')
-
-        val actualSha256 = MessageDigest.getInstance("SHA-256").run {
-            update(zip.readBytes())
-            digest().toHexString()
-        }
-
-        check(actualSha256 == sha256) {
-            "Actual:\n${actualSha256}\nExpected\n${sha256}"
-        }
-
-        sync {
-            into(kotlincDir)
-            from(zipTree(zip))
-        }
-    }
-}
-
-listOf(kotlincUrl, kotlincSha256Url).forEach { url ->
-    val task = tasks.register<Download>("downloadKotlinc_" + url.substringAfterLast(".")) {
-        group = "kotlinc"
-        src(url)
-        dest(kotlincDownloadDir)
-        configureReliableDownload()
-    }
-    downloadKotlinc.configure { dependsOn(task) }
-}
-
 val verifyBundledKotlinCompatibility by tasks.registering(VerifyBundledKotlinCompatibilityTask::class) {
     group = "verification"
     description = "Verify bundled kotlinc is close enough to IntelliJ-bundled kotlin-stdlib"
-    dependsOn(downloadKotlinc)
+    dependsOn(kotlincDist)
     dependsOn(tasks.prepareSandbox)
 
     val sourceSets = project.extensions.getByType<SourceSetContainer>()
     mainRuntimeClasspath.from(sourceSets.getByName("main").runtimeClasspath)
     mainRuntimeClasspath.from(configurations.getByName("intellijPlatformDependency"))
-    kotlincHome.set(kotlincDir.map { it.dir("kotlinc") })
+    kotlincHome.set(kotlincDist.elements.map { files ->
+        val dir = files.first().asFile.resolve("kotlinc")
+        layout.projectDirectory.dir(dir.absolutePath)
+    })
     kotlinPluginVersion.set(providers.provider {
         plugins.getPlugin(org.jetbrains.kotlin.gradle.plugin.KotlinPluginWrapper::class.java).pluginVersion
     })
@@ -333,7 +288,7 @@ listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
                 }
             }
         }
-        from(downloadKotlinc) {
+        from(kotlincDist) {
             into(intellijPlatform.projectName)
             filesMatching("kotlinc/bin/*") {
                 if (!name.endsWith(".bat")) {
@@ -445,7 +400,9 @@ val verifyBundledLibraries by tasks.registering {
             //our binaires
             "lib/ai-agents-${project.version}.jar",
             "lib/ij-plugin-${project.version}.jar",
+            "lib/kotlin-cli-${project.version}.jar",
             "lib/ocr-common-${project.version}.jar",
+            "lib/prompts-${project.version}.jar",
 
             //libraries
             "lib/config-1.4.3.jar",

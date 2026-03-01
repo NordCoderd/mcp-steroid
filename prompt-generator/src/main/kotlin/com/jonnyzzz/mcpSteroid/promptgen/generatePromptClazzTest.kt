@@ -1,10 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.gradle
+package com.jonnyzzz.mcpSteroid.promptgen
 
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
-import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.asClassName
 import com.squareup.kotlinpoet.buildCodeBlock
@@ -36,6 +35,9 @@ fun extractKotlinBlocks(content: String): List<String> {
     return blocks
 }
 
+private val junitTestAnnotation = ClassName("org.junit.jupiter.api", "Test")
+private val junitAssertions = ClassName("org.junit.jupiter.api", "Assertions")
+
 fun PromptGenerationContext.generatePromptClazzTest(
     clazz: GeneratedPromptClazz,
 ) {
@@ -44,15 +46,15 @@ fun PromptGenerationContext.generatePromptClazzTest(
     }
 
     val testFuncSpec = FunSpec.builder("testReadResource")
+        .addAnnotation(junitTestAnnotation)
         .returns(Unit::class)
         .addCode(buildCodeBlock {
             add("val content = %T(%S).readText()\n", File::class.asClassName(), clazz.src.absolutePath)
-            add("assertEquals(content, %T().readPrompt())", clazz.clazzName)
+            add("%T.assertEquals(content, %T().readPrompt())", junitAssertions, clazz.clazzName)
         })
         .build()
 
     val testTypeSpec = TypeSpec.classBuilder(classType)
-        .superclass(ClassName.bestGuess("com.intellij.testFramework.fixtures.BasePlatformTestCase"))
         .addFunction(testFuncSpec)
         .build()
 
@@ -81,38 +83,52 @@ fun PromptGenerationContext.generateArticleReadTest(
     val methods = mutableListOf<FunSpec>()
 
     methods += FunSpec.builder("testPayloadReadable")
+        .addAnnotation(junitTestAnnotation)
         .addKdoc("Verifies %T().payload.readPrompt() returns non-empty content.", articleClassName)
         .returns(Unit::class)
         .addCode(buildCodeBlock {
             addStatement("val payload = %T().payload.readPrompt()", articleClassName)
-            addStatement("assertTrue(%S, payload.isNotEmpty())", "payload must not be empty for ${article.path}")
+            addStatement(
+                "%T.assertTrue(payload.isNotEmpty(), %S)",
+                junitAssertions,
+                "payload must not be empty for ${article.path}",
+            )
         })
         .build()
 
     if (article.hasDescription) {
         methods += FunSpec.builder("testDescriptionReadable")
+            .addAnnotation(junitTestAnnotation)
             .addKdoc("Verifies %T().description!!.readPrompt() returns non-empty content.", articleClassName)
             .returns(Unit::class)
             .addCode(buildCodeBlock {
                 addStatement("val desc = %T().description!!.readPrompt()", articleClassName)
-                addStatement("assertTrue(%S, desc.isNotEmpty())", "description must not be empty for ${article.path}")
+                addStatement(
+                    "%T.assertTrue(desc.isNotEmpty(), %S)",
+                    junitAssertions,
+                    "description must not be empty for ${article.path}",
+                )
             })
             .build()
     }
 
     if (article.hasSeeAlso) {
         methods += FunSpec.builder("testSeeAlsoReadable")
+            .addAnnotation(junitTestAnnotation)
             .addKdoc("Verifies %T().seeAlso!!.readPrompt() returns non-empty content.", articleClassName)
             .returns(Unit::class)
             .addCode(buildCodeBlock {
                 addStatement("val seeAlso = %T().seeAlso!!.readPrompt()", articleClassName)
-                addStatement("assertTrue(%S, seeAlso.isNotEmpty())", "seeAlso must not be empty for ${article.path}")
+                addStatement(
+                    "%T.assertTrue(seeAlso.isNotEmpty(), %S)",
+                    junitAssertions,
+                    "seeAlso must not be empty for ${article.path}",
+                )
             })
             .build()
     }
 
     val testTypeSpec = TypeSpec.classBuilder(classType)
-        .superclass(ClassName.bestGuess("com.intellij.testFramework.fixtures.BasePlatformTestCase"))
         .addFunctions(methods)
         .build()
 
@@ -135,10 +151,15 @@ fun PromptGenerationContext.generateArticleReadTest(
  *
  * Generates a class named `{ArticleStem}KtBlocksCompilationTest` with methods:
  *   `testBlock000Compiles()`, `testBlock001Compiles()`, …
+ *
+ * These tests are written to [ijTestOutputRoot] because they depend on the IntelliJ test
+ * framework (BaseKtBlocksCompilationTest extends BasePlatformTestCase).
  */
 fun PromptGenerationContext.generateMdKtBlockCompilationTests(
     article: GeneratedArticleClazz,
 ) {
+    if (ijTestOutputRoot == null) return
+
     val promptArticle = article.article ?: return
 
     val parts = parseNewFormatArticleParts(promptArticle.payload.content)
@@ -171,5 +192,5 @@ fun PromptGenerationContext.generateMdKtBlockCompilationTests(
         .addType(testTypeSpec)
         .build()
 
-    writeTestClazz(testFileSpec, classType)
+    writeIjTestClazz(testFileSpec, classType)
 }

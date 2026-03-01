@@ -1,9 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.prompts
 
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.prompts.generated.ResourcesIndex
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.stream.Collectors
@@ -26,11 +27,11 @@ import java.util.stream.Collectors
  *
  * Additionally, no bare Kotlin/Java code is allowed outside ` ```kotlin ``` ` fences.
  */
-class MarkdownArticleContractTest : BasePlatformTestCase() {
+class MarkdownArticleContractTest {
 
     private fun newFormatArticles(): List<Path> {
         val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory()
-        val promptsRoot = projectHome.resolve("ij-plugin/src/main/prompts")
+        val promptsRoot = projectHome.resolve("prompts/src/main/prompts")
         if (!Files.isDirectory(promptsRoot)) return emptyList()
 
         val allMdFiles = Files.walk(promptsRoot).use { stream ->
@@ -59,12 +60,13 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
         }
     }
 
+    @Test
     fun testTitleFormat() {
         val articles = newFormatArticles()
         if (articles.isEmpty()) return // No new-format articles yet — passes trivially
 
         val violations = mutableListOf<String>()
-        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("ij-plugin/src/main/prompts")
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
 
         for (file in articles) {
             val lines = Files.readAllLines(file)
@@ -78,17 +80,18 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
         }
 
         assertTrue(
+            violations.isEmpty(),
             "Title format violations in new-format articles:\n${violations.joinToString("\n")}",
-            violations.isEmpty()
         )
     }
 
+    @Test
     fun testDescriptionFormat() {
         val articles = newFormatArticles()
         if (articles.isEmpty()) return // No new-format articles yet — passes trivially
 
         val violations = mutableListOf<String>()
-        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("ij-plugin/src/main/prompts")
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
 
         for (file in articles) {
             val lines = Files.readAllLines(file)
@@ -112,8 +115,8 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
         }
 
         assertTrue(
+            violations.isEmpty(),
             "Description format violations in new-format articles:\n${violations.joinToString("\n")}",
-            violations.isEmpty()
         )
     }
 
@@ -126,12 +129,13 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
      * This catches bugs where the payload encoder or directive-stripping logic diverges
      * from what the source file contains.
      */
+    @Test
     fun testArticlePayloadMatchesSourceBody() {
         val articles = newFormatArticles()
         if (articles.isEmpty()) return
 
         val violations = mutableListOf<String>()
-        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("ij-plugin/src/main/prompts")
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
 
         // Build URI → ArticleBase map from ResourcesIndex
         val articlesByUri = ResourcesIndex().roots
@@ -146,7 +150,7 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
             val lines = content.lines()
             if (lines.size < 4) continue
 
-            // Derive URI: same logic as buildArticleUri in buildSrc
+            // Derive URI: same logic as buildArticleUri in prompt-generator
             val folderPath = promptsRoot.relativize(file.parent).toString()
                 .replace('\\', '/')
                 .trimEnd('/')
@@ -182,17 +186,18 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
         }
 
         assertTrue(
+            violations.isEmpty(),
             "Article payload mismatch for new-format articles:\n${violations.joinToString("\n")}",
-            violations.isEmpty()
         )
     }
 
+    @Test
     fun testNoCodeOutsideKotlinFences() {
         val articles = newFormatArticles()
         if (articles.isEmpty()) return // No new-format articles yet — passes trivially
 
         val violations = mutableListOf<String>()
-        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("ij-plugin/src/main/prompts")
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
 
         // Patterns that indicate bare Kotlin/Java code outside fences
         val codePatterns = listOf(
@@ -233,8 +238,8 @@ class MarkdownArticleContractTest : BasePlatformTestCase() {
         }
 
         assertTrue(
+            violations.isEmpty(),
             "Bare code outside kotlin fences in new-format articles:\n${violations.joinToString("\n")}",
-            violations.isEmpty()
         )
     }
 }

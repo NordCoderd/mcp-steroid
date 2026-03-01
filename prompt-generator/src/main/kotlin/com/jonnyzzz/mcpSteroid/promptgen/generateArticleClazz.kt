@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.gradle
+package com.jonnyzzz.mcpSteroid.promptgen
 
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
@@ -365,7 +365,7 @@ private fun PromptGenerationContext.generateNewFormatParts(
     pkg: String,
     props: MutableList<PropertySpec>,
 ) {
-    val sourcePath = article.payload!!.path
+    val sourcePath = article.payload.path
 
     // Strip any directive lines from md content — directives are not user-visible output
     fun stripDirective(s: String): String {

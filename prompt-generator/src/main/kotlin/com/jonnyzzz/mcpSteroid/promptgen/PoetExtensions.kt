@@ -1,10 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.gradle
+package com.jonnyzzz.mcpSteroid.promptgen
 
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
-import com.squareup.kotlinpoet.buildCodeBlock
 import java.io.File
 
 fun CodeBlock.Builder.controlFlow(
@@ -31,4 +30,9 @@ fun PromptGenerationContext.writeClazz(spec: FileSpec, classType: ClassName) {
 
 fun PromptGenerationContext.writeTestClazz(spec: FileSpec, classType: ClassName) {
     writeClazzInner(spec, classType, testOutputRoot)
+}
+
+fun PromptGenerationContext.writeIjTestClazz(spec: FileSpec, classType: ClassName) {
+    val root = ijTestOutputRoot ?: return
+    writeClazzInner(spec, classType, root)
 }

@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.gradle
+package com.jonnyzzz.mcpSteroid.promptgen
 
 import com.squareup.kotlinpoet.ANY
 import com.squareup.kotlinpoet.ClassName
@@ -12,6 +12,7 @@ class PromptGenerationContext(
     val inputRoot: File,
     val outputRoot: File,
     val testOutputRoot: File,
+    val ijTestOutputRoot: File?,
 ) {
     val packageName = "com.jonnyzzz.mcpSteroid.prompts.generated"
     val serviceAnnotation = ClassName("com.intellij.openapi.components", "Service")
@@ -25,4 +26,3 @@ class PromptGenerationContext(
     val promptRootBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptRootBase")
     val promptArticleClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "ArticleBase")
 }
-

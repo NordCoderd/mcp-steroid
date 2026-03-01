@@ -1,6 +1,6 @@
 Debugger: Demo Debug Test (End-to-end)
 
-Launches a debug test session: action-based for both Rider (.NET) and IntelliJ (JUnit/TestNG/Kotlin). Open the test file, position caret on the test class/method, fire the debug context action. For IntelliJ, fall back to JUnitConfiguration if no session starts.
+Launches a debug test session via context action: open test file, position caret on test class/method, fire debug action. Falls back to JUnitConfiguration in IntelliJ if needed.
 
 ###_IF_RIDER_###
 

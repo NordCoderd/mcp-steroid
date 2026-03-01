@@ -1,5 +1,5 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.gradle
+package com.jonnyzzz.mcpSteroid.promptgen
 
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
@@ -16,7 +16,7 @@ fun PromptGenerationContext.generateIndexClazz(
     indexes: List<GeneratedIndexClazz>,
 ) {
     val classType = run {
-        ClassName(packageName,  "ResourcesIndex")
+        ClassName(packageName, "ResourcesIndex")
     }
 
     val rootsProp = PropertySpec
@@ -31,7 +31,7 @@ fun PromptGenerationContext.generateIndexClazz(
                             addStatement("put(%S, %T())", r.folder.trim('/'), r.clazzName)
                         }
                 }
-        }).build())
+            }).build())
         .build()
 
     val typeSpec = TypeSpec.classBuilder(classType)
