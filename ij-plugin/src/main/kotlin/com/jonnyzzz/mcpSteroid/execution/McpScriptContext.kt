@@ -52,6 +52,7 @@ import com.intellij.openapi.application.smartReadAction as intellijSmartReadActi
  *
  * NEVER use runBlocking - it causes deadlocks.
  */
+@Suppress("unused")
 interface McpScriptContext {
     /** The IntelliJ Project this execution is associated with */
     val project: Project
@@ -207,7 +208,6 @@ interface McpScriptContext {
      * }
      * ```
      */
-    @Suppress("GrazieInspection", "GrazieInspectionRunner")
     suspend fun getHighlightsWhenReady(
         file: VirtualFile,
         minSeverityValue: Int = 200, // HighlightSeverity.WEAK_WARNING.myVal
@@ -299,7 +299,6 @@ interface McpScriptContext {
      *
      * @see com.intellij.openapi.application.writeAction
      */
-    @Suppress("UnstableApiUsage")
     suspend fun <T> writeAction(action: () -> T): T = intellijWriteAction(action)
 
     /**
@@ -314,7 +313,6 @@ interface McpScriptContext {
      *
      * @see com.intellij.openapi.application.smartReadAction
      */
-    @Suppress("unused")
     suspend fun <T> smartReadAction(action: () -> T): T = intellijSmartReadAction(project, action)
 
     // ============================================================
@@ -339,7 +337,6 @@ interface McpScriptContext {
      * JavaPsiFacade.getInstance(project).findClass("java.util.List", scope)
      * ```
      */
-    @Suppress("unused")
     fun allScope(): GlobalSearchScope = GlobalSearchScope.allScope(project)
 
     // ============================================================
@@ -383,7 +380,6 @@ interface McpScriptContext {
      * val vf = findProjectFile("src/main/kotlin/MyClass.kt")
      * ```
      */
-    @Suppress("unused")
     fun findProjectFile(relativePath: String): VirtualFile? {
         val basePath = project.basePath ?: return null
         return findFile("$basePath/$relativePath")
@@ -399,7 +395,6 @@ interface McpScriptContext {
      *
      * Returns files sorted by absolute path for deterministic results.
      */
-    @Suppress("unused")
     suspend fun findProjectFiles(globPattern: String): List<VirtualFile> {
         if (globPattern.isBlank()) return emptyList()
 
@@ -444,7 +439,6 @@ interface McpScriptContext {
      * val psiFile = findProjectPsiFile("src/main/kotlin/MyClass.kt")
      * ```
      */
-    @Suppress("unused")
     suspend fun findProjectPsiFile(relativePath: String): PsiFile? {
         val basePath = project.basePath ?: return null
         return findPsiFile("$basePath/$relativePath")
