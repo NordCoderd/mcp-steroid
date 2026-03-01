@@ -38,6 +38,7 @@ dependencies {
     testImplementation(project(":test-helper"))
     testImplementation(project(":agent-output-filter"))
     testImplementation(project(":ai-agents"))
+    testImplementation(project(":intellij-downloader"))
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter-api")
