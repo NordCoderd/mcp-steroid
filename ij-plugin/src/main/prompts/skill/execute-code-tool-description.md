@@ -18,13 +18,15 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - Available: project, println(), printJson(), printException(), progress()
 
 **Common Operations:**
-- **Debugger:** Set breakpoints, launch debug sessions, suspend at breakpoints, evaluate expressions at any call frame, step over code, inspect thread stacks — read `mcp-steroid://skill/debugger-skill`
 - Code navigation: Find usages, go to definition, symbol search
-- Refactoring: Rename, extract method, move files
 - Inspections: Run code analysis, get warnings/errors
-- Tests: Run via JUnitConfiguration (JUnit/TestNG/Kotlin) or `RiderUnitTestDebugContextAction` context action (Rider .NET) — see `mcp-steroid://skill/debugger-skill`
 - Actions: Trigger any IDE action programmatically
-- **Reflection:** Access private fields/methods at runtime — `obj.javaClass.getDeclaredField("x").also { it.isAccessible = true }.get(obj)`. Inspect class hierarchies, list all fields, invoke hidden methods.
+
+**Power Features — use these aggressively:**
+- **Debugger:** Set breakpoints, launch debug sessions, suspend at breakpoints, evaluate expressions at any call frame, step over, inspect thread stacks. Full IntelliJ XDebugger API works in all IDEs (IDEA, Rider, GoLand, …). Read `mcp-steroid://skill/debugger-skill`
+- **Refactoring:** Rename symbols, extract method/variable, move files, inline, change signature — all via `RefactoringActionHandler` and IntelliJ refactoring APIs. Use `ActionManager.getInstance().getAction("RenameElement")` etc.
+- **Tests:** Launch via context action — open test file, position caret on test class/method, fire action. IntelliJ: `DebugContextAction` (fallback: JUnitConfiguration with explicit module). Rider: `RiderUnitTestDebugContextAction`. See `mcp-steroid://skill/debugger-skill`
+- **Reflection (when API is unclear):** Use Java reflection to access private fields, methods, and internal state when the public API is not obvious: `obj.javaClass.getDeclaredField("fieldName").also { it.isAccessible = true }.get(obj)`. List all fields of a class: `clazz.declaredFields.forEach { println("${it.name}: ${it.type}") }`. Call a private method: `clazz.getDeclaredMethod("name", ArgType::class.java).also { it.isAccessible = true }.invoke(obj, arg)`. Inspect class hierarchy: `generateSequence(obj.javaClass) { it.superclass }.forEach { println(it.name) }`.
 
 **After a compile error**: fix and retry — do NOT switch to Bash/Read/Write. Common fixes:
 - `suspension functions can only be called within coroutine body` → mark your helper as `suspend fun`
@@ -48,7 +50,7 @@ For complex IntelliJ API work, delegate to a sub-agent:
 - [Debugger Guide](mcp-steroid://skill/debugger-skill) - Debug workflows
 - [Test Runner Guide](mcp-steroid://skill/test-skill) - Test execution
 
-IntelliJ API Version: IU-253.31033.53
+IntelliJ API Version: IU-253.31033.145
 
 **When to use other steroid tools instead:**
 - steroid_list_projects — list open projects and their paths
