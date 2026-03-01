@@ -31,8 +31,3 @@ fun PromptGenerationContext.writeClazz(spec: FileSpec, classType: ClassName) {
 fun PromptGenerationContext.writeTestClazz(spec: FileSpec, classType: ClassName) {
     writeClazzInner(spec, classType, testOutputRoot)
 }
-
-fun PromptGenerationContext.writeIjTestClazz(spec: FileSpec, classType: ClassName) {
-    val root = ijTestOutputRoot ?: return
-    writeClazzInner(spec, classType, root)
-}

@@ -12,7 +12,6 @@ class PromptGenerationContext(
     val inputRoot: File,
     val outputRoot: File,
     val testOutputRoot: File,
-    val ijTestOutputRoot: File?,
 ) {
     val packageName = "com.jonnyzzz.mcpSteroid.prompts.generated"
     val serviceAnnotation = ClassName("com.intellij.openapi.components", "Service")

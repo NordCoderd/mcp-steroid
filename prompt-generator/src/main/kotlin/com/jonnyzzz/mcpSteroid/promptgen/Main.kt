@@ -8,19 +8,16 @@ fun main(args: Array<String>) {
     val inputDir = File(argsMap.getValue("--input-dir"))
     val outputDir = File(argsMap.getValue("--output-dir"))
     val testOutputDir = File(argsMap.getValue("--test-output-dir"))
-    val ijTestOutputDir = argsMap["--ij-test-output-dir"]?.let { File(it) }
 
     require(inputDir.isDirectory) { "Input directory does not exist: $inputDir" }
 
     if (outputDir.exists()) outputDir.deleteRecursively()
     if (testOutputDir.exists()) testOutputDir.deleteRecursively()
-    ijTestOutputDir?.let { if (it.exists()) it.deleteRecursively() }
 
     outputDir.mkdirs()
     testOutputDir.mkdirs()
-    ijTestOutputDir?.mkdirs()
 
-    generate(inputDir, outputDir, testOutputDir, ijTestOutputDir)
+    generate(inputDir, outputDir, testOutputDir)
 }
 
 private fun parseArgs(args: Array<String>): Map<String, String> {
@@ -40,9 +37,8 @@ internal fun generate(
     inputRoot: File,
     outputRoot: File,
     testOutputRoot: File,
-    ijTestOutputRoot: File?,
 ) {
-    val ctx = PromptGenerationContext(inputRoot, outputRoot, testOutputRoot, ijTestOutputRoot)
+    val ctx = PromptGenerationContext(inputRoot, outputRoot, testOutputRoot)
     val promptClasses = inputRoot
         .walkTopDown()
         .filter { it.isFile }

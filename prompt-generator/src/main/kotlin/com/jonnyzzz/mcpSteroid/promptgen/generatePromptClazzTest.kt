@@ -147,19 +147,17 @@ fun PromptGenerationContext.generateArticleReadTest(
  * Called after [generateArticleClazz] so the article's generated class (with its
  * `ktBlock000`, `ktBlock001`, … properties) already exists. Each test method simply
  * instantiates that class and passes the corresponding block to
- * [com.jonnyzzz.mcpSteroid.koltinc.BaseKtBlocksCompilationTest.compileKtBlock].
+ * [KtBlockCompilationTestBase.compileKtBlock].
  *
  * Generates a class named `{ArticleStem}KtBlocksCompilationTest` with methods:
  *   `testBlock000Compiles()`, `testBlock001Compiles()`, …
  *
- * These tests are written to [ijTestOutputRoot] because they depend on the IntelliJ test
- * framework (BaseKtBlocksCompilationTest extends BasePlatformTestCase).
+ * These tests are written to [testOutputRoot] and extend
+ * [KtBlockCompilationTestBase] (JUnit 5, no IntelliJ test framework).
  */
 fun PromptGenerationContext.generateMdKtBlockCompilationTests(
     article: GeneratedArticleClazz,
 ) {
-    if (ijTestOutputRoot == null) return
-
     val promptArticle = article.article ?: return
 
     val parts = parseNewFormatArticleParts(promptArticle.payload.content)
@@ -176,6 +174,7 @@ fun PromptGenerationContext.generateMdKtBlockCompilationTests(
     val testMethods = (0 until blockCount).map { index ->
         val blockIndex = index.toString().padStart(3, '0')
         FunSpec.builder("testBlock${blockIndex}Compiles")
+            .addAnnotation(junitTestAnnotation)
             .addKdoc("Source: %L, block #%L", article.path, index)
             .returns(Unit::class)
             .addStatement("compileKtBlock(%T().ktBlock${blockIndex})", articleClassName)
@@ -183,7 +182,7 @@ fun PromptGenerationContext.generateMdKtBlockCompilationTests(
     }
 
     val testTypeSpec = TypeSpec.classBuilder(classType)
-        .superclass(ClassName.bestGuess("com.jonnyzzz.mcpSteroid.koltinc.BaseKtBlocksCompilationTest"))
+        .superclass(ClassName.bestGuess("com.jonnyzzz.mcpSteroid.prompts.KtBlockCompilationTestBase"))
         .addFunctions(testMethods)
         .build()
 
@@ -192,5 +191,5 @@ fun PromptGenerationContext.generateMdKtBlockCompilationTests(
         .addType(testTypeSpec)
         .build()
 
-    writeIjTestClazz(testFileSpec, classType)
+    writeTestClazz(testFileSpec, classType)
 }

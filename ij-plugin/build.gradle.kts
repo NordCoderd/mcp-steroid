@@ -132,20 +132,13 @@ val generateMetadata by tasks.registering(GenerateMetadataTask::class) {
     outputFile.set(generatedSourcesPath.map { it.file("PluginMetadata.kt") })
 }
 
-// Generated IJ test sources from prompt-generator (KtBlock compilation tests)
-val promptIjTestSources = rootProject.layout.buildDirectory.dir("generated-ij-tests/prompts")
-
 // Add generated sources to main source set and make kotlin compilation depend on it
 kotlin.sourceSets.main {
     kotlin.srcDir(generatedSourcesPath)
 }
-kotlin.sourceSets.test {
-    kotlin.srcDir(promptIjTestSources)
-}
 
 tasks.withType<KotlinCompile>().configureEach {
     dependsOn(generateMetadata)
-    dependsOn(":prompts:generatePrompts")
 }
 
 intellijPlatform {
@@ -173,9 +166,6 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
-        doFirst {
-            systemProperty("mcp.steroid.full.intellij", intellijPlatform.platformPath)
-        }
     }
 
     patchPluginXml {
