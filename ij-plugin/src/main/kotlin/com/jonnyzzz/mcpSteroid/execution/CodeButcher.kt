@@ -3,34 +3,19 @@ package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
+import com.jonnyzzz.mcpSteroid.koltinc.CodeWrapperForCompilation
 
 inline val codeButcher: CodeButcher get() = service()
-
-private val defaultImports = listOf(
-    "import com.intellij.openapi.project.*",
-    "import com.intellij.openapi.application.*",
-    "import com.intellij.openapi.application.readAction",
-    "import com.intellij.openapi.application.writeAction",
-    "import com.intellij.openapi.vfs.*",
-    "import com.intellij.openapi.editor.*",
-    "import com.intellij.openapi.fileEditor.*",
-    "import com.intellij.openapi.command.*",
-    "import com.intellij.psi.*",
-    "import kotlinx.coroutines.*",
-    "import kotlin.time.Duration.Companion.seconds",
-    "import kotlin.time.Duration.Companion.minutes",
-)
 
 private val mcpScriptContextFqn = McpScriptContext::class.java.name
 private val mcpScriptBuilderFqn = McpScriptBuilder::class.java.name
 private val mcpScriptBuilderAddBlock = McpScriptBuilder::addBlock.name
-private const val mcpScriptMethodName = "jonnyzzz_execute_all_script_content_77" //make it unlikely to clash with code
 
 @Service(Service.Level.APP)
 class CodeButcher {
     data class ScriptCoordinates(
         val classFqn: String,
-        val methodName: String = mcpScriptMethodName,
+        val methodName: String = CodeWrapperForCompilation.DEFAULT_METHOD_NAME,
         val code: String,
     )
 
@@ -39,52 +24,13 @@ class CodeButcher {
      * This is exposed so the review can show the final code.
      */
     fun wrapToKotlinClass(scriptClassName: String, code: String): ScriptCoordinates {
-        val clazzName = scriptClassName.replace("[^a-z0-9_]+".toRegex(RegexOption.IGNORE_CASE), "_")
-
-        val importLines = mutableListOf<String>()
-        val otherLines = mutableListOf<String>()
-        // Track whether we're inside a triple-quoted string so that `import` lines
-        // embedded in string literals (e.g. Java source written as Kotlin raw strings)
-        // are NOT extracted as top-level Kotlin imports.
-        var tripleQuoteCount = 0
-        for (line in code.lineSequence()) {
-            val inTripleQuotedString = tripleQuoteCount % 2 != 0
-            // Count """ occurrences in this line to track nesting for subsequent lines.
-            var idx = 0
-            while (idx <= line.length - 3) {
-                if (line[idx] == '"' && line[idx + 1] == '"' && line[idx + 2] == '"') {
-                    tripleQuoteCount++
-                    idx += 3
-                } else {
-                    idx++
-                }
-            }
-            if (!inTripleQuotedString && line.trim().trimStart(';').trim().startsWith("import ")) {
-                importLines.add(line)
-            } else {
-                otherLines.add(line)
-            }
-        }
-
-        val code = buildString {
-            append(defaultImports.joinToString(separator = "\n", postfix = "\n"))
-            appendLine()
-            appendLine("//imports from the submitted code")
-            importLines.forEach { appendLine(it) }
-            appendLine()
-            appendLine("class $clazzName {")
-            appendLine("  inline fun $mcpScriptContextFqn.execute(ƒ: $mcpScriptContextFqn.() -> Unit) = ƒ()")
-            appendLine("  fun $mcpScriptMethodName(builder : $mcpScriptBuilderFqn) { ")
-            appendLine("    builder.$mcpScriptBuilderAddBlock { ${mcpScriptMethodName}_code() }")
-            appendLine("  }")
-            appendLine("  suspend fun $mcpScriptContextFqn.${mcpScriptMethodName}_code() {")
-            appendLine("    //the rest of submitted code")
-            otherLines.forEach { append("    ").appendLine(it) }
-            appendLine("  }")
-            appendLine("}")
-            append("\n")
-        }
-
-        return ScriptCoordinates(classFqn = clazzName, code = code)
+        val result = CodeWrapperForCompilation.wrap(
+            className = scriptClassName,
+            code = code,
+            scriptContextFqn = mcpScriptContextFqn,
+            scriptBuilderFqn = mcpScriptBuilderFqn,
+            addBlockName = mcpScriptBuilderAddBlock,
+        )
+        return ScriptCoordinates(classFqn = result.classFqn, methodName = result.methodName, code = result.code)
     }
 }
