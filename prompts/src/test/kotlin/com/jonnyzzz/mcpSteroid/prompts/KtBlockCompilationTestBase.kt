@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.prompts
 import com.jonnyzzz.mcpSteroid.koltinc.CodeWrapperForCompilation
 import com.jonnyzzz.mcpSteroid.koltinc.KotlincCommandLineBuilder
 import com.jonnyzzz.mcpSteroid.koltinc.toArgFile
+import org.junit.jupiter.api.Assertions
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
@@ -67,7 +68,7 @@ abstract class KtBlockCompilationTestBase {
             // this test depends on the classes on the disk
             // parallel execution of tests can break it
             // re-run usually is enough to fix that
-            assert(exitCode == 0) {
+            Assertions.assertEquals(0, exitCode) {
                 "Compilation failed or has warnings (-Werror):\n$output"
             }
         } finally {
