@@ -6,6 +6,7 @@ include(":agent-output-filter")
 include(":prompt-generator")
 include(":kotlin-cli")
 include(":prompts")
+include(":intellij-downloader")
 
 include(":ij-plugin")
 
