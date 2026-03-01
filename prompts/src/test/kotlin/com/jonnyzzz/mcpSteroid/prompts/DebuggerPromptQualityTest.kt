@@ -1,59 +1,56 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
-package com.jonnyzzz.mcpSteroid.server
+package com.jonnyzzz.mcpSteroid.prompts
 
-import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.jonnyzzz.mcpSteroid.prompts.generated.debugger.DebuggerIndex
 import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillIndex
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
 
-class DebuggerPromptQualityTest : BasePlatformTestCase() {
+class DebuggerPromptQualityTest {
     private val debuggerIndex = DebuggerIndex()
     private val skillIndex = SkillIndex()
 
-    override fun runInDispatchThread(): Boolean = false
-
+    @Test
     fun testSetLineBreakpointUsesToggleLineBreakpoint() {
         val prompt = debuggerIndex.setLineBreakpointMd.ktBlock000.readPrompt()
-        assertTrue("Expected toggleLineBreakpoint guidance", prompt.contains("toggleLineBreakpoint"))
-        assertTrue("Expected EDT guidance", prompt.contains("Dispatchers.EDT"))
+        assertTrue(prompt.contains("toggleLineBreakpoint")) { "Expected toggleLineBreakpoint guidance" }
+        assertTrue(prompt.contains("Dispatchers.EDT")) { "Expected EDT guidance" }
         assertFalse(
-            "Should not use addLineBreakpoint(...) directly in code",
             prompt.contains("breakpointManager.addLineBreakpoint(")
-        )
+        ) { "Should not use addLineBreakpoint(...) directly in code" }
     }
 
+    @Test
     fun testDebugRunConfigurationUsesModernProgramRunnerUtilPackage() {
         val prompt = debuggerIndex.debugRunConfigurationMd.ktBlock000.readPrompt()
         assertTrue(
-            "Expected modern ProgramRunnerUtil package",
             prompt.contains("import com.intellij.execution.ProgramRunnerUtil")
-        )
+        ) { "Expected modern ProgramRunnerUtil package" }
         assertFalse(
-            "Should not use outdated ProgramRunnerUtil package",
             prompt.contains("import com.intellij.execution.runners.ProgramRunnerUtil")
-        )
+        ) { "Should not use outdated ProgramRunnerUtil package" }
     }
 
+    @Test
     fun testDebuggerOverviewClarifiesZeroBasedLineNumbers() {
         val prompt = debuggerIndex.overviewMd.payload.readPrompt()
         assertTrue(
-            "Expected explicit 0-indexed line guidance",
             prompt.contains("0-indexed", ignoreCase = true)
-        )
+        ) { "Expected explicit 0-indexed line guidance" }
     }
 
+    @Test
     fun testDebuggerSkillDocumentsCriticalImports() {
         val prompt = skillIndex.debuggerSkillMd.payload.readPrompt()
         assertTrue(
-            "Expected suspendCancellableCoroutine import guidance",
             prompt.contains("kotlinx.coroutines.suspendCancellableCoroutine")
-        )
+        ) { "Expected suspendCancellableCoroutine import guidance" }
         assertTrue(
-            "Expected ProgramRunnerUtil package guidance",
             prompt.contains("com.intellij.execution.ProgramRunnerUtil")
-        )
+        ) { "Expected ProgramRunnerUtil package guidance" }
         assertTrue(
-            "Expected explicit anti-pattern warning for old ProgramRunnerUtil package",
             prompt.contains("not `com.intellij.execution.runners.ProgramRunnerUtil`")
-        )
+        ) { "Expected explicit anti-pattern warning for old ProgramRunnerUtil package" }
     }
 }
