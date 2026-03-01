@@ -14,6 +14,14 @@ repositories {
     mavenCentral()
 }
 
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}
+
+tasks.test {
+    useJUnit()
+}
+
 // --- kotlinc download and distribution ---
 
 val kotlincVersion = "2.3.10"
