@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.infra
 
+import com.jonnyzzz.mcpSteroid.ideDownloader.HostOs as DownloaderHostOs
 import com.jonnyzzz.mcpSteroid.ideDownloader.IdeChannel as DownloaderChannel
 import com.jonnyzzz.mcpSteroid.ideDownloader.IdeDistribution as DownloaderDistribution
 import com.jonnyzzz.mcpSteroid.ideDownloader.IdeProduct as DownloaderProduct
@@ -47,7 +48,8 @@ fun IdeDistribution.resolveAndDownload(): File {
     )
 
     val downloaderDist = toDownloaderDistribution()
-    return downloaderDist.resolveAndDownload(downloadDir)
+    // Always download the Linux archive — IDE containers are always Linux regardless of host OS.
+    return downloaderDist.resolveAndDownload(downloadDir, DownloaderHostOs.LINUX)
 }
 
 private fun IdeDistribution.toDownloaderDistribution(): DownloaderDistribution {
