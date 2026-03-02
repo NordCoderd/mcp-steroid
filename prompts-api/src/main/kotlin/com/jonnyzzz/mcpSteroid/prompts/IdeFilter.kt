@@ -13,6 +13,7 @@ sealed interface IdeFilter {
 
     fun not(): IdeFilter = Not(this)
     fun and(other: IdeFilter): IdeFilter = And(this, other)
+    fun or(other: IdeFilter): IdeFilter = Or(this, other)
 
     /** Matches everything — used for unconditional parts. */
     data object All : IdeFilter {
@@ -44,5 +45,11 @@ sealed interface IdeFilter {
     data class And(val left: IdeFilter, val right: IdeFilter) : IdeFilter {
         override fun matches(context: PromptsContext) =
             left.matches(context) && right.matches(context)
+    }
+
+    /** Disjunction — used for article-level OR-union of code block filters. */
+    data class Or(val left: IdeFilter, val right: IdeFilter) : IdeFilter {
+        override fun matches(context: PromptsContext) =
+            left.matches(context) || right.matches(context)
     }
 }

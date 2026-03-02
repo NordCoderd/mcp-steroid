@@ -1,7 +1,9 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.promptgen
 
+import com.jonnyzzz.mcpSteroid.prompts.IdeFilter
 import com.squareup.kotlinpoet.ClassName
+import com.squareup.kotlinpoet.FileSpec
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -125,6 +127,192 @@ class ArticleHelpersTest {
         assertTrue(article.noAutoToc)
     }
 
+    @Test
+    fun `auto TOC filtering excludes NO_AUTO_TOC articles`() {
+        val regular = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/regular.md", "skill", content = "Regular\n\nA regular article\n\nBody\n")
+        )
+        val excluded = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/excluded.md", "skill", content = "Excluded\n\nAn excluded article\n\n$NO_AUTO_TOC_MARKER\nBody\n")
+        )
+        val articles = listOf(regular, excluded)
+
+        // Same filtering as Main.kt: val tocMembers = articles.filter { !it.noAutoToc }
+        val tocMembers = articles.filter { !it.noAutoToc }
+        assertEquals(1, tocMembers.size)
+        assertEquals("skill/regular.md", tocMembers[0].canonicalPayloadPath)
+    }
+
+    @Test
+    fun `auto TOC filtering excludes EXCLUDE_FROM_AUTO_TOC articles`() {
+        val regular = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/regular.md", "skill", content = "Regular\n\nA regular article\n\nBody\n")
+        )
+        val excluded = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/excluded.md", "skill", content = "Excluded\n\nAn excluded article\n\n$EXCLUDE_FROM_AUTO_TOC_MARKER\nBody\n")
+        )
+        val articles = listOf(regular, excluded)
+
+        val tocMembers = articles.filter { !it.noAutoToc }
+        assertEquals(1, tocMembers.size)
+        assertEquals("skill/regular.md", tocMembers[0].canonicalPayloadPath)
+    }
+
+    @Test
+    fun `auto TOC includes all articles when no markers present`() {
+        val a = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/a.md", "skill", content = "Title A\n\nDesc A\n\nBody A\n")
+        )
+        val b = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/b.md", "skill", content = "Title B\n\nDesc B\n\nBody B\n")
+        )
+        val articles = listOf(a, b)
+
+        val tocMembers = articles.filter { !it.noAutoToc }
+        assertEquals(2, tocMembers.size)
+    }
+
+    @Test
+    fun `auto sibling see-also excludes NO_AUTO_TOC articles`() {
+        val regular = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/regular.md", "skill", content = "Regular\n\nA regular article\n\nBody\n")
+        )
+        val helper = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/helper.md", "skill", content = "Helper\n\nA helper article\n\nBody\n")
+        )
+        val excluded = PromptArticle(
+            payload = makeGeneratedPromptClazz("md", "skill/excluded.md", "skill", content = "Excluded\n\nAn excluded article\n\n$NO_AUTO_TOC_MARKER\nBody\n")
+        )
+
+        // Same filtering as Main.kt resolveSeeAlsoClassNames:
+        //   val siblings = folderArticles[folder]?.filter { it !== article && !it.noAutoToc }
+        val folderArticles = listOf(regular, helper, excluded)
+        val siblingsOfRegular = folderArticles.filter { it !== regular && !it.noAutoToc }
+        assertEquals(1, siblingsOfRegular.size)
+        assertEquals("skill/helper.md", siblingsOfRegular[0].canonicalPayloadPath)
+    }
+
+    // --- computeArticleFilter tests ---
+
+    @Test
+    fun `computeArticleFilter no kt blocks returns root filter`() {
+        val root = IdeFilter.Ide(setOf("IU"))
+        assertEquals(root, computeArticleFilter(root, emptyList()))
+    }
+
+    @Test
+    fun `computeArticleFilter All root with single Ide block`() {
+        val result = computeArticleFilter(IdeFilter.All, listOf(IdeFilter.Ide(setOf("RD"))))
+        assertEquals(IdeFilter.Ide(setOf("RD")), result)
+    }
+
+    @Test
+    fun `computeArticleFilter Ide root with All block`() {
+        val root = IdeFilter.Ide(setOf("IU"))
+        val result = computeArticleFilter(root, listOf(IdeFilter.All))
+        assertEquals(root, result)
+    }
+
+    @Test
+    fun `computeArticleFilter merges product codes from multiple blocks`() {
+        // Two blocks with separate codes → OR-union merges them
+        val result = computeArticleFilter(
+            IdeFilter.All,
+            listOf(IdeFilter.Ide(setOf("RD")), IdeFilter.Ide(setOf("IU"))),
+        )
+        assertEquals(IdeFilter.Ide(setOf("IU", "RD")), result)
+    }
+
+    @Test
+    fun `computeArticleFilter single block with multiple codes`() {
+        val result = computeArticleFilter(
+            IdeFilter.All,
+            listOf(IdeFilter.Ide(setOf("RD", "IU"))),
+        )
+        assertEquals(IdeFilter.Ide(setOf("IU", "RD")), result)
+    }
+
+    @Test
+    fun `computeArticleFilter Ide root AND with block union`() {
+        val root = IdeFilter.Ide(setOf("IU"))
+        val orUnion = IdeFilter.Ide(setOf("IU", "RD"))
+        val result = computeArticleFilter(
+            root,
+            listOf(IdeFilter.Ide(setOf("RD")), IdeFilter.Ide(setOf("IU"))),
+        )
+        // root AND orUnion — no simplification of AND
+        assertEquals(IdeFilter.And(root, orUnion), result)
+    }
+
+    @Test
+    fun `computeArticleFilter Ide root AND single block`() {
+        val root = IdeFilter.Ide(setOf("IU"), minVersion = 253)
+        val block = IdeFilter.Ide(setOf("IU", "RD"))
+        val result = computeArticleFilter(root, listOf(block))
+        // Single block, root is not All → And(root, block)
+        assertEquals(IdeFilter.And(root, block), result)
+    }
+
+    @Test
+    fun `computeArticleFilter merges contiguous version ranges in OR`() {
+        // Two blocks with overlapping version ranges → OR merges into single Ide
+        val result = computeArticleFilter(
+            IdeFilter.All,
+            listOf(
+                IdeFilter.Ide(setOf("IU"), minVersion = 251, maxVersion = 253),
+                IdeFilter.Ide(setOf("IU"), minVersion = 253, maxVersion = 255),
+            ),
+        )
+        // All AND merged → merged (simplified)
+        assertEquals(IdeFilter.Ide(setOf("IU"), minVersion = 251, maxVersion = 255), result)
+    }
+
+    @Test
+    fun `computeArticleFilter version gap keeps composite Or formula`() {
+        val block1 = IdeFilter.Ide(setOf("IU"), minVersion = 251, maxVersion = 253)
+        val block2 = IdeFilter.Ide(setOf("IU"), minVersion = 255, maxVersion = 257)
+        val result = computeArticleFilter(IdeFilter.All, listOf(block1, block2))
+        // All AND Or(b1, b2) → Or(b1, b2) (simplified)
+        assertEquals(IdeFilter.Or(block1, block2), result)
+    }
+
+    @Test
+    fun `computeArticleFilter version gap with root filter keeps And-Or formula`() {
+        val root = IdeFilter.Ide(setOf("IU"))
+        val block1 = IdeFilter.Ide(setOf("IU"), minVersion = 251, maxVersion = 253)
+        val block2 = IdeFilter.Ide(setOf("IU"), minVersion = 255, maxVersion = 257)
+        val result = computeArticleFilter(root, listOf(block1, block2))
+        assertEquals(IdeFilter.And(root, IdeFilter.Or(block1, block2)), result)
+    }
+
+    @Test
+    fun `computeArticleFilter disjoint codes keep And formula`() {
+        val root = IdeFilter.Ide(setOf("CL"))
+        val block = IdeFilter.Ide(setOf("RD", "IU"))
+        val result = computeArticleFilter(root, listOf(block))
+        // No simplification — keep And(root, block)
+        assertEquals(IdeFilter.And(root, block), result)
+    }
+
+    @Test
+    fun `computeArticleFilter Not block in Or union`() {
+        // IF_RIDER + ELSE pattern: Ide(RD) + Not(Ide(RD)) → Or tree
+        val root = IdeFilter.Ide(setOf("IU"))
+        val block1 = IdeFilter.Ide(setOf("RD"))
+        val block2 = IdeFilter.Not(IdeFilter.Ide(setOf("RD")))
+        val result = computeArticleFilter(root, listOf(block1, block2))
+        // Not in inputs → can't simplify OR, builds Or tree then And with root
+        assertEquals(IdeFilter.And(root, IdeFilter.Or(block1, block2)), result)
+    }
+
+    @Test
+    fun `computeArticleFilter And block in Or union`() {
+        val andBlock = IdeFilter.And(IdeFilter.Ide(setOf("IU")), IdeFilter.Ide(setOf("RD")))
+        val result = computeArticleFilter(IdeFilter.All, listOf(andBlock))
+        // Single composite block, All root → simplified to the block itself
+        assertEquals(andBlock, result)
+    }
+
     private fun makeGeneratedPromptClazz(
         fileType: String,
         path: String,
@@ -134,12 +322,14 @@ class ArticleHelpersTest {
         val tmpFile = File.createTempFile("test-", ".$fileType")
         tmpFile.deleteOnExit()
         tmpFile.writeText(content)
+        val clazzName = ClassName("com.test", path.substringAfterLast("/").removeSuffix(".$fileType").toPromptClassName() + "Prompt")
         return GeneratedPromptClazz(
             fileType = fileType,
             folder = folder,
             path = path,
-            clazzName = ClassName("com.test", path.substringAfterLast("/").removeSuffix(".$fileType").toPromptClassName() + "Prompt"),
+            clazzName = clazzName,
             src = tmpFile,
+            fileSpec = FileSpec.builder(clazzName).build(),
         )
     }
 }

@@ -147,6 +147,29 @@ class ContentPartTest {
     }
 
     @Test
+    fun `NO_AUTO_TOC directive stripped from content`() {
+        val parts = partsFromBody("$NO_AUTO_TOC_MARKER\nBody text\n")
+        assertEquals(1, parts.size)
+        assertEquals("Body text\n", parts[0].content)
+        assertEquals(false, parts[0].isKotlinBlock)
+    }
+
+    @Test
+    fun `EXCLUDE_FROM_AUTO_TOC directive stripped from content`() {
+        val parts = partsFromBody("$EXCLUDE_FROM_AUTO_TOC_MARKER\nBody text\n")
+        assertEquals(1, parts.size)
+        assertEquals("Body text\n", parts[0].content)
+        assertEquals(false, parts[0].isKotlinBlock)
+    }
+
+    @Test
+    fun `TOC directive in middle of content stripped`() {
+        val parts = partsFromBody("Before\n$NO_AUTO_TOC_MARKER\nAfter\n")
+        assertEquals(1, parts.size)
+        assertEquals("Before\nAfter\n", parts[0].content)
+    }
+
+    @Test
     fun `conditional with else spanning code block boundary`() {
         // IF opens, kt block, IF closes in next md segment
         val parts = partsFromBody(

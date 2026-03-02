@@ -274,6 +274,107 @@ fun articleDescription(article: PromptArticle): String =
 fun articleDescriptionFirstLine(article: PromptArticle): String =
     articleDescription(article)
 
+/**
+ * Computes the article-level filter from the declared root filter and the
+ * OR-union of all kotlin code block filters.
+ *
+ * Rule: `articleFilter = declaredFilter AND (OR for all code block filters)`
+ *
+ * Simplifications (logically equivalent):
+ * - `All AND x = x`, `x AND All = x`
+ * - If all blocks are [IdeFilter.Ide] with contiguous version ranges, the OR-union
+ *   is merged into a single `Ide` (codes united, versions widened)
+ * - Otherwise, the full composite formula is kept (Or tree + And wrapper)
+ */
+fun computeArticleFilter(rootFilter: IdeFilter, ktBlockFilters: List<IdeFilter>): IdeFilter {
+    if (ktBlockFilters.isEmpty()) return rootFilter
+
+    // Build OR-union of all block filters, simplifying when possible
+    val orUnion = simplifyOrUnion(ktBlockFilters)
+
+    // Intersect with root filter, simplifying when possible
+    return simplifyAnd(rootFilter, orUnion)
+}
+
+/**
+ * Builds the OR-union of filters, applying simplifications that don't change logic:
+ * - Single filter → return as-is
+ * - Any [IdeFilter.All] → union is All
+ * - All [IdeFilter.Ide] with contiguous version ranges → merge into single Ide
+ * - Otherwise → composite Or tree
+ */
+private fun simplifyOrUnion(filters: List<IdeFilter>): IdeFilter {
+    if (filters.size == 1) return filters[0]
+
+    // If any filter is All, the union is All
+    if (filters.any { it is IdeFilter.All }) return IdeFilter.All
+
+    // If all are Ide, try to merge into a single Ide
+    val ideFilters = filters.filterIsInstance<IdeFilter.Ide>()
+    if (ideFilters.size == filters.size) {
+        // Check for empty product codes (= any product = All)
+        if (ideFilters.any { it.productCodes.isEmpty() }) return IdeFilter.All
+        val merged = mergeIdeFilters(ideFilters)
+        if (merged != null) return merged
+    }
+
+    // Can't simplify — build composite Or(f1, Or(f2, f3))
+    return filters.reduce { acc, f -> acc.or(f) }
+}
+
+/**
+ * Intersects two filters (AND semantics), simplifying only trivial cases:
+ * - All AND x → x
+ * - x AND All → x
+ * - Otherwise → And(a, b)
+ */
+private fun simplifyAnd(a: IdeFilter, b: IdeFilter): IdeFilter {
+    if (a is IdeFilter.All) return b
+    if (b is IdeFilter.All) return a
+    return a.and(b)
+}
+
+
+/**
+ * Tries to merge multiple [IdeFilter.Ide] filters into a single [IdeFilter.Ide].
+ *
+ * OR-union semantics: product codes are merged, version ranges are widened.
+ * Returns the merged filter if all version ranges form a contiguous interval,
+ * or null if there are gaps that prevent representing the union as a single range.
+ */
+private fun mergeIdeFilters(filters: List<IdeFilter.Ide>): IdeFilter.Ide? {
+    if (filters.isEmpty()) return null
+
+    val allCodes = filters.flatMapTo(mutableSetOf()) { it.productCodes }
+
+    // If any filter has no version constraint, the union is unconstrained
+    if (filters.any { it.minVersion == null && it.maxVersion == null }) {
+        return IdeFilter.Ide(allCodes)
+    }
+
+    // Collect all intervals; treat null min as Int.MIN_VALUE, null max as Int.MAX_VALUE
+    data class Interval(val min: Int, val max: Int)
+    val intervals = filters.map {
+        Interval(it.minVersion ?: Int.MIN_VALUE, it.maxVersion ?: Int.MAX_VALUE)
+    }.sortedBy { it.min }
+
+    // Merge contiguous/overlapping intervals
+    var merged = intervals[0]
+    for (i in 1 until intervals.size) {
+        val next = intervals[i]
+        if (next.min <= merged.max + 1) {
+            merged = Interval(merged.min, maxOf(merged.max, next.max))
+        } else {
+            // Gap found — can't represent as single range
+            return null
+        }
+    }
+
+    val mergedMin = if (merged.min == Int.MIN_VALUE) null else merged.min
+    val mergedMax = if (merged.max == Int.MAX_VALUE) null else merged.max
+    return IdeFilter.Ide(allCodes, mergedMin, mergedMax)
+}
+
 fun buildSeeAlsoLine(folder: String, article: PromptArticle): String {
     val uri = buildArticleUri(folder, article.canonicalPayloadPath)
     val name = articleName(article)
@@ -330,6 +431,11 @@ fun PromptGenerationContext.generateArticleClazz(
     // Generate part classes and ktBlock properties
     val partClassNames = generateNewFormatParts(article, parts, classType, pkg, props)
 
+    // Compute article filter: declared root filter AND (OR-union of kotlin block filters)
+    val contentParts = buildContentParts(parts)
+    val ktBlockFilters = contentParts.filter { it.isKotlinBlock }.map { it.filter }
+    val articleFilter = computeArticleFilter(parts.rootFilter, ktBlockFilters)
+
     // uri property
     props += PropertySpec.builder("uri", String::class)
         .addModifiers(KModifier.OVERRIDE)
@@ -348,7 +454,7 @@ fun PromptGenerationContext.generateArticleClazz(
     val filterType = IdeFilter::class.asClassName()
     props += PropertySpec.builder("filter", filterType)
         .addModifiers(KModifier.OVERRIDE)
-        .initializer(emitFilterConstructor(parts.rootFilter))
+        .initializer(emitFilterConstructor(articleFilter))
         .build()
 
     // description property (non-nullable)
@@ -454,6 +560,7 @@ private fun PromptGenerationContext.generateNewFormatParts(
 
     // Build flat content parts with filters from the parsed article parts
     val contentParts = buildContentParts(parts)
+    val rootFilter = parts.rootFilter
 
     var partCounter = 0
     val partClassNames = mutableListOf<ClassName>()
@@ -468,6 +575,14 @@ private fun PromptGenerationContext.generateNewFormatParts(
             continue
         }
 
+        // Compose part filter with article root filter so parts carry the effective filter
+        // when accessed directly (e.g., in tests via article.parts)
+        val effectiveFilter = when {
+            rootFilter is IdeFilter.All -> part.filter
+            part.filter is IdeFilter.All -> rootFilter
+            else -> rootFilter.and(part.filter)
+        }
+
         val idx = partCounter.toString().padStart(3, '0')
         val cls = ClassName(pkg, "${classType.simpleName}Part$idx")
 
@@ -475,7 +590,7 @@ private fun PromptGenerationContext.generateNewFormatParts(
             content = content,
             classType = cls,
             isKotlinBlock = part.isKotlinBlock,
-            filter = part.filter,
+            filter = effectiveFilter,
             sourcePath = sourcePath,
         )
 
@@ -528,6 +643,13 @@ fun emitFilterConstructor(filter: IdeFilter): CodeBlock = when (filter) {
         .build()
     is IdeFilter.And -> CodeBlock.builder()
         .add("%T.And(", IdeFilter::class.asClassName())
+        .add(emitFilterConstructor(filter.left))
+        .add(", ")
+        .add(emitFilterConstructor(filter.right))
+        .add(")")
+        .build()
+    is IdeFilter.Or -> CodeBlock.builder()
+        .add("%T.Or(", IdeFilter::class.asClassName())
         .add(emitFilterConstructor(filter.left))
         .add(", ")
         .add(emitFilterConstructor(filter.right))

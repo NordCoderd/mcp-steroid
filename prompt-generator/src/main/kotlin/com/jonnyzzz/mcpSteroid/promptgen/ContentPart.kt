@@ -200,6 +200,11 @@ private fun splitConditionals(md: String, state: ConditionalState): List<Content
             continue
         }
 
+        // Strip build-time-only TOC directives from output content
+        if (trimmed == NO_AUTO_TOC_MARKER || trimmed == EXCLUDE_FROM_AUTO_TOC_MARKER) {
+            continue
+        }
+
         currentLines.add(line)
     }
 
@@ -213,4 +218,6 @@ private fun lineIsDirective(trimmed: String): Boolean =
     trimmed.startsWith("###_IF_") ||
             trimmed == ELSE_MARKER ||
             trimmed == END_IF_MARKER ||
+            trimmed == NO_AUTO_TOC_MARKER ||
+            trimmed == EXCLUDE_FROM_AUTO_TOC_MARKER ||
             ELSE_IF_IDE_PATTERN.matchEntire(trimmed) != null

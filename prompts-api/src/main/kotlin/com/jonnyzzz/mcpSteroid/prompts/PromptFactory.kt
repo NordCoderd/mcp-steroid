@@ -41,28 +41,23 @@ abstract class ArticleBase {
     abstract val parts: List<ArticlePart>
     abstract val seeAlsoItems: List<SeeAlsoItem>
 
-    /** Renders the body: content parts filtered by context, without title/description/see-also. */
-    fun readBody(context: PromptsContext): String = buildString {
-        for (part in parts) {
-            if (!part.filter.matches(context)) continue
-            when (part) {
-                is ArticlePart.KotlinCode -> {
-                    append("```kotlin\n")
-                    append(part.readPrompt())
-                    append("```")
-                }
-                is ArticlePart.Markdown -> append(part.readPrompt())
-            }
-        }
-    }
-
     /** Renders full article: title, description, body, see-also — all filtered by context. */
     fun readPayload(context: PromptsContext): String = buildString {
         appendLine(title.readPrompt())
         appendLine()
         appendLine(description.readPrompt())
         appendLine()
-        append(readBody(context))
+        for (part in parts) {
+            if (!part.filter.matches(context)) continue
+            when (part) {
+                is ArticlePart.KotlinCode -> {
+                    appendLine("```kotlin")
+                    append(part.readPrompt())
+                    appendLine("```")
+                }
+                is ArticlePart.Markdown -> appendLine(part.readPrompt())
+            }
+        }
         val visibleItems = seeAlsoItems.filter { it.matchesContext(context) }
         if (visibleItems.isNotEmpty()) {
             append("\n\n# See also\n\n")
