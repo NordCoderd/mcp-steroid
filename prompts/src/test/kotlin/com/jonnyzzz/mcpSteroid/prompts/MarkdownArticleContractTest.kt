@@ -2,6 +2,7 @@
 package com.jonnyzzz.mcpSteroid.prompts
 
 import com.jonnyzzz.mcpSteroid.promptgen.buildContentParts
+import com.jonnyzzz.mcpSteroid.promptgen.computeArticleFilter
 import com.jonnyzzz.mcpSteroid.promptgen.parseNewFormatArticleParts
 import com.jonnyzzz.mcpSteroid.prompts.generated.ResourcesIndex
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
@@ -277,6 +278,94 @@ class MarkdownArticleContractTest {
     }
 
     /**
+     * Verifies that no code fences are inside blockquotes (prefixed with `> `).
+     *
+     * Blockquoted code fences (e.g., `> ```kotlin`) are not detected by the fence parser,
+     * so they escape compilation testing. All code blocks must be at the top level.
+     */
+    @Test
+    fun testNoBlockquotedCodeFences() {
+        val articles = newFormatArticles()
+        if (articles.isEmpty()) return
+
+        val violations = mutableListOf<String>()
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
+        val blockquoteFencePattern = Regex("""^>\s*```""")
+
+        for (file in articles) {
+            val lines = Files.readAllLines(file)
+            val relPath = promptsRoot.relativize(file)
+
+            lines.forEachIndexed { index, line ->
+                if (index < 4) return@forEachIndexed
+                if (blockquoteFencePattern.containsMatchIn(line)) {
+                    violations.add("$relPath:${index + 1}: code fence inside blockquote — remove '> ' prefix: $line")
+                }
+            }
+        }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Blockquoted code fences found (these escape compilation testing):\n${violations.joinToString("\n")}",
+        )
+    }
+
+    /**
+     * Verifies that no kotlin code block contains large commented-out code sections.
+     *
+     * Commented-out code (3+ consecutive lines starting with `//` that look like real code)
+     * should not be present in prompt articles. Instead, convert to descriptive prose or
+     * link to a separate resource.
+     */
+    @Test
+    fun testNoCommentedOutCodeBlocks() {
+        val articles = newFormatArticles()
+        if (articles.isEmpty()) return
+
+        val violations = mutableListOf<String>()
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
+        // Patterns that look like commented-out real code (not explanatory comments)
+        val codeCommentPattern = Regex("""^//\s*(import |val |var |fun |class |if \(|for \(|when |return |\.also|\.let|\?\.|runManager|withContext|ProgramRunnerUtil)""")
+
+        for (file in articles) {
+            val lines = Files.readAllLines(file)
+            val relPath = promptsRoot.relativize(file)
+            var inFence = false
+            var consecutiveComments = 0
+            var commentBlockStart = 0
+
+            lines.forEachIndexed { index, line ->
+                if (index < 4) return@forEachIndexed
+                val trimmed = line.trimStart()
+                when {
+                    trimmed.startsWith("```") -> {
+                        if (inFence && consecutiveComments >= 3) {
+                            violations.add("$relPath:${commentBlockStart + 1}: $consecutiveComments consecutive commented-out code lines inside fence")
+                        }
+                        inFence = !inFence
+                        consecutiveComments = 0
+                    }
+                    inFence && codeCommentPattern.containsMatchIn(trimmed) -> {
+                        if (consecutiveComments == 0) commentBlockStart = index
+                        consecutiveComments++
+                    }
+                    inFence -> {
+                        if (consecutiveComments >= 3) {
+                            violations.add("$relPath:${commentBlockStart + 1}: $consecutiveComments consecutive commented-out code lines inside fence")
+                        }
+                        consecutiveComments = 0
+                    }
+                }
+            }
+        }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Commented-out code blocks found in articles (remove or convert to prose):\n${violations.joinToString("\n")}",
+        )
+    }
+
+    /**
      * Verifies that no article uses non-kotlin fences like ` ```text `, ` ```json `, etc.
      *
      * All code blocks in prompt articles must be ` ```kotlin ``` ` (optionally with fence
@@ -309,6 +398,111 @@ class MarkdownArticleContractTest {
         assertTrue(
             violations.isEmpty(),
             "Non-kotlin fences found in articles (use ```kotlin or ```kotlin[FILTER] instead):\n${violations.joinToString("\n")}",
+        )
+    }
+
+    /**
+     * Verifies that article-level filter is consistent with code block filters.
+     *
+     * The article root filter must not be more restrictive than the weakest (most permissive)
+     * code block filter. For example, an `[IU]` article with a `[RD]` code block is invalid
+     * because the block would never be shown. Also, every article with code blocks must have
+     * its parts' effective filters (article AND block) be satisfiable.
+     */
+    @Test
+    fun testArticleFilterConsistency() {
+        val articles = newFormatArticles()
+        if (articles.isEmpty()) return
+
+        val violations = mutableListOf<String>()
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
+
+        for (file in articles) {
+            val content = Files.readString(file)
+            val relPath = promptsRoot.relativize(file)
+            val lines = content.lines()
+            if (lines.size < 4) continue
+
+            val parts = parseNewFormatArticleParts(content)
+            val rootFilter = parts.rootFilter
+            val contentParts = buildContentParts(parts)
+            val ktParts = contentParts.filter { it.isKotlinBlock }
+
+            // Skip articles without code blocks (overview/prose articles are valid)
+            if (ktParts.isEmpty()) continue
+
+            for ((index, ktPart) in ktParts.withIndex()) {
+                val blockFilter = ktPart.filter
+                // If both article and block have explicit IDE restrictions,
+                // verify the intersection is non-empty (satisfiable)
+                if (rootFilter is IdeFilter.Ide && blockFilter is IdeFilter.Ide) {
+                    val rootCodes = rootFilter.productCodes
+                    val blockCodes = blockFilter.productCodes
+                    if (rootCodes.isNotEmpty() && blockCodes.isNotEmpty() && rootCodes.intersect(blockCodes).isEmpty()) {
+                        violations.add(
+                            "$relPath: block #$index has filter $blockCodes but article root filter is $rootCodes — " +
+                                "intersection is empty, block will never be shown"
+                        )
+                    }
+                }
+            }
+        }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Article filter inconsistencies:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    /**
+     * Verifies that the generated article `filter` property matches the computed rule:
+     * `articleFilter = declaredRootFilter AND orUnion(ktBlockFilters)`.
+     *
+     * TOC articles are excluded (they have no source file).
+     */
+    @Test
+    fun testArticleFilterMatchesComputedRule() {
+        val articles = newFormatArticles()
+        if (articles.isEmpty()) return
+
+        val violations = mutableListOf<String>()
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
+
+        val articlesByUri = ResourcesIndex().roots
+            .flatMap { it.value.articles.values }
+            .associateBy { it.uri }
+
+        for (file in articles) {
+            val content = Files.readString(file)
+            val relPath = promptsRoot.relativize(file)
+            val lines = content.lines()
+            if (lines.size < 4) continue
+
+            val folderPath = promptsRoot.relativize(file.parent).toString()
+                .replace('\\', '/')
+                .trimEnd('/')
+            val stem = file.fileName.toString().removeSuffix(".md")
+            val uri = if (folderPath.isEmpty()) "mcp" + "-steroid" + "://$stem" else "mcp" + "-steroid" + "://$folderPath/$stem"
+
+            val article = articlesByUri[uri] ?: continue
+
+            val parts = parseNewFormatArticleParts(content)
+            val contentParts = buildContentParts(parts)
+            val ktBlockFilters = contentParts.filter { it.isKotlinBlock }.map { it.filter }
+            val expectedFilter = computeArticleFilter(parts.rootFilter, ktBlockFilters)
+
+            if (article.filter != expectedFilter) {
+                violations.add(
+                    "$relPath: generated filter ${article.filter} does not match " +
+                        "computed filter $expectedFilter (root=${parts.rootFilter}, " +
+                        "ktBlocks=${ktBlockFilters.size})"
+                )
+            }
+        }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Article filter does not match computed rule:\n${violations.joinToString("\n")}",
         )
     }
 }
