@@ -296,49 +296,6 @@ class DebuggerDemoTest {
         }
     }
 
-    private fun assertUsedExecuteCodeEvidence(combined: String) {
-        val executionIdPattern = Regex("""\b(?:Execution ID|execution_id):\s*eid_[A-Za-z0-9_-]+""")
-        val hasToolEvidence = executionIdPattern.containsMatchIn(combined)
-
-        check(hasToolEvidence) {
-            "Agent must show evidence of steroid_execute_code usage.\n" +
-                    "Expected an execution id marker (`Execution ID: eid_...` or `execution_id: eid_...`).\nOutput:\n$combined"
-        }
-    }
-
-    private fun hasAnyMarkerLine(output: String, vararg markers: String): Boolean {
-        return markers.any { marker ->
-            Regex("""(?im)^\s*[*_`>#-]*\s*${Regex.escape(marker)}\s*:""").containsMatchIn(output)
-        }
-    }
-
-    private fun findMarkerValue(output: String, vararg markers: String): String? {
-        if (markers.isEmpty()) return null
-        val markerAlternation = markers.joinToString("|") { Regex.escape(it) }
-        val markerRegex = Regex(
-            pattern = """(?im)^\s*[*_`>#-]*\s*(?:$markerAlternation)\s*:\s*(.+?)\s*[*_`]*\s*$"""
-        )
-        val candidates = markerRegex.findAll(output).mapNotNull { match ->
-            match.groupValues
-                .getOrNull(1)
-                ?.trim()
-                ?.trim('*', '_', '`')
-                ?.takeIf { it.isNotEmpty() }
-        }.toList()
-
-        // Filter out template placeholders like <the exact buggy source line>
-        // but allow code type params (<Player>, <T>) and C# lambdas (p => p.Score)
-        // Template placeholders always contain spaces; code type params don't
-        val templatePlaceholder = Regex("""<[a-zA-Z][^>]*\s[^>]*>""")
-        return candidates.lastOrNull { value ->
-            val lowered = value.lowercase()
-            !templatePlaceholder.containsMatchIn(value) &&
-                    !lowered.contains("copy the") &&
-                    !lowered.contains("one line description") &&
-                    !lowered.contains("exact buggy source line")
-        }
-    }
-
     /**
      * Asks the agent to find [DemoByJonnyzzzTest] (a failing JUnit test in the test-project),
      * run it through the IntelliJ debugger, set a breakpoint inside [leaderboard()], and
@@ -540,11 +497,11 @@ class DebuggerDemoTest {
         console.writeInfo("Checking: ROOT_CAUSE marker")
         assertRootCauseQuality(
             combined, output,
-            ignoredReturnPatterns = listOf(
+            firstAspectPatterns = listOf(
                 "!=", "not equal", "inverted", "wrong condition", "incorrect condition",
                 "opposite", "negated", "reversed condition",
             ),
-            returnsNewListPatterns = listOf(
+            secondAspectPatterns = listOf(
                 "inactive", "wrong items", "returns inactive", "instead of active",
                 "active items", "should be ==", "should be equals",
             ),
@@ -760,11 +717,11 @@ class DebuggerDemoTest {
         console.writeInfo("Checking: ROOT_CAUSE marker")
         assertRootCauseQuality(
             combined, output,
-            ignoredReturnPatterns = listOf(
+            firstAspectPatterns = listOf(
                 "displayName", "by displayName", "displayName field", "displayName instead",
                 "searches by displayName", "using displayName", "matches displayName",
             ),
-            returnsNewListPatterns = listOf(
+            secondAspectPatterns = listOf(
                 "map key", "userId as key", "key lookup", "as the key",
                 "default", "fallback", "guest", "always returns", "never matches",
             ),
@@ -856,11 +813,11 @@ class DebuggerDemoTest {
         console.writeInfo("Checking: ROOT_CAUSE marker")
         assertRootCauseQuality(
             combined, output,
-            ignoredReturnPatterns = listOf(
+            firstAspectPatterns = listOf(
                 "starts at 1", "starting at 1", "index 1", "i = 1",
                 "begins at 1", "initialized to 1", "starting index",
             ),
-            returnsNewListPatterns = listOf(
+            secondAspectPatterns = listOf(
                 "instead of 0", "should be 0", "skips first", "missing first",
                 "first element", "element at index 0", "off-by-one",
             ),
@@ -889,29 +846,4 @@ class DebuggerDemoTest {
         }
     }
 
-    private fun assertRootCauseQuality(
-        combined: String,
-        output: String,
-        ignoredReturnPatterns: List<String>,
-        returnsNewListPatterns: List<String>,
-        explanation: String
-    ) {
-        val rootCause = findMarkerValue(output, "ROOT_CAUSE", "Root cause")
-        check(rootCause != null) {
-            "Agent did not output required marker 'ROOT_CAUSE:' (or equivalent).\nOutput:\n$combined"
-        }
-
-        val mentionsFirstAspect = ignoredReturnPatterns.any { pattern ->
-            rootCause.contains(pattern, ignoreCase = true)
-        }
-        val mentionsSecondAspect = returnsNewListPatterns.any { pattern ->
-            rootCause.contains(pattern, ignoreCase = true)
-        }
-        check(mentionsFirstAspect && mentionsSecondAspect) {
-            "$explanation\n" +
-                    "Expected first-aspect patterns: $ignoredReturnPatterns\n" +
-                    "Expected second-aspect patterns: $returnsNewListPatterns\n" +
-                    "Actual ROOT_CAUSE: $rootCause\nOutput:\n$combined"
-        }
-    }
 }
