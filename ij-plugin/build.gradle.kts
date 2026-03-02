@@ -401,6 +401,7 @@ val verifyBundledLibraries by tasks.registering {
             "lib/ij-plugin-${project.version}.jar",
             "lib/kotlin-cli-${project.version}.jar",
             "lib/ocr-common-${project.version}.jar",
+            "lib/prompts-api-${project.version}.jar",
             "lib/prompts-${project.version}.jar",
 
             //libraries
@@ -449,6 +450,10 @@ val verifyBundledLibraries by tasks.registering {
             })
         }
     }
+}
+
+tasks.buildPlugin.configure {
+    finalizedBy(verifyBundledLibraries)
 }
 
 tasks.verifyPlugin {
