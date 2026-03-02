@@ -9,11 +9,19 @@ Use IntelliJ test execution APIs from `steroid_execute_code` to run tests and in
 
 ## Quickstart
 
+**Preferred — run a specific test at caret position (IDE-agnostic):**
+1) Open the test file in the editor and position the caret on the test method or class.
+2) Fire the context action — see `mcp-steroid://test/run-test-at-caret`.
+   - When the caret is on a test, the action title shows the name: **"Run 'testMethodName'"** / **"Debug 'testMethodName'"**
+   - IntelliJ: action IDs `RunClass` (Ctrl+Shift+F10) and `DebugClass`
+   - Rider: action IDs `RiderUnitTestRunContextAction` and `RiderUnitTestDebugContextAction`
+3) Poll for completion and access results (example: `mcp-steroid://test/inspect-test-results`).
+
+**Alternative — run by named run configuration:**
 1) Load `mcp-steroid://test/overview` and pick the examples you need.
 2) List available run configurations (example: `mcp-steroid://test/list-run-configurations`).
 3) Execute a test configuration (example: `mcp-steroid://test/run-tests`).
-4) Poll for completion and access results (example: `mcp-steroid://test/inspect-test-results`).
-5) Navigate test tree and check individual test status (example: `mcp-steroid://test/tree-navigation`).
+4) Navigate test tree and check individual test status (example: `mcp-steroid://test/tree-navigation`).
 
 ## Stateful exec_code workflow
 
@@ -84,7 +92,52 @@ println("Tests started")
 Results appear in Rider's Unit Test tool window. The agent should use the test action,
 then check the debugger for breakpoint hits.
 ###_ELSE_###
-## Run a Specific JUnit Test Class (correct API)
+## Run a Specific Test — Caret Context Action (preferred)
+
+Open the test file, position the caret on the test method or class, and fire the context action.
+The action title dynamically shows the test name: **"Run 'myTestMethod'"** / **"Debug 'myTestMethod'"**.
+
+```kotlin[IU]
+import com.intellij.ide.DataManager
+import com.intellij.openapi.actionSystem.ActionManager
+import com.intellij.openapi.actionSystem.ActionUiKind
+import com.intellij.openapi.actionSystem.AnActionEvent
+import com.intellij.openapi.actionSystem.ex.ActionUtil
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
+import com.intellij.openapi.vfs.LocalFileSystem
+
+val testFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(
+    project.basePath + "/src/test/kotlin/com/example/MyTest.kt"
+) ?: error("Test file not found")
+val editors = withContext(Dispatchers.EDT) {
+    FileEditorManager.getInstance(project).openFile(testFile, true)
+}
+val editor = editors.filterIsInstance<TextEditor>().firstOrNull()?.editor
+    ?: error("No text editor")
+
+// Prefer method offset over class offset — reduces ambiguous "Choose configuration" dialog
+val text = editor.document.text
+val offset = text.indexOf("fun myTestMethod").takeIf { it >= 0 } ?: text.indexOf("class MyTest")
+withContext(Dispatchers.EDT) { editor.caretModel.moveToOffset(offset) }
+
+// RunClass = "Run 'myTestMethod'" (Ctrl+Shift+F10); DebugClass = "Debug 'myTestMethod'"
+val action = ActionManager.getInstance().getAction("RunClass") ?: error("RunClass not found")
+withContext(Dispatchers.EDT) {
+    val dataContext = DataManager.getInstance().getDataContext(editor.contentComponent)
+    val event = AnActionEvent.createEvent(
+        dataContext, action.templatePresentation.clone(), "EditorPopup", ActionUiKind.NONE, null
+    )
+    ActionUtil.performAction(action, event)
+}
+println("Test started")
+```
+
+See `mcp-steroid://test/run-test-at-caret` for full pattern with run/debug variants.
+
+## Run a Specific JUnit Test Class (fallback API)
+
+Use when the context action shows a dialog or a specific programmatic configuration is needed:
 
 ```kotlin[IU]
 import com.intellij.execution.junit.JUnitConfiguration
@@ -106,18 +159,8 @@ ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecut
 println("Test run started")
 ```
 
-⚠️ **Common mistake**: `data.TEST_OBJECT = "class"` or `data.TEST_CLASS` as property on a supertype → compile error
-`"unresolved reference 'TEST_CLASS'"`. Always use `JUnitConfiguration.TEST_CLASS` (the static constant).
-
-**Alternative — run via Maven wrapper (simpler, no IDE runner needed):**
-```kotlin
-// ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed in arena
-val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-q")
-    .directory(java.io.File(project.basePath!!))
-    .redirectErrorStream(true).start()
-println(process.inputStream.bufferedReader().readText())
-process.waitFor()
-```
+⚠️ **Common mistake**: `data.TEST_OBJECT = "class"` → compile error. Always use `JUnitConfiguration.TEST_CLASS`.
+⚠️ **Module required**: set `junitConfig.setModule(module)` — without it the configuration is invalid.
 ###_END_IF_###
 
 ## Key APIs to use

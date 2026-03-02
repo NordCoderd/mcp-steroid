@@ -80,9 +80,10 @@ val caretOffset = text.indexOf("fun myTestMethod").takeIf { it >= 0 }
     ?: text.indexOf("class MyTest")
 withContext(Dispatchers.EDT) { editor.caretModel.moveToOffset(caretOffset) }
 
-// Step 2: Debug via context action (same pattern as Rider)
-val action = ActionManager.getInstance().getAction("DebugContextAction")
-    ?: error("DebugContextAction not found")
+// Step 2: Debug via context action — "Debug 'myTestMethod'" appears in gutter/context menu
+// Action ID: "DebugClass" (shortcut shown in gutter icon tooltip)
+val action = ActionManager.getInstance().getAction("DebugClass")
+    ?: error("DebugClass action not found")
 withContext(Dispatchers.EDT) {
     val dataContext = DataManager.getInstance().getDataContext(editor.contentComponent)
     val presentation = action.templatePresentation.clone()

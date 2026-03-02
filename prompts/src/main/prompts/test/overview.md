@@ -6,7 +6,25 @@ Overview of IntelliJ test execution and result inspection examples.
 
 This directory contains runnable examples for IntelliJ test execution and result inspection APIs.
 
-## Complete Test Execution Workflow
+## Preferred Workflow — Run Test at Caret (IDE-agnostic)
+
+```
+1. Open test file in editor
+   ↓
+2. Position caret on test method or class
+   ↓
+3. Fire RunClass / DebugClass (IntelliJ) or RiderUnitTestRunContextAction (Rider)
+   — Action title shows test name: "Run 'myTestMethod'" / "Debug 'myTestMethod'"
+   — Default shortcut: Ctrl+Shift+F10 (run) — shown in gutter icon tooltip
+   ↓
+4. Poll RunContentManager → ProcessHandler.isProcessTerminated()
+   ↓
+5. Inspect results via SMTRunnerConsoleView
+```
+
+See `mcp-steroid://test/run-test-at-caret` for the full runnable example.
+
+## Alternative Workflow — Run by Named Configuration
 
 ```
 1. List run configurations
@@ -43,8 +61,9 @@ Or run [Demo Debug Test](mcp-steroid://test/demo-debug-test) for a one-call end-
 
 ### Basic Test Execution
 
+- **`run-test-at-caret.md`** - Run/debug at caret position (IDE-agnostic, preferred)
 - **`list-run-configurations.md`** - List all run configurations in the project
-- **`run-tests.md`** - Execute a test run configuration
+- **`run-tests.md`** - Execute a named test run configuration
 - **`wait-for-completion.md`** - Wait for test execution to complete
 - **`inspect-test-results.md`** - Access and inspect test results
 
@@ -218,8 +237,9 @@ This pattern avoids timeout issues and provides better feedback to the agent.
 
 ### Test Execution Examples
 - [Test Overview](mcp-steroid://test/overview) - This document
+- [Run Test at Caret](mcp-steroid://test/run-test-at-caret) - IDE-agnostic caret context action
 - [List Run Configurations](mcp-steroid://test/list-run-configurations) - Discover available tests
-- [Run Tests](mcp-steroid://test/run-tests) - Execute test configurations
+- [Run Tests](mcp-steroid://test/run-tests) - Execute named test configurations
 - [Inspect Test Results](mcp-steroid://test/inspect-test-results) - Access results
 - [Test Tree Navigation](mcp-steroid://test/tree-navigation) - Navigate test hierarchy
 - [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll test status

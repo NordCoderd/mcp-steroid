@@ -49,6 +49,9 @@ println("Use 'inspect-test-results' example to access results after completion."
 
 # See also
 
+Preferred — run by caret position (no named configuration needed):
+- [Run Test at Caret](mcp-steroid://test/run-test-at-caret) - Context action approach (RunClass / DebugClass)
+
 Related IDE operations:
 - [Run Configuration](mcp-steroid://ide/run-configuration) - List and execute run configs
 
