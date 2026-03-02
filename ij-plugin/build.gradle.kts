@@ -241,7 +241,7 @@ val verifySupportedHostArchitecture by tasks.registering {
     }
 }
 
-tasks.named("check") {
+tasks.check {
     dependsOn(verifyIntellijMajorReleaseAlignment)
     dependsOn(verifySupportedHostArchitecture)
 }
@@ -452,7 +452,11 @@ val verifyBundledLibraries by tasks.registering {
     }
 }
 
-tasks.buildPlugin.configure {
+tasks.test {
+    dependsOn(verifyBundledLibraries)
+}
+
+tasks.buildPlugin {
     finalizedBy(verifyBundledLibraries)
 }
 

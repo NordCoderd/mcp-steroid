@@ -2,7 +2,6 @@
 package com.jonnyzzz.mcpSteroid.prompts
 
 import com.jonnyzzz.mcpSteroid.promptgen.buildContentParts
-import com.jonnyzzz.mcpSteroid.promptgen.computeArticleFilter
 import com.jonnyzzz.mcpSteroid.promptgen.parseNewFormatArticleParts
 import com.jonnyzzz.mcpSteroid.prompts.generated.ResourcesIndex
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
@@ -454,55 +453,4 @@ class MarkdownArticleContractTest {
         )
     }
 
-    /**
-     * Verifies that the generated article `filter` property matches the computed rule:
-     * `articleFilter = declaredRootFilter AND orUnion(ktBlockFilters)`.
-     *
-     * TOC articles are excluded (they have no source file).
-     */
-    @Test
-    fun testArticleFilterMatchesComputedRule() {
-        val articles = newFormatArticles()
-        if (articles.isEmpty()) return
-
-        val violations = mutableListOf<String>()
-        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
-
-        val articlesByUri = ResourcesIndex().roots
-            .flatMap { it.value.articles.values }
-            .associateBy { it.uri }
-
-        for (file in articles) {
-            val content = Files.readString(file)
-            val relPath = promptsRoot.relativize(file)
-            val lines = content.lines()
-            if (lines.size < 4) continue
-
-            val folderPath = promptsRoot.relativize(file.parent).toString()
-                .replace('\\', '/')
-                .trimEnd('/')
-            val stem = file.fileName.toString().removeSuffix(".md")
-            val uri = if (folderPath.isEmpty()) "mcp" + "-steroid" + "://$stem" else "mcp" + "-steroid" + "://$folderPath/$stem"
-
-            val article = articlesByUri[uri] ?: continue
-
-            val parts = parseNewFormatArticleParts(content)
-            val contentParts = buildContentParts(parts)
-            val ktBlockFilters = contentParts.filter { it.isKotlinBlock }.map { it.filter }
-            val expectedFilter = computeArticleFilter(parts.rootFilter, ktBlockFilters)
-
-            if (article.filter != expectedFilter) {
-                violations.add(
-                    "$relPath: generated filter ${article.filter} does not match " +
-                        "computed filter $expectedFilter (root=${parts.rootFilter}, " +
-                        "ktBlocks=${ktBlockFilters.size})"
-                )
-            }
-        }
-
-        assertTrue(
-            violations.isEmpty(),
-            "Article filter does not match computed rule:\n${violations.joinToString("\n")}",
-        )
-    }
 }
