@@ -2,7 +2,7 @@ IDE: Safe Delete
 
 This example safely deletes a method or class, similar to "Refactor | Safe Delete".
 
-```kotlin
+```text
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.safeDelete.SafeDeleteProcessor

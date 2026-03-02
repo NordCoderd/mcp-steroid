@@ -148,7 +148,10 @@ Give your AI agent a senior developer's toolkit: semantic code understanding, au
 **Performance note**: Operations complete in sub-second time for typical projects. Large codebases may take longer.
 
 **Quick example:**
-```text
+```kotlin[IU]
+import com.intellij.psi.search.searches.ReferencesSearch
+import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
+
 // Find a class and all its usages - indexed, accurate, fast
 smartReadAction {
     val classes = KotlinClassShortNameIndex.get("UserService", project, projectScope())
@@ -211,7 +214,7 @@ These resources are designed to be plugged directly into `steroid_execute_code` 
 ## Critical Rules
 
 ### 1. Script Body is a SUSPEND Function
-```text
+```kotlin
 // This is a coroutine - use suspend APIs!
 // waitForSmartMode() is called automatically before your script starts.
 delay(1000)         // coroutine delay - works directly
@@ -274,7 +277,7 @@ writeAction {
 ```
 
 **With explicit imports (same functionality):**
-```text
+```kotlin
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.application.writeAction
 
@@ -285,7 +288,7 @@ writeAction { /* ... */ }
 ## Script Template
 
 **Minimal template (uses built-in helpers):**
-```text
+```kotlin
 // waitForSmartMode() is called automatically before your script starts
 
 // Use IntelliJ APIs with built-in helpers
@@ -298,7 +301,7 @@ println(result)
 ```
 
 **With optional imports (for specialized APIs):**
-```text
+```kotlin[IU]
 import com.intellij.psi.JavaPsiFacade
 
 // Use smartReadAction - combines wait + read
@@ -370,7 +373,7 @@ println("Project: ${project.name}")
 println("Base path: ${project.basePath}")
 ```
 ### Get IDE Log Path
-```kotlin
+```text
 val logPath = com.intellij.openapi.application.PathManager.getLogPath()
 println("Log: $logPath/idea.log")
 ```
@@ -420,13 +423,13 @@ val path = Path.of("/path/to/project")
 ProjectManagerEx.getInstanceEx().openProjectAsync(path, OpenProjectTask { })
 ```
 ### Restart IDE (CAUTION: destructive operation)
-```kotlin
+```text
 com.intellij.openapi.application.ApplicationManager.getApplication().restart()
 ```
 ## Complete End-to-End PSI Example
 
 This example finds a Kotlin class, gets its methods, and prints their signatures:
-```kotlin
+```kotlin[IU]
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
@@ -455,7 +458,7 @@ smartReadAction {
 }
 ```
 ## Find Usages (Complete Example)
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.searches.ReferencesSearch
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
@@ -534,7 +537,7 @@ readAction {
 }
 ```
 ### Java PSI - Find Class by FQN
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.application.readAction
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
@@ -566,7 +569,7 @@ readAction {
 }
 ```
 ### Find Class Hierarchy
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.application.readAction
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
@@ -609,7 +612,7 @@ smartReadAction {
 }
 ```
 ### Search Files by Extension
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.FileTypeIndex
 import org.jetbrains.kotlin.idea.KotlinFileType
 
@@ -624,7 +627,7 @@ smartReadAction {
 }
 ```
 ### Find Methods by Name (Stub Index)
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.application.readAction
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.stubs.StubIndex
@@ -676,7 +679,7 @@ readAction {
 }
 ```
 ### Modify Document (CAUTION: modifies file)
-```kotlin
+```text
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -804,7 +807,7 @@ if (element is PsiNamedElement) {
 }
 ```
 ### Safe Refactoring with RefactoringFactory
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.application.readAction
 import com.intellij.refactoring.RefactoringFactory
 import com.intellij.psi.JavaPsiFacade
@@ -1044,7 +1047,7 @@ symbols.groupBy { it.second }.forEach { (kind, items) ->
 }
 ```
 ### Introspect a Class - Get All Methods and Fields
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.application.readAction
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
@@ -1088,7 +1091,7 @@ readAction {
 }
 ```
 ### Introspect an Interface - Discover Available APIs
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.application.readAction
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
@@ -1129,7 +1132,7 @@ readAction {
 }
 ```
 ### Get Type Information at a Position
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiManager
@@ -1189,7 +1192,7 @@ readAction {
 }
 ```
 ### Resolve Reference - Find What a Symbol Points To
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiManager
@@ -1262,8 +1265,7 @@ readAction {
 
 ### Access Project Services
 
-```text
-import com.intellij.openapi.components.service
+```kotlin
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.module.ModuleManager
 
@@ -1290,7 +1292,7 @@ rootManager.contentSourceRoots.forEach { src ->
 
 ### Check File Type in Project
 
-```text
+```kotlin
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.vfs.LocalFileSystem
 
@@ -1358,7 +1360,7 @@ ActionManager.getInstance().getActionIdList("")
 ```
 ## Reflection for API Discovery
 
-```text
+```kotlin
 try {
     val clazz = Class.forName("com.intellij.openapi.project.Project")
     clazz.methods
@@ -1374,7 +1376,7 @@ try {
 
 Use `printException` for errors - it includes the stack trace in the output:
 
-```text
+```kotlin
 try {
     // risky operation
 } catch (e: Exception) {

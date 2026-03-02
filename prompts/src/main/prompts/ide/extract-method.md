@@ -1,5 +1,5 @@
 IDE: Extract Method
-
+[IU]
 This example extracts a range of statements into a new method,
 
 ```kotlin

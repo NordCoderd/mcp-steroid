@@ -41,13 +41,13 @@ println("VCS-modified files:\n" + changes.joinToString("\n"))
 ---
 
 ## Read a Project File
-```kotlin
+```text
 val text = VfsUtil.loadText(findProjectFile("src/main/resources/application.properties")!!)
 println(text)
 ```
 
 **⚠️ `findProjectFile()` pitfall for resource files**: requires the **FULL relative path** from the project root (e.g., `"src/main/resources/application.properties"`). Calling it with just a filename **always returns null** — causing NPE on `!!`. For files under `src/main/resources/`, use `FilenameIndex.getVirtualFilesByName()` which searches by filename:
-```kotlin
+```text
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 val scope = GlobalSearchScope.projectScope(project)
@@ -63,7 +63,7 @@ println(VfsUtil.loadText(appProps))
 ## ⚡ Read Multiple Files in One Call — PREFERRED Over Separate Calls (Saves ~20s Per Call)
 
 > **⚠️ EXPLORATION RULE: Complete ALL exploration in AT MOST 2 exec_code calls.** (1) Test files + domain model in one batch. (2) Test infrastructure in a second batch only if needed. Do NOT issue one call per file group.
-```kotlin
+```text
 // Batch exploration: replace 5-8 sequential steroid_execute_code calls with 1
 for (path in listOf(
     "pom.xml",
@@ -111,7 +111,7 @@ filtered.forEach { println(it.path) }
 ## Combined Discovery + Read in One Call
 
 When you know target filenames from test imports — skip separate discovery step:
-```kotlin
+```text
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.FilenameIndex
 val targets = listOf(
@@ -132,7 +132,7 @@ files.forEach { vf ->
 ---
 
 ## Search for Text Across Project Files — PREFERRED Over ProcessBuilder("grep")
-```kotlin
+```text
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 // Find all Java files containing a literal string — uses IDE index, no regex pitfalls
@@ -168,7 +168,7 @@ println(if (changes.isEmpty()) "Clean slate — no prior agent changes" else "FI
 ```
 
 **After VCS check: verify that changed files ACTUALLY solve the problem** (a prior agent may have created files in the WRONG package — modified files ≠ correct fix):
-```kotlin
+```kotlin[IU]
 // Check whether required classes exist with correct FQN (not just any file)
 val scope = com.intellij.psi.search.GlobalSearchScope.projectScope(project)
 val required = listOf(

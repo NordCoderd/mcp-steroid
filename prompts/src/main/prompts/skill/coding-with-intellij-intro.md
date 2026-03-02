@@ -100,7 +100,7 @@ This applies to ALL suspend context APIs: `readAction { }`, `writeAction { }`, `
 ### Automatic Smart Mode
 
 `waitForSmartMode()` is called **automatically before your script starts**. You only need to call it again if you trigger indexing mid-script.
-```kotlin
+```kotlin[IU]
 // Smart mode already waited - safe to use indices immediately
 val classes = readAction {
     JavaPsiFacade.getInstance(project)

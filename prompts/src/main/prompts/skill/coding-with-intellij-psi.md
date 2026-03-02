@@ -7,7 +7,7 @@ PSI tree navigation, find usages, class hierarchy, Java/Kotlin PSI, code inspect
 PSI (Program Structure Interface) is IntelliJ's parsed representation of source code. It provides a rich API for code analysis and manipulation.
 
 ### End-to-End Example: Find Kotlin Class Methods
-```kotlin
+```kotlin[IU]
 import org.jetbrains.kotlin.psi.KtClass
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
@@ -37,7 +37,7 @@ smartReadAction {
 ```
 
 ### Find Usages
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.searches.ReferencesSearch
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
@@ -86,7 +86,7 @@ readAction {
 ```
 
 ### Find Elements by Type
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtClass
@@ -111,7 +111,7 @@ if (psiFile != null) {
 ```
 
 ### Java PSI - Find Class by FQN
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 
@@ -142,7 +142,7 @@ readAction {
 ```
 
 ### Find Class Hierarchy
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ClassInheritorsSearch

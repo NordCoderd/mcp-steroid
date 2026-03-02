@@ -1,5 +1,5 @@
 IDE: Call Hierarchy (Find Callers)
-
+[IU]
 This example finds call sites for a method, similar to the
 
 ```kotlin

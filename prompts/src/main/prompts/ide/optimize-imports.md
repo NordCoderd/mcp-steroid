@@ -2,7 +2,7 @@ IDE: Optimize Imports
 
 This example removes unused imports and sorts remaining ones,
 
-```kotlin
+```text
 import com.intellij.psi.codeStyle.JavaCodeStyleManager
 
 // Configuration - modify these for your use case

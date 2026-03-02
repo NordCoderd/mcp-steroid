@@ -2,7 +2,7 @@ IDE: Extract Interface
 
 This example extracts an interface from a class,
 
-```kotlin
+```text
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.refactoring.extractInterface.ExtractInterfaceProcessor
 import com.intellij.refactoring.util.DocCommentPolicy

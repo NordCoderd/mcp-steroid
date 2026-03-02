@@ -2,7 +2,7 @@ LSP: textDocument/references - Find All References
 
 This example demonstrates how to find all references to a symbol,
 
-```kotlin
+```text
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
 

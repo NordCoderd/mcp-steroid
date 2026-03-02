@@ -24,7 +24,7 @@ Any PSI access (`JavaPsiFacade`, `PsiShortNamesCache`, `PsiManager.findFile`, `P
 ## ⚠️ writeAction { } Is NOT a Coroutine Scope
 
 Calling `readAction { }` or ANY suspend function inside `writeAction { }` throws `suspension functions can only be called within coroutine body`. **ALWAYS read first (outside), then write (inside)**:
-```kotlin
+```text
 val vf = findProjectFile("src/main/java/com/example/Foo.java")!!
 val content = VfsUtil.loadText(vf)               // read OUTSIDE writeAction
 

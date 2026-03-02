@@ -11,7 +11,7 @@ println("Base path: ${project.basePath}")
 ```
 
 ### Get IDE Log Path
-```kotlin
+```text
 val logPath = com.intellij.openapi.application.PathManager.getLogPath()
 println("Log: $logPath/idea.log")
 ```

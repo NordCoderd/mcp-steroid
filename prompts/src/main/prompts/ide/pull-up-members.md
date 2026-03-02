@@ -1,5 +1,5 @@
 IDE: Pull Up Members
-
+[IU]
 This example pulls a member from a subclass into a base class,
 
 ```kotlin

@@ -126,7 +126,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.minutes
 val result = CompletableDeferred<Boolean>()
-val s = com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings()
+val s = ExternalSystemTaskExecutionSettings()
 s.externalProjectPath = project.basePath!!
 // ⚠️ After writing new source files: add "--rerun-tasks" to force test execution even if UP-TO-DATE
 s.taskNames = listOf(":api:test", "--tests", "shop.api.composite.product.ProductCompositeServiceApplicationTests", "--rerun-tasks")
@@ -139,7 +139,7 @@ val ok = withTimeout(5.minutes) { result.await() }; println("Gradle result: succ
 // When success=false: read JUnit XML test results directly for failure details:
 val testResultsDir = findProjectFile("build/test-results/test")
 testResultsDir?.children?.filter { it.name.endsWith(".xml") }?.forEach { xmlFile ->
-    val content = com.intellij.openapi.vfs.VfsUtil.loadText(xmlFile)
+    val content = com.intellij.openapi.vfs.VfsUtilCore.loadText(xmlFile)
     val failures = Regex("<failure[^>]*>(.+?)</failure>", RegexOption.DOT_MATCHES_ALL)
         .findAll(content).map { it.groupValues[1].take(300) }.toList()
     if (failures.isNotEmpty()) println("FAIL ${xmlFile.name}: " + failures.first())
@@ -152,7 +152,7 @@ testResultsDir?.children?.filter { it.name.endsWith(".xml") }?.forEach { xmlFile
 ## Verify @ControllerAdvice / @ExceptionHandler Exists
 
 CRITICAL before writing controllers that throw custom exceptions — if no global handler exists, the API returns 500 instead of 404, breaking tests:
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.AnnotatedElementsSearch
 val scope = GlobalSearchScope.projectScope(project)

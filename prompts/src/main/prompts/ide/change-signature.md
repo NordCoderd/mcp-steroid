@@ -1,5 +1,5 @@
 IDE: Change Signature
-
+[IU]
 This example updates a method signature (adds a parameter)
 
 ```kotlin

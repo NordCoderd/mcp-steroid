@@ -1,5 +1,5 @@
 IDE: Hierarchy Search
-
+[IU]
 This example finds class inheritors and method overrides,
 
 ```kotlin

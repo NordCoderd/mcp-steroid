@@ -113,7 +113,7 @@ if (targetConfig != null) {
 
 ## Step 3: Set Breakpoints Programmatically
 
-```text
+```kotlin
 import com.intellij.xdebugger.XDebuggerManager
 import com.intellij.xdebugger.breakpoints.XLineBreakpointType
 import com.intellij.openapi.vfs.VfsUtil
@@ -132,7 +132,8 @@ if (file != null) {
     val breakpointManager = XDebuggerManager.getInstance(project).breakpointManager
     val lineBreakpointType = XLineBreakpointType.EXTENSION_POINT_NAME
         .extensionList
-        .firstOrNull { it is XLineBreakpointType }
+        .filterIsInstance<XLineBreakpointType<*>>()
+        .firstOrNull()
 
     if (lineBreakpointType != null) {
         breakpointManager.addLineBreakpoint(

@@ -7,7 +7,7 @@ PSI structural queries, ReferencesSearch, JavaPsiFacade patterns, and PSI vs fil
 ## ⚡ PSI Structural Query — Explore Class Structure WITHOUT Reading Files
 
 Replaces 5-10 `VfsUtil.loadText` calls with a single PSI query:
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 // When you need to know a class's methods, fields, or call-sites — use PSI.
@@ -56,7 +56,7 @@ ReferencesSearch.search(cls!!, projectScope()).findAll().forEach { ref ->
 ## Find All Usages of a Class (Call Sites, Constructor Invocations)
 
 **CRITICAL when adding new fields to command/DTO objects** — find every call site first so you can update all constructors before running the compiler:
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.searches.ReferencesSearch
 val cmdClass = readAction {
     JavaPsiFacade.getInstance(project).findClass("com.example.CreateReleaseCommand", projectScope())
@@ -72,7 +72,7 @@ if (cmdClass != null) {
 ---
 
 ## Find @Repository Methods with @Query Annotations
-```kotlin
+```kotlin[IU]
 val repo = readAction {
     JavaPsiFacade.getInstance(project).findClass("com.example.ReleaseRepository", projectScope())
 }
@@ -85,7 +85,7 @@ repo?.methods?.forEach { m ->
 ---
 
 ## Find All @Entity Classes in the Project
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.searches.AnnotatedElementsSearch
 val entityAnnotation = readAction {
     JavaPsiFacade.getInstance(project).findClass("jakarta.persistence.Entity", allScope())
@@ -99,7 +99,7 @@ AnnotatedElementsSearch.searchPsiClasses(entityAnnotation!!, projectScope()).fin
 ## Discover Existing Class Naming Conventions Before Creating New Classes
 
 Avoids naming mismatches like `CreateCommentPayload` vs `AddReplyPayload` vs `CreateReplyPayload`. Always do this FIRST when the test doesn't import the payload class directly:
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.PsiShortNamesCache
 val allNames = readAction { PsiShortNamesCache.getInstance(project).allClassNames.toList() }
 allNames.filter { it.endsWith("Payload") || it.endsWith("Request") || it.endsWith("Dto") ||
@@ -110,7 +110,7 @@ allNames.filter { it.endsWith("Payload") || it.endsWith("Request") || it.endsWit
 ---
 
 ## Check if a Java Class Already Exists
-```kotlin
+```kotlin[IU]
 val existing = readAction {
     com.intellij.psi.JavaPsiFacade.getInstance(project).findClass(
         "com.example.MyClass",
@@ -125,7 +125,7 @@ println(if (existing == null) "NOT_FOUND: safe to create" else "EXISTS: " + exis
 ## Discover REST Endpoint Mappings via PSI
 
 PREFERRED over string-searching source — correctly handles class-level `@RequestMapping` + method-level `@GetMapping` combinations:
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.GlobalSearchScope
 val controllerClass = readAction {
     JavaPsiFacade.getInstance(project).findClass(
@@ -150,7 +150,7 @@ readAction {
 ---
 
 ## Targeted File Read — Extract Only Relevant Lines to Avoid Context Bloat
-```kotlin
+```text
 val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/MyTest.java")!!)
 testContent.lines()
     .filter { it.contains("assert") || it.contains("/api/") || it.contains("@Test") }
@@ -162,7 +162,7 @@ testContent.lines()
 ## Find Next Flyway Migration Version Number
 
 Avoids `V5__` collision if `V5__` already exists:
-```kotlin
+```kotlin[IU]
 val migDir = findProjectFile("src/main/resources/db/migration")!!
 val nextVersion = readAction {
     migDir.children.map { it.name }

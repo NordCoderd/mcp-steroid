@@ -2,7 +2,7 @@ IDE: Move File
 
 This example moves a file to another directory,
 
-```kotlin
+```text
 import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesProcessor
 
 data class MoveData(

@@ -26,7 +26,7 @@ if (element is PsiNamedElement) {
 ```
 
 ### Safe Refactoring with RefactoringFactory
-```kotlin
+```kotlin[IU]
 import com.intellij.refactoring.RefactoringFactory
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
@@ -82,7 +82,7 @@ completions.forEach { variant ->
 }
 ```
 ### Introspect a Class - Get All Methods and Fields
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 
@@ -120,7 +120,7 @@ readAction {
 }
 ```
 ### Resolve Reference - Find What a Symbol Points To
-```kotlin
+```kotlin[IU]
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.psi.PsiManager
 import com.intellij.psi.PsiMethod
@@ -254,7 +254,9 @@ try {
 
 ### 1. Use smartReadAction for PSI Operations
 
-```text
+```kotlin[IU]
+import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
+
 // ✓ RECOMMENDED - combines wait + read in one call
 val classes = smartReadAction {
     KotlinClassShortNameIndex.get("MyClass", project, projectScope())
@@ -262,7 +264,7 @@ val classes = smartReadAction {
 
 // Instead of:
 waitForSmartMode()
-val classes = readAction {
+val classesViaReadAction = readAction {
     KotlinClassShortNameIndex.get("MyClass", project, projectScope())
 }
 ```
@@ -476,14 +478,14 @@ import com.intellij.openapi.command.WriteCommandAction
 
 ### Thread Safety
 
-```text
+```kotlin
 readAction { }    // For reading PSI/VFS
 writeAction { }   // For writing PSI/VFS
 smartReadAction { } // Wait for indexing + read
 ```
 
 ### Example: Find and Modify
-```kotlin
+```kotlin[IU]
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 import com.intellij.openapi.command.WriteCommandAction
 
@@ -506,7 +508,7 @@ if (ktClass != null) {
 When adding a new field or parameter to a record, command, or DTO class, use `ReferencesSearch`
 to locate every call site **before** editing. This prevents compile errors from undiscovered
 constructors or factory calls in other files.
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.ReferencesSearch

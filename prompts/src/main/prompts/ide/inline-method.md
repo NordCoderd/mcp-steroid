@@ -1,5 +1,5 @@
 IDE: Inline Method
-
+[IU]
 This example inlines a method body at call sites,
 
 ```kotlin

@@ -32,7 +32,7 @@ Use IntelliJ test execution APIs from `steroid_execute_code` to run tests and in
 
 Avoid long waits or sleeps inside a single call; prefer multiple short polls.
 
-###_IF_RIDER_###
+###_IF_IDE[RD]_###
 ## Run .NET Tests in Rider (Native Test Runner)
 
 Rider uses its own test runner via context actions. Do NOT use JUnitConfiguration — it does not exist in Rider.

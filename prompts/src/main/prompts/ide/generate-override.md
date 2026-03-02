@@ -2,7 +2,7 @@ IDE: Generate Overrides / Implementations
 
 This example generates an override/implementation method in a class,
 
-```kotlin
+```text
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.TypeConversionUtil
 import com.intellij.codeInsight.generation.GenerateMembersUtil

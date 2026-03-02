@@ -1,5 +1,5 @@
 Execute Code: Spring & Maven Patterns
-
+[IU]
 Maven sync, @Component architecture, MavenSyncSpec import, VFS vs native Edit for pom.xml, and package discovery.
 
 # Execute Code: Spring & Maven Patterns
@@ -73,9 +73,9 @@ println("Test imports (required class names):\n" + testImports?.joinToString("\n
 ## Add a Maven Dependency to pom.xml via VFS Text Replace
 
 PREFER this over native Edit tool — VFS write triggers IDE file-change notification immediately:
-```kotlin
+```text
 val pomFile = findProjectFile("pom.xml")!!
-val content = VfsUtil.loadText(pomFile)
+val content = VfsUtilCore.loadText(pomFile)
 val newDep = "\n    <dependency>" +
     "\n        <groupId>io.jsonwebtoken</groupId>" +
     "\n        <artifactId>jjwt-api</artifactId>" +
@@ -93,7 +93,7 @@ println("pom.xml updated — run Maven sync next")
 
 ## Trigger Maven Re-Import After Editing pom.xml AND Await Completion
 
-```text
+```kotlin
 import org.jetbrains.idea.maven.project.MavenProjectsManager
 import org.jetbrains.idea.maven.buildtool.MavenSyncSpec  // ← correct package for IU-253+; NOT .project.MavenSyncSpec
 import com.intellij.platform.backend.observation.Observation
@@ -151,7 +151,7 @@ println("Created Java files:\n" + created.joinToString("\n"))
 `./gradlew test --tests ClassName` silently finds NO tests when the class is in a submodule.
 ALWAYS use the subproject prefix and `--rerun-tasks` after writing new files:
 
-```text
+```kotlin
 // Find the correct Gradle subproject path from module content roots:
 import com.intellij.openapi.roots.ProjectRootManager
 val roots = readAction { ProjectRootManager.getInstance(project).contentSourceRoots }

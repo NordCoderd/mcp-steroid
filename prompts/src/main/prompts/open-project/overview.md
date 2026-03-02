@@ -88,8 +88,14 @@ Resource: `mcp-steroid://open-project/open-with-dialogs`
 
 For advanced scenarios using IntelliJ APIs directly:
 
-```text
+```kotlin
+import com.intellij.ide.trustedProjects.TrustedProjects
+import com.intellij.openapi.project.ex.ProjectManagerEx
+import com.intellij.ide.impl.OpenProjectTask
+import java.nio.file.Path
+
 // Trust and open via APIs
+val path = Path.of("/absolute/path/to/project")
 TrustedProjects.setProjectTrusted(path, true)
 ProjectManagerEx.getInstanceEx().openProjectAsync(path, OpenProjectTask { })
 ```

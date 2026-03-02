@@ -1,5 +1,5 @@
 Coding with IntelliJ: Java & Spring Boot Patterns
-
+[IU]
 Comprehensive Java and Spring Boot patterns: Maven/Gradle, PSI class creation, Spring annotations, repositories, and test execution.
 
 ## Java / Spring Boot Patterns
@@ -79,7 +79,7 @@ Comprehensive Java and Spring Boot patterns: Maven/Gradle, PSI class creation, S
 When implementing a new Spring Boot feature from scratch (e.g., JWT authentication, a new service + controller), follow this workflow to minimize wasted turns:
 
 **Phase 1: Explore (1-2 exec_code calls)**
-```kotlin
+```text
 import com.intellij.openapi.vfs.VfsUtil
 
 // Call 1: readiness + Docker + VCS + test file content in ONE call
@@ -95,17 +95,17 @@ val changes = readAction {
 println(if (changes.isEmpty()) "VCS: clean" else "VCS-modified:\n" + changes.joinToString("\n"))
 // Read test file and pom.xml in SAME call to understand what's needed
 val testVf = findProjectFile("src/test/java/eval/sample/AuthControllerTest.java")  // ← use actual test path
-if (testVf != null) println("\n=== TEST ===\n" + VfsUtil.loadText(testVf))
+if (testVf != null) println("\n=== TEST ===\n" + VfsUtilCore.loadText(testVf))
 val pomVf = findProjectFile("pom.xml")
-if (pomVf != null) println("\n=== pom.xml ===\n" + VfsUtil.loadText(pomVf))
+if (pomVf != null) println("\n=== pom.xml ===\n" + VfsUtilCore.loadText(pomVf))
 ```
 **Phase 2: Add dependencies to pom.xml (1 exec_code call)**
-```kotlin
+```text
 import com.intellij.openapi.vfs.VfsUtil
 
 // Read → inject new dependencies → write via VFS (DO NOT use native Write tool)
 val pomFile = findProjectFile("pom.xml")!!
-val content = VfsUtil.loadText(pomFile)
+val content = VfsUtilCore.loadText(pomFile)
 val jjwtDeps = """
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -204,7 +204,7 @@ println(lines.takeLast(30).joinToString("\n")) // Maven BUILD summary at bottom
 > - If exec_code compilation fails with `.class` or `$` → use triple-quoted Kotlin strings for Java source content
 ### Find All @Entity / @Service / @RestController Classes
 
-```text
+```kotlin
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.searches.AnnotatedElementsSearch
 
@@ -240,7 +240,7 @@ if (rcClass != null) {
 
 ### Check if a Class Already Exists (prevent duplicate file creation)
 
-```text
+```kotlin
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.psi.search.GlobalSearchScope
 
@@ -260,7 +260,7 @@ if (existing != null) {
 
 ### Check Jakarta vs javax Import Conflicts
 
-```text
+```kotlin
 import com.intellij.psi.JavaPsiFacade
 
 // Check which persistence API is available (Jakarta EE 3 vs older javax)
@@ -289,8 +289,9 @@ println("Use: ${persistencePrefix}.persistence.Entity")
 > verify project-wide correctness. Skipping step 1 causes "cannot find symbol" errors that only
 > surface during test execution, not during file-level inspection.
 
-```text
+```kotlin
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.search.GlobalSearchScope
 
 // Find every place that constructs or references CreateReleaseCommand
 val cmdClass = readAction {
@@ -320,10 +321,13 @@ PSI insertion is atomic and whitespace-independent — no excerpt-first ritual, 
 2. Then add the record component via PSI.
 3. Then update each call site.
 
-```text
+```kotlin
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.JavaPsiFacade
-import com.intellij.openapi.command.writeCommandAction
+import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.searches.ReferencesSearch
 
 // Step 1: Find all call sites BEFORE modifying the record
 val cmdClass = readAction {
@@ -352,7 +356,7 @@ if (record != null) {
     val factory = JavaPsiFacade.getElementFactory(project)
     // Create as a field — IntelliJ represents record components as fields
     val newComponent = readAction { factory.createFieldFromText("String parentCode;", record) }
-    writeCommandAction(project) {
+    WriteCommandAction.runWriteCommandAction(project) {
         // Insert AFTER the last existing component (or use addBefore to prepend)
         val lastComponent = record.recordComponents.lastOrNull()
         if (lastComponent != null) {
@@ -375,7 +379,9 @@ if (record != null) {
 
 Inspect existing DB query patterns before adding new queries:
 
-```text
+```kotlin
+import com.intellij.psi.search.GlobalSearchScope
+
 val repo = readAction {
     JavaPsiFacade.getInstance(project).findClass(
         "com.example.ReleaseRepository",
@@ -403,7 +409,7 @@ repo?.methods?.forEach { method ->
 
 > **Rule**: Inspect every file you **modify** — not just files you **create**. The most common undetected error pattern is: inspections pass on all newly created files, but the modified repository has a subtly invalid method name that causes a 90+ second Maven test failure. Catching it with `runInspectionsDirectly` (~5s) prevents that wasted turn.
 
-```text
+```kotlin
 // After modifying a Spring Data JPA repository (adding new findBy... methods):
 val repoVf = findProjectFile("src/main/java/com/example/CommentRepository.java")!!
 val problems = runInspectionsDirectly(repoVf)
@@ -417,7 +423,7 @@ else problems.forEach { (id, d) -> d.forEach { println("[$id] ${it.descriptionTe
 ```
 
 **Batch: inspect multiple modified files at once**
-```text
+```kotlin
 // Inspect both modified file AND newly created files in a single call
 for (path in listOf(
     "src/main/java/com/example/CommentRepository.java",   // ← MODIFIED (added findBy methods)
@@ -435,7 +441,7 @@ for (path in listOf(
 
 **CRITICAL for controllers that throw custom exceptions** (e.g. `ResourceNotFoundException`): if no `@ControllerAdvice` handles the exception, the API returns HTTP 500 instead of 404, failing tests like `shouldReturnNotFoundForNonExistentNotification`. Always verify this BEFORE finalising a new controller.
 
-```text
+```kotlin
 // Find all @ControllerAdvice/@RestControllerAdvice classes and the exceptions they handle
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.searches.AnnotatedElementsSearch
@@ -483,7 +489,9 @@ if (adviceAnnotation == null) {
 
 Understand existing JPA mappings before adding `@ManyToOne` / `@OneToMany` relationships:
 
-```text
+```kotlin
+import com.intellij.psi.search.GlobalSearchScope
+
 val entityClass = readAction {
     JavaPsiFacade.getInstance(project).findClass(
         "com.example.Release",
@@ -505,11 +513,11 @@ entityClass?.fields?.forEach { field ->
 
 ```text
 // Read pom.xml
-val pomContent = VfsUtil.loadText(findProjectFile("pom.xml")!!)
+val pomContent = VfsUtilCore.loadText(findProjectFile("pom.xml")!!)
 println(pomContent)
 
 // Read a specific test file to understand its assertions before implementing
-val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/ProductTest.java")!!)
+val testContent = VfsUtilCore.loadText(findProjectFile("src/test/java/com/example/ProductTest.java")!!)
 println(testContent)
 ```
 
@@ -519,7 +527,7 @@ Instead of printing the full file, filter for the lines you need:
 
 ```text
 // Extract only test assertions and endpoint URLs from a large test file
-val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/MyIntegrationTest.java")!!)
+val testContent = VfsUtilCore.loadText(findProjectFile("src/test/java/com/example/MyIntegrationTest.java")!!)
 testContent.lines()
     .filter { it.contains("assert") || it.contains("/api/") || it.contains("@Test") || it.trim().startsWith("//") }
     .forEach { println(it) }
@@ -531,7 +539,7 @@ This is much cheaper than reading the full file when you only need to know what 
 
 Before creating a new class, check what naming patterns already exist in the project to avoid mismatches (e.g., `EventType` vs `NotificationEventType`):
 
-```text
+```kotlin
 import com.intellij.psi.search.PsiShortNamesCache
 
 val allNames = readAction { PsiShortNamesCache.getInstance(project).allClassNames.toList() }
@@ -546,7 +554,7 @@ allNames.filter { name ->
 
 Avoid creating a migration with a version number that already exists:
 
-```text
+```kotlin
 val migDir = findProjectFile("src/main/resources/db/migration")!!
 val nextVersion = readAction {
     migDir.children.map { it.name }
@@ -562,7 +570,7 @@ println("Next version: V$nextVersion")
 
 **Always prefer the IDE index over `ProcessBuilder("find", ...)`.** The IDE index respects source roots, handles not-yet-flushed writes, and stays consistent with PSI. Shell `find` bypasses indexing and may return stale or out-of-scope results.
 
-```text
+```kotlin
 // PREFERRED: IDE index — respects source roots, project scope
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
@@ -606,6 +614,7 @@ Shell grep bypasses the IDE's PSI and may silently fail on regex escaping (`\/` 
 import com.intellij.psi.search.PsiSearchHelper
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.psi.search.FilenameIndex
 
 // Option A: Find all files containing a specific word (word-boundary search)
 // Use this for plain identifiers, class names, annotation names, etc.
@@ -624,16 +633,16 @@ matchingFiles.forEach { println(it) }
 // Faster than shell grep because it operates on the IDE's already-indexed file list
 val filesWithPath = readAction {
     FilenameIndex.getAllFilesByExt(project, "java", GlobalSearchScope.projectScope(project))
-        .filter { vf -> VfsUtil.loadText(vf).contains("/api/") }
+        .filter { vf -> VfsUtilCore.loadText(vf).contains("/api/") }
 }
 filesWithPath.forEach { println(it.path) }
 
 // Option C: Search in YAML/XML/properties files (no word boundary needed)
 val yamlFiles = readAction {
     FilenameIndex.getAllFilesByExt(project, "yml", GlobalSearchScope.projectScope(project))
-        .filter { vf -> VfsUtil.loadText(vf).contains("/api/") }
+        .filter { vf -> VfsUtilCore.loadText(vf).contains("/api/") }
 }
-yamlFiles.forEach { println(it.path + ": " + VfsUtil.loadText(it).lines().filter { l -> l.contains("/api/") }.joinToString("; ")) }
+yamlFiles.forEach { println(it.path + ": " + VfsUtilCore.loadText(it).lines().filter { l -> l.contains("/api/") }.joinToString("; ")) }
 ```
 
 ### Combine Discovery + Batch Update in ONE Call (Eliminates Two-Step Pattern)
@@ -654,11 +663,11 @@ import com.intellij.openapi.vfs.VfsUtil
 val scope = GlobalSearchScope.projectScope(project)
 val toUpdate = readAction {
     FilenameIndex.getAllFilesByExt(project, "java", scope)
-        .filter { vf -> VfsUtil.loadText(vf).contains("/api/v1") }
+        .filter { vf -> VfsUtilCore.loadText(vf).contains("/api/v1") }
 }
 println("Files to update: ${toUpdate.size}")
 toUpdate.forEach { vf ->
-    val content = VfsUtil.loadText(vf)          // read OUTSIDE writeAction
+    val content = VfsUtilCore.loadText(vf)          // read OUTSIDE writeAction
     val updated = content.replace("/api/v1", "/api/v2")
     check(updated != content) { "Replace matched nothing in ${vf.name}" }
     writeAction { VfsUtil.saveText(vf, updated) } // write INSIDE writeAction
@@ -681,7 +690,7 @@ the file. **Always print the exact target region BEFORE attempting the replace:*
 
 ```text
 val vf = findProjectFile("src/main/java/com/example/ReleaseService.java")!!
-val content = VfsUtil.loadText(vf)
+val content = VfsUtilCore.loadText(vf)
 
 // Step 1: Locate the target region and PRINT it before replacing (costs nothing; saves a retry turn):
 val keyword = "updateRelease"   // keyword near your target
@@ -711,7 +720,7 @@ insensitive and survive partial edits made by other agents.
 
 Explore the full project structure and read multiple relevant files in a single execution — avoid making 5+ separate calls to understand the codebase:
 
-```text
+```kotlin
 import com.intellij.openapi.roots.ProjectRootManager
 
 // Step 1: Print the full file tree for src/main and src/test
@@ -738,7 +747,7 @@ val filesToRead = listOf(
 for (path in filesToRead) {
     val vf = findProjectFile(path) ?: run { println("NOT FOUND: $path"); continue }
     println("\n=== $path ===")
-    println(VfsUtil.loadText(vf))
+    println(VfsUtilCore.loadText(vf))
 }
 ```
 
@@ -748,7 +757,9 @@ for (path in filesToRead) {
 "what methods does FeatureService have?" or "what fields does CommentDto have?", a single PSI call
 answers that question in one round-trip — no need to read 5-6 full files one by one.
 
-```text
+```kotlin
+import com.intellij.psi.search.GlobalSearchScope
+
 // Get all methods and fields of a Java class WITHOUT reading the full file text
 val cls = readAction {
     JavaPsiFacade.getInstance(project).findClass(
@@ -768,7 +779,7 @@ if (cls != null) {
 } else println("Class not found")
 ```
 
-```text
+```kotlin
 // Inspect multiple related classes in ONE script to understand codebase structure
 val classesToInspect = listOf(
     "com.example.features.domain.FeatureRepository",
@@ -783,7 +794,7 @@ for (fqn in classesToInspect) {
 }
 ```
 
-This replaces 6 separate `VfsUtil.loadText()` calls with 1 PSI-based structural query.
+This replaces 6 separate `VfsUtilCore.loadText()` calls with 1 PSI-based structural query.
 
 ### Verify Project Package Structure Before Creating Files
 
@@ -791,7 +802,7 @@ This replaces 6 separate `VfsUtil.loadText()` calls with 1 PSI-based structural 
 Directory names alone are NOT reliable — module source roots may start at a different depth than you expect.
 Getting this wrong means your files are in the wrong package (tests pass locally but fail arena validation).
 
-```text
+```kotlin
 import com.intellij.openapi.roots.ProjectRootManager
 
 // Step 1: List all content source roots (shows exactly where packages start)
@@ -819,7 +830,7 @@ but fails integration validation (class path matching).
 
 **For empty modules with no existing source files** — also infer package convention from sibling modules:
 
-```text
+```kotlin
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 
@@ -849,9 +860,12 @@ The `group` field in `build.gradle` (`group = 'shop.microservices.api'`) is the 
 
 **Always derive the required Java package from test import statements or existing source files — never from the Gradle `group` field.**
 
-```text
+```kotlin
 // Extract required packages from test imports (ground truth for new files):
 import com.intellij.psi.PsiJavaFile
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
+
 val testFile = readAction {
     FilenameIndex.getVirtualFilesByName("ProductServiceApiTests.java",
         GlobalSearchScope.projectScope(project)).firstOrNull()
@@ -868,7 +882,7 @@ println("Packages to use for new files:\n" + testImports?.joinToString("\n"))
 
 **PREFERRED over `ProcessBuilder("git", "diff", "HEAD", "--name-only")`** — avoids blocking the script executor thread and works correctly even inside IDE-managed VFS.
 
-```text
+```kotlin
 // Check which files have pending (uncommitted) changes
 val changes = readAction {
     com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
@@ -881,8 +895,10 @@ Use this at the start of arena tasks to detect whether a previous agent slot alr
 
 **Multi-agent step 2: after VCS check, verify required classes exist with correct FQN** (changed files ≠ correct fix — a prior agent may have created files in the wrong package):
 
-```text
+```kotlin
 // After detecting modified files, check that required classes actually resolve
+import com.intellij.psi.search.GlobalSearchScope
+
 val scope = GlobalSearchScope.projectScope(project)
 val required = listOf(
     "shop.api.core.product.Product",
@@ -908,7 +924,7 @@ if (testResultsDir == null) {
     println("No test-results dir — tests may not have run (compilation error stopped before test phase)")
 } else {
     testResultsDir.children.filter { it.name.endsWith(".xml") }.forEach { xmlFile ->
-        val content = VfsUtil.loadText(xmlFile)
+        val content = VfsUtilCore.loadText(xmlFile)
         val failures = Regex("""<failure[^>]*>(.+?)</failure>""", RegexOption.DOT_MATCHES_ALL)
             .findAll(content).map { it.groupValues[1].take(300) }.toList()
         if (failures.isNotEmpty()) println("FAIL ${xmlFile.name}:\n" + failures.first())
@@ -943,9 +959,10 @@ println(result.inputStream.bufferedReader().readText())
 
 **`VfsUtil.saveText()` replaces the ENTIRE file** — if you only need to add one method, use PSI surgery instead. This avoids overwriting code you haven't read and reduces the risk of accidentally losing other methods.
 
-```text
+```kotlin
 import com.intellij.psi.JavaPsiFacade
 import com.intellij.openapi.command.WriteCommandAction
+import com.intellij.psi.search.GlobalSearchScope
 
 // Find the class to modify
 val psiClass = readAction {
@@ -981,7 +998,7 @@ if (psiClass != null) {
 ```text
 // Step 1: Add dependency via VFS text replace
 val pomFile = findProjectFile("pom.xml")!!
-val content = VfsUtil.loadText(pomFile)
+val content = VfsUtilCore.loadText(pomFile)
 
 // Print excerpt before replacing — catch whitespace issues before they waste a turn:
 val idx = content.indexOf("</dependencies>")
@@ -1002,7 +1019,7 @@ println("pom.xml updated — trigger Maven sync next")
 
 ### Trigger Maven Re-import After pom.xml Changes
 
-```text
+```kotlin
 import org.jetbrains.idea.maven.project.MavenProjectsManager
 import org.jetbrains.idea.maven.buildtool.MavenSyncSpec  // ← correct package for IU-253+; NOT .project.MavenSyncSpec
 import com.intellij.platform.backend.observation.Observation
@@ -1028,7 +1045,7 @@ println("Maven sync and indexing complete — safe to run tests now")
 ```text
 // ✓ PREFERRED: Edit existing file via VFS — triggers IDE change notification
 val vf = findProjectFile("pom.xml")!!
-val content = VfsUtil.loadText(vf)             // read OUTSIDE writeAction
+val content = VfsUtilCore.loadText(vf)             // read OUTSIDE writeAction
 // Print the target slice first to verify exact whitespace/content before replacing:
 val idx = content.indexOf("</dependencies>")
 println("Target slice:\n" + content.substring(maxOf(0, idx - 100), minOf(content.length, idx + 50)))
@@ -1059,7 +1076,7 @@ println("pom.xml updated — IDE change notification fired")
 
 **Prefer over `File(basePath, "pom.xml").readText()`** — respects parent POM inheritance and property interpolation. Useful for checking which version of a library is in use, or whether a dependency is present.
 
-```text
+```kotlin
 import org.jetbrains.idea.maven.project.MavenProjectsManager
 
 // Query Maven project model (effective POM — includes parent POM inheritance and property resolution)
@@ -1085,7 +1102,7 @@ import com.intellij.openapi.module.ModuleManager
 import kotlinx.coroutines.future.await
 
 val modules = ModuleManager.getInstance(project).modules
-val result = ProjectTaskManager.getInstance(project).build(modules).await()
+val result = ProjectTaskManager.getInstance(project).build(*modules).await()
 println("Build errors: ${result.hasErrors()}")
 println("Build aborted: ${result.isAborted}")
 // result.hasErrors() == false means project-wide compile passed
@@ -1124,7 +1141,7 @@ A fix is complete when code is correct and either:
 - target tests pass, or
 - target and baseline tests fail with the same infrastructure signature
 
-```text
+```kotlin
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -1191,7 +1208,7 @@ println("VERIFICATION_DECISION=${if (complete) "COMPLETE" else "INCOMPLETE"}")
 > If the latch still times out after 2 minutes, fall back to `ProcessBuilder("./mvnw", ...)`
 > immediately — do not wait the full 10 minutes.
 
-```text
+```kotlin
 import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
 import org.jetbrains.idea.maven.execution.MavenRunnerParameters
 import org.jetbrains.idea.maven.execution.MavenRunnerSettings
@@ -1253,11 +1270,11 @@ println("Result: passed=$passed")
 
 #### Gradle projects — `GradleRunConfiguration.setRunAsTest(true)`
 
-```text
+```kotlin
 import org.jetbrains.plugins.gradle.service.execution.GradleExternalTaskConfigurationType
 import org.jetbrains.plugins.gradle.service.execution.GradleRunConfiguration
 import com.intellij.execution.RunManager
-import com.intellij.execution.runners.ProgramRunnerUtil
+import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.executors.DefaultRunExecutor
 import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
@@ -1317,7 +1334,7 @@ This is exactly what the green ▶ gutter button does:
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.executors.DefaultRunExecutor
-import com.intellij.openapi.actionSystem.SimpleDataContext
+import com.intellij.openapi.actionSystem.impl.SimpleDataContext
 import com.intellij.openapi.actionSystem.CommonDataKeys
 
 val psiClass = readAction {
@@ -1348,7 +1365,7 @@ println("Test started — check IDE Test Results window")
 > pull logs, full stack traces). Printing the full output causes MCP token limit errors.
 > **Always use `takeLast()` to read only the relevant tail**:
 
-```text
+```kotlin
 // ⚠️ FALLBACK ONLY — use the JUnit or Maven IDE runner below when possible
 // ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed in arena environments
 // ⚠️ NEVER print process.inputStream.bufferedReader().readText() — Spring Boot output can be 200k+ chars
@@ -1389,7 +1406,7 @@ println(lines.takeLast(30).joinToString("\n"))
 > **⚠️ When take/takeLast is not enough** (output still exceeds limit after first+last 30 lines):
 > Use keyword filtering to extract only signal lines from verbose Spring Boot / Testcontainers output:
 
-```text
+```kotlin
 // Keyword-filtered Maven output — use when verbose Spring Boot output exceeds MCP token limit
 // even after take(30)+takeLast(30). Prevents multi-step Bash parsing recovery (saves 3-5 turns).
 val process = ProcessBuilder("./mvnw", "test", "-Dtest=OnlyOneTestClass", "-Dspotless.check.skip=true", "-q")
@@ -1407,7 +1424,7 @@ lines.takeLast(15).forEach(::println)
 ```
 
 Similarly for `test-compile` (project-wide dependency check, faster than full test run):
-```text
+```kotlin
 val process = ProcessBuilder("./mvnw", "test-compile", "-Dspotless.check.skip=true", "-q")
     .directory(java.io.File(project.basePath!!))
     .redirectErrorStream(true).start()
@@ -1429,7 +1446,7 @@ println(lines.takeLast(20).joinToString("\n"))
 > resource exhaustion. Use the IntelliJ ExternalSystem API below instead. If the IDE runner is
 > unavailable, fall back to the Bash tool (outside exec_code) — NOT ProcessBuilder inside exec_code.
 
-```text
+```kotlin
 import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings
 import com.intellij.openapi.externalSystem.service.execution.ProgressExecutionMode
 import com.intellij.openapi.externalSystem.task.TaskCallback
@@ -1480,7 +1497,7 @@ For **Gradle** projects, use `./gradlew` with `--tests` for targeted test class 
 
 > **⚠️ UP-TO-DATE false-positive after writing new files**: After creating new source files via `writeAction { VfsUtil.saveText(...) }`, Gradle may report the test task as `UP-TO-DATE` and skip executing tests entirely — yet still exit with code 0 and print `BUILD SUCCESSFUL`. The task inputs appear unchanged from Gradle's perspective because the compilation cache was not invalidated. **Always add `--rerun-tasks` to the FIRST Gradle test invocation after writing new source files.** If you see `BUILD SUCCESSFUL` with no `Tests run:` line in the output, add `--rerun-tasks` and rerun.
 
-```text
+```kotlin
 // Run a specific test class in a specific Gradle submodule
 // ⚠️ After writing new source files: ALWAYS add --rerun-tasks to the first test run
 // to avoid the UP-TO-DATE false-positive (Gradle skips tests silently, exits 0)
@@ -1500,7 +1517,7 @@ println("--- Last 30 lines (Gradle BUILD FAILED summary appears here) ---")
 println(lines.takeLast(30).joinToString("\n"))
 ```
 
-```text
+```kotlin
 // Run ALL tests in a module (when no specific class is needed):
 val proc = ProcessBuilder("./gradlew", ":product-service:test", "--no-daemon", "-q")
     .directory(java.io.File(project.basePath!!))
@@ -1528,7 +1545,7 @@ println(lines.takeLast(30).joinToString("\n"))
 
 **Consolidate all Docker and system environment checks into ONE `steroid_execute_code` call** instead of multiple Bash tool calls (each Bash call costs ~20s overhead). This single call replaces 8+ separate Bash commands (`docker info`, `ls /var/run/docker.sock`, `find / -name docker*`, `env | grep DOCKER`, `env | grep TESTCONTAINER`, `ps aux | grep docker`, etc.):
 
-```text
+```kotlin
 // ONE call replaces 8 separate Bash diagnostics — saves ~160s round-trip overhead
 val dockerEnv = System.getenv().filter { (k, _) ->
     k.contains("DOCKER", ignoreCase = true) || k.contains("TESTCONTAINERS", ignoreCase = true)
@@ -1551,7 +1568,7 @@ println("PATH: ${System.getenv("PATH")}")
 > Do NOT wait for test failures to discover Docker unavailability — that wastes 8+ turns (~3 min).
 > Combine with your IDE readiness probe so it costs zero extra turns:
 
-```text
+```kotlin
 // STEP ZERO: combine IDE probe + Docker check in one call (before any implementation)
 println("Project: ${project.name} @ ${project.basePath}")
 println("Smart mode: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
@@ -1572,7 +1589,7 @@ Before declaring "environment blocked", run one **baseline** integration test an
 integration test, then compare signatures. Same infra signature in both means the blocker is
 environmental, not patch-specific.
 
-```text
+```kotlin
 import java.io.File
 
 fun runSingleMavenTest(testClass: String): List<String> {
@@ -1612,7 +1629,7 @@ if (baselineInfraBlocked && targetInfraBlocked) {
 > IntelliJ module projects). For Maven/Gradle projects use `MavenRunConfigurationType` or
 > `GradleRunConfiguration` from the ★ PREFERRED ★ section above.
 
-```text
+```kotlin
 import com.intellij.execution.junit.JUnitConfiguration
 import com.intellij.execution.junit.JUnitConfigurationType
 import com.intellij.execution.ProgramRunnerUtil
@@ -1620,12 +1637,12 @@ import com.intellij.execution.RunManager
 import com.intellij.execution.executors.DefaultRunExecutor
 
 val factory = JUnitConfigurationType.getInstance().configurationFactories.first()
-val config = factory.createConfiguration("Run test", project) as JUnitConfiguration
+val settings = RunManager.getInstance(project).createConfiguration("Run test", factory)
+val config = settings.configuration as JUnitConfiguration
 val data = config.persistentData               // typed as JUnitConfiguration.Data
-data.TEST_CLASS = "com.example.MyValidatorTest"
 data.TEST_OBJECT = JUnitConfiguration.TEST_CLASS  // ← must use constant, NOT string "class"
+data.MAIN_CLASS_NAME = "com.example.MyValidatorTest"
 config.setWorkingDirectory(project.basePath!!)
-val settings = RunManager.getInstance(project).createConfiguration(config, factory)
 RunManager.getInstance(project).addConfiguration(settings)
 ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
 println("Test run started")
@@ -1638,7 +1655,7 @@ println("Test run started")
 `SMTRunnerEventsListener.TEST_STATUS` works for all runners (Maven, Gradle, JUnit). Subscribe
 before launching the test. Use `testsRoot.isPassed()` for overall pass/fail:
 
-```text
+```kotlin
 import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
 import com.intellij.execution.testframework.sm.runner.SMTestProxy
 import kotlinx.coroutines.CompletableDeferred
@@ -1707,7 +1724,7 @@ withTimeout(5.minutes) { result.await() }
 > unresolved `@Autowired` dependencies. Run it on `@Configuration` classes **BEFORE** `./mvnw test`
 > to catch Spring startup failures in ~5s instead of waiting for a 90s Maven cold-start.
 
-```text
+```kotlin
 // Faster than 'mvn test' — returns IDE inspection results in seconds
 // Run this after creating/modifying files, BEFORE running ./mvnw test
 val vf = findProjectFile("src/main/java/com/example/Product.java")!!
@@ -1745,7 +1762,7 @@ for (depPath in listOf(
 > **Do NOT ignore `ClassCanBeRecord` on newly-created DTO/data classes.** Treat it as a required
 > action, not informational noise.
 
-```text
+```kotlin
 // WRONG: create as traditional class and ignore ClassCanBeRecord warning
 // public class ProductAggregate { private String name; ... }
 
@@ -1797,7 +1814,7 @@ val dtoFile = readAction {
 }
 if (dtoFile != null) {
     println("=== DTO source ===")
-    println(VfsUtil.loadText(dtoFile))
+    println(VfsUtilCore.loadText(dtoFile))
 }
 
 // Step 2: Cross-reference with what the test calls on the DTO
@@ -1805,7 +1822,7 @@ val testFile = readAction {
     FilenameIndex.getVirtualFilesByName("ReleaseControllerTests.java", GlobalSearchScope.projectScope(project)).firstOrNull()
 }
 if (testFile != null) {
-    val text = VfsUtil.loadText(testFile)
+    val text = VfsUtilCore.loadText(testFile)
     // Extract .methodName() calls that look like DTO accessors (lower-camel, not assertion calls):
     val dtoCalls = Regex("\\.([a-z][a-zA-Z0-9]+)\\(\\)")
         .findAll(text)

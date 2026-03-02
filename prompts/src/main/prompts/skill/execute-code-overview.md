@@ -51,9 +51,11 @@ Options:
 - **(b)** Use a `writeAction { }` block in exec_code to both read and write the file atomically — **PREFERRED** (saves a round-trip)
 
 If you plan to modify a file via exec_code `writeAction { }`, do NOT also issue a native `Read` for that file — it wastes a turn and provides zero benefit. exec_code can read and write in a single call:
-```kotlin
+```text
+import com.intellij.openapi.vfs.VfsUtil
+
 val vf = findProjectFile("src/main/java/com/example/MyClass.java")!!
-val content = VfsUtil.loadText(vf)  // read OUTSIDE writeAction
+val content = VfsUtilCore.loadText(vf)  // read OUTSIDE writeAction
 val updated = content.replace("oldMethod", "newMethod")
 check(updated != content) { "replace matched nothing — check whitespace" }
 writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
@@ -81,7 +83,7 @@ println("Plugin installed: $installed")
 ## ⚠️ NO AUTO-IMPORTS — Every IntelliJ Class Must Be Imported Explicitly
 
 A missing import produces `unresolved reference` (sometimes misleadingly as a type-inference error) and wastes a full retry turn. Common imports not auto-added by the preprocessor:
-```kotlin
+```kotlin[IU]
 import com.intellij.psi.search.FilenameIndex        // getVirtualFilesByName, getAllFilesByExt
 import com.intellij.psi.search.GlobalSearchScope    // projectScope(), allScope()
 import com.intellij.openapi.roots.ProjectRootManager // contentSourceRoots

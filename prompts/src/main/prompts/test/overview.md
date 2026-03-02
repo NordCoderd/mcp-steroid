@@ -85,12 +85,17 @@ Or run [Demo Debug Test](mcp-steroid://test/demo-debug-test) for a one-call end-
 
 ### Pattern 1: Execute and Wait
 
-```text
+```kotlin
+import com.intellij.execution.RunManager
+import com.intellij.execution.ExecutorRegistry
+import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.ui.RunContentManager
 
 // Execute configuration
 val manager = RunManager.getInstance(project)
 val setting = manager.allSettings.first { it.name == "MyTests" }
-val executor = ExecutorRegistry.getExecutorById(DefaultRunExecutor.EXECUTOR_ID)!!
+val executor = ExecutorRegistry.getInstance().getExecutorById(DefaultRunExecutor.EXECUTOR_ID)!!
 
 withContext(Dispatchers.EDT) {
     ProgramRunnerUtil.executeConfiguration(setting, executor)
@@ -99,8 +104,8 @@ withContext(Dispatchers.EDT) {
 println("Execution started: ${setting.name}")
 
 // Second call - poll for completion
-val manager = RunContentManager.getInstance(project)
-val descriptor = manager.allDescriptors.lastOrNull { it.displayName == "MyTests" }
+val runContentManager = RunContentManager.getInstance(project)
+val descriptor = runContentManager.allDescriptors.lastOrNull { it.displayName == "MyTests" }
 val handler = descriptor?.processHandler
 
 if (handler?.isProcessTerminated == true) {
@@ -112,7 +117,10 @@ if (handler?.isProcessTerminated == true) {
 
 ### Pattern 2: Access Test Results
 
-```text
+```kotlin
+import com.intellij.execution.ui.RunContentManager
+import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
+
 val manager = RunContentManager.getInstance(project)
 val descriptor = manager.allDescriptors.lastOrNull()
 
@@ -141,18 +149,21 @@ println("  Total: ${allTests.size}")
 
 // Print failures
 rootProxy.children.forEach { test ->
-    val smTest = test as? SMTestProxy
-    if (smTest?.isDefect == true) {
-        println("\nFailed: ${smTest.name}")
-        println("  Error: ${smTest.errorMessage}")
-        println("  Stack: ${smTest.stacktrace?.take(200)}...")
+    if (test.isDefect) {
+        println("\nFailed: ${test.name}")
+        println("  Error: ${test.errorMessage}")
+        println("  Stack: ${test.stacktrace?.take(200)}...")
     }
 }
 ```
 
 ### Pattern 3: Navigate Test Tree Recursively
 
-```text
+```kotlin
+import com.intellij.execution.testframework.AbstractTestProxy
+import com.intellij.execution.ui.RunContentManager
+import com.intellij.execution.testframework.sm.runner.ui.SMTRunnerConsoleView
+
 fun printTestTree(proxy: AbstractTestProxy, indent: String = "") {
     val status = when {
         proxy.isPassed -> "✓"

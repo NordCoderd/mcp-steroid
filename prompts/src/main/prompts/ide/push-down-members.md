@@ -1,5 +1,5 @@
 IDE: Push Down Members
-
+[IU]
 This example pushes a member from a base class into its subclasses,
 
 ```kotlin

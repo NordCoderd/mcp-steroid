@@ -1,5 +1,5 @@
 IDE: Move Class / Package
-
+[IU]
 This example moves a class to another package and updates references,
 
 ```kotlin

@@ -1,5 +1,5 @@
 IDE: Demo Debug Test (End-to-end)
-
+[IU]
 End-to-end demo that creates a debug run configuration for DemoTestByJonnyzzz, runs it in Debug mode, resumes if paused, waits for completion, and prints results.
 
 ```kotlin

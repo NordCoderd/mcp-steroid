@@ -2,7 +2,7 @@ Create Application Run Configuration
 
 Create a new Application run configuration for a main class.
 
-###_IF_RIDER_###
+###_IF_IDE[RD]_###
 In Rider, use native test runner actions instead of ApplicationConfiguration (which is JVM-specific).
 
 **Run .NET tests from editor context:**
@@ -44,7 +44,7 @@ runManager.allSettings.forEach { println(it.name + " (" + it.type.displayName + 
 ###_ELSE_###
 Create a new Application run configuration for a Kotlin/Java main class.
 
-```kotlin
+```kotlin[IU]
 import com.intellij.execution.RunManager
 import com.intellij.execution.application.ApplicationConfiguration
 import com.intellij.execution.application.ApplicationConfigurationType

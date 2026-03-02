@@ -2,7 +2,7 @@ IDE: Project Search (Index)
 
 This example searches project files by name or file type using indices.
 
-```kotlin
+```text
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.psi.search.FileTypeIndex
 import com.intellij.psi.search.FilenameIndex

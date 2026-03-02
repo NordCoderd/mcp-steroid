@@ -31,7 +31,7 @@ readAction {
 ### Modify Document
 
 **CAUTION: This modifies files on disk!**
-```kotlin
+```text
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -195,7 +195,7 @@ writeAction {
 **⚠️ Import-in-strings pitfall**: The script preprocessor extracts `import foo.Bar;` lines from the top level of your script — including lines inside triple-quoted strings. This causes compilation failures (e.g., `unresolved reference 'jakarta'`) when you embed Java source in a `"""..."""` literal.
 
 **⚠️ Char-literal pitfall in string-assembled Java**: When building Java source via Kotlin `joinToString()`, char literals like `'\''` cause silent escaping errors. The Kotlin string `"'\\''"` produces Java text `'\''` which is a Java syntax error (empty char literal followed by spurious `'`). For Java code containing char literals (e.g., `toString()` with `', '` separators), prefer `java.io.File.writeText()` with triple-quoted raw strings, or use `PsiFileFactory.createFileFromText()`:
-```kotlin
+```text
 // ✓ SAFE: Use java.io.File for Java source with char literals — not affected by import extraction
 java.io.File("${project.basePath}/src/main/java/com/example/model/Product.java")
     .also { it.parentFile.mkdirs() }

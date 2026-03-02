@@ -2,7 +2,7 @@ Debugger: Demo Debug Test (End-to-end)
 
 Launches a debug test session via context action: open test file, position caret on test class/method, fire debug action. Falls back to JUnitConfiguration in IntelliJ if needed.
 
-###_IF_RIDER_###
+###_IF_IDE[RD]_###
 
 ```text
 // In Rider, use RiderUnitTestDebugContextAction to debug tests.

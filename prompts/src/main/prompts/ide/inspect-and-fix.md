@@ -2,7 +2,7 @@ IDE: Inspection + Quick Fix
 
 This example runs a local inspection and applies a quick fix,
 
-```kotlin
+```text
 import com.intellij.codeInspection.CommonProblemDescriptor
 import com.intellij.codeInspection.InspectionEngine
 import com.intellij.codeInspection.ProblemDescriptor

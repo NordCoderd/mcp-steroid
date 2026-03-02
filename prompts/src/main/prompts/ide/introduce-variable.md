@@ -1,5 +1,5 @@
 IDE: Introduce Variable
-
+[IU]
 This example extracts an expression into a new local variable,
 
 ```kotlin

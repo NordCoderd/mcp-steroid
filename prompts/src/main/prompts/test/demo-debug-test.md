@@ -1,8 +1,8 @@
 Test: Demo Debug Test (End-to-end)
-
+[IU]
 End-to-end demo that runs tests in Debug mode, waits for completion, and prints test results.
 
-###_IF_RIDER_###
+###_IF_IDE[RD]_###
 
 ```text
 // In Rider, use RiderUnitTestRunContextAction to run tests natively.

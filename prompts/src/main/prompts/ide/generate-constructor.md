@@ -1,5 +1,5 @@
 IDE: Generate Constructor
-
+[IU]
 This example generates a constructor for selected fields,
 
 ```kotlin
