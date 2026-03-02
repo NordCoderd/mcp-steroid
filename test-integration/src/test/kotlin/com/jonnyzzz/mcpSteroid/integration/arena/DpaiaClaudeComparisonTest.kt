@@ -133,7 +133,7 @@ class DpaiaClaudeComparisonTest {
         private const val DATASET_URL =
             "https://raw.githubusercontent.com/dpaia/ee-dataset/main/datasets/java-spring-ee-dataset.json"
 
-        /** Guest directory for cloned projects (no-MCP case — bash-only, no IntelliJ). */
+        /** Guest directory used by ArenaTestRunner when project is not pre-deployed (fallback). */
         private const val ARENA_WORKSPACE = "/home/agent/claude-comparison"
 
         private val results = CopyOnWriteArrayList<RunRecord>()
@@ -186,15 +186,27 @@ class DpaiaClaudeComparisonTest {
             ).waitForProjectReady()
         }
 
-        /** Container where Claude has NO MCP registered — baseline/control group. */
+        /**
+         * Container where Claude has NO MCP registered — baseline/control group.
+         *
+         * Same project as [sessionWithMcp] is pre-deployed and fully imported in IntelliJ,
+         * so the environment is identical (same Maven deps, same codebase, same IntelliJ state).
+         * The only difference is that MCP Steroid is NOT registered with the Claude agent.
+         */
         val sessionWithoutMcp by lazy {
             IntelliJContainer.create(
                 lifetimeWithoutMcp,
                 consoleTitle = "claude-cmp-none",
                 aiMode = AiMode.NONE,
+                project = IntelliJProject.ProjectFromGitCommitAndPatch(
+                    cloneUrl = setupTestCase.cloneUrl,
+                    repoOwnerAndName = setupTestCase.repo.removeSuffix(".git"),
+                    baseCommit = setupTestCase.baseCommit,
+                    testPatch = setupTestCase.testPatch,
+                    displayName = setupTestCase.instanceId,
+                ),
                 mountDockerSocket = true,
-            )
-            // No waitForProjectReady() — no-MCP agent never uses IntelliJ
+            ).waitForProjectReady()
         }
 
         private val dataset by lazy {
@@ -237,11 +249,10 @@ class DpaiaClaudeComparisonTest {
                     agent = session.aiAgents.claude,
                     withMcp = withMcp,
                     timeoutSeconds = 1800,
-                    // For MCP: the project was pre-deployed before IntelliJ started and is already
-                    // fully indexed (waitForProjectReady() was called in @BeforeAll). Pass the
-                    // pre-deployed path so ArenaTestRunner skips re-cloning.
-                    // For no-MCP: null so ArenaTestRunner clones normally to ARENA_WORKSPACE.
-                    predeployedProjectDir = if (withMcp) session.intellijDriver.getGuestProjectDir() else null,
+                    // Both containers pre-deploy the project at IntelliJ's project-home path
+                    // (waitForProjectReady() was called in @BeforeAll for both sessions).
+                    // Pass the pre-deployed path so ArenaTestRunner skips re-cloning.
+                    predeployedProjectDir = session.intellijDriver.getGuestProjectDir(),
                 )
                 val totalMs = System.currentTimeMillis() - startMs
                 val tokens = extractTokenUsage(result.agentResult.stdout)
@@ -318,7 +329,8 @@ class DpaiaClaudeComparisonTest {
                     inputTokens = usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L,
                     outputTokens = usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: 0L,
                     cacheReadTokens = usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L,
-                    costUsd = json["cost_usd"]?.jsonPrimitive?.doubleOrNull,
+                    // Claude CLI 2.1.x uses "total_cost_usd"; older versions use "cost_usd"
+                    costUsd = (json["total_cost_usd"] ?: json["cost_usd"])?.jsonPrimitive?.doubleOrNull,
                     numTurns = json["num_turns"]?.jsonPrimitive?.intOrNull,
                 )
             }
