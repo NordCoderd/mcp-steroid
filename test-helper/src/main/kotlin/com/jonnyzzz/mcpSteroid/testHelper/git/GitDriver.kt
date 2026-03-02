@@ -120,7 +120,7 @@ class GitDriver(
             return
         }
 
-        val patchPath = "$/temp/_tmp_patch_${System.currentTimeMillis()}.diff"
+        val patchPath = "/tmp/_tmp_patch_${System.currentTimeMillis()}.diff"
         println("[GIT] Applying patch to $repoDir...")
         driver.writeFileInContainer(patchPath, patchContent, executable = false)
 
