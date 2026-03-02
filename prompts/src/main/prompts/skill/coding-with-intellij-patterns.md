@@ -11,8 +11,8 @@ println("Base path: ${project.basePath}")
 ```
 
 ### Get IDE Log Path
-```text
-val logPath = com.intellij.openapi.application.PathManager.getLogPath()
+```kotlin
+val logPath = com.intellij.openapi.application.PathManager.getSystemPath() + "/log"
 println("Log: $logPath/idea.log")
 ```
 
@@ -29,7 +29,7 @@ PluginManagerCore.getPluginSet().enabledPlugins
 ```kotlin
 import com.intellij.ide.plugins.PluginManagerCore
 
-val plugin = PluginManagerCore.loadedPlugins
+val plugin = PluginManagerCore.getPluginSet().enabledPlugins
     .find { it.pluginId.idString == "org.jetbrains.kotlin" }
 println("Kotlin plugin: ${plugin?.version}")
 ```

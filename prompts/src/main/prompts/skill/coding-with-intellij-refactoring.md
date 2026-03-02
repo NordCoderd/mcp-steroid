@@ -8,13 +8,17 @@ Refactoring operations, code completion, IntelliJ services, error handling, best
 
 **CAUTION: This modifies code!**
 
-```text
+```kotlin
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.PsiNamedElement
+import com.intellij.psi.PsiManager
+import com.intellij.openapi.vfs.LocalFileSystem
 
 // First find the element to rename in a read action
 val element = readAction {
-    // ... find your PsiElement
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")
+    val psiFile = PsiManager.getInstance(project).findFile(vf!!)
+    psiFile?.findElementAt(100)?.parent  // find PsiElement at offset
 }
 
 if (element is PsiNamedElement) {
@@ -213,12 +217,16 @@ sourceRootPaths.forEach { println("Source root: $it") }
 ```
 ### Service Access Pattern
 
-```text
-// Project-level service
-val storage = project.service<ExecutionStorage>()
+```kotlin
+import com.intellij.openapi.module.ModuleManager
+
+// Project-level service — use ModuleManager.getInstance(project) or project.getService()
+val moduleManager = ModuleManager.getInstance(project)
+println("Modules: ${moduleManager.modules.map { it.name }}")
 
 // Application-level service
-val mcpServer = service<SteroidsMcpServer>()
+val app = com.intellij.openapi.application.ApplicationManager.getApplication()
+println("Application: ${app.isHeadlessEnvironment}")
 ```
 
 ---
@@ -227,12 +235,14 @@ val mcpServer = service<SteroidsMcpServer>()
 
 ### Use printException for Errors
 
-```text
+```kotlin
 try {
-    // risky operation
-    val result = someOperationThatMightFail()
+    // risky operation — e.g. accessing a file that might not exist
+    val vf = findProjectFile("src/main/kotlin/MyClass.kt") ?: error("File not found")
+    val content = String(vf.contentsToByteArray(), vf.charset)
+    println("Content length: ${content.length}")
 } catch (e: Exception) {
-    // ✓ RECOMMENDED - includes stack trace in output
+    // RECOMMENDED - includes stack trace in output
     printException("Operation failed", e)
 }
 ```
@@ -280,10 +290,12 @@ No imports needed for:
 
 Default imports are provided automatically. Add imports only when needed:
 
-```text
-// ✓ CORRECT - top-level imports when needed
+```kotlin
+// CORRECT - top-level imports when needed
 import com.intellij.psi.PsiManager
+import com.intellij.openapi.vfs.LocalFileSystem
 
+val virtualFile = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")!!
 val psiFile = readAction {
     PsiManager.getInstance(project).findFile(virtualFile)
 }
@@ -346,7 +358,7 @@ When `steroid_execute_code` fails with a Kotlin compilation error (e.g. `unresol
 
 Common imports that are frequently missing:
 
-```text
+```kotlin[IU]
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope   // ← most often missing
 import com.intellij.openapi.roots.ProjectRootManager
@@ -404,56 +416,64 @@ if (missing.isNotEmpty()) {
 
 ### Context Properties
 
-```text
-project: Project         // Current project
-params: JsonElement      // Execution parameters
-disposable: Disposable   // For cleanup
-isDisposed: Boolean      // Check if disposed
+```kotlin
+import com.intellij.openapi.Disposable
+
+// Available properties in script context:
+val p: Project = project              // Current project
+val d: Disposable = disposable        // For cleanup
+val disposed: Boolean = isDisposed    // Check if disposed
+println("Project: ${p.name}, disposed: $disposed")
 ```
 
 ### Output
 
-```text
-println(vararg values)                 // Print values
-printJson(obj)                         // JSON output
-printException(msg, throwable)         // Error with stack trace
-progress(msg)                          // Progress (throttled)
-takeIdeScreenshot(fileName)            // Capture screenshot
+```kotlin
+// Output methods available in script context:
+println("Hello", 42, "world")                        // Print values
+printJson(mapOf("key" to "value"))                    // JSON output
+progress("Step 1 of 3...")                            // Progress (throttled)
 ```
 
 ### Read/Write (No imports needed!)
 
-```text
-readAction { }           // Read PSI/VFS
-writeAction { }          // Write PSI/VFS
-smartReadAction { }      // Wait + read
+```kotlin
+readAction { project.name }           // Read PSI/VFS
+writeAction { project.name }          // Write PSI/VFS
+smartReadAction { project.name }      // Wait + read
 ```
 
 ### Scopes (No imports needed!)
 
-```text
-projectScope()           // Project files only
-allScope()               // Project + libraries
+```kotlin
+val scope1 = projectScope()           // Project files only
+val scope2 = allScope()               // Project + libraries
+println("Project scope: $scope1, all scope: $scope2")
 ```
 
 ### File Access
 
-```text
-findFile(path)                    // VirtualFile by absolute path
-findPsiFile(path)                 // PsiFile by absolute path
-findProjectFile(relativePath)     // VirtualFile by project-relative path
-findProjectPsiFile(relativePath)  // PsiFile by project-relative path
+```kotlin
+val vf1 = findFile("/path/to/file.kt")                   // VirtualFile by absolute path
+val psi1 = findPsiFile("/path/to/file.kt")                // PsiFile by absolute path
+val vf2 = findProjectFile("src/main/App.kt")              // Relative to project
+val psi2 = findProjectPsiFile("src/main/App.kt")          // Relative to project
+println("vf1=$vf1 psi1=$psi1 vf2=$vf2 psi2=$psi2")
 ```
 
 ### Code Analysis (Recommended)
 
-```text
-runInspectionsDirectly(file, includeInfoSeverity = false)
+```kotlin
+val file = findProjectFile("src/main/kotlin/MyClass.kt")
+if (file != null) {
+    val problems = runInspectionsDirectly(file, includeInfoSeverity = false)
+    println("Problems: ${problems.size}")
+}
 ```
 
 ### Common Imports
 
-```text
+```kotlin[IU]
 // PSI
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
@@ -474,14 +494,16 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 
 // Commands
 import com.intellij.openapi.command.WriteCommandAction
+
+println("Imports available")
 ```
 
 ### Thread Safety
 
 ```kotlin
-readAction { }    // For reading PSI/VFS
-writeAction { }   // For writing PSI/VFS
-smartReadAction { } // Wait for indexing + read
+readAction { project.name }    // For reading PSI/VFS
+writeAction { project.name }   // For writing PSI/VFS
+smartReadAction { project.name } // Wait for indexing + read
 ```
 
 ### Example: Find and Modify

@@ -41,21 +41,30 @@ Each example is a complete script for `steroid_execute_code`.
 
 ### Get VCS for a File
 
-```text
+```kotlin
+import com.intellij.openapi.vcs.ProjectLevelVcsManager
+
+val virtualFile = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")!!
 val vcsManager = ProjectLevelVcsManager.getInstance(project)
 val vcs = vcsManager.getVcsFor(virtualFile)
 ```
 
 ### Check if File is Under VCS
 
-```text
+```kotlin
+import com.intellij.openapi.vcs.ProjectLevelVcsManager
+
+val virtualFile = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")!!
 val vcsManager = ProjectLevelVcsManager.getInstance(project)
 val isVersioned = vcsManager.getVcsFor(virtualFile) != null
 ```
 
 ### Get VCS Root
 
-```text
+```kotlin
+import com.intellij.openapi.vcs.ProjectLevelVcsManager
+
+val virtualFile = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")!!
 val vcsManager = ProjectLevelVcsManager.getInstance(project)
 val root = vcsManager.getVcsRootFor(virtualFile)
 ```

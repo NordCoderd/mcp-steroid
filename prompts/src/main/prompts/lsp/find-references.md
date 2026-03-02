@@ -2,7 +2,7 @@ LSP: textDocument/references - Find All References
 
 This example demonstrates how to find all references to a symbol,
 
-```text
+```kotlin
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
 
@@ -63,9 +63,8 @@ val result = readAction {
                 if (refDocument != null && refLine > 0) {
                     val lineStart = refDocument.getLineStartOffset(refLine - 1)
                     val lineEnd = refDocument.getLineEndOffset(refLine - 1)
-                    val lineText = refDocument.getText(
-                        com.intellij.openapi.util.TextRange(lineStart, lineEnd)
-                    ).trim()
+                    val lineText = refDocument.charsSequence.subSequence(lineStart, lineEnd)
+                        .toString().trim()
                     appendLine("   > $lineText")
                 }
             }

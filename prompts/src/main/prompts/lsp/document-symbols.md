@@ -2,7 +2,7 @@ LSP: textDocument/documentSymbol - Document Symbols
 
 This example demonstrates how to list all symbols (classes, functions,
 
-```text
+```kotlin
 import com.intellij.ide.structureView.TreeBasedStructureViewBuilder
 import com.intellij.lang.LanguageStructureViewBuilder
 import com.intellij.openapi.util.Disposer
@@ -43,7 +43,7 @@ val result = readAction {
                 fun printElement(element: com.intellij.ide.structureView.StructureViewTreeElement, indent: String = "") {
                     val value = element.value
                     val presentation = element.presentation
-                    val name = presentation.presentableText ?: (value as? PsiNamedElement)?.name ?: "?"
+                    val name = (value as? PsiNamedElement)?.name ?: value.toString().take(50)
                     val location = presentation.locationString ?: ""
 
                     // Get line number if possible

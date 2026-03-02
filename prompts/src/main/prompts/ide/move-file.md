@@ -2,7 +2,7 @@ IDE: Move File
 
 This example moves a file to another directory,
 
-```text
+```kotlin
 import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesProcessor
 
 data class MoveData(
@@ -59,7 +59,7 @@ val processor = MoveFilesOrDirectoriesProcessor(
 
 writeIntentReadAction { processor.run() }
 
-writeAction { FileDocumentManager.getInstance().saveAllDocuments() }
+writeAction { PsiDocumentManager.getInstance(project).commitAllDocuments() }
 println("Moved file: ${moveData.fileName}")
 ```
 

@@ -2,7 +2,7 @@ IDE: Project Search (Index)
 
 This example searches project files by name or file type using indices.
 
-```text
+```kotlin
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.psi.search.FileTypeIndex
 import com.intellij.psi.search.FilenameIndex
@@ -32,7 +32,7 @@ val result = readAction {
         }
 
         if (fileExtension.isNotBlank()) {
-            val fileType = FileTypeManager.getInstance().getFileTypeByExtension(fileExtension)
+            val fileType = FileTypeManager.getInstance().getFileTypeByFileName("file.$fileExtension")
             val files = FileTypeIndex.getFiles(fileType, projectScope())
             appendLine("By extension '.$fileExtension' (${files.size}):")
             files.take(maxResults).forEach { vf ->

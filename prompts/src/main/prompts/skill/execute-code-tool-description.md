@@ -34,9 +34,9 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - `Write access is allowed from write thread only` → wrap in `writeAction { }`
 - `Read access is allowed from inside read-action only` → wrap the PSI/VFS call in `readAction { }`. Example: `val vf = readAction { FilenameIndex.getVirtualFilesByName("Foo.java", GlobalSearchScope.projectScope(project)).firstOrNull() }`
 
-**NEVER use exec_code just to read existing files**: Use the native Read/Glob/Grep tools — they have zero compilation overhead (~0s vs ~8s per exec_code call). Reserve exec_code for: writing files via VFS, PSI queries, test execution, compile checks. The only exception is reading files that were modified in this session via writeAction — in that case use VfsUtil.loadText() to see in-memory VFS state.
+**NEVER use exec_code just to read existing files**: Use the native Read/Glob/Grep tools — they have zero compilation overhead (~0s vs ~8s per exec_code call). Reserve exec_code for: writing files via VFS, PSI queries, test execution, compile checks. The only exception is reading files that were modified in this session via writeAction — in that case use `String(vf.contentsToByteArray(), vf.charset)` to see in-memory VFS state.
 
-**Prefer VfsUtil over native Read tool** (only when you already have an exec_code call for other work): use `VfsUtil.loadText(findProjectFile("path/File.java")!!)` to see unsaved modifications from prior writeAction calls. Native Read bypasses VFS and may return stale content.
+**Prefer VFS read over native Read tool** (only when you already have an exec_code call for other work): use `val vf = findProjectFile("path/File.java")!!; String(vf.contentsToByteArray(), vf.charset)` to see unsaved modifications from prior writeAction calls. Native Read bypasses VFS and may return stale content.
 
 **Best Practice: Use Sub-Agents**
 For complex IntelliJ API work, delegate to a sub-agent:

@@ -2,7 +2,7 @@ IDE: Generate Overrides / Implementations
 
 This example generates an override/implementation method in a class,
 
-```text
+```kotlin[IU]
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.util.TypeConversionUtil
 import com.intellij.codeInsight.generation.GenerateMembersUtil
@@ -66,7 +66,7 @@ WriteCommandAction.runWriteCommandAction(project) {
     val anchor = OverrideImplementUtil.getDefaultAnchorToOverrideOrImplement(psiClass, baseMethod, substitutor)
     val infos = OverrideImplementUtil.convert2GenerationInfos(prototypes)
     GenerateMembersUtil.insertMembersBeforeAnchor(psiClass, anchor, infos)
-    FileDocumentManager.getInstance().saveAllDocuments()
+    PsiDocumentManager.getInstance(project).commitAllDocuments()
 }
 
 println("Generated override(s) in class: $className")

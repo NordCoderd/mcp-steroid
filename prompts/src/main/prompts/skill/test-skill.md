@@ -42,7 +42,7 @@ with the debugger and provides better results.
 **Run tests from editor context (recommended):**
 Open the test file, position the caret on the test class or method, and invoke the action:
 
-```text
+```kotlin
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -90,7 +90,7 @@ then check the debugger for breakpoint hits.
 ###_ELSE_###
 ## Run a Specific JUnit Test Class (correct API)
 
-```text
+```kotlin[IU]
 import com.intellij.execution.junit.JUnitConfiguration
 import com.intellij.execution.junit.JUnitConfigurationType
 import com.intellij.execution.RunManager
@@ -98,9 +98,10 @@ import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.executors.DefaultRunExecutor
 
 val factory = JUnitConfigurationType.getInstance().configurationFactories.first()
-val config = factory.createConfiguration("Run test", project) as JUnitConfiguration
+val config = factory.createTemplateConfiguration(project) as JUnitConfiguration
+config.name = "Run test"
 val data = config.persistentData               // typed as JUnitConfiguration.Data
-data.TEST_CLASS = "com.example.MyValidatorTest"
+data.MAIN_CLASS_NAME = "com.example.MyValidatorTest"
 data.TEST_OBJECT = JUnitConfiguration.TEST_CLASS  // ← constant, NOT a string literal "class"
 config.setWorkingDirectory(project.basePath!!)
 val settings = RunManager.getInstance(project).createConfiguration(config, factory)

@@ -2,7 +2,7 @@ IDE: Extract Interface
 
 This example extracts an interface from a class,
 
-```text
+```kotlin[IU]
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.refactoring.extractInterface.ExtractInterfaceProcessor
 import com.intellij.refactoring.util.DocCommentPolicy
@@ -102,7 +102,7 @@ WriteCommandAction.runWriteCommandAction(project) {
         created
     } else {
         val javaFile = interfaceFile as? com.intellij.psi.PsiJavaFile
-        val existingText = interfaceFile.virtualFile?.let { VfsUtil.loadText(it) }.orEmpty()
+        val existingText = interfaceFile.virtualFile?.let { String(it.contentsToByteArray(), it.charset) }.orEmpty()
         if (!existingText.contains("interface ${plan.interfaceName}")) {
             interfaceFile.virtualFile?.let { VfsUtil.saveText(it, interfaceText) }
         }

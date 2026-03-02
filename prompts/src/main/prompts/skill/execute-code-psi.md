@@ -42,9 +42,17 @@ cls?.implementsListTypes?.forEach { t -> println("implements: ${t.presentableTex
 
 ## Find ALL Callers/Usages — PREFERRED Over Grepping Source Files
 
-```text
-// Find ALL callers/usages (replaces grepping through source files):
+```kotlin[IU]
 import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.search.GlobalSearchScope
+
+// Find ALL callers/usages (replaces grepping through source files):
+val cls = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.example.domain.FeatureService",
+        GlobalSearchScope.projectScope(project)
+    )
+}
 ReferencesSearch.search(cls!!, projectScope()).findAll().forEach { ref ->
     val snippet = ref.element.parent.text.take(80)
     println("${ref.element.containingFile.name} → $snippet")
@@ -150,8 +158,9 @@ readAction {
 ---
 
 ## Targeted File Read — Extract Only Relevant Lines to Avoid Context Bloat
-```text
-val testContent = VfsUtil.loadText(findProjectFile("src/test/java/com/example/MyTest.java")!!)
+```kotlin
+val testVf = findProjectFile("src/test/java/com/example/MyTest.java")!!
+val testContent = String(testVf.contentsToByteArray(), testVf.charset)
 testContent.lines()
     .filter { it.contains("assert") || it.contains("/api/") || it.contains("@Test") }
     .forEach { println(it) }

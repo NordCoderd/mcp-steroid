@@ -2,7 +2,7 @@ IDE: Inspection + Quick Fix
 
 This example runs a local inspection and applies a quick fix,
 
-```text
+```kotlin[IU]
 import com.intellij.codeInspection.CommonProblemDescriptor
 import com.intellij.codeInspection.InspectionEngine
 import com.intellij.codeInspection.ProblemDescriptor
@@ -48,7 +48,7 @@ val problems: List<ProblemDescriptor> = readAction {
         false,
         true,
         EmptyProgressIndicator(),
-        PairProcessor.alwaysTrue()
+        PairProcessor<LocalInspectionToolWrapper, Any> { _, _ -> true }
     )
     map.values.flatten()
 }
@@ -85,7 +85,6 @@ if (dryRun) {
 writeAction {
     fix.applyFix(project, problemInfo.problem)
     PsiDocumentManager.getInstance(project).commitAllDocuments()
-    FileDocumentManager.getInstance().saveAllDocuments()
 }
 
 println("Applied quick fix: $fixName")

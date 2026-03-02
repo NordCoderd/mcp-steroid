@@ -73,9 +73,9 @@ println("Test imports (required class names):\n" + testImports?.joinToString("\n
 ## Add a Maven Dependency to pom.xml via VFS Text Replace
 
 PREFER this over native Edit tool — VFS write triggers IDE file-change notification immediately:
-```text
+```kotlin
 val pomFile = findProjectFile("pom.xml")!!
-val content = VfsUtilCore.loadText(pomFile)
+val content = String(pomFile.contentsToByteArray(), pomFile.charset)
 val newDep = "\n    <dependency>" +
     "\n        <groupId>io.jsonwebtoken</groupId>" +
     "\n        <artifactId>jjwt-api</artifactId>" +

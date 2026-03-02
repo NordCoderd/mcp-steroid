@@ -19,7 +19,7 @@ Scripts run inside IntelliJ's JVM — unrestricted filesystem access. Use `stero
 
 ## EXCEPTION — Use Native Read Tool for Simple File Reads
 
-The native Read tool can access `/mcp-run-dir/` paths directly. For reading a single file's content, prefer the Read tool over `VfsUtil.loadText()` — it's faster (no compilation overhead). Reserve `exec_code` for operations that **REQUIRE** IntelliJ APIs: PSI analysis, compilation checks, test execution, find usages, refactoring, VCS inspection. If you just need to read file text, use the Read tool.
+The native Read tool can access `/mcp-run-dir/` paths directly. For reading a single file's content, prefer the Read tool over `String(vf.contentsToByteArray(), vf.charset)` — it's faster (no compilation overhead). Reserve `exec_code` for operations that **REQUIRE** IntelliJ APIs: PSI analysis, compilation checks, test execution, find usages, refactoring, VCS inspection. If you just need to read file text, use the Read tool.
 
 ---
 
@@ -44,18 +44,18 @@ Fix the issue and resubmit. Switching to native Write/Bash after one exec_code f
 
 ## ⚠️ exec_code VFS Reads Do NOT Satisfy the Native Edit Tool's Read-Before-Write Constraint
 
-If you read a file via exec_code (`VfsUtil.loadText(vf)`) and then try to use the native `Edit` tool on the same file, you will get `"File has not been read yet"`. These are tracked separately.
+If you read a file via exec_code (`String(vf.contentsToByteArray(), vf.charset)`) and then try to use the native `Edit` tool on the same file, you will get `"File has not been read yet"`. These are tracked separately.
 
 Options:
 - **(a)** Also issue a native `Read` tool call for that file before using `Edit`
 - **(b)** Use a `writeAction { }` block in exec_code to both read and write the file atomically — **PREFERRED** (saves a round-trip)
 
 If you plan to modify a file via exec_code `writeAction { }`, do NOT also issue a native `Read` for that file — it wastes a turn and provides zero benefit. exec_code can read and write in a single call:
-```text
+```kotlin
 import com.intellij.openapi.vfs.VfsUtil
 
 val vf = findProjectFile("src/main/java/com/example/MyClass.java")!!
-val content = VfsUtilCore.loadText(vf)  // read OUTSIDE writeAction
+val content = String(vf.contentsToByteArray(), vf.charset)  // read OUTSIDE writeAction
 val updated = content.replace("oldMethod", "newMethod")
 check(updated != content) { "replace matched nothing — check whitespace" }
 writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
@@ -87,7 +87,7 @@ A missing import produces `unresolved reference` (sometimes misleadingly as a ty
 import com.intellij.psi.search.FilenameIndex        // getVirtualFilesByName, getAllFilesByExt
 import com.intellij.psi.search.GlobalSearchScope    // projectScope(), allScope()
 import com.intellij.openapi.roots.ProjectRootManager // contentSourceRoots
-import com.intellij.openapi.vfs.VfsUtil              // loadText(), saveText(), createDirectoryIfMissing()
+import com.intellij.openapi.vfs.VfsUtil              // saveText(), createDirectoryIfMissing()
 import com.intellij.psi.search.PsiShortNamesCache   // allClassNames
 import com.intellij.psi.search.searches.AnnotatedElementsSearch
 import com.intellij.psi.search.searches.ReferencesSearch

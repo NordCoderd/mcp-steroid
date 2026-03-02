@@ -41,13 +41,14 @@ println("VCS-modified files:\n" + changes.joinToString("\n"))
 ---
 
 ## Read a Project File
-```text
-val text = VfsUtil.loadText(findProjectFile("src/main/resources/application.properties")!!)
+```kotlin
+val vf = findProjectFile("src/main/resources/application.properties")!!
+val text = String(vf.contentsToByteArray(), vf.charset)
 println(text)
 ```
 
 **⚠️ `findProjectFile()` pitfall for resource files**: requires the **FULL relative path** from the project root (e.g., `"src/main/resources/application.properties"`). Calling it with just a filename **always returns null** — causing NPE on `!!`. For files under `src/main/resources/`, use `FilenameIndex.getVirtualFilesByName()` which searches by filename:
-```text
+```kotlin
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 val scope = GlobalSearchScope.projectScope(project)
@@ -55,7 +56,7 @@ val appProps = readAction {
     FilenameIndex.getVirtualFilesByName("application.properties", scope)
         .firstOrNull { it.path.contains("src/main/resources") }
 } ?: error("application.properties not found in src/main/resources")
-println(VfsUtil.loadText(appProps))
+println(String(appProps.contentsToByteArray(), appProps.charset))
 ```
 
 ---
@@ -63,7 +64,7 @@ println(VfsUtil.loadText(appProps))
 ## ⚡ Read Multiple Files in One Call — PREFERRED Over Separate Calls (Saves ~20s Per Call)
 
 > **⚠️ EXPLORATION RULE: Complete ALL exploration in AT MOST 2 exec_code calls.** (1) Test files + domain model in one batch. (2) Test infrastructure in a second batch only if needed. Do NOT issue one call per file group.
-```text
+```kotlin
 // Batch exploration: replace 5-8 sequential steroid_execute_code calls with 1
 for (path in listOf(
     "pom.xml",
@@ -72,7 +73,7 @@ for (path in listOf(
     "src/test/java/com/example/api/CommentControllerTest.java"
 )) {
     val vf = findProjectFile(path) ?: run { println("NOT FOUND: $path"); continue }
-    val content = VfsUtil.loadText(vf)
+    val content = String(vf.contentsToByteArray(), vf.charset)
     // IMPORTANT: distinguish three states:
     //   NOT FOUND  → file doesn't exist at all (test_patch may add it later)
     //   EMPTY      → file exists but has no content (patch not yet applied, or placeholder)
@@ -111,7 +112,7 @@ filtered.forEach { println(it.path) }
 ## Combined Discovery + Read in One Call
 
 When you know target filenames from test imports — skip separate discovery step:
-```text
+```kotlin
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.FilenameIndex
 val targets = listOf(
@@ -125,14 +126,14 @@ val files = readAction {
 }
 files.forEach { vf ->
     println("\n=== ${vf.name} (${vf.path}) ===")
-    println(VfsUtil.loadText(vf))
+    println(String(vf.contentsToByteArray(), vf.charset))
 }
 ```
 
 ---
 
 ## Search for Text Across Project Files — PREFERRED Over ProcessBuilder("grep")
-```text
+```kotlin
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 // Find all Java files containing a literal string — uses IDE index, no regex pitfalls
@@ -149,7 +150,7 @@ matchingFiles.forEach { println(it) }
 // For broader substring search, filter by content after getting candidates:
 val containing = readAction {
     FilenameIndex.getAllFilesByExt(project, "java", scope)
-        .filter { vf -> VfsUtil.loadText(vf).contains("/api/v1") }
+        .filter { vf -> String(vf.contentsToByteArray(), vf.charset).contains("/api/v1") }
 }
 containing.forEach { println(it.path) }
 ```

@@ -207,8 +207,8 @@ if (problems.isEmpty()) {
 
 **Note**: This approach may return stale results if the IDE window is not focused. Prefer `runInspectionsDirectly()` for MCP use cases.
 
-```text
-import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
+```kotlin
+import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.lang.annotation.HighlightSeverity
 import com.intellij.psi.PsiManager
@@ -220,12 +220,10 @@ readAction {
     val document = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance().getDocument(vf)
 
     if (psiFile != null && document != null) {
-        val highlights = DaemonCodeAnalyzerEx.getInstanceEx(project)
-            .getFileLevelHighlights(project, psiFile)
+        val highlights = DaemonCodeAnalyzerImpl.getHighlights(document, null, project)
 
-        highlights.forEach { info ->
-            val severity = info.severity
-            println("[$severity] ${info.description} at ${info.startOffset}")
+        highlights.forEach { info: HighlightInfo ->
+            println("[${info.severity}] ${info.description} at ${info.startOffset}")
         }
     }
 }

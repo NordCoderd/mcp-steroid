@@ -2,7 +2,7 @@ IDE: Safe Delete
 
 This example safely deletes a method or class, similar to "Refactor | Safe Delete".
 
-```text
+```kotlin
 import com.intellij.psi.search.searches.ReferencesSearch
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.refactoring.safeDelete.SafeDeleteProcessor
@@ -62,7 +62,7 @@ val processor = SafeDeleteProcessor.createInstance(
 
 writeIntentReadAction { processor.run() }
 
-writeAction { FileDocumentManager.getInstance().saveAllDocuments() }
+writeAction { PsiDocumentManager.getInstance(project).commitAllDocuments() }
 println("Safely deleted: $targetName")
 ```
 

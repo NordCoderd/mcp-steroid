@@ -4,82 +4,84 @@ Comprehensive Java and Spring Boot patterns: Maven/Gradle, PSI class creation, S
 
 ## Java / Spring Boot Patterns
 
-> **Step -1 — Combined startup call: readiness + Docker + VCS in ONE exec_code call**
->
-> For any Spring Boot / Maven task, combine your first three checks into a single call.
-> This saves ~60s (3 round-trips × ~20s each) and gives you everything you need to plan exploration:
->
-> ```text
-> // Recommended FIRST exec_code call — do NOT split into 3 separate calls:
-> println("Project: ${project.name}, base: ${project.basePath}")
-> println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
-> val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
-> val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
-> println("Docker: $dockerOk")
-> val changes = readAction {
->     com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
->         .allChanges.mapNotNull { it.virtualFile?.path }
-> }
-> println(if (changes.isEmpty()) "VCS: clean slate" else "VCS-modified files:\n" + changes.joinToString("\n"))
-> // If files are listed: read them BEFORE writing to avoid overwriting parallel-agent work.
-> // If dockerOk=false: still attempt to run FAIL_TO_PASS tests — many use H2 in-memory DB,
-> // no Docker needed. Only fall back to runInspectionsDirectly if the test fails with an
-> // explicit Docker connection error ("Cannot connect to Docker daemon").
-> // Then add file reads for VCS-modified files + FAIL_TO_PASS test files IN THIS SAME CALL
-> // to compress exploration from 7+ calls to 2-3.
-> ```
+**Step -1 — Combined startup call: readiness + Docker + VCS in ONE exec_code call**
 
-> **Step 0 — Explore with PSI BEFORE reading files**
->
-> When you need to understand a class's methods, fields, or call-sites, use PSI structural
-> queries instead of reading file contents. **1 PSI call replaces 5-10 VfsUtil.loadText calls.**
->
-> ```text
-> // Inspect class structure — no file read needed:
-> val cls = readAction {
->     JavaPsiFacade.getInstance(project).findClass(
->         "com.example.domain.FeatureService",
->         GlobalSearchScope.projectScope(project)
->     )
-> }
-> cls?.methods?.forEach { m ->
->     val params = m.parameterList.parameters.joinToString { "${it.name}: ${it.type.presentableText}" }
->     println("${m.name}($params): ${m.returnType?.presentableText}")
-> }
-> // Find all callers (replaces grepping source files):
-> import com.intellij.psi.search.searches.ReferencesSearch
-> ReferencesSearch.search(cls!!, projectScope()).findAll().forEach { ref ->
->     println("${ref.element.containingFile.name} → ${ref.element.parent.text.take(80)}")
-> }
-> ```
->
-> **Rule**: Before reading a 3rd file just to trace code flow, try `ReferencesSearch.search()`
-> or `JavaPsiFacade.findClass()`. These answer in 1 round-trip what file reading takes 5-10 calls.
+For any Spring Boot / Maven task, combine your first three checks into a single call.
+This saves ~60s (3 round-trips × ~20s each) and gives you everything you need to plan exploration:
 
-> **Step 2 — Do This FIRST Before Creating Any Migration File**
->
-> Always determine the next available Flyway migration version number before writing `V{N}__*.sql`.
-> Creating `V5__` when `V5__` already exists breaks Flyway on startup (checksum conflict).
->
-> ```text
-> val migDir = findProjectFile("src/main/resources/db/migration")!!
-> val nextVersion = readAction {
->     migDir.children.map { it.name }
->         .mapNotNull { Regex("""V(\d+)__""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
->         .maxOrNull()?.plus(1) ?: 1
-> }
-> println("Existing migrations:")
-> readAction { migDir.children.map { it.name }.sorted() }.forEach { println("  $it") }
-> println("NEXT_MIGRATION_VERSION=V$nextVersion")
-> // Use this output as the prefix for your new migration file name
-> ```
+```kotlin
+// Recommended FIRST exec_code call — do NOT split into 3 separate calls:
+println("Project: ${project.name}, base: ${project.basePath}")
+println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
+val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
+val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
+println("Docker: $dockerOk")
+val changes = readAction {
+    com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
+        .allChanges.mapNotNull { it.virtualFile?.path }
+}
+println(if (changes.isEmpty()) "VCS: clean slate" else "VCS-modified files:\n" + changes.joinToString("\n"))
+// If files are listed: read them BEFORE writing to avoid overwriting parallel-agent work.
+// If dockerOk=false: still attempt to run FAIL_TO_PASS tests — many use H2 in-memory DB,
+// no Docker needed. Only fall back to runInspectionsDirectly if the test fails with an
+// explicit Docker connection error ("Cannot connect to Docker daemon").
+// Then add file reads for VCS-modified files + FAIL_TO_PASS test files IN THIS SAME CALL
+// to compress exploration from 7+ calls to 2-3.
+```
+
+**Step 0 — Explore with PSI BEFORE reading files**
+
+When you need to understand a class's methods, fields, or call-sites, use PSI structural
+queries instead of reading file contents. **1 PSI call replaces 5-10 VfsUtil.loadText calls.**
+
+```kotlin
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.searches.ReferencesSearch
+
+// Inspect class structure — no file read needed:
+val cls = readAction {
+    JavaPsiFacade.getInstance(project).findClass(
+        "com.example.domain.FeatureService",
+        GlobalSearchScope.projectScope(project)
+    )
+}
+cls?.methods?.forEach { m ->
+    val params = m.parameterList.parameters.joinToString { "${it.name}: ${it.type.presentableText}" }
+    println("${m.name}($params): ${m.returnType?.presentableText}")
+}
+// Find all callers (replaces grepping source files):
+ReferencesSearch.search(cls!!, projectScope()).findAll().forEach { ref ->
+    println("${ref.element.containingFile.name} → ${ref.element.parent.text.take(80)}")
+}
+```
+
+**Rule**: Before reading a 3rd file just to trace code flow, try `ReferencesSearch.search()`
+or `JavaPsiFacade.findClass()`. These answer in 1 round-trip what file reading takes 5-10 calls.
+
+**Step 2 — Do This FIRST Before Creating Any Migration File**
+
+Always determine the next available Flyway migration version number before writing `V{N}__*.sql`.
+Creating `V5__` when `V5__` already exists breaks Flyway on startup (checksum conflict).
+
+```kotlin
+val migDir = findProjectFile("src/main/resources/db/migration")!!
+val nextVersion = readAction {
+    migDir.children.map { it.name }
+        .mapNotNull { Regex("""V(\d+)__""").find(it)?.groupValues?.get(1)?.toIntOrNull() }
+        .maxOrNull()?.plus(1) ?: 1
+}
+println("Existing migrations:")
+readAction { migDir.children.map { it.name }.sorted() }.forEach { println("  $it") }
+println("NEXT_MIGRATION_VERSION=V$nextVersion")
+// Use this output as the prefix for your new migration file name
+```
 
 ### Spring Boot Feature Implementation Workflow (New Feature / JWT / Security)
 
 When implementing a new Spring Boot feature from scratch (e.g., JWT authentication, a new service + controller), follow this workflow to minimize wasted turns:
 
 **Phase 1: Explore (1-2 exec_code calls)**
-```text
+```kotlin
 import com.intellij.openapi.vfs.VfsUtil
 
 // Call 1: readiness + Docker + VCS + test file content in ONE call
@@ -95,17 +97,17 @@ val changes = readAction {
 println(if (changes.isEmpty()) "VCS: clean" else "VCS-modified:\n" + changes.joinToString("\n"))
 // Read test file and pom.xml in SAME call to understand what's needed
 val testVf = findProjectFile("src/test/java/eval/sample/AuthControllerTest.java")  // ← use actual test path
-if (testVf != null) println("\n=== TEST ===\n" + VfsUtilCore.loadText(testVf))
+if (testVf != null) println("\n=== TEST ===\n" + String(testVf.contentsToByteArray(), testVf.charset))
 val pomVf = findProjectFile("pom.xml")
-if (pomVf != null) println("\n=== pom.xml ===\n" + VfsUtilCore.loadText(pomVf))
+if (pomVf != null) println("\n=== pom.xml ===\n" + String(pomVf.contentsToByteArray(), pomVf.charset))
 ```
 **Phase 2: Add dependencies to pom.xml (1 exec_code call)**
-```text
+```kotlin
 import com.intellij.openapi.vfs.VfsUtil
 
 // Read → inject new dependencies → write via VFS (DO NOT use native Write tool)
 val pomFile = findProjectFile("pom.xml")!!
-val content = VfsUtilCore.loadText(pomFile)
+val content = String(pomFile.contentsToByteArray(), pomFile.charset)
 val jjwtDeps = """
         <dependency>
             <groupId>io.jsonwebtoken</groupId>
@@ -511,13 +513,15 @@ entityClass?.fields?.forEach { field ->
 
 ### Read pom.xml / Test Files via VFS
 
-```text
+```kotlin
 // Read pom.xml
-val pomContent = VfsUtilCore.loadText(findProjectFile("pom.xml")!!)
+val pomVf = findProjectFile("pom.xml")!!
+val pomContent = String(pomVf.contentsToByteArray(), pomVf.charset)
 println(pomContent)
 
 // Read a specific test file to understand its assertions before implementing
-val testContent = VfsUtilCore.loadText(findProjectFile("src/test/java/com/example/ProductTest.java")!!)
+val testVf = findProjectFile("src/test/java/com/example/ProductTest.java")!!
+val testContent = String(testVf.contentsToByteArray(), testVf.charset)
 println(testContent)
 ```
 
@@ -525,9 +529,10 @@ println(testContent)
 
 Instead of printing the full file, filter for the lines you need:
 
-```text
+```kotlin
 // Extract only test assertions and endpoint URLs from a large test file
-val testContent = VfsUtilCore.loadText(findProjectFile("src/test/java/com/example/MyIntegrationTest.java")!!)
+val integTestVf = findProjectFile("src/test/java/com/example/MyIntegrationTest.java")!!
+val testContent = String(integTestVf.contentsToByteArray(), integTestVf.charset)
 testContent.lines()
     .filter { it.contains("assert") || it.contains("/api/") || it.contains("@Test") || it.trim().startsWith("//") }
     .forEach { println(it) }
@@ -610,7 +615,7 @@ filtered.forEach { println(it.path) }
 Shell grep bypasses the IDE's PSI and may silently fail on regex escaping (`\/` is invalid in ripgrep).
 `PsiSearchHelper` uses the same index as "Find in Files" — it's fast and always correct.
 
-```text
+```kotlin
 import com.intellij.psi.search.PsiSearchHelper
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.openapi.vfs.VfsUtil
@@ -633,16 +638,16 @@ matchingFiles.forEach { println(it) }
 // Faster than shell grep because it operates on the IDE's already-indexed file list
 val filesWithPath = readAction {
     FilenameIndex.getAllFilesByExt(project, "java", GlobalSearchScope.projectScope(project))
-        .filter { vf -> VfsUtilCore.loadText(vf).contains("/api/") }
+        .filter { vf -> String(vf.contentsToByteArray(), vf.charset).contains("/api/") }
 }
 filesWithPath.forEach { println(it.path) }
 
 // Option C: Search in YAML/XML/properties files (no word boundary needed)
 val yamlFiles = readAction {
     FilenameIndex.getAllFilesByExt(project, "yml", GlobalSearchScope.projectScope(project))
-        .filter { vf -> VfsUtilCore.loadText(vf).contains("/api/") }
+        .filter { vf -> String(vf.contentsToByteArray(), vf.charset).contains("/api/") }
 }
-yamlFiles.forEach { println(it.path + ": " + VfsUtilCore.loadText(it).lines().filter { l -> l.contains("/api/") }.joinToString("; ")) }
+yamlFiles.forEach { println(it.path + ": " + String(it.contentsToByteArray(), it.charset).lines().filter { l -> l.contains("/api/") }.joinToString("; ")) }
 ```
 
 ### Combine Discovery + Batch Update in ONE Call (Eliminates Two-Step Pattern)
@@ -654,7 +659,7 @@ This approach eliminates the most common wasteful two-step pattern seen in Sprin
 (e.g., "update URL prefix in all controllers"). Instead of `FilenameIndex` → read each → decide → update,
 do everything in one shot:
 
-```text
+```kotlin
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.openapi.vfs.VfsUtil
@@ -663,11 +668,11 @@ import com.intellij.openapi.vfs.VfsUtil
 val scope = GlobalSearchScope.projectScope(project)
 val toUpdate = readAction {
     FilenameIndex.getAllFilesByExt(project, "java", scope)
-        .filter { vf -> VfsUtilCore.loadText(vf).contains("/api/v1") }
+        .filter { vf -> String(vf.contentsToByteArray(), vf.charset).contains("/api/v1") }
 }
 println("Files to update: ${toUpdate.size}")
 toUpdate.forEach { vf ->
-    val content = VfsUtilCore.loadText(vf)          // read OUTSIDE writeAction
+    val content = String(vf.contentsToByteArray(), vf.charset)  // read OUTSIDE writeAction
     val updated = content.replace("/api/v1", "/api/v2")
     check(updated != content) { "Replace matched nothing in ${vf.name}" }
     writeAction { VfsUtil.saveText(vf, updated) } // write INSIDE writeAction
@@ -688,9 +693,9 @@ If `check(updated != content)` fires with `"Replace matched nothing"`, the targe
 different whitespace, indentation, or line endings than you expected — or a prior agent already modified
 the file. **Always print the exact target region BEFORE attempting the replace:**
 
-```text
+```kotlin
 val vf = findProjectFile("src/main/java/com/example/ReleaseService.java")!!
-val content = VfsUtilCore.loadText(vf)
+val content = String(vf.contentsToByteArray(), vf.charset)
 
 // Step 1: Locate the target region and PRINT it before replacing (costs nothing; saves a retry turn):
 val keyword = "updateRelease"   // keyword near your target
@@ -736,7 +741,7 @@ contentRoots.forEach { root ->
 }
 ```
 
-```text
+```kotlin
 // Step 2: Read multiple files in a single script (batch instead of per-file calls)
 val filesToRead = listOf(
     "src/main/java/com/example/domain/FeatureService.java",
@@ -747,7 +752,7 @@ val filesToRead = listOf(
 for (path in filesToRead) {
     val vf = findProjectFile(path) ?: run { println("NOT FOUND: $path"); continue }
     println("\n=== $path ===")
-    println(VfsUtilCore.loadText(vf))
+    println(String(vf.contentsToByteArray(), vf.charset))
 }
 ```
 
@@ -915,7 +920,7 @@ println(if (missing.isEmpty()) "All required classes present — run tests"
 
 When `ExternalSystemUtil.runTask()` returns `success=false` **do NOT immediately fall back to `ProcessBuilder("./gradlew")`**. Read the JUnit XML results directly from `build/test-results/test/` instead — this gives you structured failure details without spawning a nested Gradle daemon:
 
-```text
+```kotlin
 import com.intellij.openapi.vfs.VfsUtil
 
 // Adjust path for your module (e.g. "microservices/product-service/build/test-results/test")
@@ -924,7 +929,7 @@ if (testResultsDir == null) {
     println("No test-results dir — tests may not have run (compilation error stopped before test phase)")
 } else {
     testResultsDir.children.filter { it.name.endsWith(".xml") }.forEach { xmlFile ->
-        val content = VfsUtilCore.loadText(xmlFile)
+        val content = String(xmlFile.contentsToByteArray(), xmlFile.charset)
         val failures = Regex("""<failure[^>]*>(.+?)</failure>""", RegexOption.DOT_MATCHES_ALL)
             .findAll(content).map { it.groupValues[1].take(300) }.toList()
         if (failures.isNotEmpty()) println("FAIL ${xmlFile.name}:\n" + failures.first())
@@ -941,7 +946,12 @@ if (testResultsDir == null) {
 
 **⚠️ VFS → Git sync lag**: After bulk `writeAction { VfsUtil.saveText(...) }` edits, git-based tools (subprocess `git diff`, `ProcessBuilder("git", ...)`) may see stale content because VFS changes haven't been flushed to disk yet. Always call `LocalFileSystem.getInstance().refresh(false)` (synchronous) after bulk VFS edits, BEFORE running any git subprocess or checking git diff:
 
-```text
+```kotlin
+// Example: collect files to update as Map<VirtualFile, String>
+val files = mapOf(
+    findProjectFile("src/main/java/com/example/Foo.java")!! to "package com.example;\npublic class Foo {}",
+)
+
 // Apply bulk changes
 writeAction {
     files.forEach { (vf, content) -> VfsUtil.saveText(vf, content) }
@@ -995,10 +1005,10 @@ if (psiClass != null) {
 
 **PREFER exec_code VFS write over native Edit tool** for pom.xml changes. VFS write triggers IDE file-change notification immediately, making Maven auto-import more reliable.
 
-```text
+```kotlin
 // Step 1: Add dependency via VFS text replace
 val pomFile = findProjectFile("pom.xml")!!
-val content = VfsUtilCore.loadText(pomFile)
+val content = String(pomFile.contentsToByteArray(), pomFile.charset)
 
 // Print excerpt before replacing — catch whitespace issues before they waste a turn:
 val idx = content.indexOf("</dependencies>")
@@ -1040,12 +1050,12 @@ println("Maven sync and indexing complete — safe to run tests now")
 
 ### Editing Existing Files via VFS (PREFERRED over native Edit tool)
 
-**Use `VfsUtil.loadText` + `VfsUtil.saveText` for editing existing files** when IDE change notification matters (e.g., pom.xml edits that trigger Maven auto-import, or any file that the IDE needs to re-parse). The native `Edit` tool writes directly to disk, bypassing IntelliJ's VFS layer — Maven auto-import may not trigger.
+**Use `String(vf.contentsToByteArray(), vf.charset)` + `VfsUtil.saveText` for editing existing files** when IDE change notification matters (e.g., pom.xml edits that trigger Maven auto-import, or any file that the IDE needs to re-parse). The native `Edit` tool writes directly to disk, bypassing IntelliJ's VFS layer — Maven auto-import may not trigger.
 
-```text
+```kotlin
 // ✓ PREFERRED: Edit existing file via VFS — triggers IDE change notification
 val vf = findProjectFile("pom.xml")!!
-val content = VfsUtilCore.loadText(vf)             // read OUTSIDE writeAction
+val content = String(vf.contentsToByteArray(), vf.charset)  // read OUTSIDE writeAction
 // Print the target slice first to verify exact whitespace/content before replacing:
 val idx = content.indexOf("</dependencies>")
 println("Target slice:\n" + content.substring(maxOf(0, idx - 100), minOf(content.length, idx + 50)))
@@ -1096,15 +1106,15 @@ println("Has Liquibase: $hasLiquibase")
 
 **Preferred over `./mvnw test-compile`** — compiles through IntelliJ's build system, gives structured results, and avoids spawning a child Maven process. Use when you want to verify project-wide compilation without running any tests.
 
-```text
+```kotlin
 import com.intellij.task.ProjectTaskManager
 import com.intellij.openapi.module.ModuleManager
-import kotlinx.coroutines.future.await
+import org.jetbrains.concurrency.await
 
 val modules = ModuleManager.getInstance(project).modules
 val result = ProjectTaskManager.getInstance(project).build(*modules).await()
 println("Build errors: ${result.hasErrors()}")
-println("Build aborted: ${result.isAborted}")
+println("Build aborted: ${result.isAborted()}")
 // result.hasErrors() == false means project-wide compile passed
 ```
 
@@ -1330,24 +1340,17 @@ println("Result: passed=$passed")
 
 This is exactly what the green ▶ gutter button does:
 
-```text
+```kotlin
 import com.intellij.execution.actions.ConfigurationContext
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.executors.DefaultRunExecutor
-import com.intellij.openapi.actionSystem.impl.SimpleDataContext
-import com.intellij.openapi.actionSystem.CommonDataKeys
 
 val psiClass = readAction {
     JavaPsiFacade.getInstance(project).findClass("com.example.MyTest", projectScope())
 } ?: error("Class not found")
 
 val settings = readAction {
-    ConfigurationContext.getFromContext(
-        SimpleDataContext.builder()
-            .add(CommonDataKeys.PROJECT, project)
-            .add(CommonDataKeys.PSI_ELEMENT, psiClass)
-            .build()
-    ).configuration
+    ConfigurationContext(psiClass).configuration
 } ?: error("No run configuration produced for this class")
 
 // Auto-selects Maven/Gradle/JUnit runner based on project structure
@@ -1668,11 +1671,10 @@ val result = CompletableDeferred<Unit>()
 val connection = project.messageBus.connect()
 connection.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
     override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) {
-        val passed = testsRoot.isPassed()
-        val hasErrors = testsRoot.hasErrors()
-        val allTests = testsRoot.getAllTests()
+        val passed = testsRoot.isPassed
+        val allTests = testsRoot.allTests
         val failCount = allTests.count { it.isDefect }
-        println("Done — passed=$passed errors=$hasErrors failures=$failCount")
+        println("Done — passed=$passed failures=$failCount")
         allTests.filter { it.isDefect }.forEach { println("  FAILED: ${it.name}") }
         connection.disconnect()
         result.complete(Unit)
@@ -1805,7 +1807,7 @@ writeAction {
 
 **Diagnosis recipe** — run when you see `[ConstantValue] Value ... is always 'null'` on a DTO accessor:
 
-```text
+```kotlin
 // Step 1: Read the DTO record source to see its actual component list
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
@@ -1814,7 +1816,7 @@ val dtoFile = readAction {
 }
 if (dtoFile != null) {
     println("=== DTO source ===")
-    println(VfsUtilCore.loadText(dtoFile))
+    println(String(dtoFile.contentsToByteArray(), dtoFile.charset))
 }
 
 // Step 2: Cross-reference with what the test calls on the DTO
@@ -1822,7 +1824,7 @@ val testFile = readAction {
     FilenameIndex.getVirtualFilesByName("ReleaseControllerTests.java", GlobalSearchScope.projectScope(project)).firstOrNull()
 }
 if (testFile != null) {
-    val text = VfsUtilCore.loadText(testFile)
+    val text = String(testFile.contentsToByteArray(), testFile.charset)
     // Extract .methodName() calls that look like DTO accessors (lower-camel, not assertion calls):
     val dtoCalls = Regex("\\.([a-z][a-zA-Z0-9]+)\\(\\)")
         .findAll(text)

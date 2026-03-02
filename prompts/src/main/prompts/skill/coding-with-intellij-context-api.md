@@ -10,112 +10,86 @@ The `McpScriptContext` is the receiver (`this`) of your script body. It provides
 
 ### Core Properties
 
-```text
-project: Project         // IntelliJ Project instance
-params: JsonElement      // Original tool execution parameters (JSON)
-disposable: Disposable   // Parent Disposable for resource cleanup
-isDisposed: Boolean      // Check if context is disposed
+```kotlin
+// Core properties available on McpScriptContext (this):
+//   project: Project         — IntelliJ Project instance
+//   params: JsonElement       — Original tool execution parameters (JSON)
+//   disposable: Disposable   — Parent Disposable for resource cleanup
+//   isDisposed: Boolean      — Check if context is disposed
+println("Project: ${project.name}, disposed: $isDisposed")
 ```
 
 ### Output Methods
 
-```text
-// Print space-separated values
-println(vararg values: Any?)
-
-// Serialize to pretty JSON (uses Jackson)
-printJson(obj: Any)
-
-// Report error without failing execution (includes stack trace)
-printException(msg: String, throwable: Throwable)
-
-// Report progress (throttled to 1 message per second)
-progress(message: String)
-
-// Capture IDE screenshot - artifacts saved as screenshot.png, screenshot-tree.md, screenshot-meta.json
-takeIdeScreenshot(fileName: String = "screenshot"): String  // returns execution_id
+```kotlin
+// Output methods:
+println("Hello", "World")               // Print space-separated values
+printJson(mapOf("key" to "value"))       // Serialize to pretty JSON (uses Jackson)
+progress("Processing step 1...")         // Report progress (throttled to 1/sec)
+val execId = takeIdeScreenshot()         // Capture IDE screenshot, returns execution_id
+try { error("demo") } catch (e: Exception) { printException("oops", e) } // Report error without failing
 ```
 
 ### Built-in Read/Write Actions (NO IMPORTS NEEDED!)
 
-```text
-// Execute under read lock (for PSI/VFS reads)
-suspend fun <T> readAction(block: () -> T): T
-
-// Execute under write lock (for PSI/VFS writes)
-suspend fun <T> writeAction(block: () -> T): T
-
-// Wait for smart mode + read action in one call
-suspend fun <T> smartReadAction(block: () -> T): T
+```kotlin
+// Built-in read/write actions (no imports needed):
+val text = readAction { "read under lock" }         // Execute under read lock (PSI/VFS reads)
+writeAction { /* modify PSI/VFS under write lock */ }  // Execute under write lock
+val smart = smartReadAction { "smart + read" }       // Wait for smart mode + read action
+println("read=$text, smart=$smart")
 ```
 
 **Important**: These are **built-in** - you do NOT need to import `readAction` or `writeAction` from IntelliJ Platform!
 
 ### Built-in Search Scopes (NO IMPORTS NEEDED!)
 
-```text
-// Project files only (no libraries)
-fun projectScope(): GlobalSearchScope
-
-// Project + libraries
-fun allScope(): GlobalSearchScope
+```kotlin
+// Built-in search scopes (no imports needed):
+val projScope = projectScope()  // Project files only (no libraries)
+val everything = allScope()     // Project + libraries
+println("Project scope: $projScope")
 ```
 
 ### File Access Helpers
 
-```text
-// Find VirtualFile by absolute path
-fun findFile(path: String): VirtualFile?
-
-// Find PsiFile by absolute path (suspend - uses readAction)
-suspend fun findPsiFile(path: String): PsiFile?
-
-// Find VirtualFile relative to project base path
-fun findProjectFile(relativePath: String): VirtualFile?
-
-// Find PsiFile relative to project base path (suspend - uses readAction)
-suspend fun findProjectPsiFile(relativePath: String): PsiFile?
+```kotlin
+// File access helpers:
+val vf = findFile("/tmp/test.txt")                   // VirtualFile by absolute path
+val psi = findPsiFile("/tmp/test.txt")                // PsiFile by absolute path (suspend)
+val projFile = findProjectFile("build.gradle.kts")    // VirtualFile relative to project
+val projPsi = findProjectPsiFile("build.gradle.kts")  // PsiFile relative to project (suspend)
+println("file=$vf, psi=$psi, projFile=$projFile, projPsi=$projPsi")
 ```
 
 > **⚠️ `findProjectFile()` pitfall for resource files**: This function requires the **full relative path** from the project root (e.g., `"src/main/resources/application.properties"`). Calling it with just a filename (`findProjectFile("application.properties")`) **always returns null** — causing NPE on `!!`. For files under `src/main/resources/`, use `FilenameIndex.getVirtualFilesByName()` which searches by filename without requiring the full path:
-> ```text
-> import com.intellij.psi.search.FilenameIndex
-> import com.intellij.psi.search.GlobalSearchScope
-> val scope = GlobalSearchScope.projectScope(project)
-> val appProps = readAction {
->     FilenameIndex.getVirtualFilesByName("application.properties", scope)
->         .firstOrNull { it.path.contains("src/main/resources") }
-> } ?: error("application.properties not found in src/main/resources")
-> println(VfsUtil.loadText(appProps))
-> ```
+```kotlin
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
+val scope = GlobalSearchScope.projectScope(project)
+val appProps = readAction {
+    FilenameIndex.getVirtualFilesByName("application.properties", scope)
+        .firstOrNull { it.path.contains("src/main/resources") }
+} ?: error("application.properties not found in src/main/resources")
+println(String(appProps.contentsToByteArray(), appProps.charset))
+```
 
 ### IDE Utilities
 
-```text
-// Wait for indexing to complete (called automatically before script starts)
-suspend fun waitForSmartMode()
+```kotlin
+// IDE utilities:
+waitForSmartMode()                        // Wait for indexing (called automatically before script)
+println("Daemon running: ${isDaemonRunning()}")  // Check if daemon analyzer is running
+doNotCancelOnModalityStateChange()        // Disable auto-cancel on modal dialogs
 
-// Check if daemon code analyzer is currently running
-fun isDaemonRunning(): Boolean
-
-// Wait for highlighting to complete on a file (requires IDE window focus)
-suspend fun waitForDaemonAnalysis(file: VirtualFile, timeout: Duration = 30.seconds): Boolean
-
-// Get highlights after analysis completes (note: requires IDE window focus)
-suspend fun getHighlightsWhenReady(
-    file: VirtualFile,
-    minSeverityValue: Int = HighlightSeverity.WEAK_WARNING.myVal,
-    timeout: Duration = 30.seconds
-): List<HighlightInfo>
-
-// ✓ RECOMMENDED: Run inspections bypassing daemon cache (works regardless of window focus)
-suspend fun runInspectionsDirectly(
-    file: VirtualFile,
-    includeInfoSeverity: Boolean = false
-): Map<String, List<ProblemDescriptor>>
-
-// Disable automatic cancellation when modal dialogs appear
-fun doNotCancelOnModalityStateChange()
+// Inspections on a file (RECOMMENDED — works regardless of window focus):
+val buildFile = findProjectFile("build.gradle.kts")
+if (buildFile != null) {
+    val problems = runInspectionsDirectly(buildFile) // Map<toolId, List<ProblemDescriptor>>
+    for ((tool, descs) in problems) {
+        println("$tool: ${descs.size} problems")
+    }
+}
 ```
 
 ### Disposable Hierarchy

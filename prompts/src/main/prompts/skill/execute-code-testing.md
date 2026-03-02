@@ -8,10 +8,12 @@ Running tests via IDE runner and Maven/Gradle, Docker check, modal dialog recove
 
 After creating multiple files in a batch `writeAction`, run a project-wide incremental compile to catch errors fast — before paying for a full Gradle/Maven test cycle:
 
-```text
+```kotlin
 import com.intellij.task.ProjectTaskManager
-val result = ProjectTaskManager.getInstance(project).buildAllModules().get()
-println("Compile errors: ${result.hasErrors()}, warnings: ${result.hasWarnings()}")
+import org.jetbrains.concurrency.await
+
+val result = ProjectTaskManager.getInstance(project).buildAllModules().await()
+println("Compile errors: ${result.hasErrors()}, aborted: ${result.isAborted()}")
 // If hasErrors() == true: read and fix compile errors BEFORE running tests.
 // This saves a full Gradle/Maven compile round-trip (~60-90s saved per error).
 ```
@@ -42,7 +44,7 @@ else problems.forEach { (id, descs) -> descs.forEach { println("[$id] ${it.descr
 
 Use this for Maven test execution when pom.xml was NOT modified in this session. Always pass `dialog_killer: true` on the `steroid_execute_code` call to auto-dismiss modals:
 
-```text
+```kotlin[IU]
 import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
 import org.jetbrains.idea.maven.execution.MavenRunnerParameters
 import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
@@ -52,14 +54,21 @@ import kotlinx.coroutines.withTimeout
 import kotlin.time.Duration.Companion.minutes
 val mavenResult = CompletableDeferred<Boolean>()
 project.messageBus.connect().subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
-    override fun onTestingFinished(suite: SMTestProxy.SMRootTestProxy) { mavenResult.complete(suite.isPassed) }
-    override fun onTestingStarted(s: SMTestProxy.SMRootTestProxy) {}
-    override fun onTestNodeAdded(r: com.intellij.execution.testframework.sm.runner.SMTestRunnerResultsForm, t: SMTestProxy) {}
-    override fun onTestingFinished(r: com.intellij.execution.testframework.sm.runner.SMTestRunnerResultsForm) {}
-    override fun onCustomProgressTestsCategory(c: String?, n: Int) {}
-    override fun onCustomProgressTestStarted() {}; override fun onCustomProgressTestFailed() {}
+    override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) { mavenResult.complete(testsRoot.isPassed) }
+    override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
+    override fun onTestsCountInSuite(count: Int) {}
+    override fun onTestStarted(test: SMTestProxy) {}
+    override fun onTestFinished(test: SMTestProxy) {}
+    override fun onTestFailed(test: SMTestProxy) {}
+    override fun onTestIgnored(test: SMTestProxy) {}
+    override fun onSuiteFinished(suite: SMTestProxy) {}
+    override fun onSuiteStarted(suite: SMTestProxy) {}
+    override fun onCustomProgressTestsCategory(categoryName: String?, count: Int) {}
+    override fun onCustomProgressTestStarted() {}
+    override fun onCustomProgressTestFailed() {}
     override fun onCustomProgressTestFinished() {}
-    override fun onSuiteTreeNodeAdded(t: SMTestProxy) {}; override fun onSuiteTreeStarted(s: SMTestProxy) {}
+    override fun onSuiteTreeNodeAdded(testProxy: SMTestProxy) {}
+    override fun onSuiteTreeStarted(suite: SMTestProxy) {}
 })
 MavenRunConfigurationType.runConfiguration(project,
     MavenRunnerParameters(true, project.basePath!!, "pom.xml",
@@ -67,7 +76,7 @@ MavenRunConfigurationType.runConfiguration(project,
     null, null) {}
 val mvnPassed = withTimeout(5.minutes) { mavenResult.await() }
 println("Maven IDE runner: passed=$mvnPassed")
-// If modal dialog blocks: steroid_take_screenshot → steroid_input dismiss → retry. Do NOT fall back to ProcessBuilder.
+// If modal dialog blocks: steroid_take_screenshot -> steroid_input dismiss -> retry. Do NOT fall back to ProcessBuilder.
 ```
 
 ---
@@ -116,7 +125,7 @@ println("Docker available: $dockerOk")
 
 PREFERRED over `ProcessBuilder("./gradlew")` inside exec_code — the latter spawns a nested Gradle daemon from within the IDE JVM, causing classpath conflicts:
 
-```text
+```kotlin[IU]
 import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings
 import com.intellij.openapi.externalSystem.service.execution.ProgressExecutionMode
 import com.intellij.openapi.externalSystem.task.TaskCallback
@@ -128,7 +137,7 @@ import kotlin.time.Duration.Companion.minutes
 val result = CompletableDeferred<Boolean>()
 val s = ExternalSystemTaskExecutionSettings()
 s.externalProjectPath = project.basePath!!
-// ⚠️ After writing new source files: add "--rerun-tasks" to force test execution even if UP-TO-DATE
+// After writing new source files: add "--rerun-tasks" to force test execution even if UP-TO-DATE
 s.taskNames = listOf(":api:test", "--tests", "shop.api.composite.product.ProductCompositeServiceApplicationTests", "--rerun-tasks")
 s.externalSystemIdString = GradleConstants.SYSTEM_ID.toString()
 ExternalSystemUtil.runTask(s, com.intellij.execution.executors.DefaultRunExecutor.EXECUTOR_ID,
@@ -139,7 +148,7 @@ val ok = withTimeout(5.minutes) { result.await() }; println("Gradle result: succ
 // When success=false: read JUnit XML test results directly for failure details:
 val testResultsDir = findProjectFile("build/test-results/test")
 testResultsDir?.children?.filter { it.name.endsWith(".xml") }?.forEach { xmlFile ->
-    val content = com.intellij.openapi.vfs.VfsUtilCore.loadText(xmlFile)
+    val content = String(xmlFile.contentsToByteArray(), xmlFile.charset)
     val failures = Regex("<failure[^>]*>(.+?)</failure>", RegexOption.DOT_MATCHES_ALL)
         .findAll(content).map { it.groupValues[1].take(300) }.toList()
     if (failures.isNotEmpty()) println("FAIL ${xmlFile.name}: " + failures.first())

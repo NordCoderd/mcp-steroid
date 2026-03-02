@@ -19,31 +19,34 @@ IntelliJ Platform has strict threading rules:
 
 ### Using Built-in Read Actions
 
-```text
-// ✓ CORRECT - Use built-in readAction (no import needed)
-val psiFile = readAction {
-    PsiManager.getInstance(project).findFile(virtualFile)
-}
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
 
-// Also correct - but built-in is more convenient
-import com.intellij.openapi.application.readAction
+// CORRECT - Use built-in readAction (no import needed)
+val virtualFile = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")!!
 val psiFile = readAction {
     PsiManager.getInstance(project).findFile(virtualFile)
 }
+println("PSI file: ${psiFile?.name}")
 ```
 
 ### Using Built-in Write Actions
 
-```text
-// ✓ CORRECT - Use built-in writeAction (no import needed)
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.command.WriteCommandAction
+
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")!!
+val document = FileDocumentManager.getInstance().getDocument(vf)!!
+
+// CORRECT - Use built-in writeAction (no import needed)
 writeAction {
     document.setText("new content")
 }
 
 // For command-wrapped writes (shows in undo stack)
-import com.intellij.openapi.command.WriteCommandAction
 WriteCommandAction.runWriteCommandAction(project) {
-    document.insertString(0, "// Added comment\n")
+    document.replaceString(0, 0, "// Added comment\n")
 }
 ```
 
@@ -53,20 +56,27 @@ suspension functions can only be called within coroutine body
 ```
 This error appears at **runtime** (not at compile time), so it's easy to miss. The fix is simple — always **read first, write second**:
 
-```text
-// ✗ WRONG — readAction inside writeAction causes runtime error
-writeAction {
-    val text = readAction { VfsUtil.loadText(vf) }  // ERROR: suspend function in non-coroutine
-    VfsUtil.saveText(vf, text.replace(...))
-}
+```kotlin
+// WRONG — readAction inside writeAction causes runtime error:
+//
+//   writeAction {
+//       val text = readAction { String(vf.contentsToByteArray(), vf.charset) }  // ERROR: suspend function in non-coroutine
+//       VfsUtil.saveText(vf, text.replace("old", "new"))
+//   }
+//
+// This fails at runtime because writeAction { } is NOT a coroutine scope,
+// and readAction is a suspend function. See CORRECT version below.
+```
 
-// ✓ CORRECT — read outside, write inside
-val text = VfsUtil.loadText(vf)           // read OUTSIDE writeAction (VfsUtil.loadText is NOT suspend)
+```kotlin
+// CORRECT — read outside, write inside
+val vf = findProjectFile("src/main/resources/application.properties")!!
+val text = String(vf.contentsToByteArray(), vf.charset)  // read OUTSIDE writeAction
 val updated = text.replace("\"api\"", "\"/api/v1\"")
 writeAction { VfsUtil.saveText(vf, updated) }   // write INSIDE — no suspend calls allowed here
 ```
 
-**Note**: `VfsUtil.loadText(vf)` is a regular function (not suspend) — it's safe to call outside any action. `VfsUtil.saveText(vf, text)` is also a regular function but requires a write lock, so it must go inside `writeAction { }`.
+**Note**: `String(vf.contentsToByteArray(), vf.charset)` is a regular call (not suspend) — it's safe to call outside any action. `VfsUtil.saveText(vf, text)` is also a regular function but requires a write lock, so it must go inside `writeAction { }`.
 
 If you genuinely need suspend calls inside a write block, use `edtWriteAction { }` instead of `writeAction { }` — it is a suspend function that acquires the write lock.
 
@@ -74,17 +84,14 @@ If you genuinely need suspend calls inside a write block, use `edtWriteAction { 
 
 Use `smartReadAction` when you need both smart mode and read access:
 
-```text
-// ✓ RECOMMENDED - Combines waitForSmartMode() + readAction in one call
+```kotlin[IU]
+import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
+
+// RECOMMENDED - Combines waitForSmartMode() + readAction in one call
 val classes = smartReadAction {
     KotlinClassShortNameIndex.get("MyService", project, projectScope())
 }
-
-// Equivalent to:
-waitForSmartMode()
-val classes = readAction {
-    KotlinClassShortNameIndex.get("MyService", project, projectScope())
-}
+println("Found ${classes.size} classes")
 ```
 
 ### Smart Mode vs Dumb Mode
@@ -132,6 +139,12 @@ withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
 
 **Detecting modal dialogs:**
 ```kotlin
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
 withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
     val isModal = ModalityState.current() != ModalityState.nonModal()
     println("Modal dialog showing: $isModal")

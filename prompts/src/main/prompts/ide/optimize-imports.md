@@ -2,7 +2,7 @@ IDE: Optimize Imports
 
 This example removes unused imports and sorts remaining ones,
 
-```text
+```kotlin[IU]
 import com.intellij.psi.codeStyle.JavaCodeStyleManager
 
 // Configuration - modify these for your use case
@@ -71,7 +71,6 @@ if (dryRun) {
 WriteCommandAction.runWriteCommandAction(project) {
     JavaCodeStyleManager.getInstance(project).optimizeImports(psiFile)
     PsiDocumentManager.getInstance(project).commitAllDocuments()
-    FileDocumentManager.getInstance().saveAllDocuments()
 }
 
 println("Optimized imports for: $filePath")

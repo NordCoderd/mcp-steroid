@@ -31,7 +31,7 @@ readAction {
 ### Modify Document
 
 **CAUTION: This modifies files on disk!**
-```text
+```kotlin
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -41,14 +41,11 @@ val document = FileDocumentManager.getInstance().getDocument(vf!!)
 
 if (document != null) {
     WriteCommandAction.runWriteCommandAction(project) {
-        // Insert at position
-        document.insertString(0, "// Added comment\n")
+        // Insert at position (replaceString with equal start/end offsets = insert)
+        document.replaceString(0, 0, "// Added comment\n")
 
         // Or replace text
         // document.replaceString(startOffset, endOffset, "new text")
-
-        // Or delete
-        // document.deleteString(startOffset, endOffset)
     }
     println("Document modified")
 }
@@ -145,8 +142,9 @@ writeAction {
 
 When VFS reports `'path/security' is not a directory`, a plain file occupies a path you expect to be a directory. Fix by checking `isDirectory`, deleting the blocking file, then recreating the directory:
 
-```text
+```kotlin
 // Safe directory creation — handles file/directory conflict
+val basePath = project.basePath!!
 writeAction {
     val parent = LocalFileSystem.getInstance()
         .findFileByPath("$basePath/src/main/java/eval/sample")
@@ -177,15 +175,16 @@ Use `VfsUtil.createDirectoryIfMissing` + `VfsUtil.saveText` — safer than shell
 
 **⚠️ ALL VFS mutation ops need writeAction**: `createChildData()`, `createChildFile()`, `createChildDirectory()`, `delete()`, `rename()`, `move()`, and `saveText()` ALL require writeAction. `createDirectoryIfMissing(VirtualFile parent, String relative)` also requires writeAction — use this overload inside writeAction. Note: `createDirectoryIfMissing(String absolutePath)` self-acquires a write lock internally (safe to call outside writeAction, but DO NOT call it inside writeAction). Put the ENTIRE create-directory-and-write sequence inside a SINGLE writeAction block using the VirtualFile overload:
 
-```text
-// ✓ CORRECT — everything that creates or modifies files goes INSIDE writeAction:
+```kotlin
+// CORRECT — everything that creates or modifies files goes INSIDE writeAction:
+val content = "package com.example.model;\npublic class Product { }"
 writeAction {
     val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
     val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example/model")  // ← writeAction required
     val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")   // ← writeAction required
     VfsUtil.saveText(f, content)                                                          // ← writeAction required
 }
-// ✗ WRONG:
+// WRONG:
 // val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/...")  // OUTSIDE writeAction → throws!
 // writeAction { VfsUtil.saveText(f, content) }                           // only saveText inside = WRONG
 ```
@@ -195,7 +194,7 @@ writeAction {
 **⚠️ Import-in-strings pitfall**: The script preprocessor extracts `import foo.Bar;` lines from the top level of your script — including lines inside triple-quoted strings. This causes compilation failures (e.g., `unresolved reference 'jakarta'`) when you embed Java source in a `"""..."""` literal.
 
 **⚠️ Char-literal pitfall in string-assembled Java**: When building Java source via Kotlin `joinToString()`, char literals like `'\''` cause silent escaping errors. The Kotlin string `"'\\''"` produces Java text `'\''` which is a Java syntax error (empty char literal followed by spurious `'`). For Java code containing char literals (e.g., `toString()` with `', '` separators), prefer `java.io.File.writeText()` with triple-quoted raw strings, or use `PsiFileFactory.createFileFromText()`:
-```text
+```kotlin
 // ✓ SAFE: Use java.io.File for Java source with char literals — not affected by import extraction
 java.io.File("${project.basePath}/src/main/java/com/example/model/Product.java")
     .also { it.parentFile.mkdirs() }
@@ -216,7 +215,7 @@ LocalFileSystem.getInstance().refreshAndFindFileByPath("${project.basePath}/src/
 println("Created Product.java")
 // Verify the write succeeded:
 val vf = findProjectFile("src/main/java/com/example/model/Product.java")!!
-check(VfsUtil.loadText(vf).contains("class Product")) { "Write failed or file is empty" }
+check(String(vf.contentsToByteArray(), vf.charset).contains("class Product")) { "Write failed or file is empty" }
 println("Verified: Product.java written correctly")
 ```
 

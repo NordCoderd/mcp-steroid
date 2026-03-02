@@ -231,26 +231,34 @@ trigger re-indexing mid-script.
 
 Default imports are provided automatically. Add imports only when you need APIs outside the defaults.
 
-```text
+```kotlin
 import com.intellij.psi.PsiManager
-import com.intellij.openapi.application.readAction
+import com.intellij.openapi.vfs.LocalFileSystem
 
+val virtualFile = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")!!
 val psiFile = readAction {
     PsiManager.getInstance(project).findFile(virtualFile)
 }
 ```
 
 **WRONG:**
-```text
-val filePath = "src/Main.kt"
-import com.intellij.psi.PsiManager  // ERROR!
+```kotlin
+// ERROR example — imports must be at the top, not after code:
+//
+//   val filePath = "src/Main.kt"
+//   import com.intellij.psi.PsiManager  // ERROR: imports must be at the top!
+//
+// The script engine extracts imports from the top of the script.
+// Placing them after code causes compilation errors.
 ```
 
 **CORRECT:**
-```text
+```kotlin
 import com.intellij.psi.PsiManager
+import com.intellij.openapi.vfs.LocalFileSystem
 
 // Use built-in readAction helper - no import needed!
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")!!
 val file = readAction { PsiManager.getInstance(project).findFile(vf) }
 ```
 
@@ -259,18 +267,17 @@ val file = readAction { PsiManager.getInstance(project).findFile(vf) }
 > **⚠️ THREADING RULE — NEVER SKIP**: Any PSI access (JavaPsiFacade, PsiShortNamesCache, PsiManager.findFile, module roots, annotations, etc.) **MUST** be inside `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately — they are NOT silently ignored. This is the most common cause of first-attempt runtime errors.
 
 **Built-in helpers (no imports needed):**
-```text
+```kotlin
+import com.intellij.openapi.vfs.LocalFileSystem
+
 // Reading PSI/VFS/indices - use built-in readAction
+val virtualFile = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")!!
 val psiFile = readAction {
     PsiManager.getInstance(project).findFile(virtualFile)
 }
 
-// Or use smartReadAction to auto-wait for indexing
-val classes = smartReadAction {
-    JavaPsiFacade.getInstance(project).findClass("MyClass", projectScope())
-}
-
 // Modifying PSI/VFS/documents
+val document = FileDocumentManager.getInstance().getDocument(virtualFile)!!
 writeAction {
     document.setText("new content")
 }
@@ -278,11 +285,8 @@ writeAction {
 
 **With explicit imports (same functionality):**
 ```kotlin
-import com.intellij.openapi.application.readAction
-import com.intellij.openapi.application.writeAction
-
-val data = readAction { /* ... */ }
-writeAction { /* ... */ }
+val data = readAction { project.name }
+writeAction { project.name }
 ```
 
 ## Script Template
@@ -313,23 +317,23 @@ println(psiClass?.qualifiedName)
 
 ## Context Available in the Script Body
 
-```text
+```kotlin
+import com.intellij.openapi.Disposable
+
 // === Properties ===
-project      // IntelliJ Project instance
-params       // Tool parameters (JsonElement)
-disposable   // For resource cleanup
-isDisposed   // Check if disposed
+val p: Project = project              // IntelliJ Project instance
+val d: Disposable = disposable        // For resource cleanup
+val disposed: Boolean = isDisposed    // Check if disposed
 
 // === Output Methods ===
 println("Hello", 42, "world")       // Space-separated output
-printJson(object { val x = 1 })     // Pretty JSON
-printException("Failed", exception) // Error with stack trace (recommended!)
+printJson(mapOf("key" to "value"))   // Pretty JSON
 progress("Step 1 of 3...")          // Progress (throttled 1/sec)
 
 // === Read/Write Actions (NO IMPORTS NEEDED!) ===
-val data = readAction { /* PSI/VFS reads */ }      // Suspend read action
-writeAction { /* PSI/VFS writes */ }               // Suspend write action
-val smart = smartReadAction { /* reads in smart mode */ }  // Auto-waits for indexing
+val data = readAction { project.name }           // Suspend read action
+writeAction { project.name }                     // Suspend write action
+val smart = smartReadAction { project.name }     // Auto-waits for indexing
 
 // === Search Scopes (NO IMPORTS NEEDED!) ===
 val scope1 = projectScope()  // Project files only
@@ -346,8 +350,11 @@ val psi2 = findProjectPsiFile("src/main/App.kt") // Relative to project (suspend
 
 // === Code Analysis (no window focus required) ===
 // runInspectionsDirectly returns Map<String, List<ProblemDescriptor>> - empty if no problems
-val file = requireNotNull(findProjectFile("src/main/App.kt")) { "File not found" }
-val problems = runInspectionsDirectly(file)
+val file = findProjectFile("src/main/App.kt")
+if (file != null) {
+    val problems = runInspectionsDirectly(file)
+    println("Problems: ${problems.size}")
+}
 ```
 
 ## Running Tests
@@ -373,18 +380,18 @@ println("Project: ${project.name}")
 println("Base path: ${project.basePath}")
 ```
 ### Get IDE Log Path
-```text
-val logPath = com.intellij.openapi.application.PathManager.getLogPath()
+```kotlin
+val logPath = com.intellij.openapi.application.PathManager.getSystemPath() + "/log"
 println("Log: $logPath/idea.log")
 ```
 ### List Plugins
 ```kotlin
-com.intellij.ide.plugins.PluginManagerCore.loadedPlugins
+com.intellij.ide.plugins.PluginManagerCore.getPluginSet().enabledPlugins
     .forEach { println("${it.name}: ${it.version}") }
 ```
 ### Find Plugin by ID
 ```kotlin
-val plugin = com.intellij.ide.plugins.PluginManagerCore.loadedPlugins
+val plugin = com.intellij.ide.plugins.PluginManagerCore.getPluginSet().enabledPlugins
     .find { it.pluginId.idString == "org.jetbrains.kotlin" }
 println("Kotlin plugin: ${plugin?.version}")
 ```
@@ -423,8 +430,11 @@ val path = Path.of("/path/to/project")
 ProjectManagerEx.getInstanceEx().openProjectAsync(path, OpenProjectTask { })
 ```
 ### Restart IDE (CAUTION: destructive operation)
-```text
-com.intellij.openapi.application.ApplicationManager.getApplication().restart()
+```kotlin
+import com.intellij.openapi.actionSystem.ActionManager
+val restartAction = ActionManager.getInstance().getAction("RestartIde")
+println("Restart action available: ${restartAction != null}")
+// To actually restart: invoke the action via ActionUtil.performAction()
 ```
 ## Complete End-to-End PSI Example
 
@@ -512,27 +522,29 @@ readAction {
 ```
 ### Find Elements by Type
 
-```text
-import com.intellij.openapi.application.readAction
+```kotlin[IU]
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.psi.KtNamedFunction
 import org.jetbrains.kotlin.psi.KtClass
-
+import com.intellij.openapi.vfs.LocalFileSystem
 
 readAction {
-    val psiFile = // ... get file
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")
+    val psiFile = vf?.let { PsiManager.getInstance(project).findFile(it) }
 
-    // Find all functions in file
-    val functions = PsiTreeUtil.findChildrenOfType(psiFile, KtNamedFunction::class.java)
-    functions.forEach { fn ->
-        println("Function: ${fn.name} at line ${fn.textOffset}")
-    }
+    if (psiFile != null) {
+        // Find all functions in file
+        val functions = PsiTreeUtil.findChildrenOfType(psiFile, KtNamedFunction::class.java)
+        functions.forEach { fn ->
+            println("Function: ${fn.name} at line ${fn.textOffset}")
+        }
 
-    // Find all classes
-    val classes = PsiTreeUtil.findChildrenOfType(psiFile, KtClass::class.java)
-    classes.forEach { cls ->
-        println("Class: ${cls.name}")
+        // Find all classes
+        val classes = PsiTreeUtil.findChildrenOfType(psiFile, KtClass::class.java)
+        classes.forEach { cls ->
+            println("Class: ${cls.name}")
+        }
     }
 }
 ```
@@ -679,7 +691,7 @@ readAction {
 }
 ```
 ### Modify Document (CAUTION: modifies file)
-```text
+```kotlin
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -689,14 +701,11 @@ val document = FileDocumentManager.getInstance().getDocument(vf!!)
 
 if (document != null) {
     WriteCommandAction.runWriteCommandAction(project) {
-        // Insert at position
-        document.insertString(0, "// Added comment\n")
+        // Insert at position (replaceString with equal start/end offsets = insert)
+        document.replaceString(0, 0, "// Added comment\n")
 
         // Or replace text
         // document.replaceString(startOffset, endOffset, "new text")
-
-        // Or delete
-        // document.deleteString(startOffset, endOffset)
     }
     println("Document modified")
 }
@@ -788,15 +797,17 @@ writeAction {
 
 ### Rename Element (CAUTION: modifies code)
 
-```text
-import com.intellij.openapi.application.writeAction
+```kotlin
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.psi.PsiNamedElement
-
+import com.intellij.psi.PsiManager
+import com.intellij.openapi.vfs.LocalFileSystem
 
 // First find the element to rename in a read action
 val element = readAction {
-    // ... find your PsiElement
+    val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")
+    val psiFile = PsiManager.getInstance(project).findFile(vf!!)
+    psiFile?.findElementAt(100)?.parent  // find PsiElement at offset
 }
 
 if (element is PsiNamedElement) {
@@ -1315,7 +1326,7 @@ if (vf != null) {
 
 ## Search Scopes
 
-```text
+```kotlin
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.openapi.module.ModuleManager
 
@@ -1333,11 +1344,12 @@ if (module != null) {
 }
 
 // File scope
-val vf = // ... get virtual file
+val vf = findProjectFile("src/main/kotlin/MyClass.kt")!!
 val fileScope = GlobalSearchScope.fileScope(project, vf)
 
 // Multiple files scope
-val filesScope = GlobalSearchScope.filesScope(project, listOf(vf1, vf2))
+val vf2 = findProjectFile("src/main/kotlin/Other.kt")!!
+val filesScope = GlobalSearchScope.filesScope(project, listOf(vf, vf2))
 ```
 
 ## Actions

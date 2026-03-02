@@ -24,9 +24,9 @@ Any PSI access (`JavaPsiFacade`, `PsiShortNamesCache`, `PsiManager.findFile`, `P
 ## ⚠️ writeAction { } Is NOT a Coroutine Scope
 
 Calling `readAction { }` or ANY suspend function inside `writeAction { }` throws `suspension functions can only be called within coroutine body`. **ALWAYS read first (outside), then write (inside)**:
-```text
+```kotlin
 val vf = findProjectFile("src/main/java/com/example/Foo.java")!!
-val content = VfsUtil.loadText(vf)               // read OUTSIDE writeAction
+val content = String(vf.contentsToByteArray(), vf.charset)  // read OUTSIDE writeAction
 
 // ⚠️ BEFORE content.replace() — ALWAYS print the excerpt BEFORE THE FIRST ATTEMPT:
 // Do NOT print it only after a failure — that costs an extra turn.
@@ -50,14 +50,15 @@ Use `edtWriteAction { }` (a suspend wrapper) if you need suspend calls inside th
 
 `createDirectoryIfMissing()`, `createChildData()`, `createChildFile()`, `createChildDirectory()`, `delete()`, `rename()`, `move()`, and `saveText()` ALL require `writeAction`. Calling any of these OUTSIDE a `writeAction` throws `Write access is allowed inside write-action only` at runtime. Always put the ENTIRE create-directory-and-write sequence inside a SINGLE `writeAction` block:
 
-```text
+```kotlin
+val content = "package com.example.model;\npublic class Product { }"
 writeAction {
     val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
     val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example/model")  // ← needs writeAction
     val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")   // ← needs writeAction
     VfsUtil.saveText(f, content)                                                          // ← needs writeAction
 }
-// ✗ WRONG: val dir = VfsUtil.createDirectoryIfMissing(...) OUTSIDE writeAction, then writeAction { saveText }
+// WRONG: val dir = VfsUtil.createDirectoryIfMissing(...) OUTSIDE writeAction, then writeAction { saveText }
 // ↑ This throws "Write access is allowed inside write-action only" on the createDirectoryIfMissing call
 ```
 
