@@ -110,4 +110,4 @@ IDE power operations:
 - [Call Hierarchy](mcp-steroid://ide/call-hierarchy) - Find method callers
 
 Overview resources:
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

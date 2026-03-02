@@ -80,4 +80,4 @@ Related MCP tools:
 - `steroid_list_projects` - List all open projects
 - `steroid_list_windows` - Check project initialization status
 
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

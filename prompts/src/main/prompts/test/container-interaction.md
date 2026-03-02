@@ -84,5 +84,5 @@ Related test operations:
 - [Inspect Test Results](mcp-steroid://test/inspect-test-results) - Read test result XML/reports
 
 Skill guides:
-- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Essential test knowledge
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Debugging workflows
+- [Test Runner Skill Guide](mcp-steroid://prompt/test-skill) - Essential test knowledge
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Debugging workflows

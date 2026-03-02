@@ -87,9 +87,9 @@ val root = vcsManager.getVcsRootFor(virtualFile)
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API reference and patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Debug workflows
-- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Test execution
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Debug workflows
+- [Test Runner Skill Guide](mcp-steroid://prompt/test-skill) - Test execution
 
 ### VCS Examples
 - [Git Annotations](mcp-steroid://vcs/git-annotations) - Get blame/annotations for files

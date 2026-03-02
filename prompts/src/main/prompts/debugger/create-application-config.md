@@ -91,4 +91,4 @@ Related debugger operations:
 - [Set Line Breakpoint](mcp-steroid://debugger/set-line-breakpoint) - Set breakpoint before debugging
 
 Overview resources:
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Essential debugger knowledge

@@ -10,6 +10,7 @@ import com.jonnyzzz.mcpSteroid.server.ListProjectsResponse
 import com.jonnyzzz.mcpSteroid.server.ListWindowsResponse
 import com.jonnyzzz.mcpSteroid.server.ServerMetadataResponse
 import com.jonnyzzz.mcpSteroid.server.SteroidsMcpServer
+import com.jonnyzzz.mcpSteroid.prompts.generated.prompt.SkillPromptArticle
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.*
@@ -1321,7 +1322,8 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         assertNull("prompts/list should succeed", listRpc.error)
 
         val promptsList = McpJson.decodeFromJsonElement<PromptsListResult>(listRpc.result!!)
-        val mainPrompt = promptsList.prompts.find { it.name == "mcp-steroid" }
+        val skillUri = SkillPromptArticle().uri
+        val mainPrompt = promptsList.prompts.find { it.name == skillUri }
         assertNotNull("Should expose main skill prompt", mainPrompt)
         assertEquals("IntelliJ API Power User Guide", mainPrompt!!.title)
 
@@ -1334,7 +1336,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                 put("id", "prompts-get")
                 put("method", "prompts/get")
                 putJsonObject("params") {
-                    put("name", "mcp-steroid")
+                    put("name", skillUri)
                 }
             }.toString())
         }

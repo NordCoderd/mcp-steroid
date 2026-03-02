@@ -68,4 +68,4 @@ println(result)
 - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
 - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
 - [Workspace Symbol](mcp-steroid://lsp/workspace-symbol) - Search symbols across workspace
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

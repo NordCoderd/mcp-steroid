@@ -141,4 +141,4 @@ IDE power operations:
 - [Inspection Summary](mcp-steroid://ide/inspection-summary) - List enabled inspections
 
 Overview resources:
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

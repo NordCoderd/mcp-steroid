@@ -2,10 +2,6 @@ IntelliJ Test Runner Skill Guide
 
 Use IntelliJ test execution APIs via steroid_execute_code to run tests, inspect test results, check test status, and access test output.
 
----
-name: mcp-steroid-test-runner
-description: Use IntelliJ test execution APIs via steroid_execute_code to run tests, inspect test results, check test status, and access test output.
----
 
 # IntelliJ Test Runner Skill
 
@@ -166,9 +162,9 @@ process.waitFor()
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Essential IntelliJ API patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Debug session management
-- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - This guide
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Essential IntelliJ API patterns
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Debug session management
+- [Test Runner Skill Guide](mcp-steroid://prompt/test-skill) - This guide
 
 ### Test Execution Resources
 - [Test Overview](mcp-steroid://test/overview) - Complete test execution workflow and patterns

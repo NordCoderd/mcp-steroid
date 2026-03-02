@@ -56,4 +56,4 @@ Related debugger operations:
 - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debugging
 
 Skill guides:
-- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Essential test knowledge
+- [Test Runner Skill Guide](mcp-steroid://prompt/test-skill) - Essential test knowledge

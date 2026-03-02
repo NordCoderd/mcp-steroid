@@ -2,10 +2,6 @@ IntelliJ Debugger Skill Guide
 
 Use IntelliJ debugger APIs via steroid_execute_code to set breakpoints, start debug sessions, pause/resume, inspect threads, and build thread dumps.
 
----
-name: mcp-steroid-debugger
-description: Use IntelliJ debugger APIs via steroid_execute_code to set breakpoints, start debug sessions, evaluate variables, step through code, and inspect threads.
----
 
 # IntelliJ Debugger Skill
 
@@ -113,9 +109,9 @@ After `stepOver()`, the debugger may land in a different method scope:
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Essential IntelliJ API patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - This guide
-- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Test execution workflows
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Essential IntelliJ API patterns
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - This guide
+- [Test Runner Skill Guide](mcp-steroid://prompt/test-skill) - Test execution workflows
 
 ### Debugger Resources
 - [Debugger Overview](mcp-steroid://debugger/overview) - Complete debugger examples overview

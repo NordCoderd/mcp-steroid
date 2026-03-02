@@ -41,4 +41,4 @@ Related test operations:
 - [Wait for Completion](mcp-steroid://test/wait-for-completion) - Poll test status
 
 Overview resources:
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Essential debugger knowledge

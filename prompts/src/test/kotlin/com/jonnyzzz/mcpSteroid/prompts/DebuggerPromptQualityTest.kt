@@ -2,14 +2,14 @@
 package com.jonnyzzz.mcpSteroid.prompts
 
 import com.jonnyzzz.mcpSteroid.prompts.generated.debugger.DebuggerIndex
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillIndex
+import com.jonnyzzz.mcpSteroid.prompts.generated.prompt.PromptIndex
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class DebuggerPromptQualityTest {
     private val debuggerIndex = DebuggerIndex()
-    private val skillIndex = SkillIndex()
+    private val promptIndex = PromptIndex()
 
     private val ideaContext = PromptsContext("IU", 253)
 
@@ -44,7 +44,7 @@ class DebuggerPromptQualityTest {
 
     @Test
     fun testDebuggerSkillDocumentsCriticalImports() {
-        val prompt = skillIndex.debuggerSkillMd.readPayload(ideaContext)
+        val prompt = promptIndex.debuggerSkillMd.readPayload(ideaContext)
         assertTrue(
             prompt.contains("kotlinx.coroutines.suspendCancellableCoroutine")
         ) { "Expected suspendCancellableCoroutine import guidance" }

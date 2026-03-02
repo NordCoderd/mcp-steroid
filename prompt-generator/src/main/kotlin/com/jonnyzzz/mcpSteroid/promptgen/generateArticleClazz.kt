@@ -238,6 +238,7 @@ fun folderToDisplayName(folder: String): String {
         "vcs" -> "VCS"
         "open-project" -> "Open Project"
         "skill" -> "Skill"
+        "prompt" -> "Prompt"
         "" -> ""
         else -> folder.titleCase()
     }

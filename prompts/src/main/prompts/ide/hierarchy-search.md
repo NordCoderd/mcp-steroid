@@ -86,4 +86,4 @@ if (hierarchyData.overridesCount > 20) {
 - [Find References](mcp-steroid://lsp/find-references) - Find all usages of a symbol
 - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
 - [Go to Definition](mcp-steroid://lsp/go-to-definition) - Navigate to symbol definition
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

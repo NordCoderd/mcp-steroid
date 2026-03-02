@@ -76,4 +76,4 @@ println("Generated override(s) in class: $className")
 
 - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
 - [Document Symbols](mcp-steroid://lsp/document-symbols) - List symbols in a document
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

@@ -96,4 +96,4 @@ println("Changed signature for: ${methodData.name}")
 
 - [Signature Help](mcp-steroid://lsp/signature-help) - Parameter hints for function calls
 - [Code Action](mcp-steroid://lsp/code-action) - Quick fixes and refactorings
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

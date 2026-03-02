@@ -186,9 +186,9 @@ return immediately with a message indicating the project is already open.
 ## Related Resources
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API reference and patterns
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Debug workflows
-- [Test Runner Skill Guide](mcp-steroid://skill/test-skill) - Test execution
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API reference and patterns
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Debug workflows
+- [Test Runner Skill Guide](mcp-steroid://prompt/test-skill) - Test execution
 
 ### Project Opening Examples
 - [Open Project Overview](mcp-steroid://open-project/overview) - This document

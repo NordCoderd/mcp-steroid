@@ -125,4 +125,4 @@ IDE power operations:
 - [Hierarchy Search](mcp-steroid://ide/hierarchy-search) - Find class inheritors
 
 Overview resources:
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

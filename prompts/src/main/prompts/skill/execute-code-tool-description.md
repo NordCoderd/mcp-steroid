@@ -23,9 +23,9 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - Actions: Trigger any IDE action programmatically
 
 **Power Features — use these aggressively:**
-- **Debugger:** Set breakpoints, launch debug sessions, suspend at breakpoints, evaluate expressions at any call frame, step over, inspect thread stacks. Full IntelliJ XDebugger API works in all IDEs (IDEA, Rider, GoLand, …). Read `mcp-steroid://skill/debugger-skill`
+- **Debugger:** Set breakpoints, launch debug sessions, suspend at breakpoints, evaluate expressions at any call frame, step over, inspect thread stacks. Full IntelliJ XDebugger API works in all IDEs (IDEA, Rider, GoLand, …). Read `mcp-steroid://prompt/debugger-skill`
 - **Refactoring:** Rename symbols, extract method/variable, move files, inline, change signature — all via `RefactoringActionHandler` and IntelliJ refactoring APIs. Use `ActionManager.getInstance().getAction("RenameElement")` etc.
-- **Tests:** Launch via context action — open test file, position caret on test class/method, fire action. IntelliJ: `DebugContextAction` (fallback: JUnitConfiguration with explicit module). Rider: `RiderUnitTestDebugContextAction`. See `mcp-steroid://skill/debugger-skill`
+- **Tests:** Launch via context action — open test file, position caret on test class/method, fire action. IntelliJ: `DebugContextAction` (fallback: JUnitConfiguration with explicit module). Rider: `RiderUnitTestDebugContextAction`. See `mcp-steroid://prompt/debugger-skill`
 - **Reflection (when API is unclear):** Use Java reflection to access private fields, methods, and internal state when the public API is not obvious: `obj.javaClass.getDeclaredField("fieldName").also { it.isAccessible = true }.get(obj)`. List all fields of a class: `clazz.declaredFields.forEach { println("${it.name}: ${it.type}") }`. Call a private method: `clazz.getDeclaredMethod("name", ArgType::class.java).also { it.isAccessible = true }.invoke(obj, arg)`. Inspect class hierarchy: `generateSequence(obj.javaClass) { it.superclass }.forEach { println(it.name) }`.
 
 **After a compile error**: fix and retry — do NOT switch to Bash/Read/Write. Common fixes:
@@ -46,9 +46,9 @@ For complex IntelliJ API work, delegate to a sub-agent:
 
 **Resources:**
 - [Complete Coding Guide](mcp-steroid://skill/coding-with-intellij) - Patterns, examples, best practices
-- [API Power User Guide](mcp-steroid://skill/skill) - Essential patterns
-- [Debugger Guide](mcp-steroid://skill/debugger-skill) - Debug workflows
-- [Test Runner Guide](mcp-steroid://skill/test-skill) - Test execution
+- [API Power User Guide](mcp-steroid://prompt/skill) - Essential patterns
+- [Debugger Guide](mcp-steroid://prompt/debugger-skill) - Debug workflows
+- [Test Runner Guide](mcp-steroid://prompt/test-skill) - Test execution
 
 IntelliJ API Version: IU-253.31033.145
 

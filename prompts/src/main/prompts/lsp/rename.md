@@ -113,4 +113,4 @@ IDE power operations:
 - [Move Class](mcp-steroid://ide/move-class) - Move classes between packages
 
 Overview resources:
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - Core API patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - Core API patterns

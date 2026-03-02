@@ -31,7 +31,7 @@ class ResourceRegistrar : McpRegistrar {
 
         for ((folder, index) in resourcesIndex.roots) {
             registerArticleResources(server, index, context)
-            if (folder == "skill") {
+            if (folder == "prompt") {
                 registerSkillPrompts(server, index, context)
             }
         }
@@ -64,24 +64,19 @@ class ResourceRegistrar : McpRegistrar {
         for ((_, article) in index.articles) {
             if (!article.filter.matches(context)) continue
 
-            val body = article.readPayload(context)
-            val parsed = parseSkillFrontmatter(body)
-            val frontmatter = parsed.frontmatter ?: continue
-            val promptName = frontmatter.name?.takeIf { it.isNotBlank() } ?: continue
-
             server.promptRegistry.registerPrompt(
                 Prompt(
-                    name = promptName,
+                    name = article.uri,
                     title = article.title.readPrompt(),
-                    description = frontmatter.description,
+                    description = article.description.readPrompt(),
                 )
             ) {
                 PromptGetResult(
-                    description = frontmatter.description,
+                    description = article.description.readPrompt(),
                     messages = listOf(
                         PromptMessage(
                             role = "user",
-                            content = PromptContent.Text(parsed.body)
+                            content = PromptContent.Text(article.readPayload(context))
                         )
                     )
                 )

@@ -2,15 +2,6 @@ IntelliJ API Power User Guide
 
 RECOMMENDED: Execute Kotlin code directly in IntelliJ IDEA's runtime with full access to IntelliJ Platform APIs.
 
----
-name: mcp-steroid
-description: Execute Kotlin code directly in IntelliJ IDEA's runtime with full access to IntelliJ Platform APIs. Use when you need to search code, run refactorings, access PSI (parsed code model), query project structure, run inspections, or perform any IDE operation. Prefer this over file-based operations - the IDE has indexed everything.
-license: Apache-2.0
-compatibility: Requires IntelliJ IDEA 2025.3+ with the MCP Steroid plugin installed
-metadata:
-  author: jonnyzzz
-  category: development
----
 
 # MCP Steroid - IDE API Access for AI Agents
 
@@ -197,9 +188,9 @@ This server exposes built-in resources through the MCP resource APIs. These are 
 2. Call `read_mcp_resource` with the resource URI to load the content.
 
 **Key resources provided by this server:**
-- `mcp-steroid://skill/skill` - This guide as a resource.
+- `mcp-steroid://prompt/skill` - This guide as a resource.
 - `mcp-steroid://skill/coding-with-intellij` - Comprehensive guide for writing IntelliJ API code (execution model, patterns, examples).
-- `mcp-steroid://skill/debugger-skill` - Debugger-focused skill guide (breakpoints, sessions, threads).
+- `mcp-steroid://prompt/debugger-skill` - Debugger-focused skill guide (breakpoints, sessions, threads).
 - `mcp-steroid://lsp/overview` - Overview of LSP-like examples and how to use them.
 - `mcp-steroid://lsp/<id>` - Runnable Kotlin scripts (e.g., `go-to-definition`, `find-references`, `rename`, `code-action`, `signature-help`).
 - `mcp-steroid://ide/overview` - Overview of IDE power operation examples (refactorings, inspections, generation).
@@ -1429,8 +1420,8 @@ Use MCP `resources/list` and `resources/read` instead of HTTP fetching when poss
 
 Recommended resources:
 - Use `resources/list` to discover all available resources
-- `mcp-steroid://skill/skill` - Full SKILL.md content as a resource
-- `mcp-steroid://skill/debugger-skill` - Debugger workflow guide + stateful exec_code notes
+- `mcp-steroid://prompt/skill` - Full SKILL.md content as a resource
+- `mcp-steroid://prompt/debugger-skill` - Debugger workflow guide + stateful exec_code notes
 - `mcp-steroid://ide/overview` - IDE usage overview and patterns
 - `mcp-steroid://lsp/overview` - LSP-style workflows and examples
 - `mcp-steroid://debugger/overview` - Debugger workflows and runnable examples
@@ -1446,9 +1437,9 @@ Recommended resources:
 📊 Use `resources/list` to discover all available resources and their navigation paths
 
 ### Skill Guides
-- [IntelliJ API Power User Guide](mcp-steroid://skill/skill) - This guide
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Debug workflows and stateful execution
-- [Test Runner Guide](mcp-steroid://skill/test-skill) - Test execution patterns
+- [IntelliJ API Power User Guide](mcp-steroid://prompt/skill) - This guide
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Debug workflows and stateful execution
+- [Test Runner Guide](mcp-steroid://prompt/test-skill) - Test execution patterns
 
 ### Example Resources
 - [LSP Examples](mcp-steroid://lsp/overview) - LSP-like operations (navigation, code intelligence, refactoring)
@@ -1459,8 +1450,8 @@ Recommended resources:
 - [Open Project Examples](mcp-steroid://open-project/overview) - Project opening workflows
 
 ### Specific Skill Resources
-- [Debugger Guide](mcp-steroid://skill/debugger-skill) - Setting breakpoints and debugging
-- [Test Runner Guide](mcp-steroid://skill/test-skill) - Running and inspecting tests
+- [Debugger Guide](mcp-steroid://prompt/debugger-skill) - Setting breakpoints and debugging
+- [Test Runner Guide](mcp-steroid://prompt/test-skill) - Running and inspecting tests
 
 ---
 

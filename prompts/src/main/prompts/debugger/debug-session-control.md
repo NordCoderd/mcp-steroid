@@ -32,4 +32,4 @@ Related test operations:
 - [Run Tests](mcp-steroid://test/run-tests) - Execute test configuration
 
 Overview resources:
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Essential debugger knowledge

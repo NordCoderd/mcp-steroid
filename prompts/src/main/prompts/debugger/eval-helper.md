@@ -131,4 +131,4 @@ Related debugger operations:
 - [Wait for Suspend](mcp-steroid://debugger/wait-for-suspend) - Wait for breakpoint hit
 
 Overview resources:
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Essential debugger knowledge

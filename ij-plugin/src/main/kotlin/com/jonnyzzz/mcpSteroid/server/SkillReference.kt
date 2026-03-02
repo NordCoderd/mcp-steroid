@@ -6,7 +6,7 @@ import com.intellij.openapi.components.service
 import com.jonnyzzz.mcpSteroid.prompts.generated.debugger.OverviewPromptArticle as DebuggerOverview
 import com.jonnyzzz.mcpSteroid.prompts.generated.ide.OverviewPromptArticle as IdeOverview
 import com.jonnyzzz.mcpSteroid.prompts.generated.lsp.OverviewPromptArticle as LspOverview
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillPromptArticle
+import com.jonnyzzz.mcpSteroid.prompts.generated.prompt.SkillPromptArticle
 
 /**
  * Application service providing MCP resource references and brief tips for LLM agents.

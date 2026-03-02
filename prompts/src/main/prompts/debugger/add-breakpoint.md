@@ -63,4 +63,4 @@ Related debugger operations:
 - [Debug Run Configuration](mcp-steroid://debugger/debug-run-configuration) - Start debug session
 
 Overview resources:
-- [Debugger Skill Guide](mcp-steroid://skill/debugger-skill) - Essential debugger knowledge
+- [Debugger Skill Guide](mcp-steroid://prompt/debugger-skill) - Essential debugger knowledge
