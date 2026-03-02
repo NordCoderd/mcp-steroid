@@ -35,6 +35,7 @@ class ResourceRegistrar : McpRegistrar {
                 registerSkillPrompts(server, index, context)
             }
         }
+
     }
 
     private fun registerArticleResources(

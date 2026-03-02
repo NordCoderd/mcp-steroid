@@ -50,16 +50,43 @@ dependencies {
 
 val generatedSources = layout.buildDirectory.dir("generated/kotlin/prompts")
 val generatedTestSources = layout.buildDirectory.dir("generated/kotlin-test/prompts")
+val licensePromptsDir = layout.buildDirectory.dir("license-prompts")
+
+val prepareLicensePrompt by tasks.registering {
+    val websiteLicense = rootProject.layout.projectDirectory.file("website/LICENSE")
+    val outputFile = licensePromptsDir.map { it.file("license/LICENSE.md") }
+    inputs.file(websiteLicense)
+    outputs.file(outputFile)
+    doLast {
+        val licenseText = websiteLicense.asFile.readText()
+        // Strip the first two lines (title + blank) from the raw LICENSE;
+        // the article header below re-introduces the title and adds a description.
+        val body = licenseText.lines().drop(2).joinToString("\n")
+        val article = buildString {
+            appendLine("MCP Steroid Plugin - End User License Agreement (EULA)")
+            appendLine()
+            appendLine("End User License Agreement for the MCP Steroid Plugin")
+            appendLine()
+            append(body)
+        }
+        val out = outputFile.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(article)
+    }
+}
 
 val generatePrompts by tasks.registering(JavaExec::class) {
+    dependsOn(prepareLicensePrompt)
     classpath = promptGeneratorClasspath
     mainClass.set("com.jonnyzzz.mcpSteroid.promptgen.MainKt")
     args(
         "--input-dir", layout.projectDirectory.dir("src/main/prompts").asFile.absolutePath,
         "--output-dir", generatedSources.get().asFile.absolutePath,
         "--test-output-dir", generatedTestSources.get().asFile.absolutePath,
+        "--extra-input-dirs", licensePromptsDir.get().asFile.absolutePath,
     )
     inputs.dir(layout.projectDirectory.dir("src/main/prompts"))
+    inputs.dir(licensePromptsDir)
     outputs.dir(generatedSources)
     outputs.dir(generatedTestSources)
 }

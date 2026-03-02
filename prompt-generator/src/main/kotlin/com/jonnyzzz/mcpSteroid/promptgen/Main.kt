@@ -9,8 +9,16 @@ fun main(args: Array<String>) {
     val inputDir = File(argsMap.getValue("--input-dir"))
     val outputDir = File(argsMap.getValue("--output-dir"))
     val testOutputDir = File(argsMap.getValue("--test-output-dir"))
+    val extraInputDirs = argsMap["--extra-input-dirs"]
+        ?.split(",")
+        ?.filter { it.isNotBlank() }
+        ?.map { File(it) }
+        ?: emptyList()
 
     require(inputDir.isDirectory) { "Input directory does not exist: $inputDir" }
+    for (dir in extraInputDirs) {
+        require(dir.isDirectory) { "Extra input directory does not exist: $dir" }
+    }
 
     if (outputDir.exists()) outputDir.deleteRecursively()
     if (testOutputDir.exists()) testOutputDir.deleteRecursively()
@@ -18,7 +26,7 @@ fun main(args: Array<String>) {
     outputDir.mkdirs()
     testOutputDir.mkdirs()
 
-    generate(inputDir, outputDir, testOutputDir)
+    generate(listOf(inputDir) + extraInputDirs, outputDir, testOutputDir)
 }
 
 private fun parseArgs(args: Array<String>): Map<String, String> {
@@ -38,17 +46,24 @@ internal fun generate(
     inputRoot: File,
     outputRoot: File,
     testOutputRoot: File,
-) {
-    val ctx = PromptGenerationContext(inputRoot, outputRoot, testOutputRoot)
-    val promptClasses = inputRoot
-        .walkTopDown()
-        .filter { it.isFile }
-        .map { src -> ctx.generatePromptClazz(src) }
-        .toList()
+) = generate(listOf(inputRoot), outputRoot, testOutputRoot)
 
-    promptClasses.forEach { clazz ->
-        ctx.generatePromptClazzTest(clazz)
+internal fun generate(
+    inputRoots: List<File>,
+    outputRoot: File,
+    testOutputRoot: File,
+) {
+    val primaryCtx = PromptGenerationContext(inputRoots.first(), outputRoot, testOutputRoot)
+    val promptClasses = inputRoots.flatMap { inputRoot ->
+        val ctx = PromptGenerationContext(inputRoot, outputRoot, testOutputRoot)
+        inputRoot
+            .walkTopDown()
+            .filter { it.isFile }
+            .map { src -> ctx.generatePromptClazz(src) }
+            .toList()
+            .also { clazzes -> clazzes.forEach { ctx.generatePromptClazzTest(it) } }
     }
+    val ctx = primaryCtx
 
     // First pass: group articles per folder
     val folderArticles = promptClasses.groupBy { it.folder }

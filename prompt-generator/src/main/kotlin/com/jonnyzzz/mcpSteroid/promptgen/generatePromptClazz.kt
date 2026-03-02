@@ -107,8 +107,14 @@ fun PromptGenerationContext.generatePromptClazz(
         .initializer("%S", mimeType)
         .build()
 
+    val uri = buildArticleUri(folderValue, pathValue)
+    val uriProp = PropertySpec.builder("uri", String::class)
+        .initializer("%S", uri)
+        .build()
+
     val typeSpec = TypeSpec.classBuilder(classType)
         .superclass(promptBaseClass)
+        .addProperty(uriProp)
         .addProperty(mimeTypeProp)
         .addFunction(readResourceFun)
         .addFunctions(readFn)
