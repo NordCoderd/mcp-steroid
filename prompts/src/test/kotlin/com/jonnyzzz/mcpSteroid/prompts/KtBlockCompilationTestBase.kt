@@ -99,12 +99,15 @@ abstract class KtBlockCompilationTestBase {
         // product-info.json content for IDE identity
         val productInfoContent = readProductInfo(home)
 
+        // kotlinc version for compiler identity
+        val kotlincVersion = readKotlincVersion()
+
         // Relative classpath paths (relative to IDE home) — avoids machine-specific absolute paths in hash
         val relativeClasspath = classpath.map { homePath.relativize(it).toString() }
 
         // Check compilation cache
         val cacheDir = cacheDir()
-        val cacheKey = computeCacheKey(wrapped, relativeClasspath, compilerOptions, productInfoContent, extraSourcesContent)
+        val cacheKey = computeCacheKey(wrapped, relativeClasspath, compilerOptions, productInfoContent, extraSourcesContent, kotlincVersion)
 
         val cacheFile = cacheDir.resolve("$cacheKey.txt")
         if (cacheFile.isFile) {
@@ -194,6 +197,16 @@ abstract class KtBlockCompilationTestBase {
             return bin
         }
 
+        private val kotlincVersionCache: String by lazy {
+            val kotlincHome = System.getProperty("mcp.steroid.kotlinc.home")
+                ?: error("Missing system property 'mcp.steroid.kotlinc.home'")
+            val buildTxt = File(kotlincHome, "kotlinc/build.txt")
+            require(buildTxt.isFile) { "kotlinc build.txt not found at: $buildTxt" }
+            buildTxt.readText(StandardCharsets.UTF_8).trim()
+        }
+
+        private fun readKotlincVersion(): String = kotlincVersionCache
+
         private val productInfoCache = mutableMapOf<String, String>()
 
         private fun readProductInfo(home: String): String {
@@ -225,6 +238,7 @@ abstract class KtBlockCompilationTestBase {
             compilerOptions: List<String>,
             productInfoContent: String,
             extraSourcesContent: List<String>,
+            kotlincVersion: String,
         ): String {
             val digest = MessageDigest.getInstance("SHA-512")
 
@@ -254,6 +268,9 @@ abstract class KtBlockCompilationTestBase {
                 feedString(content)
             }
 
+            feedString("kotlinc-version:")
+            feedString(kotlincVersion)
+
             val hashBytes = digest.digest()
             return hashBytes.joinToString("") { "%02x".format(it) }
         }
@@ -267,6 +284,7 @@ abstract class KtBlockCompilationTestBase {
             cacheFile.writeText(buildString {
                 appendLine("# KtBlock compilation cache entry")
                 appendLine("# timestamp: ${Instant.now()}")
+                appendLine("# kotlinc-version: ${readKotlincVersion()}")
                 appendLine("# compiler-options: ${compilerOptions.joinToString(" ")}")
                 appendLine("#")
                 appendLine("# source:")
