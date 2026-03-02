@@ -17,6 +17,7 @@ application {
 
 dependencies {
     implementation("com.squareup:kotlinpoet:2.2.0")
+    implementation(project(":prompts-api"))
 
     testImplementation(platform("org.junit:junit-bom:5.11.4"))
     testImplementation("org.junit.jupiter:junit-jupiter")

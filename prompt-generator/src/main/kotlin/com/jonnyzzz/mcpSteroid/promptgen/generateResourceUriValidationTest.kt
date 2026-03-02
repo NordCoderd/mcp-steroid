@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.promptgen
 
+import com.jonnyzzz.mcpSteroid.prompts.PromptsContext
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
@@ -17,7 +18,7 @@ private val junitAssertions = ClassName("org.junit.jupiter.api", "Assertions")
  *
  * The test:
  * 1. Collects all known article URIs from [ResourcesIndex]
- * 2. Reads all article content (payload, seeAlso, description)
+ * 2. Reads all article content (readPayload for each IDE context)
  * 3. Extracts `mcp-steroid://` references via regex
  * 4. Fails if any reference does not match a known URI
  */
@@ -26,6 +27,7 @@ fun PromptGenerationContext.generateResourceUriValidationTest(
 ) {
     val classType = ClassName(packageName, "ResourceUriValidationTest")
     val resourcesIndexClass = ClassName(packageName, "ResourcesIndex")
+    val promptsContextClass = PromptsContext::class.asClassName()
 
     val testFunc = FunSpec.builder("testAllMcpSteroidUriReferencesAreValid")
         .addAnnotation(junitTestAnnotation)
@@ -44,13 +46,15 @@ fun PromptGenerationContext.generateResourceUriValidationTest(
             // URI pattern and error collector
             add("val uriPattern = %T(%S)\n", Regex::class.asClassName(), """mcp-steroid://[\w-]+(?:/[\w-]+)*""")
             addStatement("val errors = mutableListOf<String>()")
+            addStatement("val ideaContext = %T(%S, 253)", promptsContextClass, "IU")
+            addStatement("val riderContext = %T(%S, 253)", promptsContextClass, "RD")
             addStatement("")
 
-            // Check all article content (payload + seeAlso + description)
+            // Check all article content via readPayload with both contexts
             controlFlow("for ((_, folderIndex) in index.roots)") {
                 controlFlow("for ((articleKey, article) in folderIndex.articles)") {
                     addStatement(
-                        "val contents = listOfNotNull(article.payload.readPrompt(), article.seeAlso?.readPrompt(), article.description?.readPrompt())"
+                        "val contents = listOf(article.readPayload(ideaContext), article.readPayload(riderContext), article.description.readPrompt())"
                     )
                     controlFlow("for (content in contents)") {
                         controlFlow("for (match in uriPattern.findAll(content))") {

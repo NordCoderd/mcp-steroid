@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.promptgen
 
+import com.jonnyzzz.mcpSteroid.prompts.IdeFilter
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.FileSpec
 import com.squareup.kotlinpoet.FunSpec
@@ -21,6 +22,7 @@ data class GeneratedPromptClazz(
     val path: String,
     override val clazzName: ClassName,
     val src: File,
+    val fileSpec: FileSpec,
 ) : Generated {
     val content get() = src.readText()
 
@@ -28,7 +30,7 @@ data class GeneratedPromptClazz(
 }
 
 /**
- * Build the encoded readPromptN() helper functions and readPromptInternal() override
+ * Build the encoded chunk helper functions and readPrompt() override
  * for a given text content. The content is chunked and obfuscated using a random factor.
  *
  * @param sourcePath Optional source path to embed as KDoc on each helper method (for readability).
@@ -61,7 +63,7 @@ fun buildEncodedReadFunctions(content: String, sourcePath: String? = null): Pair
             .build()
     }
 
-    val readResourceFun = FunSpec.builder("readPromptInternal")
+    val readResourceFun = FunSpec.builder("readPrompt")
         .addModifiers(KModifier.OVERRIDE)
         .returns(String::class)
         .addCode(buildCodeBlock {
@@ -117,13 +119,12 @@ fun PromptGenerationContext.generatePromptClazz(
         .addType(typeSpec)
         .build()
 
-    writeClazz(fileSpec, classType)
-    return GeneratedPromptClazz(filePropValue, folderValue, pathValue, classType, src)
+    return GeneratedPromptClazz(filePropValue, folderValue, pathValue, classType, src, fileSpec)
 }
 
 /**
  * Generate a PromptBase subclass that holds an inline string content.
- * Used for generated content like descriptions, see-also, and TOC.
+ * Used for generated content like descriptions and TOC.
  *
  * @param sourcePath When provided, added as KDoc to the class and each encoded chunk method.
  */
@@ -143,6 +144,44 @@ fun PromptGenerationContext.generateStringPromptClazz(
     val typeSpec = TypeSpec.classBuilder(classType)
         .apply { if (sourcePath != null) addKdoc("Content from: %L", sourcePath) }
         .superclass(promptBaseClass)
+        .addProperty(mimeTypeProp)
+        .addFunction(readResourceFun)
+        .addFunctions(readFn)
+        .build()
+
+    val fileSpec = FileSpec.builder(classType)
+        .addFileComment("GENERATED FILE - DO NOT EDIT")
+        .addType(typeSpec)
+        .build()
+
+    writeClazz(fileSpec, classType)
+}
+
+/**
+ * Generate an ArticlePart subclass (Markdown or KotlinCode) that holds inline string content.
+ * Used for article body parts that carry their own [IdeFilter].
+ */
+fun PromptGenerationContext.generateArticlePartClazz(
+    content: String,
+    classType: ClassName,
+    isKotlinBlock: Boolean,
+    filter: IdeFilter,
+    sourcePath: String? = null,
+) {
+    val (readFn, readResourceFun) = buildEncodedReadFunctions(content, sourcePath)
+
+    val superclass = if (isKotlinBlock) articlePartKotlinCodeClass else articlePartMarkdownClass
+
+    val mimeType = if (isKotlinBlock) "text/x-kotlin" else "text/markdown"
+    val mimeTypeProp = PropertySpec.builder("mimeType", String::class)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer("%S", mimeType)
+        .build()
+
+    val typeSpec = TypeSpec.classBuilder(classType)
+        .apply { if (sourcePath != null) addKdoc("Content from: %L", sourcePath) }
+        .superclass(superclass)
+        .addSuperclassConstructorParameter(emitFilterConstructor(filter))
         .addProperty(mimeTypeProp)
         .addFunction(readResourceFun)
         .addFunctions(readFn)

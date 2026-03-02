@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.promptgen
 
+import com.squareup.kotlinpoet.ClassName
 import java.io.File
 
 fun main(args: Array<String>) {
@@ -53,29 +54,50 @@ internal fun generate(
     val folderArticles = promptClasses.groupBy { it.folder }
         .mapValues { (_, clazzes) -> groupByArticle(clazzes) }
 
-    // Second pass: generate article classes with see-also content, then index classes
+    // Build URI → ClassName and URI → title maps for see-also resolution
+    val uriToClassName = mutableMapOf<String, ClassName>()
+    val uriToTitle = mutableMapOf<String, String>()
+    for ((folder, articles) in folderArticles) {
+        for (article in articles) {
+            val uri = buildArticleUri(folder, article.canonicalPayloadPath)
+            uriToClassName[uri] = articleClassName(article)
+            uriToTitle[uri] = articleName(article)
+        }
+    }
+
+    // Second pass: generate article classes with resolved see-also, then index classes
     val allStandalonePrompts = mutableListOf<GeneratedPromptClazz>()
     val indexes = promptClasses.groupBy { it.folder }
         .map { (folder, clazzes) ->
             val articles = folderArticles[folder] ?: emptyList()
 
             val articleClasses = articles.map { article ->
-                val seeAlsoContent = buildSeeAlsoContent(folder, article, folderArticles)
-                val articleClazz = ctx.generateArticleClazz(folder, article, seeAlsoContent)
+                val resolvedSeeAlso = resolveSeeAlsoClassNames(folder, article, folderArticles, uriToClassName, uriToTitle)
+                val articleClazz = ctx.generateArticleClazz(folder, article, resolvedSeeAlso)
                 ctx.generateArticleReadTest(articleClazz)
                 ctx.generateMdKtBlockCompilationTests(articleClazz)
                 articleClazz
             }
 
-            val tocContent = buildTocContent(folder, articles)
+            // Collect member articles for the TOC (excluding no-auto-toc)
+            val tocMembers = articles.filter { !it.noAutoToc }
+
             val pkg = articleClasses.firstOrNull()?.clazzName?.packageName
                 ?: (ctx.packageName + "." + folder.toPromptIdentifierName())
-            val tocArticle = ctx.generateTocArticleClazz(folder, tocContent, pkg)
+            val tocArticle = ctx.generateTocArticleClazz(folder, tocMembers, pkg)
             val allArticleClasses = articleClasses + listOfNotNull(tocArticle)
 
             val usedPromptNames = allArticleClasses.flatMap { it.article?.allClasses ?: emptyList() }.map { it.path }.toSortedSet()
             val standaloneFiles = clazzes.filter { it.path !in usedPromptNames }
             allStandalonePrompts.addAll(standaloneFiles)
+
+            // Write prompt classes: standalone → main output, article-content → test output
+            for (clazz in standaloneFiles) {
+                ctx.writeClazz(clazz.fileSpec, clazz.clazzName)
+            }
+            for (clazz in clazzes.filter { it.path in usedPromptNames }) {
+                ctx.writeTestClazz(clazz.fileSpec, clazz.clazzName)
+            }
 
             ctx.generateIndexClazz(folder, standaloneFiles, allArticleClasses)
         }
@@ -84,6 +106,41 @@ internal fun generate(
 
     // Generate test that validates all mcp-steroid:// URI references in prompt content
     ctx.generateResourceUriValidationTest(allStandalonePrompts)
+}
+
+/**
+ * Resolves see-also entries for an article into article class names.
+ *
+ * 1. **Custom**: extracts `mcp-steroid://...` URIs from the `# See also` section in the
+ *    source `.md` file and resolves them to article class names via [uriToClassName].
+ * 2. **Generated**: sibling articles in the same folder (not already in custom, not no-auto-toc)
+ *    are added as auto-generated see-also entries.
+ *
+ * Custom entries come first, then generated entries.
+ */
+private fun resolveSeeAlsoClassNames(
+    folder: String,
+    article: PromptArticle,
+    folderArticles: Map<String, List<PromptArticle>>,
+    uriToClassName: Map<String, ClassName>,
+    uriToTitle: Map<String, String>,
+): ResolvedSeeAlso {
+    // Extract manual URIs from # See also section
+    val manualUris = extractManualSeeAlsoUris(article)
+    val customClassNames = manualUris.mapNotNull { uri ->
+        val cls = uriToClassName[uri] ?: return@mapNotNull null
+        val title = uriToTitle[uri] ?: ""
+        cls to title
+    }.sortedBy { it.second }.map { it.first }
+
+    // Auto-generated siblings (not already in manual, not no-auto-toc), sorted by title
+    val siblings = folderArticles[folder]?.filter { it !== article && !it.noAutoToc } ?: emptyList()
+    val generatedClassNames = siblings
+        .filter { buildArticleUri(folder, it.canonicalPayloadPath) !in manualUris }
+        .sortedBy { articleName(it) }
+        .map { articleClassName(it) }
+
+    return ResolvedSeeAlso(customClassNames, generatedClassNames)
 }
 
 /**
@@ -99,60 +156,4 @@ private fun extractManualSeeAlsoUris(article: PromptArticle): Set<String> {
     if (idx < 0) return emptySet()
     val seeAlsoSection = content.substring(idx)
     return Regex("mcp-steroid://[a-zA-Z0-9/_-]+").findAll(seeAlsoSection).map { it.value }.toSet()
-}
-
-/**
- * Build the auto-generated see-also content for an article.
- *
- * Returns a list of sibling article links that are NOT already mentioned in the
- * article's manual `# See also` section (embedded in the `.md` file).
- *
- * Returns empty string if there are no new sibling links to add.
- * Articles with `###_NO_AUTO_TOC_###` are excluded from sibling lists.
- */
-private fun buildSeeAlsoContent(
-    folder: String,
-    article: PromptArticle,
-    folderArticles: Map<String, List<PromptArticle>>,
-): String {
-    val siblings = folderArticles[folder]?.filter { it !== article && !it.noAutoToc } ?: emptyList()
-    if (siblings.isEmpty()) return ""
-
-    // Exclude siblings already referenced in the file's manual # See also section
-    val manualUris = extractManualSeeAlsoUris(article)
-    val newSiblings = siblings.filter {
-        buildArticleUri(folder, it.canonicalPayloadPath) !in manualUris
-    }
-    if (newSiblings.isEmpty()) return ""
-
-    val displayName = folderToDisplayName(folder)
-    val folderLabel = displayName.ifEmpty { "related" }
-    return buildString {
-        appendLine("Related $folderLabel resources:")
-        for (sibling in newSiblings) {
-            appendLine(buildSeeAlsoLine(folder, sibling))
-        }
-    }.trim()
-}
-
-/**
- * Build the table-of-contents content for a folder, generated at build time.
- * Articles with `###_NO_AUTO_TOC_###` are excluded from the TOC.
- */
-private fun buildTocContent(
-    folder: String,
-    articles: List<PromptArticle>,
-): String {
-    val tocArticles = articles.filter { !it.noAutoToc }
-    if (tocArticles.isEmpty()) return ""
-    val displayName = folderToDisplayName(folder)
-    val tocName = if (displayName.isNotEmpty()) "$displayName Resources" else "Resources"
-
-    return buildString {
-        appendLine("# $tocName")
-        appendLine()
-        for (article in tocArticles) {
-            appendLine(buildSeeAlsoLine(folder, article))
-        }
-    }.trim()
 }

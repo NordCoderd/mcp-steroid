@@ -1,6 +1,13 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.promptgen
 
+import com.jonnyzzz.mcpSteroid.prompts.ArticleBase
+import com.jonnyzzz.mcpSteroid.prompts.ArticlePart
+import com.jonnyzzz.mcpSteroid.prompts.IdeFilter
+import com.jonnyzzz.mcpSteroid.prompts.PromptBase
+import com.jonnyzzz.mcpSteroid.prompts.PromptIndexBase
+import com.jonnyzzz.mcpSteroid.prompts.PromptRootBase
+import com.jonnyzzz.mcpSteroid.prompts.SeeAlsoItem
 import com.squareup.kotlinpoet.ANY
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.MemberName
@@ -20,8 +27,13 @@ class PromptGenerationContext(
     val sequenceOfAny = Sequence::class.asClassName().parameterizedBy(ANY)
     val serviceMember = MemberName("com.intellij.openapi.components", "service")
 
-    val promptBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptBase")
-    val promptIndexBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptIndexBase")
-    val promptRootBaseClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "PromptRootBase")
-    val promptArticleClass = ClassName("com.jonnyzzz.mcpSteroid.prompts", "ArticleBase")
+    val promptBaseClass = PromptBase::class.asClassName()
+    val promptIndexBaseClass = PromptIndexBase::class.asClassName()
+    val promptRootBaseClass = PromptRootBase::class.asClassName()
+    val promptArticleClass = ArticleBase::class.asClassName()
+    val articlePartClass = ArticlePart::class.asClassName()
+    val articlePartMarkdownClass = ArticlePart.Markdown::class.asClassName()
+    val articlePartKotlinCodeClass = ArticlePart.KotlinCode::class.asClassName()
+    val ideFilterClass = IdeFilter::class.asClassName()
+    val seeAlsoItemClass = SeeAlsoItem::class.asClassName()
 }
