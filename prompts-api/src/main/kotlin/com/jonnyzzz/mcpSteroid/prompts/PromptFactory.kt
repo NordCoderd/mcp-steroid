@@ -36,10 +36,17 @@ data class SeeAlsoItem(
 abstract class ArticleBase {
     abstract val uri: String
     abstract val title: PromptBase
-    abstract val filter: IdeFilter
+    abstract val ownFilter: IdeFilter
     abstract val description: PromptBase
     abstract val parts: List<ArticlePart>
     abstract val seeAlsoItems: List<SeeAlsoItem>
+
+    val filter: IdeFilter get() {
+        val ktFilters = parts.filterIsInstance<ArticlePart.KotlinCode>().map { it.filter }
+        if (ktFilters.isEmpty()) return ownFilter
+        val orUnion = if (ktFilters.size == 1) ktFilters[0] else IdeFilter.Or(ktFilters)
+        return ownFilter.and(orUnion)
+    }
 
     /** Renders full article: title, description, body, see-also — all filtered by context. */
     fun readPayload(context: PromptsContext): String = buildString {

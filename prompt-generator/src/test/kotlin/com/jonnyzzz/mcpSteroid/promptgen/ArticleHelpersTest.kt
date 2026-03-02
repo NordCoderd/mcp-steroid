@@ -241,7 +241,7 @@ class ArticleHelpersTest {
             listOf(IdeFilter.Ide(setOf("RD")), IdeFilter.Ide(setOf("IU"))),
         )
         // root AND orUnion — no simplification of AND
-        assertEquals(IdeFilter.And(root, orUnion), result)
+        assertEquals(IdeFilter.And(listOf(root, orUnion)), result)
     }
 
     @Test
@@ -250,7 +250,7 @@ class ArticleHelpersTest {
         val block = IdeFilter.Ide(setOf("IU", "RD"))
         val result = computeArticleFilter(root, listOf(block))
         // Single block, root is not All → And(root, block)
-        assertEquals(IdeFilter.And(root, block), result)
+        assertEquals(IdeFilter.And(listOf(root, block)), result)
     }
 
     @Test
@@ -273,7 +273,7 @@ class ArticleHelpersTest {
         val block2 = IdeFilter.Ide(setOf("IU"), minVersion = 255, maxVersion = 257)
         val result = computeArticleFilter(IdeFilter.All, listOf(block1, block2))
         // All AND Or(b1, b2) → Or(b1, b2) (simplified)
-        assertEquals(IdeFilter.Or(block1, block2), result)
+        assertEquals(IdeFilter.Or(listOf(block1, block2)), result)
     }
 
     @Test
@@ -282,7 +282,7 @@ class ArticleHelpersTest {
         val block1 = IdeFilter.Ide(setOf("IU"), minVersion = 251, maxVersion = 253)
         val block2 = IdeFilter.Ide(setOf("IU"), minVersion = 255, maxVersion = 257)
         val result = computeArticleFilter(root, listOf(block1, block2))
-        assertEquals(IdeFilter.And(root, IdeFilter.Or(block1, block2)), result)
+        assertEquals(IdeFilter.And(listOf(root, IdeFilter.Or(listOf(block1, block2)))), result)
     }
 
     @Test
@@ -291,7 +291,7 @@ class ArticleHelpersTest {
         val block = IdeFilter.Ide(setOf("RD", "IU"))
         val result = computeArticleFilter(root, listOf(block))
         // No simplification — keep And(root, block)
-        assertEquals(IdeFilter.And(root, block), result)
+        assertEquals(IdeFilter.And(listOf(root, block)), result)
     }
 
     @Test
@@ -302,12 +302,12 @@ class ArticleHelpersTest {
         val block2 = IdeFilter.Not(IdeFilter.Ide(setOf("RD")))
         val result = computeArticleFilter(root, listOf(block1, block2))
         // Not in inputs → can't simplify OR, builds Or tree then And with root
-        assertEquals(IdeFilter.And(root, IdeFilter.Or(block1, block2)), result)
+        assertEquals(IdeFilter.And(listOf(root, IdeFilter.Or(listOf(block1, block2)))), result)
     }
 
     @Test
     fun `computeArticleFilter And block in Or union`() {
-        val andBlock = IdeFilter.And(IdeFilter.Ide(setOf("IU")), IdeFilter.Ide(setOf("RD")))
+        val andBlock = IdeFilter.And(listOf(IdeFilter.Ide(setOf("IU")), IdeFilter.Ide(setOf("RD"))))
         val result = computeArticleFilter(IdeFilter.All, listOf(andBlock))
         // Single composite block, All root → simplified to the block itself
         assertEquals(andBlock, result)

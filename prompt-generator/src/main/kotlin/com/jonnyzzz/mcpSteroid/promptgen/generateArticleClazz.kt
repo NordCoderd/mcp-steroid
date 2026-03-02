@@ -432,11 +432,6 @@ fun PromptGenerationContext.generateArticleClazz(
     // Generate part classes and ktBlock properties
     val partClassNames = generateNewFormatParts(article, parts, classType, pkg, props)
 
-    // Compute article filter: declared root filter AND (OR-union of kotlin block filters)
-    val contentParts = buildContentParts(parts)
-    val ktBlockFilters = contentParts.filter { it.isKotlinBlock }.map { it.filter }
-    val articleFilter = computeArticleFilter(parts.rootFilter, ktBlockFilters)
-
     // uri property
     props += PropertySpec.builder("uri", String::class)
         .addModifiers(KModifier.OVERRIDE)
@@ -451,11 +446,11 @@ fun PromptGenerationContext.generateArticleClazz(
         }).build())
         .build()
 
-    // filter property
+    // ownFilter property
     val filterType = IdeFilter::class.asClassName()
-    props += PropertySpec.builder("filter", filterType)
+    props += PropertySpec.builder("ownFilter", filterType)
         .addModifiers(KModifier.OVERRIDE)
-        .initializer(emitFilterConstructor(articleFilter))
+        .initializer(emitFilterConstructor(parts.rootFilter))
         .build()
 
     // description property (non-nullable)
@@ -642,20 +637,22 @@ fun emitFilterConstructor(filter: IdeFilter): CodeBlock = when (filter) {
         .add(emitFilterConstructor(filter.inner))
         .add(")")
         .build()
-    is IdeFilter.And -> CodeBlock.builder()
-        .add("%T.And(", IdeFilter::class.asClassName())
-        .add(emitFilterConstructor(filter.left))
-        .add(", ")
-        .add(emitFilterConstructor(filter.right))
-        .add(")")
-        .build()
-    is IdeFilter.Or -> CodeBlock.builder()
-        .add("%T.Or(", IdeFilter::class.asClassName())
-        .add(emitFilterConstructor(filter.left))
-        .add(", ")
-        .add(emitFilterConstructor(filter.right))
-        .add(")")
-        .build()
+    is IdeFilter.And -> {
+        val builder = CodeBlock.builder().add("%T.And(listOf(", IdeFilter::class.asClassName())
+        filter.operands.forEachIndexed { i, op ->
+            if (i > 0) builder.add(", ")
+            builder.add(emitFilterConstructor(op))
+        }
+        builder.add("))").build()
+    }
+    is IdeFilter.Or -> {
+        val builder = CodeBlock.builder().add("%T.Or(listOf(", IdeFilter::class.asClassName())
+        filter.operands.forEachIndexed { i, op ->
+            if (i > 0) builder.add(", ")
+            builder.add(emitFilterConstructor(op))
+        }
+        builder.add("))").build()
+    }
 }
 
 /**
@@ -711,7 +708,7 @@ fun PromptGenerationContext.generateTocArticleClazz(
         }).build())
         .build()
 
-    props += PropertySpec.builder("filter", filterType)
+    props += PropertySpec.builder("ownFilter", filterType)
         .addModifiers(KModifier.OVERRIDE)
         .initializer("%T.All", IdeFilter::class.asClassName())
         .build()

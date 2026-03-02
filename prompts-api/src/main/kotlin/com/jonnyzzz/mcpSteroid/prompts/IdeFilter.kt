@@ -12,8 +12,8 @@ sealed interface IdeFilter {
     fun matches(context: PromptsContext): Boolean
 
     fun not(): IdeFilter = Not(this)
-    fun and(other: IdeFilter): IdeFilter = And(this, other)
-    fun or(other: IdeFilter): IdeFilter = Or(this, other)
+    fun and(other: IdeFilter): IdeFilter = And(listOf(this, other))
+    fun or(other: IdeFilter): IdeFilter = Or(listOf(this, other))
 
     /** Matches everything — used for unconditional parts. */
     data object All : IdeFilter {
@@ -41,15 +41,13 @@ sealed interface IdeFilter {
         override fun not(): IdeFilter = inner
     }
 
-    /** Conjunction — used for ELSE_IF branches (not(previous) AND this). */
-    data class And(val left: IdeFilter, val right: IdeFilter) : IdeFilter {
-        override fun matches(context: PromptsContext) =
-            left.matches(context) && right.matches(context)
+    /** Conjunction — all operands must match. */
+    data class And(val operands: List<IdeFilter>) : IdeFilter {
+        override fun matches(context: PromptsContext) = operands.all { it.matches(context) }
     }
 
-    /** Disjunction — used for article-level OR-union of code block filters. */
-    data class Or(val left: IdeFilter, val right: IdeFilter) : IdeFilter {
-        override fun matches(context: PromptsContext) =
-            left.matches(context) || right.matches(context)
+    /** Disjunction — at least one operand must match. */
+    data class Or(val operands: List<IdeFilter>) : IdeFilter {
+        override fun matches(context: PromptsContext) = operands.any { it.matches(context) }
     }
 }
