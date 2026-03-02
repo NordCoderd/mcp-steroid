@@ -20,9 +20,10 @@ abstract class PromptBase {
             .joinToString("") { it.toChar().toString() }
 }
 
-sealed class ArticlePart(val filter: IdeFilter) : PromptBase() {
-    abstract class Markdown(filter: IdeFilter) : ArticlePart(filter)
-    abstract class KotlinCode(filter: IdeFilter) : ArticlePart(filter)
+sealed class ArticlePart : PromptBase() {
+    abstract val filter: IdeFilter
+    abstract class Markdown : ArticlePart()
+    abstract class KotlinCode : ArticlePart()
 }
 
 data class SeeAlsoItem(

@@ -178,10 +178,16 @@ fun PromptGenerationContext.generateArticlePartClazz(
         .initializer("%S", mimeType)
         .build()
 
+    val filterType = IdeFilter::class.asClassName()
+    val filterProp = PropertySpec.builder("filter", filterType)
+        .addModifiers(KModifier.OVERRIDE)
+        .initializer(emitFilterConstructor(filter))
+        .build()
+
     val typeSpec = TypeSpec.classBuilder(classType)
         .apply { if (sourcePath != null) addKdoc("Content from: %L", sourcePath) }
         .superclass(superclass)
-        .addSuperclassConstructorParameter(emitFilterConstructor(filter))
+        .addProperty(filterProp)
         .addProperty(mimeTypeProp)
         .addFunction(readResourceFun)
         .addFunctions(readFn)
