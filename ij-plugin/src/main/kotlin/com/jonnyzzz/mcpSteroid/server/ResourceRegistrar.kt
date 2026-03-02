@@ -64,7 +64,7 @@ class ResourceRegistrar : McpRegistrar {
         for ((_, article) in index.articles) {
             if (!article.filter.matches(context)) continue
 
-            val body = article.readBody(context)
+            val body = article.readPayload(context)
             val parsed = parseSkillFrontmatter(body)
             val frontmatter = parsed.frontmatter ?: continue
             val promptName = frontmatter.name?.takeIf { it.isNotBlank() } ?: continue

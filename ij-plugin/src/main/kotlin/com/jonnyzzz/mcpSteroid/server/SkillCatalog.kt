@@ -18,29 +18,34 @@ internal fun parseSkillFrontmatter(content: String): FrontmatterParseResult {
         return FrontmatterParseResult(frontmatter = null, body = normalized.trimStart())
     }
 
-    val opening = lines.first()
-    if (!isYamlDelimiterLine(opening) && !isTomlDelimiterLine(opening)) {
+    // Find the opening delimiter line — may be after title/description from readPayload()
+    val openingIndex = lines.indexOfFirst { isYamlDelimiterLine(it) || isTomlDelimiterLine(it) }
+    if (openingIndex < 0) {
         return FrontmatterParseResult(frontmatter = null, body = normalized.trimStart())
     }
 
+    val opening = lines[openingIndex]
     val isYaml = isYamlDelimiterLine(opening)
-    val closingIndex = lines.drop(1).indexOfFirst { line ->
+    val closingIndex = lines.drop(openingIndex + 1).indexOfFirst { line ->
         if (isYaml) isYamlClosingDelimiterLine(line) else isTomlDelimiterLine(line)
     }
     if (closingIndex < 0) {
         return FrontmatterParseResult(frontmatter = null, body = normalized.trimStart())
     }
 
-    val closingLineIndex = closingIndex + 1
-    val frontmatterLines = lines.subList(1, closingLineIndex)
-    val bodyLines = lines.drop(closingLineIndex + 1)
+    val closingLineIndex = openingIndex + 1 + closingIndex
+    val frontmatterLines = lines.subList(openingIndex + 1, closingLineIndex)
 
     val name = if (isYaml) readYamlFrontmatterValue(frontmatterLines, "name") else readTomlFrontmatterValue(frontmatterLines, "name")
     val description = if (isYaml) readYamlFrontmatterValue(frontmatterLines, "description") else readTomlFrontmatterValue(frontmatterLines, "description")
 
+    val preLines = lines.subList(0, openingIndex)
+    val postLines = lines.drop(closingLineIndex + 1)
+    val body = (preLines + postLines).joinToString("\n").trimStart()
+
     return FrontmatterParseResult(
         frontmatter = SkillFrontmatter(name = name, description = description),
-        body = bodyLines.joinToString("\n").trimStart()
+        body = body
     )
 }
 

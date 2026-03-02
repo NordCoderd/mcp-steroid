@@ -74,6 +74,10 @@ dependencies {
             JetBrainsIdeProduct.WebStorm,
             -> error("Plugin build targets IntelliJ IDEA or PyCharm only. GoLand/WebStorm are for integration tests.")
         }
+        // Required for IdeExamplesExecutionTest (Java refactoring APIs) and
+        // LanguageSupportExecutionTest (Java/Kotlin language support actions)
+        bundledPlugin("com.intellij.java")
+        bundledPlugin("org.jetbrains.kotlin")
         testFramework(TestFrameworkType.Platform)
     }
 

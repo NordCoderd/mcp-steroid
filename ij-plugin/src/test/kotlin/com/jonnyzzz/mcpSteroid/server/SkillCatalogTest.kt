@@ -11,12 +11,12 @@ class SkillCatalogTest : BasePlatformTestCase() {
     fun testSkillFrontmatterParsed() {
         val index = SkillIndex()
         val skillArticle = index.articles.values.first { article ->
-            val content = article.readBody(context)
+            val content = article.readPayload(context)
             val parsed = parseSkillFrontmatter(content)
             parsed.frontmatter?.name == "mcp-steroid"
         }
 
-        val content = skillArticle.readBody(context)
+        val content = skillArticle.readPayload(context)
         val parsed = parseSkillFrontmatter(content)
         assertNotNull("Main skill frontmatter should be parsed", parsed.frontmatter)
         assertTrue(
@@ -32,7 +32,7 @@ class SkillCatalogTest : BasePlatformTestCase() {
     fun testDebuggerSkillPromptName() {
         val index = SkillIndex()
         val debuggerArticle = index.articles.values.firstOrNull { article ->
-            val content = article.readBody(context)
+            val content = article.readPayload(context)
             val parsed = parseSkillFrontmatter(content)
             parsed.frontmatter?.name == "mcp-steroid-debugger"
         }
