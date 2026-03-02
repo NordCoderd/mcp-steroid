@@ -4,11 +4,16 @@ package com.jonnyzzz.mcpSteroid.prompts
 import com.jonnyzzz.mcpSteroid.koltinc.CodeWrapperForCompilation
 import com.jonnyzzz.mcpSteroid.koltinc.KotlincCommandLineBuilder
 import com.jonnyzzz.mcpSteroid.koltinc.toArgFile
+import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import org.junit.jupiter.api.Assertions
 import java.io.File
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
+import java.security.MessageDigest
+import java.time.Duration
+import java.time.Instant
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
 import kotlin.io.path.walk
@@ -28,26 +33,104 @@ import kotlin.io.path.walk
  * - `mcp.steroid.ide.home` — path to the unpacked IDE distribution
  * - `mcp.steroid.kotlinc.home` — path to the unpacked kotlinc distribution (parent of `kotlinc/`)
  * - `mcp.steroid.ij.sources` — path to ij-plugin/src/main/kotlin (for McpScriptContext/McpScriptBuilder sources)
+ * - `mcp.steroid.ktblock.cache.dir` — path to compilation cache directory (optional but recommended)
  */
 abstract class KtBlockCompilationTestBase {
 
+    /**
+     * Compiles a Kotlin code block against the default IDE classpath (IDEA).
+     * Backward-compatible — used by older generated tests.
+     */
     protected fun compileKtBlock(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.ide.home", werror = true)
+    }
+
+    /** Compiles a Kotlin code block against the IntelliJ IDEA classpath. */
+    protected fun compileKtBlockOnIdea(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.ide.home", werror = true)
+    }
+
+    /** Compiles a Kotlin code block against the Rider classpath. */
+    protected fun compileKtBlockOnRider(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.rider.home", werror = true)
+    }
+
+    /** Compiles a Kotlin code block against the CLion classpath. */
+    protected fun compileKtBlockOnClion(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.clion.home", werror = true)
+    }
+
+    /** Compiles a Kotlin code block against the PyCharm classpath. */
+    protected fun compileKtBlockOnPycharm(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.pycharm.home", werror = true)
+    }
+
+    /** Compiles a Kotlin code block against the IntelliJ IDEA EAP classpath (warnings allowed). */
+    protected fun compileKtBlockOnIdeaEap(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.ide.eap.home", werror = false)
+    }
+
+    /** Compiles a Kotlin code block against the Rider EAP classpath (warnings allowed). */
+    protected fun compileKtBlockOnRiderEap(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.rider.eap.home", werror = false)
+    }
+
+    /** Compiles a Kotlin code block against the CLion EAP classpath (warnings allowed). */
+    protected fun compileKtBlockOnClionEap(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.clion.eap.home", werror = false)
+    }
+
+    /** Compiles a Kotlin code block against the PyCharm EAP classpath (warnings allowed). */
+    protected fun compileKtBlockOnPycharmEap(block: PromptBase) {
+        compileAgainst(block, "mcp.steroid.pycharm.eap.home", werror = false)
+    }
+
+    private fun compileAgainst(block: PromptBase, homeProperty: String, werror: Boolean) {
+        val home = System.getProperty(homeProperty)
+            ?: error("Missing system property '$homeProperty' — IDE distribution not available")
+
         val content = block.readPrompt()
         val wrapped = CodeWrapperForCompilation.wrap("MdKtBlock", content).code
+        val homePath = Path.of(home)
+        val classpath = classpathFor(home)
+        val extraSourcesContent = ijPluginSourceFiles().map { Files.readString(it, StandardCharsets.UTF_8) }
+
+        // Compiler options (must match what KotlincCommandLineBuilder produces)
+        val compilerOptions = buildList {
+            if (werror) add("-Werror")
+            add("-jvm-target")
+            add(KotlincCommandLineBuilder.DEFAULT_JVM_TARGET)
+            add("-no-stdlib")
+        }
+
+        // product-info.json content for IDE identity
+        val productInfoContent = readProductInfo(home)
+
+        // Relative classpath paths (relative to IDE home) — avoids machine-specific absolute paths in hash
+        val relativeClasspath = classpath.map { homePath.relativize(it).toString() }
+
+        // Check compilation cache
+        val cacheDir = cacheDir()
+        val cacheKey = computeCacheKey(wrapped, relativeClasspath, compilerOptions, productInfoContent, extraSourcesContent)
+
+        val cacheFile = cacheDir.resolve("$cacheKey.txt")
+        if (cacheFile.isFile) {
+            println("[cache hit] $cacheKey")
+            return
+        }
+
         val tempDir = Files.createTempDirectory("md-kt-block-compile")
         try {
             val sourceFile = tempDir.resolve("Script.kt")
             Files.writeString(sourceFile, wrapped, StandardCharsets.UTF_8)
             val outputJar = tempDir.resolve("out.jar")
-            val classpath = ideClasspath()
+            val extraParams = if (werror) listOf("-Werror") else emptyList()
             val builder = KotlincCommandLineBuilder(outputJar)
                 .withNoStdLib(true)
-                .withExtraParameters(listOf("-Werror"))
+                .withExtraParameters(extraParams)
                 .addClasspathEntries(classpath)
                 .addSource(sourceFile)
 
-            // Add McpScriptContext and McpScriptBuilder source files from ij-plugin
-            // so they compile together with the wrapped code
             for (sourceExtra in ijPluginSourceFiles()) {
                 builder.addSource(sourceExtra)
             }
@@ -57,33 +140,45 @@ abstract class KtBlockCompilationTestBase {
             val argCmd = cmd.toArgFile(argFile)
 
             val kotlincBin = resolveKotlincBin()
-            val process = ProcessBuilder(kotlincBin.absolutePath, *argCmd.args.toTypedArray())
-                .directory(tempDir.toFile())
-                .redirectErrorStream(true)
-                .start()
+            val result = RunProcessRequest(
+                workingDir = tempDir.toFile(),
+                args = listOf(kotlincBin.absolutePath) + argCmd.args,
+                logPrefix = "kotlinc",
+                timeout = Duration.ofMinutes(3),
+                quietly = true,
+            ).startProcess().awaitForProcessFinish()
 
-            val output = process.inputStream.bufferedReader().readText()
-            val exitCode = process.waitFor()
-
-            // this test depends on the classes on the disk
-            // parallel execution of tests can break it
-            // re-run usually is enough to fix that
-            Assertions.assertEquals(0, exitCode) {
-                "Compilation failed or has warnings (-Werror):\n$output"
+            Assertions.assertEquals(0, result.exitCode) {
+                buildString {
+                    appendLine("Compilation failed or has warnings (-Werror) [IDE: $homeProperty]:")
+                    if (result.stdout.isNotBlank()) {
+                        appendLine("STDOUT:")
+                        appendLine(result.stdout)
+                    }
+                    if (result.stderr.isNotBlank()) {
+                        appendLine("STDERR:")
+                        appendLine(result.stderr)
+                    }
+                }
             }
+
+            // Cache successful compilation
+            writeCacheEntry(cacheDir, cacheKey, wrapped, compilerOptions)
         } finally {
             tempDir.toFile().deleteRecursively()
         }
     }
 
     companion object {
-        private val ideClasspathCache: List<Path> by lazy {
-            val home = System.getProperty("mcp.steroid.ide.home")
-                ?: error("Missing system property 'mcp.steroid.ide.home'")
-            Path.of(home)
-                .walk()
-                .filter { it.isRegularFile() && it.name.endsWith(".jar") }
-                .toList()
+        private val classpathCache = mutableMapOf<String, List<Path>>()
+
+        private fun classpathFor(home: String): List<Path> {
+            return classpathCache.getOrPut(home) {
+                Path.of(home)
+                    .walk()
+                    .filter { it.isRegularFile() && it.name.endsWith(".jar") }
+                    .toList()
+            }
         }
 
         private val ijPluginSourceFilesCache: List<Path> by lazy {
@@ -97,8 +192,6 @@ abstract class KtBlockCompilationTestBase {
             }
         }
 
-        private fun ideClasspath(): List<Path> = ideClasspathCache
-
         private fun ijPluginSourceFiles(): List<Path> = ijPluginSourceFilesCache
 
         private fun resolveKotlincBin(): File {
@@ -108,6 +201,88 @@ abstract class KtBlockCompilationTestBase {
             val bin = File(kotlincDir, "bin/kotlinc")
             require(bin.isFile) { "kotlinc binary not found at: $bin" }
             return bin
+        }
+
+        private val productInfoCache = mutableMapOf<String, String>()
+
+        private fun readProductInfo(home: String): String {
+            return productInfoCache.getOrPut(home) {
+                val productInfoFile = Path.of(home, "product-info.json")
+                require(productInfoFile.isRegularFile()) {
+                    "product-info.json not found in IDE home: $productInfoFile"
+                }
+                Files.readString(productInfoFile, StandardCharsets.UTF_8)
+            }
+        }
+
+        private fun cacheDir(): File {
+            val dir = System.getProperty("mcp.steroid.ktblock.cache.dir")
+                ?: error("Missing system property 'mcp.steroid.ktblock.cache.dir'")
+            val file = File(dir)
+            file.mkdirs()
+            require(file.isDirectory) { "Cache directory does not exist and could not be created: $dir" }
+            return file
+        }
+
+        /**
+         * Computes a SHA-512 hash from all inputs that affect compilation outcome.
+         * The hash is deterministic for the same inputs.
+         */
+        private fun computeCacheKey(
+            wrappedSource: String,
+            relativeClasspath: List<String>,
+            compilerOptions: List<String>,
+            productInfoContent: String,
+            extraSourcesContent: List<String>,
+        ): String {
+            val digest = MessageDigest.getInstance("SHA-512")
+
+            fun feedString(s: String) {
+                digest.update(s.toByteArray(StandardCharsets.UTF_8))
+                digest.update(0) // null terminator as separator
+            }
+
+            feedString("source:")
+            feedString(wrappedSource)
+
+            feedString("classpath:")
+            for (entry in relativeClasspath.sorted()) {
+                feedString(entry)
+            }
+
+            feedString("options:")
+            for (option in compilerOptions) {
+                feedString(option)
+            }
+
+            feedString("product-info:")
+            feedString(productInfoContent)
+
+            feedString("extra-sources:")
+            for (content in extraSourcesContent) {
+                feedString(content)
+            }
+
+            val hashBytes = digest.digest()
+            return hashBytes.joinToString("") { "%02x".format(it) }
+        }
+
+        /**
+         * Writes a cache entry for a successful compilation.
+         * Includes timestamp, source, and compiler args for debugging.
+         */
+        private fun writeCacheEntry(cacheDir: File, cacheKey: String, source: String, compilerOptions: List<String>) {
+            val cacheFile = File(cacheDir, "$cacheKey.txt")
+            cacheFile.writeText(buildString {
+                appendLine("# KtBlock compilation cache entry")
+                appendLine("# timestamp: ${Instant.now()}")
+                appendLine("# compiler-options: ${compilerOptions.joinToString(" ")}")
+                appendLine("#")
+                appendLine("# source:")
+                for (line in source.lines()) {
+                    appendLine("# $line")
+                }
+            })
         }
     }
 }

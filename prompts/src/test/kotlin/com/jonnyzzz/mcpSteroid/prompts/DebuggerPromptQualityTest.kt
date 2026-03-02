@@ -11,6 +11,8 @@ class DebuggerPromptQualityTest {
     private val debuggerIndex = DebuggerIndex()
     private val skillIndex = SkillIndex()
 
+    private val ideaContext = PromptsContext("IU", 253)
+
     @Test
     fun testSetLineBreakpointUsesToggleLineBreakpoint() {
         val prompt = debuggerIndex.setLineBreakpointMd.ktBlock000.readPrompt()
@@ -34,7 +36,7 @@ class DebuggerPromptQualityTest {
 
     @Test
     fun testDebuggerOverviewClarifiesZeroBasedLineNumbers() {
-        val prompt = debuggerIndex.overviewMd.payload.readPrompt()
+        val prompt = debuggerIndex.overviewMd.readPayload(ideaContext)
         assertTrue(
             prompt.contains("0-indexed", ignoreCase = true)
         ) { "Expected explicit 0-indexed line guidance" }
@@ -42,7 +44,7 @@ class DebuggerPromptQualityTest {
 
     @Test
     fun testDebuggerSkillDocumentsCriticalImports() {
-        val prompt = skillIndex.debuggerSkillMd.payload.readPrompt()
+        val prompt = skillIndex.debuggerSkillMd.readPayload(ideaContext)
         assertTrue(
             prompt.contains("kotlinx.coroutines.suspendCancellableCoroutine")
         ) { "Expected suspendCancellableCoroutine import guidance" }

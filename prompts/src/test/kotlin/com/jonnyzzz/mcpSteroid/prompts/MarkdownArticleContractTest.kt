@@ -1,6 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.prompts
 
+import com.jonnyzzz.mcpSteroid.promptgen.buildContentParts
+import com.jonnyzzz.mcpSteroid.promptgen.parseNewFormatArticleParts
 import com.jonnyzzz.mcpSteroid.prompts.generated.ResourcesIndex
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -19,7 +21,7 @@ import java.util.stream.Collectors
  * Format contract:
  * ```
  * Title         ← line 1: non-empty, ≤ 80 chars, no # prefix
- *               ← line 2: blank
+ * [RD]          ← line 2: blank (IdeFilter.All) or filter like [RD]
  * Description   ← line 3: non-empty, ≤ 200 chars, no # prefix
  *               ← line 4: blank
  * ...content
@@ -28,6 +30,8 @@ import java.util.stream.Collectors
  * Additionally, no bare Kotlin/Java code is allowed outside ` ```kotlin ``` ` fences.
  */
 class MarkdownArticleContractTest {
+
+    private val filterLinePattern = Regex("""^\[[A-Z,;>=<\d\s]+]$""")
 
     private fun newFormatArticles(): List<Path> {
         val projectHome = ProjectHomeDirectory.requireProjectHomeDirectory()
@@ -97,20 +101,34 @@ class MarkdownArticleContractTest {
             val lines = Files.readAllLines(file)
             val relPath = promptsRoot.relativize(file)
 
-            val line2 = lines.getOrNull(1) ?: ""
-            if (line2.isNotBlank()) {
-                violations.add("$relPath:2: expected blank line after title, got: $line2")
+            // Line 2: must be blank or a filter like [RD]
+            val line2 = lines.getOrNull(1)?.trim() ?: ""
+            if (line2.isNotBlank() && !filterLinePattern.matches(line2)) {
+                violations.add("$relPath:2: expected blank line or filter (e.g. [RD]) after title, got: $line2")
                 continue
             }
-            val description = lines.getOrNull(2) ?: ""
-            when {
-                description.isEmpty() -> violations.add("$relPath:3: description is empty")
-                description.startsWith("#") -> violations.add("$relPath:3: description must not start with '#': $description")
-                description.length > 200 -> violations.add("$relPath:3: description exceeds 200 chars (${description.length}): $description")
+
+            // Description: lines 3+ until blank line (multi-line allowed)
+            val descLines = mutableListOf<String>()
+            var descIdx = 2
+            while (descIdx < lines.size && lines[descIdx].isNotBlank()) {
+                descLines.add(lines[descIdx])
+                descIdx++
             }
-            val line4 = lines.getOrNull(3) ?: ""
-            if (line4.isNotBlank()) {
-                violations.add("$relPath:4: expected blank line after description, got: $line4")
+            if (descLines.isEmpty()) {
+                violations.add("$relPath:3: description is empty")
+                continue
+            }
+            val firstDescLine = descLines[0]
+            if (firstDescLine.startsWith("#")) {
+                violations.add("$relPath:3: description must not start with '#': $firstDescLine")
+            }
+            val fullDescription = descLines.joinToString("\n")
+            if (fullDescription.length > 200) {
+                violations.add("$relPath:3: description exceeds 200 chars (${fullDescription.length}): ${fullDescription.take(80)}...")
+            }
+            if (descIdx >= lines.size || lines[descIdx].isNotBlank()) {
+                violations.add("$relPath:${descIdx + 1}: expected blank line after description")
             }
         }
 
@@ -121,12 +139,10 @@ class MarkdownArticleContractTest {
     }
 
     /**
-     * For each new-format article, verifies that `payload.readPrompt()` equals the expected body:
-     * - Lines 5+ of the source file (after title, blank, description, blank)
-     * - `# See also` section removed
-     * - Directive lines (`###_NO_AUTO_TOC_###`, `###_EXCLUDE_FROM_AUTO_TOC_###`) stripped
+     * For each new-format article, verifies that the article's parts produce content
+     * matching the expected body from the source file.
      *
-     * This catches bugs where the payload encoder or directive-stripping logic diverges
+     * This catches bugs where the part encoder or directive-stripping logic diverges
      * from what the source file contains.
      */
     @Test
@@ -141,8 +157,6 @@ class MarkdownArticleContractTest {
         val articlesByUri = ResourcesIndex().roots
             .flatMap { it.value.articles.values }
             .associateBy { it.uri }
-
-        val directives = setOf("###_NO_AUTO_TOC_###", "###_EXCLUDE_FROM_AUTO_TOC_###")
 
         for (file in articles) {
             val relPath = promptsRoot.relativize(file)
@@ -163,18 +177,37 @@ class MarkdownArticleContractTest {
                 continue
             }
 
-            // Extract body: lines 5+ joined, then strip # See also section
-            val bodyAndSeeAlso = lines.drop(4).joinToString("\n")
-            val seeAlsoMarker = "\n\n# See also\n"
-            val seeAlsoIdx = bodyAndSeeAlso.indexOf(seeAlsoMarker)
-            val body = if (seeAlsoIdx >= 0) bodyAndSeeAlso.substring(0, seeAlsoIdx) else bodyAndSeeAlso
+            // Use prompt-generator's own parser + content builder to build expected payload —
+            // this stays in sync with how parts are generated at build time
+            // (handles fence annotations, directive stripping, conditional blocks).
+            val parsed = parseNewFormatArticleParts(content)
+            val contentParts = buildContentParts(parsed)
+            val expectedPayload = buildString {
+                for (part in contentParts) {
+                    if (part.isKotlinBlock) {
+                        append("```kotlin\n")
+                        append(part.content)
+                        append("```")
+                    } else {
+                        append(part.content)
+                    }
+                }
+            }
 
-            // Strip directive lines (same logic as generateNewFormatParts.stripDirective)
-            val expectedPayload = if (directives.any { body.contains(it) }) {
-                body.lines().filter { it !in directives }.joinToString("\n")
-            } else body
+            // Read all parts unfiltered (concatenate all part content)
+            val actualPayload = buildString {
+                for (part in article.parts) {
+                    when (part) {
+                        is ArticlePart.KotlinCode -> {
+                            append("```kotlin\n")
+                            append(part.readPrompt())
+                            append("```")
+                        }
+                        is ArticlePart.Markdown -> append(part.readPrompt())
+                    }
+                }
+            }
 
-            val actualPayload = article.payload.readPrompt()
             if (actualPayload != expectedPayload) {
                 val firstDiff = expectedPayload.zip(actualPayload).indexOfFirst { (a, b) -> a != b }
                 violations.add(
@@ -240,6 +273,42 @@ class MarkdownArticleContractTest {
         assertTrue(
             violations.isEmpty(),
             "Bare code outside kotlin fences in new-format articles:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    /**
+     * Verifies that no article uses non-kotlin fences like ` ```text `, ` ```json `, etc.
+     *
+     * All code blocks in prompt articles must be ` ```kotlin ``` ` (optionally with fence
+     * annotations like ` ```kotlin[IU] `). Non-kotlin fences hide code from compilation
+     * testing and should not be used.
+     */
+    @Test
+    fun testNoNonKotlinFences() {
+        val articles = newFormatArticles()
+        if (articles.isEmpty()) return
+
+        val violations = mutableListOf<String>()
+        val promptsRoot = ProjectHomeDirectory.requireProjectHomeDirectory().resolve("prompts/src/main/prompts")
+        val nonKotlinFencePattern = Regex("""^```(?!kotlin)(\w+)""")
+
+        for (file in articles) {
+            val lines = Files.readAllLines(file)
+            val relPath = promptsRoot.relativize(file)
+
+            lines.forEachIndexed { index, line ->
+                if (index < 4) return@forEachIndexed
+                val trimmed = line.trimStart()
+                val match = nonKotlinFencePattern.find(trimmed)
+                if (match != null) {
+                    violations.add("$relPath:${index + 1}: non-kotlin fence ```${match.groupValues[1]} — use ```kotlin instead")
+                }
+            }
+        }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Non-kotlin fences found in articles (use ```kotlin or ```kotlin[FILTER] instead):\n${violations.joinToString("\n")}",
         )
     }
 }

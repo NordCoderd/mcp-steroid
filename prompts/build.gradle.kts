@@ -2,6 +2,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
     kotlin("jvm")
+    `java-library`
 }
 
 kotlin {
@@ -35,10 +36,13 @@ val ideDownloaderClasspath by configurations.creating {
 dependencies {
     promptGeneratorClasspath(project(":prompt-generator"))
 
+    api(project(":prompts-api"))
+
     testImplementation("org.junit.jupiter:junit-jupiter:5.11.0")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     testImplementation(project(":test-helper"))
     testImplementation(project(":kotlin-cli"))
+    testImplementation(project(":prompt-generator"))
 
     kotlincDist(project(":kotlin-cli"))
     ideDownloaderClasspath(project(":intellij-downloader"))
@@ -74,60 +78,70 @@ tasks.withType<KotlinCompile>().configureEach {
 
 // --- IDE download for KtBlock compilation tests ---
 
-val ideDownloadDir = layout.buildDirectory.dir("ide-download")
-val ideUnpackDir = layout.buildDirectory.dir("ide-unpack")
+// Each entry: product ID, channel, system property name for the unpacked IDE home
+data class IdeDownloadSpec(
+    val product: String,
+    val channel: String,
+    val systemProperty: String,
+)
 
-val downloadAndUnpackIde by tasks.registering(JavaExec::class) {
-    group = "verification"
-    description = "Download and unpack IDEA distribution for KtBlock compilation tests"
-    classpath = ideDownloaderClasspath
-    mainClass.set("com.jonnyzzz.mcpSteroid.ideDownloader.MainKt")
-    args(
-        "--product", "idea",
-        "--channel", "stable",
-        "--os", "linux",
-        "--output-dir", ideDownloadDir.get().asFile.absolutePath,
-        "--unpack-dir", ideUnpackDir.get().asFile.absolutePath,
-    )
-    outputs.dir(ideUnpackDir)
-}
+val ideDownloadSpecs = listOf(
+    IdeDownloadSpec("idea", "stable", "mcp.steroid.ide.home"),
+    IdeDownloadSpec("idea", "eap", "mcp.steroid.ide.eap.home"),
+    IdeDownloadSpec("rider", "stable", "mcp.steroid.rider.home"),
+    IdeDownloadSpec("rider", "eap", "mcp.steroid.rider.eap.home"),
+    IdeDownloadSpec("clion", "stable", "mcp.steroid.clion.home"),
+    IdeDownloadSpec("clion", "eap", "mcp.steroid.clion.eap.home"),
+    IdeDownloadSpec("pycharm", "stable", "mcp.steroid.pycharm.home"),
+    IdeDownloadSpec("pycharm", "eap", "mcp.steroid.pycharm.eap.home"),
+)
 
-val riderDownloadDir = layout.buildDirectory.dir("rider-download")
-val riderUnpackDir = layout.buildDirectory.dir("rider-unpack")
+val ideDownloadTasks = ideDownloadSpecs.map { spec ->
+    val dirSuffix = "${spec.product}-${spec.channel}"
+    val downloadDir = layout.buildDirectory.dir("ide-download-$dirSuffix")
+    val unpackDir = layout.buildDirectory.dir("ide-unpack-$dirSuffix")
 
-val downloadAndUnpackRider by tasks.registering(JavaExec::class) {
-    group = "verification"
-    description = "Download and unpack Rider distribution for KtBlock compilation tests"
-    classpath = ideDownloaderClasspath
-    mainClass.set("com.jonnyzzz.mcpSteroid.ideDownloader.MainKt")
-    args(
-        "--product", "rider",
-        "--channel", "stable",
-        "--os", "linux",
-        "--output-dir", riderDownloadDir.get().asFile.absolutePath,
-        "--unpack-dir", riderUnpackDir.get().asFile.absolutePath,
-    )
-    outputs.dir(riderUnpackDir)
+    val task = tasks.register("downloadAndUnpack-${dirSuffix}", JavaExec::class) {
+        group = "verification"
+        description = "Download and unpack ${spec.product} (${spec.channel}) for KtBlock compilation tests"
+        classpath = ideDownloaderClasspath
+        mainClass.set("com.jonnyzzz.mcpSteroid.ideDownloader.MainKt")
+        args(
+            "--product", spec.product,
+            "--channel", spec.channel,
+            "--os", "linux",
+            "--output-dir", downloadDir.get().asFile.absolutePath,
+            "--unpack-dir", unpackDir.get().asFile.absolutePath,
+        )
+        outputs.dir(unpackDir)
+    }
+
+    Triple(spec, unpackDir, task)
 }
 
 tasks.test {
     useJUnitPlatform()
+    maxParallelForks = 8
 
-    dependsOn(downloadAndUnpackIde, downloadAndUnpackRider, kotlincDist)
+    // JUnit Platform parallel execution
+    systemProperty("junit.jupiter.execution.parallel.enabled", "true")
+    systemProperty("junit.jupiter.execution.parallel.mode.default", "concurrent")
+    systemProperty("junit.jupiter.execution.parallel.config.strategy", "fixed")
+    systemProperty("junit.jupiter.execution.parallel.config.fixed.parallelism", "8")
+
+    for ((_, _, task) in ideDownloadTasks) {
+        dependsOn(task)
+    }
+    dependsOn(kotlincDist)
 
     doFirst {
-        val unpackDir = ideUnpackDir.get().asFile
-        val ideHome = unpackDir.listFiles()?.firstOrNull { it.isDirectory }
-        if (ideHome != null) {
-            systemProperty("mcp.steroid.ide.home", ideHome.absolutePath)
+        for ((spec, unpackDir, _) in ideDownloadTasks) {
+            val dir = unpackDir.get().asFile
+            val home = dir.listFiles()?.firstOrNull { it.isDirectory }
+            if (home != null) {
+                systemProperty(spec.systemProperty, home.absolutePath)
+            }
         }
-        // KtBlock tests will fail with a clear error if mcp.steroid.ide.home is missing;
-        // non-KtBlock tests don't need it.
-
-        val riderUnpack = riderUnpackDir.get().asFile
-        val riderHome = riderUnpack.listFiles()?.firstOrNull { it.isDirectory }
-            ?: error("No Rider IDE directory found in $riderUnpack. Did downloadAndUnpackRider succeed?")
-        systemProperty("mcp.steroid.rider.home", riderHome.absolutePath)
 
         val kotlincHome = kotlincDist.singleFile
         systemProperty("mcp.steroid.kotlinc.home", kotlincHome.absolutePath)
@@ -136,5 +150,9 @@ tasks.test {
         val ijSources = rootProject.layout.projectDirectory
             .dir("ij-plugin/src/main/kotlin").asFile.absolutePath
         systemProperty("mcp.steroid.ij.sources", ijSources)
+
+        // Compilation cache directory
+        val cacheDir = layout.buildDirectory.dir("ktblock-cache").get().asFile.absolutePath
+        systemProperty("mcp.steroid.ktblock.cache.dir", cacheDir)
     }
 }
