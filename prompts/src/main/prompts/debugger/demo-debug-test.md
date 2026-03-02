@@ -65,7 +65,7 @@ import com.intellij.openapi.actionSystem.ActionUiKind
 import com.intellij.openapi.actionSystem.ex.ActionUtil
 import com.intellij.ide.DataManager
 
-// Step 1: Open test file and position caret on test class or method
+// Step 1: Open test file and position caret ON the method name
 val basePath = project.basePath ?: error("No basePath")
 val testFile = LocalFileSystem.getInstance().refreshAndFindFileByPath(basePath + "/src/test/kotlin/com/example/MyTest.kt")
     ?: error("Test file not found")
@@ -75,9 +75,16 @@ val editors = withContext(Dispatchers.EDT) {
 val textEditor = editors.filterIsInstance<TextEditor>().firstOrNull() ?: error("No text editor")
 val editor = textEditor.editor
 val text = editor.document.text
-// Prefer a specific test method offset over the class offset for less ambiguity
-val caretOffset = text.indexOf("fun myTestMethod").takeIf { it >= 0 }
-    ?: text.indexOf("class MyTest")
+// IMPORTANT: caret must be on the NAME identifier, not on the keyword before it.
+// Placing caret on 'fun' or 'class' keyword triggers a "nothing here" popup.
+// - Caret on method name  → debugs that single test method
+// - Caret on class name   → debugs all tests in the class
+// Advance past "fun " (or "class ") to land on the identifier.
+val caretOffset = run {
+    val funIdx = text.indexOf("fun myTestMethod")
+    if (funIdx >= 0) funIdx + "fun ".length
+    else text.indexOf("class MyTest") + "class ".length
+}
 withContext(Dispatchers.EDT) { editor.caretModel.moveToOffset(caretOffset) }
 
 // Step 2: Debug via context action — "Debug 'myTestMethod'" appears in gutter/context menu
@@ -95,7 +102,7 @@ println("Debug context action fired — check XDebuggerManager for active sessio
 
 For debugging Java/Kotlin tests in IntelliJ:
 1. Set breakpoints using `mcp-steroid://debugger/set-line-breakpoint` (XDebuggerUtil works)
-2. Open test file, position caret on test class or method, fire `DebugContextAction`
+2. Open test file, position caret ON the method name (to debug one test) or ON the class name (to debug all tests in the class) — caret must be on the identifier, not on the `fun`/`class` keyword, or you'll get "nothing here". Fire `DebugContextAction`
 3. If no session starts, create a `JUnitConfiguration` programmatically (set `MAIN_CLASS_NAME`, `TEST_OBJECT = TEST_CLASS`, and assign the module via `ModuleManager`) — see `mcp-steroid://ide/run-configuration` for the pattern
 4. Wait for breakpoint hit using `mcp-steroid://debugger/wait-for-suspend`
 5. Evaluate variables using `mcp-steroid://debugger/evaluate-expression`
