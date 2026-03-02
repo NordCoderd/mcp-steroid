@@ -5,6 +5,7 @@ import com.jonnyzzz.mcpSteroid.koltinc.CodeWrapperForCompilation
 import com.jonnyzzz.mcpSteroid.koltinc.KotlincCommandLineBuilder
 import com.jonnyzzz.mcpSteroid.koltinc.toArgFile
 import com.jonnyzzz.mcpSteroid.testHelper.process.RunProcessRequest
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
 import com.jonnyzzz.mcpSteroid.testHelper.process.startProcess
 import org.junit.jupiter.api.Assertions
 import java.io.File
@@ -36,14 +37,6 @@ import kotlin.io.path.walk
  * - `mcp.steroid.ktblock.cache.dir` — path to compilation cache directory (optional but recommended)
  */
 abstract class KtBlockCompilationTestBase {
-
-    /**
-     * Compiles a Kotlin code block against the default IDE classpath (IDEA).
-     * Backward-compatible — used by older generated tests.
-     */
-    protected fun compileKtBlock(block: PromptBase) {
-        compileAgainst(block, "mcp.steroid.ide.home", werror = true)
-    }
 
     /** Compiles a Kotlin code block against the IntelliJ IDEA classpath. */
     protected fun compileKtBlockOnIdea(block: PromptBase) {
@@ -145,19 +138,17 @@ abstract class KtBlockCompilationTestBase {
                 args = listOf(kotlincBin.absolutePath) + argCmd.args,
                 logPrefix = "kotlinc",
                 timeout = Duration.ofMinutes(3),
-                quietly = true,
-            ).startProcess().awaitForProcessFinish()
-
-            Assertions.assertEquals(0, result.exitCode) {
+                quietly = false,
+            ).startProcess().assertExitCode(0) {
                 buildString {
                     appendLine("Compilation failed or has warnings (-Werror) [IDE: $homeProperty]:")
-                    if (result.stdout.isNotBlank()) {
+                    if (stdout.isNotBlank()) {
                         appendLine("STDOUT:")
-                        appendLine(result.stdout)
+                        appendLine(stdout)
                     }
-                    if (result.stderr.isNotBlank()) {
+                    if (stderr.isNotBlank()) {
                         appendLine("STDERR:")
-                        appendLine(result.stderr)
+                        appendLine(stderr)
                     }
                 }
             }
