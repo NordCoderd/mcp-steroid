@@ -4,7 +4,7 @@ Launches a debug test session via context action: open test file, position caret
 
 ###_IF_IDE[RD]_###
 
-```text
+```kotlin
 // In Rider, use RiderUnitTestDebugContextAction to debug tests.
 // JUnitConfiguration does NOT exist in Rider.
 
@@ -50,7 +50,7 @@ For debugging .NET code in Rider:
 5. Step through code using `mcp-steroid://debugger/step-over` (only if needed — skip if the bug is visible from evaluation at the breakpoint)
 ###_ELSE_###
 
-```text
+```kotlin
 // In IntelliJ, use the same action-based approach as Rider: open the test file,
 // position the caret on the test class or method, then fire the debug context action.
 // If no debug session starts within a few seconds (check XDebuggerManager.getInstance(project).currentSession),
@@ -90,43 +90,12 @@ withContext(Dispatchers.EDT) {
     ActionUtil.performAction(action, event)
 }
 println("Debug context action fired — check XDebuggerManager for active session")
-
-// --- FALLBACK: JUnitConfiguration (use if action-based approach produces no session) ---
-// import com.intellij.execution.ProgramRunnerUtil
-// import com.intellij.execution.RunManager
-// import com.intellij.execution.executors.DefaultDebugExecutor
-// import com.intellij.execution.junit.JUnitConfiguration
-// import com.intellij.execution.junit.JUnitConfigurationType
-// import com.intellij.openapi.module.ModuleManager
-//
-// val configurationName = "MyTest (Debug)"           // TODO: set your run configuration name
-// val testClass = "com.example.MyTest"               // TODO: set your test class FQN
-// val runManager = RunManager.getInstance(project)
-// val settings = runManager.allSettings.firstOrNull { it.name == configurationName }
-//     ?: runManager.createConfiguration(configurationName,
-//         JUnitConfigurationType.getInstance().configurationFactories.first()
-//     ).also { runManager.addConfiguration(it) }
-// val junitConfig = settings.configuration as JUnitConfiguration
-// val data = junitConfig.persistentData
-// data.TEST_OBJECT = JUnitConfiguration.TEST_CLASS
-// data.MAIN_CLASS_NAME = testClass
-// // CRITICAL: set the module so IntelliJ can find the test class
-// val modules = ModuleManager.getInstance(project).modules.toList()
-// val module = modules.firstOrNull { it.name.endsWith(".test") }
-//     ?: modules.firstOrNull { it.name.contains("test", ignoreCase = true) }
-//     ?: modules.firstOrNull()
-// if (module != null) junitConfig.setModule(module)
-// runManager.selectedConfiguration = settings
-// withContext(Dispatchers.EDT) {
-//     ProgramRunnerUtil.executeConfiguration(settings, DefaultDebugExecutor.getDebugExecutorInstance())
-// }
-// println("Started debug run: ${settings.name}")
 ```
 
 For debugging Java/Kotlin tests in IntelliJ:
 1. Set breakpoints using `mcp-steroid://debugger/set-line-breakpoint` (XDebuggerUtil works)
 2. Open test file, position caret on test class or method, fire `DebugContextAction`
-3. If no session starts, use the JUnitConfiguration fallback (uncomment the block above)
+3. If no session starts, create a `JUnitConfiguration` programmatically (set `MAIN_CLASS_NAME`, `TEST_OBJECT = TEST_CLASS`, and assign the module via `ModuleManager`) — see `mcp-steroid://ide/run-configuration` for the pattern
 4. Wait for breakpoint hit using `mcp-steroid://debugger/wait-for-suspend`
 5. Evaluate variables using `mcp-steroid://debugger/evaluate-expression`
 6. Step through code using `mcp-steroid://debugger/step-over` (only if needed — skip if the bug is visible from evaluation at the breakpoint)

@@ -6,7 +6,7 @@ Create a new Application run configuration for a main class.
 In Rider, use native test runner actions instead of ApplicationConfiguration (which is JVM-specific).
 
 **Run .NET tests from editor context:**
-```text
+```kotlin
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -36,7 +36,7 @@ println("Tests started")
 ```
 
 To list existing run configurations:
-```text
+```kotlin
 import com.intellij.execution.RunManager
 val runManager = RunManager.getInstance(project)
 runManager.allSettings.forEach { println(it.name + " (" + it.type.displayName + ")") }

@@ -1,10 +1,10 @@
 Test: Demo Debug Test (End-to-end)
-[IU]
+[IU,RD]
 End-to-end demo that runs tests in Debug mode, waits for completion, and prints test results.
 
 ###_IF_IDE[RD]_###
 
-```text
+```kotlin[RD]
 // In Rider, use RiderUnitTestRunContextAction to run tests natively.
 // JUnitConfiguration does NOT exist in Rider.
 
@@ -49,7 +49,7 @@ Test results appear in Rider's Unit Test tool window (NOT RunContentManager/SMTR
 ###_ELSE_###
 This example creates/updates the demo JUnit configuration, starts it in Debug mode, resumes the debugger if it pauses, waits for completion, and prints test results.
 
-```kotlin
+```kotlin[IU]
 import com.intellij.execution.ExecutorRegistry
 import com.intellij.execution.ProgramRunnerUtil
 import com.intellij.execution.RunManager
