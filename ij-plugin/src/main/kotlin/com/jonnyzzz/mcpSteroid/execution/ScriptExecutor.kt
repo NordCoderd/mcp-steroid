@@ -131,13 +131,13 @@ class ScriptExecutor(
                     }
                 }
             }
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: TimeoutCancellationException) {
-            // Timeout - report as error
+            // Timeout - report as error (must be caught before CancellationException since it's a subclass)
             log.warn("Execution $executionId timed out: ${e.message}")
             resultBuilder.logException("Execution timed out", e)
             resultBuilder.reportFailed("Execution timed out after ${exec.timeout} seconds")
+        } catch (e: CancellationException) {
+            throw e
         } catch (t: Throwable) {
             log.warn("Unexpected error during execution $executionId: ${t.message}", t)
             resultBuilder.logException("Unexpected error during execution: ${t.message}", t)
