@@ -31,10 +31,12 @@ if (removed.isEmpty()) {
 }
 ```
 
-```text
-- fileUrl is VirtualFile.getUrl() format (e.g., "file:///path/to/File.java")
-- Line numbers are 0-indexed in the API (editor line 7 = API line 6)
-- Default breakpoints (like "Any Exception") are just disabled, not actually removed
+```kotlin
+// Important notes:
+// - fileUrl is VirtualFile.getUrl() format (e.g., "file:///path/to/File.java")
+// - Line numbers are 0-indexed in the API (editor line 7 = API line 6)
+// - Default breakpoints (like "Any Exception") are just disabled, not actually removed
+println("See code block above for the complete remove-breakpoint pattern")
 ```
 
 # See also

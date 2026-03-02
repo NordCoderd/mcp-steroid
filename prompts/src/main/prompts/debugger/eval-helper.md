@@ -93,22 +93,34 @@ suspend fun eval(
 }
 ```
 
-```text
-Usage: Copy this eval() function into your script, then call it:
+```kotlin
+// Usage: get the current debug session and evaluate an expression.
+import com.intellij.xdebugger.XDebuggerManager
+import com.intellij.xdebugger.evaluation.XDebuggerEvaluator
+import com.intellij.xdebugger.frame.XValue
+import kotlinx.coroutines.CompletableDeferred
+import kotlin.time.Duration.Companion.seconds
 
-  val session = XDebuggerManager.getInstance(project).currentSession ?: error("No session")
-  val frame = session.currentStackFrame ?: error("No frame")
-  val evaluator = frame.evaluator ?: error("No evaluator")
-  val pos = frame.sourcePosition
+val session = XDebuggerManager.getInstance(project).currentSession ?: error("No session")
+val frame = session.currentStackFrame ?: error("No frame")
+val evaluator = frame.evaluator ?: error("No evaluator")
 
-  val result = eval(evaluator, "myVariable", pos)
-  println("myVariable =", result)
+// Evaluate an expression using callback → coroutine bridge
+val deferred = CompletableDeferred<XValue>()
+readAction {
+    evaluator.evaluate("myVariable", object : XDebuggerEvaluator.XEvaluationCallback {
+        override fun evaluated(result: XValue) { deferred.complete(result) }
+        override fun errorOccurred(errorMessage: String) { deferred.completeExceptionally(RuntimeException(errorMessage)) }
+    }, frame.sourcePosition)
+}
+val result = withTimeout(10.seconds) { deferred.await() }
+println("myVariable = $result")
 
-Language-specific expressions:
-  Kotlin/Java: players.sortedByDescending { it.score }
-  C#/.NET:     players.OrderByDescending(p => p.Score).ToList()
-
-After step-over, get fresh evaluator from session.currentStackFrame.
+// Language-specific expressions:
+//   Kotlin/Java: players.sortedByDescending { it.score }
+//   C#/.NET:     players.OrderByDescending(p => p.Score).ToList()
+//
+// After step-over, get fresh evaluator from session.currentStackFrame.
 ```
 
 # See also

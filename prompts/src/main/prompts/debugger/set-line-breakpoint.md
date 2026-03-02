@@ -67,15 +67,18 @@ if (removed.isEmpty()) {
 
 ## Important notes
 
-```text
-toggleLineBreakpoint() is a TOGGLE — it adds if absent, REMOVES if present.
-It MUST run on Dispatchers.EDT.
-
-For idempotent "ensure breakpoint exists" (never removes an existing one),
-use add-breakpoint.md which uses findBreakpointsAtLine + addLineBreakpoint.
-
-- Line numbers are 0-indexed in the API (editor line 7 = API line 6)
-- In Rider, breakpoint creation is async (RD protocol to backend)
+```kotlin
+// Important notes:
+//
+// toggleLineBreakpoint() is a TOGGLE — it adds if absent, REMOVES if present.
+// It MUST run on Dispatchers.EDT.
+//
+// For idempotent "ensure breakpoint exists" (never removes an existing one),
+// use add-breakpoint.md which uses findBreakpointsAtLine + addLineBreakpoint.
+//
+// - Line numbers are 0-indexed in the API (editor line 7 = API line 6)
+// - In Rider, breakpoint creation is async (RD protocol to backend)
+println("See code blocks above for toggle and remove breakpoint patterns")
 ```
 
 # See also

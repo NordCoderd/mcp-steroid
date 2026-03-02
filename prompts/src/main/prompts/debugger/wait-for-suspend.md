@@ -70,19 +70,22 @@ try {
 
 ## How it works
 
-```text
-XDebugSessionListener.sessionPaused() fires when the debugger suspends for ANY reason:
-- Breakpoint hit (process calls session.breakpointReached())
-- Step completion (step-over/step-into/step-out calls session.positionReached())
-- Manual pause (session.pause())
-
-This is more efficient than polling session.isSuspended in a loop —
-the listener fires immediately when suspension occurs, with no delay.
-
-Always check isSuspended BEFORE registering the listener to handle the race
-where the breakpoint was hit between launching the debug session and running this script.
-
-Always handle sessionStopped() to avoid hanging if the debug process terminates.
+```kotlin
+// How it works:
+//
+// XDebugSessionListener.sessionPaused() fires when the debugger suspends for ANY reason:
+// - Breakpoint hit (process calls session.breakpointReached())
+// - Step completion (step-over/step-into/step-out calls session.positionReached())
+// - Manual pause (session.pause())
+//
+// This is more efficient than polling session.isSuspended in a loop —
+// the listener fires immediately when suspension occurs, with no delay.
+//
+// Always check isSuspended BEFORE registering the listener to handle the race
+// where the breakpoint was hit between launching the debug session and running this script.
+//
+// Always handle sessionStopped() to avoid hanging if the debug process terminates.
+println("See the code block above for the complete wait-for-suspend pattern")
 ```
 
 # See also

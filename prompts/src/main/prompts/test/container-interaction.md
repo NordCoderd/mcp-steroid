@@ -73,26 +73,8 @@ println("Screenshot: $hostScreenshot")
 println("(Use the Read tool to view the image)")
 println()
 
-// ── Keyboard / mouse input examples ──────────────────────────────────
-// Uncomment the lines you need:
-
-// Open Find Action dialog (Ctrl+Shift+A)
-// dockerExec(containerId, display, "xdotool key ctrl+shift+a")
-// Thread.sleep(500)
-// dockerExec(containerId, display, "xdotool type --delay 50 -- 'steroid_execute_code'")
-// dockerExec(containerId, display, "xdotool key Return")
-
-// Click at display coordinates
-// dockerExec(containerId, display, "xdotool mousemove --sync 800 400 && xdotool click 1")
-
-// Show all sessions (including stopped ones)
-// sessionsRoot.listFiles()
-//     ?.filter { it.isDirectory && File(it, "session-info.txt").exists() }
-//     ?.sortedByDescending { it.lastModified() }
-//     ?.forEach { dir ->
-//         val p = parseSessionInfo(dir) ?: return@forEach
-//         println("${dir.name}  container=${p["CONTAINER_ID"]}")
-//     }
+// Keyboard input: dockerExec(containerId, display, "xdotool key ctrl+shift+a")
+// Mouse click:    dockerExec(containerId, display, "xdotool mousemove --sync 800 400 && xdotool click 1")
 ```
 
 # See also

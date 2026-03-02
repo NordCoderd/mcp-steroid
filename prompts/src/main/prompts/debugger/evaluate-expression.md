@@ -128,32 +128,33 @@ println("sorted result =", sortedValue)
 
 ## Common mistakes to avoid
 
-```text
-1. Expression body type mismatch:
-   BAD:  override fun evaluated(value: XValue) = valueDeferred.complete(value)
-   GOOD: override fun evaluated(value: XValue) { valueDeferred.complete(value) }
-
-   complete() returns Boolean; the override expects Unit. With -Werror this is a hard error.
-
-2. Awaiting value.isReady BEFORE computePresentation (Rider deadlock):
-   BAD:  value.isReady.await()       // blocks forever in Rider!
-         value.computePresentation(...)
-   GOOD: value.computePresentation(...)   // triggers isReady completion in Rider
-         // retry loop handles JVM "Collecting data..." cases
-
-   In Rider/DotNetValue, readyFuture.complete() is called INSIDE computePresentation's
-   async coroutine. Awaiting isReady first deadlocks — it waits 30 seconds then crashes
-   the MCP server. The retry loop in eval() already handles JVM placeholder text.
-
-3. Wrong XValuePresentation import:
-   WRONG: com.intellij.xdebugger.frame.XValuePresentation
-   RIGHT: com.intellij.xdebugger.frame.presentation.XValuePresentation
-
-4. Scope after stepping:
-   After step-over, old XValue instances are invalidated. Get fresh evaluator
-   from session.currentStackFrame after each step. Variables from the calling
-   scope may not be accessible if the debugger is inside a different method —
-   use `this.fieldName` to access instance state at method boundaries.
+```kotlin
+// Common mistakes to avoid:
+//
+// 1. Expression body type mismatch:
+//    BAD:  override fun evaluated(value: XValue) = valueDeferred.complete(value)
+//    GOOD: override fun evaluated(value: XValue) { valueDeferred.complete(value) }
+//    complete() returns Boolean; the override expects Unit. With -Werror this is a hard error.
+//
+// 2. Awaiting value.isReady BEFORE computePresentation (Rider deadlock):
+//    BAD:  value.isReady.await()       // blocks forever in Rider!
+//          value.computePresentation(...)
+//    GOOD: value.computePresentation(...)   // triggers isReady completion in Rider
+//          // retry loop handles JVM "Collecting data..." cases
+//    In Rider/DotNetValue, readyFuture.complete() is called INSIDE computePresentation's
+//    async coroutine. Awaiting isReady first deadlocks for 30 seconds.
+//    The retry loop in eval() already handles JVM placeholder text.
+//
+// 3. Wrong XValuePresentation import:
+//    WRONG: com.intellij.xdebugger.frame.XValuePresentation
+//    RIGHT: com.intellij.xdebugger.frame.presentation.XValuePresentation
+//
+// 4. Scope after stepping:
+//    After step-over, old XValue instances are invalidated. Get fresh evaluator
+//    from session.currentStackFrame after each step. Variables from the calling
+//    scope may not be accessible if the debugger is inside a different method —
+//    use `this.fieldName` to access instance state at method boundaries.
+println("See eval() helper above for correct implementation")
 ```
 
 # See also

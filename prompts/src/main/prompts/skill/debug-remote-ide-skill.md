@@ -210,36 +210,59 @@ if (targetProject != null) {
 
 ### Check Process Status
 
-```bash
-# Find target IDE process
-ps aux | grep "DevMainKt" | grep -v grep
+```kotlin
+// Find target IDE process and extract debug port
+val findProcess = ProcessBuilder(listOf("bash", "-c", "ps aux | grep DevMainKt | grep -v grep"))
+    .redirectErrorStream(true).start()
+val processOutput = findProcess.inputStream.bufferedReader().readText()
+findProcess.waitFor()
+println("Target IDE processes:\n$processOutput")
 
-# Extract debug port
-ps aux | grep "DevMainKt" | grep -o "address=[^,]*"
-# Output: address=127.0.0.1:60228
+val extractPort = ProcessBuilder(listOf("bash", "-c", """ps aux | grep DevMainKt | grep -o "address=[^,]*" """))
+    .redirectErrorStream(true).start()
+val portOutput = extractPort.inputStream.bufferedReader().readText()
+extractPort.waitFor()
+println("Debug port: $portOutput")
+// Expected output: address=127.0.0.1:60228
 ```
 
 ### Monitor Logs
 
-```bash
-# Logs directory (adjust path for your IDE)
-ls -la ~/Library/Logs/JetBrains/TARGET_IDE/
+```kotlin
+// Monitor target IDE logs (adjust path for your IDE)
+val home = System.getProperty("user.home")
+val logDir = "$home/Library/Logs/JetBrains/TARGET_IDE/"
 
-# Main log file
-tail -f ~/Library/Logs/JetBrains/TARGET_IDE/idea.log
+val listLogs = ProcessBuilder(listOf("ls", "-la", logDir))
+    .redirectErrorStream(true).start()
+println("Log directory:\n${listLogs.inputStream.bufferedReader().readText()}")
+listLogs.waitFor()
 
-# Search for plugin activity
-grep -i "your-plugin" idea.log | tail -20
+// Search for plugin activity in idea.log
+val searchPlugin = ProcessBuilder(listOf("bash", "-c", "grep -i 'your-plugin' '$logDir/idea.log' | tail -20"))
+    .redirectErrorStream(true).start()
+println("Plugin activity:\n${searchPlugin.inputStream.bufferedReader().readText()}")
+searchPlugin.waitFor()
 
-# Look for errors
-grep -i "error\|exception" idea.log | tail -10
+// Look for errors
+val searchErrors = ProcessBuilder(listOf("bash", "-c", """grep -i "error\|exception" "$logDir/idea.log" | tail -10"""))
+    .redirectErrorStream(true).start()
+println("Errors:\n${searchErrors.inputStream.bufferedReader().readText()}")
+searchErrors.waitFor()
 ```
 
 ### Check Window Visibility (macOS)
 
-```bash
-osascript -e 'tell application "System Events" to get count of windows of (first process whose name is "java")'
-# Output: 0 = headless mode
+```kotlin
+// Check window visibility on macOS
+val checkWindows = ProcessBuilder(listOf(
+    "osascript", "-e",
+    """tell application "System Events" to get count of windows of (first process whose name is "java")"""
+)).redirectErrorStream(true).start()
+val windowCount = checkWindows.inputStream.bufferedReader().readText().trim()
+checkWindows.waitFor()
+println("Window count: $windowCount")
+// Output: 0 = headless mode
 ```
 
 ---
@@ -281,17 +304,22 @@ matchingActions.forEach { actionId ->
 
 ### Pattern 3: State File Manipulation
 
-```bash
-# Create/modify plugin state to trigger reload
-cat > /path/to/project/.idea/yourPlugin.xml << 'EOF'
-<?xml version="1.0" encoding="UTF-8"?>
-<project version="4">
-  <component name="YourPluginService">
-    <!-- Your plugin state here -->
-  </component>
-</project>
-EOF
-# Target IDE will detect file change and reload
+```kotlin
+// Create/modify plugin state to trigger reload
+val pluginStateXml = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <project version="4">
+      <component name="YourPluginService">
+        <!-- Your plugin state here -->
+      </component>
+    </project>
+""".trimIndent()
+
+val stateFile = java.io.File("/path/to/project/.idea/yourPlugin.xml")
+stateFile.parentFile.mkdirs()
+stateFile.writeText(pluginStateXml)
+println("Wrote plugin state to ${stateFile.absolutePath}")
+// Target IDE will detect file change and reload
 ```
 
 ---
@@ -300,12 +328,19 @@ EOF
 
 ### Target IDE Won't Start
 
-```bash
-# Check port availability
-lsof -i :5005  # or whatever debug port
-
-# Kill conflicting process if needed
-kill <PID>
+```kotlin
+// Check port availability
+val checkPort = ProcessBuilder(listOf("lsof", "-i", ":5005"))
+    .redirectErrorStream(true).start()
+val portInfo = checkPort.inputStream.bufferedReader().readText()
+checkPort.waitFor()
+if (portInfo.isBlank()) {
+    println("Port 5005 is available")
+} else {
+    println("Port 5005 is in use:\n$portInfo")
+    // Kill conflicting process if needed:
+    // ProcessBuilder(listOf("kill", "<PID>")).start().waitFor()
+}
 ```
 
 ### Breakpoints Don't Hit

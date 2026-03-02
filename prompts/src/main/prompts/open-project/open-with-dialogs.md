@@ -12,7 +12,8 @@ Open a project and interactively handle any dialogs that appear.
 
 Call `steroid_open_project` without trusting:
 
-```json
+```kotlin
+val openProjectJson = """
 {
   "tool": "steroid_open_project",
   "arguments": {
@@ -22,13 +23,16 @@ Call `steroid_open_project` without trusting:
     "trust_project": false
   }
 }
+""".trimIndent()
+println(openProjectJson)
 ```
 
 ### Step 2: Take a Screenshot
 
 Use `steroid_take_screenshot` to see the current IDE state:
 
-```json
+```kotlin
+val takeScreenshotJson = """
 {
   "tool": "steroid_take_screenshot",
   "arguments": {
@@ -37,6 +41,8 @@ Use `steroid_take_screenshot` to see the current IDE state:
     "reason": "Checking for trust dialog or other prompts"
   }
 }
+""".trimIndent()
+println(takeScreenshotJson)
 ```
 
 Note: You need an existing open project to take screenshots. If no project is open,
@@ -46,7 +52,8 @@ the trust dialog may appear on the welcome screen.
 
 If a dialog appears (e.g., Trust Project dialog), use `steroid_input`:
 
-```json
+```kotlin
+val inputJson = """
 {
   "tool": "steroid_input",
   "arguments": {
@@ -57,6 +64,8 @@ If a dialog appears (e.g., Trust Project dialog), use `steroid_input`:
     "sequence": "click:Left@x,y"
   }
 }
+""".trimIndent()
+println(inputJson)
 ```
 
 Replace `x,y` with the coordinates of the button from the screenshot.
@@ -67,11 +76,14 @@ Continue taking screenshots and handling dialogs until the project opens.
 
 ### Step 5: Verify Project is Open
 
-```json
+```kotlin
+val listProjectsJson = """
 {
   "tool": "steroid_list_projects",
   "arguments": {}
 }
+""".trimIndent()
+println(listProjectsJson)
 ```
 
 ## Trust Project Dialog

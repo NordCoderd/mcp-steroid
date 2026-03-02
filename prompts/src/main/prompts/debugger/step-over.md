@@ -46,27 +46,26 @@ try {
 
 ## Scope changes after stepping
 
-```text
-IMPORTANT: After step-over, the debugger may land in a different scope:
-
-1. If you step over a method call, the debugger first enters the called method,
-   executes it, and returns. The next suspension may be:
-   - The next line in the SAME method (normal case)
-   - The closing brace of the CALLED method (if there's a breakpoint inside it)
-   - A completely different method (if an exception handler is triggered)
-
-2. Variables from the CALLING scope are NOT accessible when the debugger is
-   inside a different method's scope. For example, if test code calls
-   `line.AddSegment(0, 50, value)` and step-over lands inside AddSegment,
-   the variable `line` is not accessible — but `this.mySegments` is.
-
-3. After any step, old XValue instances are invalidated. Always get fresh:
-   val frame = session.currentStackFrame ?: error("No frame")
-   val evaluator = frame.evaluator ?: error("No evaluator")
-   val pos = frame.sourcePosition
-
-4. Use `this.fieldName` to access instance state when the debugger is inside
-   a method and the caller's local variables are not in scope.
+```kotlin
+// IMPORTANT: After step-over, the debugger may land in a different scope:
+//
+// 1. If you step over a method call, the debugger first enters the called method,
+//    executes it, and returns. The next suspension may be:
+//    - The next line in the SAME method (normal case)
+//    - The closing brace of the CALLED method (if there's a breakpoint inside it)
+//    - A completely different method (if an exception handler is triggered)
+//
+// 2. Variables from the CALLING scope are NOT accessible when the debugger is
+//    inside a different method's scope. For example, if test code calls
+//    `line.AddSegment(0, 50, value)` and step-over lands inside AddSegment,
+//    the variable `line` is not accessible — but `this.mySegments` is.
+//
+// 3. After any step, old XValue instances are invalidated. Always get fresh
+//    frame, evaluator, and position from session.currentStackFrame.
+//
+// 4. Use `this.fieldName` to access instance state when the debugger is inside
+//    a method and the caller's local variables are not in scope.
+println("See code block above for the complete step-over pattern")
 ```
 
 # See also

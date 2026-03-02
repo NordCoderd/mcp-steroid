@@ -77,20 +77,28 @@ runBlocking {  // ERROR: Causes deadlocks!
 
 If you define a local helper function inside your script that calls any suspend API (`runInspectionsDirectly`, `readAction`, `writeAction`, `smartReadAction`, etc.), the helper **must be declared `suspend fun`**. Omitting `suspend` causes a compile error: `"suspension functions can only be called within coroutine body"`.
 
-```text
-// ✗ WRONG — non-suspend helper calling a suspend API
-fun checkFile(vf: VirtualFile) {
-    val problems = runInspectionsDirectly(vf)  // ERROR: suspend call in non-suspend fun
-    println(if (problems.isEmpty()) "OK" else "ERRORS: $problems")
-}
+```kotlin
+// ✗ WRONG — non-suspend helper calling a suspend API.
+// Omitting "suspend" from the helper causes a compile error:
+//   "suspension functions can only be called within coroutine body"
+// The fix: declare the helper as "suspend fun" (see CORRECT version below).
+println("Always use 'suspend fun' for helpers calling suspend APIs")
+```
 
+```kotlin
 // ✓ CORRECT — declare the helper as suspend
-suspend fun checkFile(vf: VirtualFile) {
+suspend fun checkFileHelper(vf: VirtualFile) {
     val problems = runInspectionsDirectly(vf)  // OK: suspend call in suspend fun
     println(if (problems.isEmpty()) "OK" else "ERRORS: $problems")
 }
 
+val vf = findProjectFile("src/main/kotlin/MyClass.kt")!!
+checkFileHelper(vf)
+```
+
+```kotlin
 // ✓ ALTERNATIVE — inline the call directly in the script body (no helper needed):
+val vf = findProjectFile("src/main/kotlin/MyClass.kt")!!
 val problems = runInspectionsDirectly(vf)
 println(if (problems.isEmpty()) "OK" else "ERRORS: $problems")
 ```
@@ -115,19 +123,19 @@ val classes = readAction {
 > - **In a subsequent exec_code call**: Safe — `waitForSmartMode()` runs automatically at script start, so PSI is up-to-date by the time your code runs.
 > - **In the same exec_code call** (create files then immediately inspect them): call `waitForSmartMode()` explicitly after the `writeAction` block and before any `runInspectionsDirectly` / `ReferencesSearch` / `JavaPsiFacade.findClass()` calls on the new files.
 >
-> ```text
-> // Pattern: create files AND inspect in the SAME exec_code call
-> writeAction {
->     val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
->     val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example")
->     val f = dir.findChild("MyService.java") ?: dir.createChildData(this, "MyService.java")
->     VfsUtil.saveText(f, "package com.example;\npublic class MyService {}")
-> }
-> waitForSmartMode()  // ← flush PSI index before inspecting the newly created file
-> val vf = findProjectFile("src/main/java/com/example/MyService.java")!!
-> val problems = runInspectionsDirectly(vf)
-> println(if (problems.isEmpty()) "OK" else problems.toString())
-> ```
+```kotlin
+// Pattern: create files AND inspect in the SAME exec_code call
+writeAction {
+    val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+    val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example")
+    val f = dir.findChild("MyService.java") ?: dir.createChildData(this, "MyService.java")
+    VfsUtil.saveText(f, "package com.example;\npublic class MyService {}")
+}
+waitForSmartMode()  // ← flush PSI index before inspecting the newly created file
+val vf = findProjectFile("src/main/java/com/example/MyService.java")!!
+val problems = runInspectionsDirectly(vf)
+println(if (problems.isEmpty()) "OK" else problems.toString())
+```
 >
 > **Best practice**: Create files in one exec_code call, then inspect in a separate exec_code call — `waitForSmartMode()` runs automatically between calls.
 >

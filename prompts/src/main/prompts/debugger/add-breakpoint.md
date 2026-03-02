@@ -44,14 +44,15 @@ if (existing.isNotEmpty()) {
 }
 ```
 
-```text
-WARNING: Do NOT use toggleLineBreakpoint for "ensure breakpoint exists".
-toggleLineBreakpoint is a TOGGLE — it REMOVES an existing breakpoint if present.
-The find-then-add pattern above is idempotent and always safe.
-
-- Line numbers are 0-indexed in the API (editor line 7 = API line 6)
-- addLineBreakpoint does NOT deduplicate — always check with findBreakpointsAtLine first
-- In Rider, breakpoints are registered asynchronously via the RD protocol
+```kotlin
+// WARNING: Do NOT use toggleLineBreakpoint for "ensure breakpoint exists".
+// toggleLineBreakpoint is a TOGGLE — it REMOVES an existing breakpoint if present.
+// The find-then-add pattern above is idempotent and always safe.
+//
+// - Line numbers are 0-indexed in the API (editor line 7 = API line 6)
+// - addLineBreakpoint does NOT deduplicate — always check with findBreakpointsAtLine first
+// - In Rider, breakpoints are registered asynchronously via the RD protocol
+println("See code block above for the complete idempotent add-breakpoint pattern")
 ```
 
 # See also

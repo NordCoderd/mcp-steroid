@@ -12,7 +12,8 @@ Open a project with automatic trust, skipping the trust dialog.
 
 Call `steroid_open_project` with `trust_project=true`:
 
-```json
+```kotlin
+val openProjectJson = """
 {
   "tool": "steroid_open_project",
   "arguments": {
@@ -22,6 +23,8 @@ Call `steroid_open_project` with `trust_project=true`:
     "trust_project": true
   }
 }
+""".trimIndent()
+println(openProjectJson)
 ```
 
 The tool will:
@@ -40,16 +43,20 @@ Wait 2-5 seconds for the project to initialize. The time depends on:
 
 Call `steroid_list_projects` to verify:
 
-```json
+```kotlin
+val listProjectsJson = """
 {
   "tool": "steroid_list_projects",
   "arguments": {}
 }
+""".trimIndent()
+println(listProjectsJson)
 ```
 
 Expected response includes your project:
 
-```json
+```kotlin
+val expectedResponseExample = """
 {
   "ide": {
     "name": "IntelliJ IDEA",
@@ -60,22 +67,27 @@ Expected response includes your project:
     {"name": "your-project", "path": "/absolute/path/to/your/project"}
   ]
 }
+""".trimIndent()
+println("Expected response format:\n$expectedResponseExample")
 ```
 
 ### Step 4: Start Working
 
 Now you can use `steroid_execute_code` with the project:
 
-```json
+```kotlin
+val executeCodeJson = """
 {
   "tool": "steroid_execute_code",
   "arguments": {
     "project_name": "your-project",
-    "code": "println(\"Project: ${project.name}\")",
+    "code": "println(\"Project: ${'$'}{project.name}\")",
     "task_id": "verify-project",
     "reason": "Verifying project is accessible"
   }
 }
+""".trimIndent()
+println(executeCodeJson)
 ```
 
 ## Complete Example Session
