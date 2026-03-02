@@ -1,13 +1,14 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.server
 
+import com.intellij.openapi.application.ApplicationInfo
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.Prompt
 import com.jonnyzzz.mcpSteroid.mcp.PromptContent
 import com.jonnyzzz.mcpSteroid.mcp.PromptGetResult
 import com.jonnyzzz.mcpSteroid.mcp.PromptMessage
-import com.jonnyzzz.mcpSteroid.mcp.ResourceContent
 import com.jonnyzzz.mcpSteroid.prompts.PromptIndexBase
+import com.jonnyzzz.mcpSteroid.prompts.PromptsContext
 import com.jonnyzzz.mcpSteroid.prompts.generated.ResourcesIndex
 
 /**
@@ -15,16 +16,23 @@ import com.jonnyzzz.mcpSteroid.prompts.generated.ResourcesIndex
  *
  * Uses the generated [ResourcesIndex] to iterate over all folders and articles,
  * eliminating the need for generated registration code.
+ *
+ * Articles are filtered by their root [IdeFilter] — articles that don't match
+ * the current IDE are skipped entirely.
+ *
+ * Content is rendered via [ArticleBase.readPayload] which handles per-part
+ * filtering and see-also filtering internally.
  */
 class ResourceRegistrar : McpRegistrar {
 
     override fun register(server: McpServerCore) {
         val resourcesIndex = ResourcesIndex()
+        val context = buildPromptsContext()
 
         for ((folder, index) in resourcesIndex.roots) {
-            registerArticleResources(server, index)
+            registerArticleResources(server, index, context)
             if (folder == "skill") {
-                registerSkillPrompts(server, index)
+                registerSkillPrompts(server, index, context)
             }
         }
     }
@@ -32,55 +40,39 @@ class ResourceRegistrar : McpRegistrar {
     private fun registerArticleResources(
         server: McpServerCore,
         index: PromptIndexBase,
+        context: PromptsContext,
     ) {
         for ((_, article) in index.articles) {
-            val payload = article.payload
-            server.resourceRegistry.registerResourceMultiContent(
+            if (!article.filter.matches(context)) continue
+
+            server.resourceRegistry.registerResource(
                 uri = article.uri,
-                name = article.name,
-                description = article.description?.readPrompt(),
-                mimeType = payload.mimeType,
-                contentsProvider = {
-                    buildList {
-                        add(
-                            ResourceContent(
-                                uri = article.uri,
-                                mimeType = payload.mimeType,
-                                text = ProductConditionals.process(payload.readPrompt())
-                            )
-                        )
-                        val seeAlso = article.seeAlso
-                        if (seeAlso != null) {
-                            add(
-                                ResourceContent(
-                                    uri = article.uri,
-                                    mimeType = seeAlso.mimeType,
-                                    text = ProductConditionals.process(seeAlso.readPrompt())
-                                )
-                            )
-                        }
-                    }
-                }
-            )
+                name = article.title.readPrompt(),
+                description = article.description.readPrompt(),
+                mimeType = "text/markdown",
+            ) {
+                article.readPayload(context)
+            }
         }
     }
 
     private fun registerSkillPrompts(
         server: McpServerCore,
         index: PromptIndexBase,
+        context: PromptsContext,
     ) {
         for ((_, article) in index.articles) {
-            if (article.payload.mimeType != "text/markdown") continue
+            if (!article.filter.matches(context)) continue
 
-            val content = ProductConditionals.process(article.payload.readPrompt())
-            val parsed = parseSkillFrontmatter(content)
+            val body = article.readBody(context)
+            val parsed = parseSkillFrontmatter(body)
             val frontmatter = parsed.frontmatter ?: continue
             val promptName = frontmatter.name?.takeIf { it.isNotBlank() } ?: continue
 
             server.promptRegistry.registerPrompt(
                 Prompt(
                     name = promptName,
-                    title = article.name,
+                    title = article.title.readPrompt(),
                     description = frontmatter.description,
                 )
             ) {
@@ -94,6 +86,16 @@ class ResourceRegistrar : McpRegistrar {
                     )
                 )
             }
+        }
+    }
+
+    companion object {
+        fun buildPromptsContext(): PromptsContext {
+            val buildInfo = ApplicationInfo.getInstance().build
+            return PromptsContext(
+                productCode = buildInfo.productCode,
+                baselineVersion = buildInfo.baselineVersion,
+            )
         }
     }
 }

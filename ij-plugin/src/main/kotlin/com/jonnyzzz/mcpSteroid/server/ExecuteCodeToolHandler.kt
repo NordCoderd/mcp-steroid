@@ -37,7 +37,7 @@ data class ExecCodeParams(
  * Handler for the steroid_execute_code MCP tool.
  */
 class ExecuteCodeToolHandler : McpRegistrar {
-    private val toolDescription get() = ExecuteCodeToolDescriptionPromptArticle().payload.readPrompt()
+    private val toolDescription get() = ExecuteCodeToolDescriptionPromptArticle().readBody(ResourceRegistrar.buildPromptsContext())
 
     override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(

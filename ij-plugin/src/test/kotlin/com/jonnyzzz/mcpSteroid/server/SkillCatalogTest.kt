@@ -6,15 +6,17 @@ import com.jonnyzzz.mcpSteroid.prompts.generated.skill.SkillIndex
 
 class SkillCatalogTest : BasePlatformTestCase() {
 
+    private val context get() = ResourceRegistrar.buildPromptsContext()
+
     fun testSkillFrontmatterParsed() {
         val index = SkillIndex()
         val skillArticle = index.articles.values.first { article ->
-            val content = article.payload.readPrompt()
+            val content = article.readBody(context)
             val parsed = parseSkillFrontmatter(content)
             parsed.frontmatter?.name == "mcp-steroid"
         }
 
-        val content = skillArticle.payload.readPrompt()
+        val content = skillArticle.readBody(context)
         val parsed = parseSkillFrontmatter(content)
         assertNotNull("Main skill frontmatter should be parsed", parsed.frontmatter)
         assertTrue(
@@ -30,7 +32,7 @@ class SkillCatalogTest : BasePlatformTestCase() {
     fun testDebuggerSkillPromptName() {
         val index = SkillIndex()
         val debuggerArticle = index.articles.values.firstOrNull { article ->
-            val content = article.payload.readPrompt()
+            val content = article.readBody(context)
             val parsed = parseSkillFrontmatter(content)
             parsed.frontmatter?.name == "mcp-steroid-debugger"
         }

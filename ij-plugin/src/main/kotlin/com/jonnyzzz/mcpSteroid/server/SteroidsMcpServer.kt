@@ -201,19 +201,19 @@ class SteroidsMcpServer(
                 get("/") {
                     call.respondText(
                         contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                        text = SkillPromptArticle().payload.readPrompt()
+                        text = SkillPromptArticle().readPayload(ResourceRegistrar.buildPromptsContext())
                     )
                 }
                 get("/skill.md") {
                     call.respondText(
                         contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                        text = SkillPromptArticle().payload.readPrompt()
+                        text = SkillPromptArticle().readPayload(ResourceRegistrar.buildPromptsContext())
                     )
                 }
                 get("/SKILL.md") {
                     call.respondText(
                         contentType = ContentType.Text.Plain.withCharset(Charsets.UTF_8),
-                        text = SkillPromptArticle().payload.readPrompt()
+                        text = SkillPromptArticle().readPayload(ResourceRegistrar.buildPromptsContext())
                     )
                 }
             }
