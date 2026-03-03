@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.integration.arena
 import com.jonnyzzz.mcpSteroid.integration.infra.AiMode
 import com.jonnyzzz.mcpSteroid.integration.infra.IdeTestFolders
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
+import com.jonnyzzz.mcpSteroid.integration.infra.McpConnectionMode
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
@@ -141,7 +142,7 @@ class DpaiaComparisonTest {
             IntelliJContainer.create(
                 lifetimeWithoutMcp,
                 consoleTitle = "comparison-none",
-                aiMode = AiMode.NONE,
+                mcpConnectionMode = McpConnectionMode.None,
             ).waitForProjectReady()
         }
 

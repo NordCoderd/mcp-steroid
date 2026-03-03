@@ -34,11 +34,13 @@ sealed class McpConnectionMode {
 /**
  * Manages AI agent sessions (Claude, Codex, Gemini) within an IntelliJ test container.
  *
- * On construction the agent-output-filter is deployed so all agent runs can pipe
- * NDJSON output through it for human-readable logging and UI console display.
+ * Each agent is wrapped in [ConsoleAwareAgentSession] so all agent runs produce
+ * real-time console output and write per-run log files to [logDir]:
+ *  - `agent-{name}-{N}-raw.ndjson`   — raw NDJSON lines from STDOUT
+ *  - `agent-{name}-{N}-decoded.txt`  — human-readable decoded output
  *
  * MCP Steroid connectivity is determined by [mcpConnection]:
- * - [McpConnectionMode.None]  — no MCP registered (infrastructure / smoke tests)
+ * - [McpConnectionMode.None]  — no MCP registered (baseline / control group)
  * - [McpConnectionMode.Http]  — HTTP transport ([AiMode.AI_MCP])
  * - [McpConnectionMode.Npx]   — NPX stdio proxy ([AiMode.AI_NPX])
  */
@@ -50,8 +52,6 @@ class AiAgentDriver(
     private val mcpConnection: McpConnectionMode = McpConnectionMode.Http,
     private val logDir: File,
 ) {
-    // Must be declared BEFORE the init block so the lazy delegate is set up
-    // before deployAgentOutputFilter() accesses it via the container property.
     private val container by lazy {
         //TODO: Workdir in the container is not set for the agents!
         container.configureContainerExec { this.workingDirInContainer(intellijDriver.getGuestProjectDir()) }

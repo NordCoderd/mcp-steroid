@@ -38,6 +38,16 @@ fun IntelliJContainer.Companion.create(
     layoutManager : LayoutManager = HorizontalLayoutManager(),
     distribution: IdeDistribution = IdeDistribution.fromSystemProperties(),
     aiMode: AiMode = AiMode.AI_MCP,
+    /**
+     * Explicit MCP connection mode for AI agents.
+     *
+     * When provided, takes precedence over [aiMode] for MCP connectivity.
+     * Use [McpConnectionMode.None] to create a container where agents have NO MCP registered
+     * (baseline / control group) while still producing real-time console output and log files.
+     *
+     * When null (default), the mode is derived from [aiMode].
+     */
+    mcpConnectionMode: McpConnectionMode? = null,
     repoCacheDir: File? = IdeTestFolders.repoCacheDirOrNull,
     /**
      * When true, mounts the host Docker socket (`/var/run/docker.sock`) into the container
@@ -558,7 +568,7 @@ fun IntelliJContainer.Companion.create(
     console.writeInfo("Waiting for MCP Steroid server...")
     mcpSteroidDriver.waitForMcpReady()
 
-    val mcpConnectionMode = when (aiMode) {
+    val resolvedMcpConnectionMode: McpConnectionMode = mcpConnectionMode ?: when (aiMode) {
         AiMode.NONE -> McpConnectionMode.None
         AiMode.AI_MCP -> McpConnectionMode.Http
         AiMode.AI_NPX -> McpConnectionMode.Npx(NpxSteroidDriver.deploy(container, mcpSteroidDriver))
@@ -569,7 +579,7 @@ fun IntelliJContainer.Companion.create(
         intellijDriver = ijDriver,
         console = console,
         mcp = mcpSteroidDriver,
-        mcpConnection = mcpConnectionMode,
+        mcpConnection = resolvedMcpConnectionMode,
         logDir = runDir,
     )
 
@@ -619,6 +629,7 @@ fun IntelliJContainer.Companion.createFromSnapshot(
     layoutManager: LayoutManager = HorizontalLayoutManager(),
     distribution: IdeDistribution = IdeDistribution.fromSystemProperties(),
     aiMode: AiMode = AiMode.AI_MCP,
+    mcpConnectionMode: McpConnectionMode? = null,
     repoCacheDir: File? = IdeTestFolders.repoCacheDirOrNull,
     mountDockerSocket: Boolean = false,
     mountSshAgent: Boolean = true,
@@ -630,6 +641,7 @@ fun IntelliJContainer.Companion.createFromSnapshot(
     layoutManager = layoutManager,
     distribution = distribution,
     aiMode = aiMode,
+    mcpConnectionMode = mcpConnectionMode,
     repoCacheDir = repoCacheDir,
     mountDockerSocket = mountDockerSocket,
     mountSshAgent = mountSshAgent,

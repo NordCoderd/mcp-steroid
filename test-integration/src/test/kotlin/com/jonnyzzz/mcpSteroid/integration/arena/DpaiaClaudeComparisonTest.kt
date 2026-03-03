@@ -5,6 +5,7 @@ import com.jonnyzzz.mcpSteroid.integration.infra.AiMode
 import com.jonnyzzz.mcpSteroid.integration.infra.IdeTestFolders
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJProject
+import com.jonnyzzz.mcpSteroid.integration.infra.McpConnectionMode
 import com.jonnyzzz.mcpSteroid.integration.infra.create
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
 import com.jonnyzzz.mcpSteroid.testHelper.git.BareRepoCache
@@ -106,6 +107,14 @@ class DpaiaClaudeComparisonTest {
         val totalTokens: Long get() = inputTokens + outputTokens
     }
 
+    data class TestMetrics(
+        val testsRun: Int,
+        val testsPass: Int,
+        val testsFail: Int,
+        val testsError: Int,
+        val buildSuccess: Boolean?,
+    )
+
     data class RunRecord(
         val instanceId: String,
         val tags: List<String>,
@@ -121,6 +130,8 @@ class DpaiaClaudeComparisonTest {
         val usedMcpSteroid: Boolean,
         val agentSummary: String?,
         val tokenUsage: TokenUsage?,
+        /** Maven test result metrics extracted from agent output (null if no mvn test ran). */
+        val testMetrics: TestMetrics? = null,
         /** Non-null if an exception was thrown during the run. */
         val errorMessage: String? = null,
     ) {
@@ -197,7 +208,7 @@ class DpaiaClaudeComparisonTest {
             IntelliJContainer.create(
                 lifetimeWithoutMcp,
                 consoleTitle = "claude-cmp-none",
-                aiMode = AiMode.NONE,
+                mcpConnectionMode = McpConnectionMode.None,
                 project = IntelliJProject.ProjectFromGitCommitAndPatch(
                     cloneUrl = setupTestCase.cloneUrl,
                     repoOwnerAndName = setupTestCase.repo.removeSuffix(".git"),
@@ -255,13 +266,21 @@ class DpaiaClaudeComparisonTest {
                     predeployedProjectDir = session.intellijDriver.getGuestProjectDir(),
                 )
                 val totalMs = System.currentTimeMillis() - startMs
-                val tokens = extractTokenUsage(result.agentResult.stdout)
+                val rawOutput = result.agentResult.stdout
+                val tokens = extractTokenUsage(rawOutput)
+                val testMetrics = extractTestMetrics(rawOutput)
 
                 println("[CLAUDE-CMP] Completed: ${testCase.instanceId} [$modeLabel]")
                 println("[CLAUDE-CMP]   Total time:   ${totalMs / 1000}s (agent: ${result.agentDurationMs / 1000}s)")
                 println("[CLAUDE-CMP]   Exit code:    ${result.agentResult.exitCode}")
                 println("[CLAUDE-CMP]   Claimed fix:  ${result.evaluation.agentClaimedFix}")
                 println("[CLAUDE-CMP]   Used MCP:     ${result.evaluation.usedMcpSteroid}")
+                if (testMetrics != null) {
+                    val build = if (testMetrics.buildSuccess == true) "BUILD SUCCESS" else if (testMetrics.buildSuccess == false) "BUILD FAILURE" else "?"
+                    println("[CLAUDE-CMP]   Tests:        ${testMetrics.testsPass}/${testMetrics.testsRun} pass (fail=${testMetrics.testsFail}, err=${testMetrics.testsError}) | $build")
+                } else {
+                    println("[CLAUDE-CMP]   Tests:        (no test results found)")
+                }
                 if (tokens != null) {
                     println("[CLAUDE-CMP]   Tokens:       in=${tokens.inputTokens} out=${tokens.outputTokens} turns=${tokens.numTurns ?: "?"}")
                     if (tokens.costUsd != null) {
@@ -284,6 +303,7 @@ class DpaiaClaudeComparisonTest {
                     usedMcpSteroid = result.evaluation.usedMcpSteroid,
                     agentSummary = result.evaluation.agentSummary,
                     tokenUsage = tokens,
+                    testMetrics = testMetrics,
                 )
             } catch (e: Exception) {
                 val totalMs = System.currentTimeMillis() - startMs
@@ -302,6 +322,42 @@ class DpaiaClaudeComparisonTest {
                     errorMessage = e.message,
                 )
             }
+        }
+
+        private val TEST_RESULT_REGEX = Regex("""Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)""")
+        private val BUILD_STATUS_REGEX = Regex("""BUILD (SUCCESS|FAILURE)""")
+
+        /**
+         * Extract Maven Surefire test metrics from agent output.
+         *
+         * Searches the raw output (which may be NDJSON or plain text) for Maven Surefire lines:
+         * ```
+         * Tests run: 25, Failures: 0, Errors: 0, Skipped: 0
+         * BUILD SUCCESS
+         * ```
+         * Takes the LAST match for each, which corresponds to the final `mvn test` run summary.
+         * Returns null if no test result lines are found (e.g. the agent never ran tests).
+         */
+        fun extractTestMetrics(rawOutput: String): TestMetrics? {
+            val matches = TEST_RESULT_REGEX.findAll(rawOutput).toList()
+            if (matches.isEmpty()) return null
+
+            val last = matches.last()
+            val testsRun = last.groupValues[1].toInt()
+            val testsFail = last.groupValues[2].toInt()
+            val testsError = last.groupValues[3].toInt()
+            val testsPass = testsRun - testsFail - testsError
+
+            val buildMatches = BUILD_STATUS_REGEX.findAll(rawOutput).toList()
+            val buildSuccess = buildMatches.lastOrNull()?.groupValues?.get(1)?.let { it == "SUCCESS" }
+
+            return TestMetrics(
+                testsRun = testsRun,
+                testsPass = testsPass,
+                testsFail = testsFail,
+                testsError = testsError,
+                buildSuccess = buildSuccess,
+            )
         }
 
         /**
@@ -466,20 +522,32 @@ class DpaiaClaudeComparisonTest {
             }
         }
 
+        private fun fmtTestMetrics(m: TestMetrics?): String {
+            if (m == null) return "–"
+            val build = when (m.buildSuccess) {
+                true -> "✅"
+                false -> "❌"
+                null -> "?"
+            }
+            return "${m.testsPass}/${m.testsRun} ($build)"
+        }
+
         private fun resultsTable(pairs: List<Triple<String, RunRecord?, RunRecord?>>): String = buildString {
-            appendLine("| Case | Tags | MCP Fix | MCP Time | MCP Tokens (in/out) | No-MCP Fix | No-MCP Time | No-MCP Tokens (in/out) | Verdict |")
-            appendLine("|------|------|---------|----------|---------------------|------------|-------------|------------------------|---------|")
+            appendLine("| Case | Tags | MCP Fix | MCP Tests | MCP Time | MCP Tokens (in/out) | No-MCP Fix | No-MCP Tests | No-MCP Time | No-MCP Tokens (in/out) | Verdict |")
+            appendLine("|------|------|---------|-----------|----------|---------------------|------------|--------------|-------------|------------------------|---------|")
             for ((id, mcp, noMcp) in pairs) {
                 val tags = (mcp?.tags ?: noMcp?.tags ?: emptyList()).joinToString(", ")
                 val mcpFix = mcp?.let { if (it.agentClaimedFix) "✅ yes" else "❌ no" } ?: "–"
                 val noMcpFix = noMcp?.let { if (it.agentClaimedFix) "✅ yes" else "❌ no" } ?: "–"
+                val mcpTests = fmtTestMetrics(mcp?.testMetrics)
+                val noMcpTests = fmtTestMetrics(noMcp?.testMetrics)
                 val mcpTime = mcp?.let { fmtSec(it.totalDurationMs.toDouble()) } ?: "–"
                 val noMcpTime = noMcp?.let { fmtSec(it.totalDurationMs.toDouble()) } ?: "–"
                 val mcpTok = mcp?.tokenUsage?.let { "${fmtK(it.inputTokens.toDouble())}/${fmtK(it.outputTokens.toDouble())}" } ?: "–"
                 val noMcpTok = noMcp?.tokenUsage?.let { "${fmtK(it.inputTokens.toDouble())}/${fmtK(it.outputTokens.toDouble())}" } ?: "–"
                 val verdict = verdict(mcp, noMcp)
                 val shortId = id.removePrefix("dpaia__")
-                appendLine("| $shortId | $tags | $mcpFix | $mcpTime | $mcpTok | $noMcpFix | $noMcpTime | $noMcpTok | $verdict |")
+                appendLine("| $shortId | $tags | $mcpFix | $mcpTests | $mcpTime | $mcpTok | $noMcpFix | $noMcpTests | $noMcpTime | $noMcpTok | $verdict |")
             }
         }
 
@@ -687,6 +755,17 @@ class DpaiaClaudeComparisonTest {
                     }
                     appendLine("- Exit code: ${rec.exitCode ?: "n/a"}")
                     if (rec.usedMcpSteroid) appendLine("- Used steroid_execute_code: yes")
+                    val tm = rec.testMetrics
+                    if (tm != null) {
+                        val build = when (tm.buildSuccess) {
+                            true -> "BUILD SUCCESS ✅"
+                            false -> "BUILD FAILURE ❌"
+                            null -> "build status unknown"
+                        }
+                        appendLine("- Tests: ${tm.testsPass}/${tm.testsRun} passed (fail=${tm.testsFail}, err=${tm.testsError}) | $build")
+                    } else {
+                        appendLine("- Tests: (not available — agent may not have run tests)")
+                    }
                     val u = rec.tokenUsage
                     if (u != null) {
                         appendLine("- Tokens: ${u.inputTokens} in / ${u.outputTokens} out (cache-read: ${u.cacheReadTokens}), ${u.numTurns ?: "?"} turns")
@@ -725,6 +804,14 @@ class DpaiaClaudeComparisonTest {
                             put("totalTokens", u.totalTokens)
                             put("costUsd", u.costUsd ?: 0.0)
                             put("numTurns", u.numTurns ?: 0)
+                        }
+                        val tm = r.testMetrics
+                        if (tm != null) {
+                            put("testsRun", tm.testsRun)
+                            put("testsPass", tm.testsPass)
+                            put("testsFail", tm.testsFail)
+                            put("testsError", tm.testsError)
+                            put("buildSuccess", tm.buildSuccess ?: false)
                         }
                     })
                 }
