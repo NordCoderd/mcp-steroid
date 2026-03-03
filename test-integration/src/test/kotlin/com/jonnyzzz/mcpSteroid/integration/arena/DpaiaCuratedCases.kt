@@ -58,19 +58,52 @@ object DpaiaCuratedCases {
     )
 
     /**
-     * Primary 4 cases for the A/B comparison: "agent with MCP Steroid" vs "agent without".
+     * Primary comparison cases for the A/B comparison: "agent with MCP Steroid" vs "agent without".
      *
-     * Chosen because IDE tooling (navigation, compile feedback, test runner) gives the clearest
-     * measurable advantage:
+     * **Original 4 cases (Batch 1, 2026-03-02):**
      * - feature-service-125: 44 KB patch; JPQL + status machine spanning entities/services/controllers
      * - empty-maven-springboot3-1: JWT auth from scratch; Spring Security API versioning traps
      * - feature-service-25: self-referential JPA hierarchy; circular dependency caught at compile time
      * - spring-petclinic-rest-14: 575 failing tests; IDE highlights every missed edit immediately
+     *
+     * **8 new cases (Batch 2, Group 4 expansion):**
+     * Selected via dataset analysis (group4-analyze-dataset.py) covering 3 new repos and diverse
+     * task types. See docs/dpaia-runs/EXEC-SUMMARY.md for selection rationale.
+     *
+     * | instanceId                              | Repo                    | FTP | Files | Why MCP helps                                   |
+     * |-----------------------------------------|-------------------------|-----|-------|--------------------------------------------------|
+     * | dpaia__spring__petclinic-36             | spring-petclinic (NEW)  |  4  |   8   | Add email field: entity+schema+form across layers|
+     * | dpaia__jhipster__sample__app-3          | jhipster (NEW)          |  4  |   9   | Rename ROLE_ADMIN; IDE Find Usages critical      |
+     * | dpaia__train__ticket-1                  | train-ticket (NEW)      |  3  |   4   | Extend OrderRepository with date-range JPQL      |
+     * | dpaia__train__ticket-31                 | train-ticket (NEW)      |  2  |   8   | Extend PaymentRepository + service layer         |
+     * | dpaia__spring__boot__microshop-18       | spring-boot-microshop   |  8  |  23   | RestTemplate→WebClient migration; 23 files       |
+     * | dpaia__spring__boot__microshop-2        | spring-boot-microshop   |  4  |  10   | Add productId validation across all microservices|
+     * | dpaia__spring__petclinic-27             | spring-petclinic (NEW)  |  3  |   4   | Build REST endpoints for owners/pets/visits      |
+     * | dpaia__spring__petclinic__rest-3        | spring-petclinic-rest   |  3  |   5   | Cache eviction + scheduled invalidation          |
      */
     val PRIMARY_COMPARISON_CASES: List<String> = listOf(
+        // Batch 1: original 4 cases
         "dpaia__feature__service-125",
         "dpaia__empty__maven__springboot3-1",
         "dpaia__feature__service-25",
         "dpaia__spring__petclinic__rest-14",
+
+        // Batch 2: 8 new cases from Group 4 expansion
+        // NEW repo: spring-petclinic — add email field to Owner across entity/DB schema/form (REST+Validation)
+        "dpaia__spring__petclinic-36",
+        // NEW repo: jhipster-sample-app — rename ROLE_ADMIN to ROLE_ADMINISTRATOR; Find Usages ideal (Security, 9 files)
+        "dpaia__jhipster__sample__app-3",
+        // NEW repo: train-ticket — extend OrderRepository with accountId+date-range JPQL queries (Data+JPA)
+        "dpaia__train__ticket-1",
+        // NEW repo: train-ticket — extend PaymentRepository with date-range + update service layer (Controller+JPA)
+        "dpaia__train__ticket-31",
+        // spring-boot-microshop — replace RestTemplate with WebClient across ALL microservices (23 files, ftp=8)
+        "dpaia__spring__boot__microshop-18",
+        // spring-boot-microshop — add productId validation across all microservices (REST+Validation, 10 files)
+        "dpaia__spring__boot__microshop-2",
+        // NEW repo: spring-petclinic — build REST endpoints for owners/pets/visits (feature addition, 4 files)
+        "dpaia__spring__petclinic-27",
+        // spring-petclinic-rest — add cache eviction + scheduled invalidation (Cache, 5 files)
+        "dpaia__spring__petclinic__rest-3",
     )
 }
