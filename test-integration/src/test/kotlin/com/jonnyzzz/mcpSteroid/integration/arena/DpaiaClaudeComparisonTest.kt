@@ -15,6 +15,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -134,9 +135,21 @@ class DpaiaClaudeComparisonTest {
         val testMetrics: TestMetrics? = null,
         /** Non-null if an exception was thrown during the run. */
         val errorMessage: String? = null,
+        /** Number of steroid_execute_code tool calls (0 for NONE mode, null if not parsed). */
+        val steroidCallCount: Int? = null,
+        /** Total number of tool_use calls across all turns (null if not parsed). */
+        val totalToolCalls: Int? = null,
+        /** Number of tool calls that returned is_error=true (null if not parsed). */
+        val toolErrorCount: Int? = null,
     ) {
         val modeLabel: String get() = if (withMcp) "MCP" else "NONE"
         val isSuccess: Boolean get() = errorMessage == null && (exitCode == 0 || agentClaimedFix)
+        val cacheHitRate: Double?
+            get() {
+                val u = tokenUsage ?: return null
+                val total = u.inputTokens + u.cacheReadTokens
+                return if (total > 0) u.cacheReadTokens.toDouble() / total else null
+            }
     }
 
     companion object {
@@ -269,6 +282,7 @@ class DpaiaClaudeComparisonTest {
                 val rawOutput = result.agentResult.stdout
                 val tokens = extractTokenUsage(rawOutput)
                 val testMetrics = extractTestMetrics(rawOutput)
+                val toolStats = extractToolCallStats(rawOutput)
 
                 println("[CLAUDE-CMP] Completed: ${testCase.instanceId} [$modeLabel]")
                 println("[CLAUDE-CMP]   Total time:   ${totalMs / 1000}s (agent: ${result.agentDurationMs / 1000}s)")
@@ -289,6 +303,9 @@ class DpaiaClaudeComparisonTest {
                 } else {
                     println("[CLAUDE-CMP]   Tokens:       (not available — agent may have failed before producing output)")
                 }
+                if (toolStats != null) {
+                    println("[CLAUDE-CMP]   Tool calls:   total=${toolStats.totalToolCalls} steroid=${toolStats.steroidCallCount} errors=${toolStats.toolErrorCount}")
+                }
                 println("[CLAUDE-CMP] ========================================")
 
                 return RunRecord(
@@ -304,6 +321,9 @@ class DpaiaClaudeComparisonTest {
                     agentSummary = result.evaluation.agentSummary,
                     tokenUsage = tokens,
                     testMetrics = testMetrics,
+                    steroidCallCount = toolStats?.steroidCallCount,
+                    totalToolCalls = toolStats?.totalToolCalls,
+                    toolErrorCount = toolStats?.toolErrorCount,
                 )
             } catch (e: Exception) {
                 val totalMs = System.currentTimeMillis() - startMs
@@ -391,6 +411,81 @@ class DpaiaClaudeComparisonTest {
                 )
             }
             return null
+        }
+
+        data class ToolCallStats(
+            /** Number of steroid_execute_code tool invocations. */
+            val steroidCallCount: Int,
+            /** Total tool_use calls across all assistant turns. */
+            val totalToolCalls: Int,
+            /** Number of tool results that returned is_error=true. */
+            val toolErrorCount: Int,
+        )
+
+        /**
+         * Extract tool call statistics from Claude NDJSON output.
+         *
+         * Parses the new Claude CLI format (`assistant.message.content[].type == "tool_use"`)
+         * to count:
+         * - `steroid_execute_code` calls (full or bare name)
+         * - total `tool_use` blocks
+         * - tool results with `is_error: true`
+         *
+         * Returns null if no assistant events with tool_use are found (e.g. the agent failed
+         * before producing any tool calls, or the output is not NDJSON).
+         */
+        fun extractToolCallStats(rawOutput: String): ToolCallStats? {
+            var steroidCount = 0
+            var totalCount = 0
+            var errorCount = 0
+            var foundAny = false
+
+            for (line in rawOutput.lines()) {
+                val trimmed = line.trim()
+                if (trimmed.isEmpty()) continue
+                val obj = try {
+                    Json.parseToJsonElement(trimmed).jsonObject
+                } catch (e: Exception) {
+                    continue
+                }
+
+                when (obj["type"]?.jsonPrimitive?.content) {
+                    "assistant" -> {
+                        val content = obj["message"]?.jsonObject
+                            ?.get("content")?.let { el ->
+                                try { el.jsonArray } catch (e: Exception) { null }
+                            } ?: continue
+                        for (item in content) {
+                            val itemObj = try { item.jsonObject } catch (e: Exception) { continue }
+                            if (itemObj["type"]?.jsonPrimitive?.content == "tool_use") {
+                                totalCount++
+                                foundAny = true
+                                val name = itemObj["name"]?.jsonPrimitive?.content ?: ""
+                                // Match both "mcp__mcp-steroid__steroid_execute_code" and "steroid_execute_code"
+                                if (name.endsWith("steroid_execute_code")) {
+                                    steroidCount++
+                                }
+                            }
+                        }
+                    }
+                    "user" -> {
+                        val content = obj["message"]?.jsonObject
+                            ?.get("content")?.let { el ->
+                                try { el.jsonArray } catch (e: Exception) { null }
+                            } ?: continue
+                        for (item in content) {
+                            val itemObj = try { item.jsonObject } catch (e: Exception) { continue }
+                            if (itemObj["type"]?.jsonPrimitive?.content == "tool_result") {
+                                if (itemObj["is_error"]?.jsonPrimitive?.content == "true") {
+                                    errorCount++
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            return if (foundAny) ToolCallStats(steroidCount, totalCount, errorCount) else null
         }
 
         // ── Lifecycle ──────────────────────────────────────────────────────
@@ -494,15 +589,30 @@ class DpaiaClaudeComparisonTest {
             val noMcpAvgOut = avgLongOrNull(noMcpRecs.mapNotNull { it.tokenUsage?.outputTokens })
             val mcpTotalCost = mcpRecs.mapNotNull { it.tokenUsage?.costUsd }.sum()
             val noMcpTotalCost = noMcpRecs.mapNotNull { it.tokenUsage?.costUsd }.sum()
+            val mcpAvgTurns = avgLongOrNull(mcpRecs.mapNotNull { it.tokenUsage?.numTurns?.toLong() })
+            val noMcpAvgTurns = avgLongOrNull(noMcpRecs.mapNotNull { it.tokenUsage?.numTurns?.toLong() })
+            val mcpAvgSteroid = avgLongOrNull(mcpRecs.mapNotNull { it.steroidCallCount?.toLong() })
+            val noMcpAvgSteroid = avgLongOrNull(noMcpRecs.mapNotNull { it.steroidCallCount?.toLong() })
+            val mcpAvgTotalTools = avgLongOrNull(mcpRecs.mapNotNull { it.totalToolCalls?.toLong() })
+            val noMcpAvgTotalTools = avgLongOrNull(noMcpRecs.mapNotNull { it.totalToolCalls?.toLong() })
+            val mcpAvgErrors = avgLongOrNull(mcpRecs.mapNotNull { it.toolErrorCount?.toLong() })
+            val noMcpAvgErrors = avgLongOrNull(noMcpRecs.mapNotNull { it.toolErrorCount?.toLong() })
+            val mcpAvgCacheHit = mcpRecs.mapNotNull { it.cacheHitRate }.let { if (it.isEmpty()) null else it.average() }
+            val noMcpAvgCacheHit = noMcpRecs.mapNotNull { it.cacheHitRate }.let { if (it.isEmpty()) null else it.average() }
 
-            appendLine("| Metric | Claude + MCP | Claude (no MCP) |")
-            appendLine("|--------|-------------|-----------------|")
-            appendLine("| Cases run | ${mcpRecs.size} | ${noMcpRecs.size} |")
-            appendLine("| Claimed fix | $mcpFixed/$totalCases (${pct(mcpFixed, totalCases)}) | $noMcpFixed/$totalCases (${pct(noMcpFixed, totalCases)}) |")
-            appendLine("| Avg total time | ${fmtSec(mcpAvgSec)} | ${fmtSec(noMcpAvgSec)} |")
-            appendLine("| Avg input tokens | ${fmtK(mcpAvgIn)} | ${fmtK(noMcpAvgIn)} |")
-            appendLine("| Avg output tokens | ${fmtK(mcpAvgOut)} | ${fmtK(noMcpAvgOut)} |")
-            appendLine("| Total cost (USD) | \$${fmtCost(mcpTotalCost)} | \$${fmtCost(noMcpTotalCost)} |")
+            appendLine("| Metric | Claude + MCP | Claude (no MCP) | Δ |")
+            appendLine("|--------|-------------|-----------------|---|")
+            appendLine("| Cases run | ${mcpRecs.size} | ${noMcpRecs.size} | — |")
+            appendLine("| Claimed fix | $mcpFixed/$totalCases (${pct(mcpFixed, totalCases)}) | $noMcpFixed/$totalCases (${pct(noMcpFixed, totalCases)}) | ${deltaFixRate(mcpFixed, noMcpFixed, totalCases)} |")
+            appendLine("| Avg total time | ${fmtSec(mcpAvgSec)} | ${fmtSec(noMcpAvgSec)} | ${deltaSecPct(mcpAvgSec, noMcpAvgSec)} |")
+            appendLine("| Total cost (USD) | \$${fmtCost(mcpTotalCost)} | \$${fmtCost(noMcpTotalCost)} | ${deltaCostPct(mcpTotalCost, noMcpTotalCost)} |")
+            appendLine("| Avg turns | ${fmtAvg(mcpAvgTurns)} | ${fmtAvg(noMcpAvgTurns)} | ${deltaAvgPct(mcpAvgTurns, noMcpAvgTurns)} |")
+            appendLine("| Avg steroid calls | ${fmtAvg(mcpAvgSteroid)} | ${fmtAvg(noMcpAvgSteroid)} | N/A |")
+            appendLine("| Avg total tool calls | ${fmtAvg(mcpAvgTotalTools)} | ${fmtAvg(noMcpAvgTotalTools)} | ${deltaAvgPct(mcpAvgTotalTools, noMcpAvgTotalTools)} |")
+            appendLine("| Avg tool errors | ${fmtAvg(mcpAvgErrors)} | ${fmtAvg(noMcpAvgErrors)} | ${deltaAvgPct(mcpAvgErrors, noMcpAvgErrors)} |")
+            appendLine("| Avg cache hit rate | ${fmtPctOrDash(mcpAvgCacheHit)} | ${fmtPctOrDash(noMcpAvgCacheHit)} | — |")
+            appendLine("| Avg input tokens | ${fmtK(mcpAvgIn)} | ${fmtK(noMcpAvgIn)} | ${deltaAvgPct(mcpAvgIn, noMcpAvgIn)} |")
+            appendLine("| Avg output tokens | ${fmtK(mcpAvgOut)} | ${fmtK(noMcpAvgOut)} | ${deltaAvgPct(mcpAvgOut, noMcpAvgOut)} |")
             appendLine()
 
             val fixDiff = mcpFixed - noMcpFixed
@@ -533,8 +643,8 @@ class DpaiaClaudeComparisonTest {
         }
 
         private fun resultsTable(pairs: List<Triple<String, RunRecord?, RunRecord?>>): String = buildString {
-            appendLine("| Case | Tags | MCP Fix | MCP Tests | MCP Time | MCP Tokens (in/out) | No-MCP Fix | No-MCP Tests | No-MCP Time | No-MCP Tokens (in/out) | Verdict |")
-            appendLine("|------|------|---------|-----------|----------|---------------------|------------|--------------|-------------|------------------------|---------|")
+            appendLine("| Case | Tags | MCP Fix | MCP Tests | MCP Time | MCP Cost | MCP Turns | MCP Steroid# | No-MCP Fix | No-MCP Tests | No-MCP Time | No-MCP Cost | No-MCP Turns | Verdict |")
+            appendLine("|------|------|---------|-----------|----------|----------|-----------|--------------|------------|--------------|-------------|-------------|--------------|---------|")
             for ((id, mcp, noMcp) in pairs) {
                 val tags = (mcp?.tags ?: noMcp?.tags ?: emptyList()).joinToString(", ")
                 val mcpFix = mcp?.let { if (it.agentClaimedFix) "✅ yes" else "❌ no" } ?: "–"
@@ -543,11 +653,14 @@ class DpaiaClaudeComparisonTest {
                 val noMcpTests = fmtTestMetrics(noMcp?.testMetrics)
                 val mcpTime = mcp?.let { fmtSec(it.totalDurationMs.toDouble()) } ?: "–"
                 val noMcpTime = noMcp?.let { fmtSec(it.totalDurationMs.toDouble()) } ?: "–"
-                val mcpTok = mcp?.tokenUsage?.let { "${fmtK(it.inputTokens.toDouble())}/${fmtK(it.outputTokens.toDouble())}" } ?: "–"
-                val noMcpTok = noMcp?.tokenUsage?.let { "${fmtK(it.inputTokens.toDouble())}/${fmtK(it.outputTokens.toDouble())}" } ?: "–"
+                val mcpCost = mcp?.tokenUsage?.costUsd?.let { "\$${fmtCost(it)}" } ?: "–"
+                val noMcpCost = noMcp?.tokenUsage?.costUsd?.let { "\$${fmtCost(it)}" } ?: "–"
+                val mcpTurns = mcp?.tokenUsage?.numTurns?.toString() ?: "–"
+                val noMcpTurns = noMcp?.tokenUsage?.numTurns?.toString() ?: "–"
+                val mcpSteroid = mcp?.steroidCallCount?.toString() ?: "–"
                 val verdict = verdict(mcp, noMcp)
                 val shortId = id.removePrefix("dpaia__")
-                appendLine("| $shortId | $tags | $mcpFix | $mcpTests | $mcpTime | $mcpTok | $noMcpFix | $noMcpTests | $noMcpTime | $noMcpTok | $verdict |")
+                appendLine("| $shortId | $tags | $mcpFix | $mcpTests | $mcpTime | $mcpCost | $mcpTurns | $mcpSteroid | $noMcpFix | $noMcpTests | $noMcpTime | $noMcpCost | $noMcpTurns | $verdict |")
             }
         }
 
@@ -813,6 +926,9 @@ class DpaiaClaudeComparisonTest {
                             put("testsError", tm.testsError)
                             put("buildSuccess", tm.buildSuccess ?: false)
                         }
+                        if (r.steroidCallCount != null) put("steroidCallCount", r.steroidCallCount)
+                        if (r.totalToolCalls != null) put("totalToolCalls", r.totalToolCalls)
+                        if (r.toolErrorCount != null) put("toolErrorCount", r.toolErrorCount)
                     })
                 }
             }
@@ -833,5 +949,29 @@ class DpaiaClaudeComparisonTest {
             if (msValues.isEmpty()) null else msValues.average() / 1000.0
         private fun avgLongOrNull(values: List<Long>): Double? =
             if (values.isEmpty()) null else values.average()
+
+        private fun fmtAvg(v: Double?): String = if (v == null) "–" else v.toInt().toString()
+        private fun fmtPctOrDash(v: Double?): String = if (v == null) "–" else "${(v * 100).toInt()}%"
+        private fun deltaAvgPct(mcp: Double?, noMcp: Double?): String {
+            if (mcp == null || noMcp == null || noMcp == 0.0) return "–"
+            val delta = (mcp - noMcp) / noMcp * 100
+            return if (delta >= 0) "+${delta.toInt()}%" else "${delta.toInt()}%"
+        }
+        private fun deltaSecPct(mcpSec: Double?, noMcpSec: Double?): String {
+            if (mcpSec == null || noMcpSec == null || noMcpSec == 0.0) return "–"
+            val delta = (mcpSec - noMcpSec) / noMcpSec * 100
+            return if (delta >= 0) "+${delta.toInt()}%" else "${delta.toInt()}%"
+        }
+        private fun deltaCostPct(mcpCost: Double, noMcpCost: Double): String {
+            if (noMcpCost == 0.0) return "–"
+            val delta = (mcpCost - noMcpCost) / noMcpCost * 100
+            return if (delta >= 0) "+${delta.toInt()}%" else "${delta.toInt()}%"
+        }
+        private fun deltaFixRate(mcpFixed: Int, noMcpFixed: Int, total: Int): String = when {
+            total == 0 -> "–"
+            mcpFixed == noMcpFixed -> "tie"
+            mcpFixed > noMcpFixed -> "+${mcpFixed - noMcpFixed} MCP"
+            else -> "+${noMcpFixed - mcpFixed} no-MCP"
+        }
     }
 }
