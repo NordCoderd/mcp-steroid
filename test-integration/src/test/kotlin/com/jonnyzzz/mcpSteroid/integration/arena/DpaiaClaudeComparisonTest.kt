@@ -205,6 +205,7 @@ class DpaiaClaudeComparisonTest {
                     baseCommit = setupTestCase.baseCommit,
                     testPatch = setupTestCase.testPatch,
                     displayName = setupTestCase.instanceId,
+                    buildSystem = setupTestCase.buildSystem,
                 ),
                 mountDockerSocket = true,
             ).waitForProjectReady()
@@ -228,6 +229,7 @@ class DpaiaClaudeComparisonTest {
                     baseCommit = setupTestCase.baseCommit,
                     testPatch = setupTestCase.testPatch,
                     displayName = setupTestCase.instanceId,
+                    buildSystem = setupTestCase.buildSystem,
                 ),
                 mountDockerSocket = true,
             ).waitForProjectReady()

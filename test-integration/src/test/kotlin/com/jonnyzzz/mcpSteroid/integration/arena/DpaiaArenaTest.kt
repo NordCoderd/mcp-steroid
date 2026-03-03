@@ -187,6 +187,7 @@ class DpaiaArenaTest {
                     baseCommit = setupTestCase.baseCommit,
                     testPatch = setupTestCase.testPatch,
                     displayName = setupTestCase.instanceId,
+                    buildSystem = setupTestCase.buildSystem,
                 ),
                 mountDockerSocket = true,
             ).waitForProjectReady()

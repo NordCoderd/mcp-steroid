@@ -541,6 +541,13 @@ sealed class IntelliJProject{
         val baseCommit: String,
         val testPatch: String,
         val displayName: String,
+        /**
+         * Build system hint: "maven" or "gradle". When set to "maven", a minimal
+         * `.idea/misc.xml` is pre-created so IntelliJ auto-imports as Maven instead
+         * of showing the "Open or Import Project" dialog (which appears when the repo
+         * contains both pom.xml and build.gradle).
+         */
+        val buildSystem: String = "",
     ) : IntelliJProject() {
         override fun getRepoUrlForCache(): String = cloneUrl
 
@@ -560,6 +567,37 @@ sealed class IntelliJProject{
             if (testPatch.isNotBlank()) {
                 console.writeInfo("Applying test patch for $displayName ...")
                 git.applyPatch(guestProjectDir, testPatch)
+            }
+
+            if (buildSystem.equals("maven", ignoreCase = true)) {
+                console.writeInfo("Pre-creating .idea/ Maven config for $displayName ...")
+                val ideaDir = "$guestProjectDir/.idea"
+                val miscXml = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project version="4">
+                      <component name="MavenProjectsManager">
+                        <option name="originalFiles">
+                          <list>
+                            <option value="${'$'}PROJECT_DIR${'$'}/pom.xml" />
+                          </list>
+                        </option>
+                      </component>
+                    </project>
+                """.trimIndent()
+                val script = """
+                    set -euo pipefail
+                    mkdir -p "$ideaDir"
+                    cat > "$ideaDir/misc.xml" << 'XMLEOF'
+$miscXml
+XMLEOF
+                """.trimIndent()
+                container.startProcessInContainer {
+                    this
+                        .args("bash", "-c", script)
+                        .timeoutSeconds(15)
+                        .description("Pre-create .idea/ Maven config for $displayName")
+                        .quietly()
+                }.awaitForProcessFinish().assertExitCode(0, "Failed to create .idea/ for $displayName")
             }
 
             console.writeSuccess("$displayName ready")
