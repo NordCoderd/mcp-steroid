@@ -88,24 +88,33 @@ for (path in listOf(
 
 ---
 
-## Find a File by Name — Use FilenameIndex via exec_code, NOT the Glob Tool or Bash find
+## Find Files — By Name OR By Extension (use FilenameIndex, NOT Glob or Bash find)
 
-> **⚠️ Do NOT use the Glob tool or `ProcessBuilder("find")` for file discovery.** Glob scans the filesystem and is unreliable inside the container path layout. FilenameIndex is an O(1) IDE-indexed lookup that always works.
+> **⚠️ NEVER use the Glob tool or `ProcessBuilder("find")` for file discovery** — not for `*.java`, not for `*.yaml`, not for any pattern. Glob scans the filesystem and is unreliable inside the container path layout. FilenameIndex is an O(1) IDE-indexed lookup that always works.
+
+| What you want | ❌ Wrong | ✅ Right |
+|---|---|---|
+| All Java files | `Glob("src/**/*.java")` | `FilenameIndex.getAllFilesByExt(project, "java", scope)` |
+| All SQL migrations | `Glob("src/**/*.sql")` | `FilenameIndex.getAllFilesByExt(project, "sql", scope)` |
+| All YAML/yml files | `Glob("src/**/*.yaml")` | `FilenameIndex.getAllFilesByExt(project, "yaml", scope)` |
+| Specific file by name | `Glob("**/UserService.java")` | `FilenameIndex.getVirtualFilesByName("UserService.java", scope)` |
 
 ```kotlin
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope  // ← REQUIRED — missing this causes "unresolved reference"
+val scope = GlobalSearchScope.projectScope(project)
 // Find by exact filename — O(1) IDE index lookup, respects project scope
-val matches = readAction {
-    FilenameIndex.getVirtualFilesByName("UserServiceImpl.java", GlobalSearchScope.projectScope(project))
+val byName = readAction { FilenameIndex.getVirtualFilesByName("UserServiceImpl.java", scope) }
+byName.forEach { println(it.path) }
+// Find all files by extension (replaces Glob "**/*.java"):
+val byExt = readAction { FilenameIndex.getAllFilesByExt(project, "java", scope) }
+byExt.forEach { println(it.path) }
+// Find by extension + path filter (e.g., only migration SQL files):
+val migrations = readAction {
+    FilenameIndex.getAllFilesByExt(project, "sql", scope)
+        .filter { it.path.contains("db/migration", ignoreCase = true) }
 }
-matches.forEach { println(it.path) }
-// Find by extension + path filter:
-val filtered = readAction {
-    FilenameIndex.getAllFilesByExt(project, "java", GlobalSearchScope.projectScope(project))
-        .filter { it.path.contains("user", ignoreCase = true) }
-}
-filtered.forEach { println(it.path) }
+migrations.forEach { println(it.path) }
 ```
 
 > **⚠️ Compile-error recovery**: If you get `unresolved reference 'GlobalSearchScope'`, add `import com.intellij.psi.search.GlobalSearchScope` and retry immediately. Do NOT abandon steroid_execute_code and fall back to Bash/grep after a compile error.

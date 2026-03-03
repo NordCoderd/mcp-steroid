@@ -36,14 +36,17 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 
 **NEVER use exec_code just to read files you already know the path for**: Use the native Read/Glob/Grep tools to read file *content* by known path — they have zero compilation overhead (~0s vs ~8s per exec_code call). Reserve exec_code for: writing files via VFS, PSI queries, test execution, compile checks. The only exception is reading files that were modified in this session via writeAction — in that case use `String(vf.contentsToByteArray(), vf.charset)` to see in-memory VFS state.
 
-**Use exec_code + FilenameIndex for file DISCOVERY (finding files by name)**: When you need to find files whose path you don't know, use `FilenameIndex.getVirtualFilesByName()` via exec_code — **do NOT use the Glob tool**. FilenameIndex is an O(1) IDE-indexed lookup; the Glob tool scans the filesystem and is unreliable inside the container path layout.
+**Use exec_code + FilenameIndex for ANY file discovery** — by exact filename OR by extension. **Never use the Glob tool for discovery.** Glob scans the filesystem and is unreliable inside the container path layout; FilenameIndex is an O(1) IDE-indexed lookup.
 ```kotlin
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
-val files = readAction {
-    FilenameIndex.getVirtualFilesByName("Application.java", GlobalSearchScope.projectScope(project))
-}
-files.forEach { println(it.path) }
+val scope = GlobalSearchScope.projectScope(project)
+// ❌ WRONG: Glob("src/main/**/*.java") or Glob("src/main/**/*.yaml")
+// ✅ RIGHT: FilenameIndex in exec_code
+val byName = readAction { FilenameIndex.getVirtualFilesByName("Application.java", scope) }
+byName.forEach { println(it.path) }
+val byExt = readAction { FilenameIndex.getAllFilesByExt(project, "yaml", scope) }
+byExt.forEach { println(it.path) }
 ```
 See `mcp-steroid://skill/execute-code-file-ops` for more file-discovery patterns.
 
