@@ -23,6 +23,7 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 
 | Instead of... | Use IntelliJ API | Why? |
 |--------------|------------------|------|
+| `Glob` tool or `find` in Bash | `FilenameIndex.getVirtualFilesByName()` via exec_code | O(1) IDE-indexed lookup vs O(n) filesystem scan; Glob is unreliable inside the container |
 | `grep`, `find` | PSI search, Find Usages | Understands code structure |
 | Reading files with `cat` | VFS and PSI APIs | Respects IDE's caching |
 | Manual text replacement | Refactoring APIs | Maintains code correctness |

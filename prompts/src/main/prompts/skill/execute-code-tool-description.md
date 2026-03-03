@@ -34,7 +34,18 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - `Write access is allowed from write thread only` → wrap in `writeAction { }`
 - `Read access is allowed from inside read-action only` → wrap the PSI/VFS call in `readAction { }`. Example: `val vf = readAction { FilenameIndex.getVirtualFilesByName("Foo.java", GlobalSearchScope.projectScope(project)).firstOrNull() }`
 
-**NEVER use exec_code just to read existing files**: Use the native Read/Glob/Grep tools — they have zero compilation overhead (~0s vs ~8s per exec_code call). Reserve exec_code for: writing files via VFS, PSI queries, test execution, compile checks. The only exception is reading files that were modified in this session via writeAction — in that case use `String(vf.contentsToByteArray(), vf.charset)` to see in-memory VFS state.
+**NEVER use exec_code just to read files you already know the path for**: Use the native Read/Glob/Grep tools to read file *content* by known path — they have zero compilation overhead (~0s vs ~8s per exec_code call). Reserve exec_code for: writing files via VFS, PSI queries, test execution, compile checks. The only exception is reading files that were modified in this session via writeAction — in that case use `String(vf.contentsToByteArray(), vf.charset)` to see in-memory VFS state.
+
+**Use exec_code + FilenameIndex for file DISCOVERY (finding files by name)**: When you need to find files whose path you don't know, use `FilenameIndex.getVirtualFilesByName()` via exec_code — **do NOT use the Glob tool**. FilenameIndex is an O(1) IDE-indexed lookup; the Glob tool scans the filesystem and is unreliable inside the container path layout.
+```kotlin
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
+val files = readAction {
+    FilenameIndex.getVirtualFilesByName("Application.java", GlobalSearchScope.projectScope(project))
+}
+files.forEach { println(it.path) }
+```
+See `mcp-steroid://skill/execute-code-file-ops` for more file-discovery patterns.
 
 **Prefer VFS read over native Read tool** (only when you already have an exec_code call for other work): use `val vf = findProjectFile("path/File.java")!!; String(vf.contentsToByteArray(), vf.charset)` to see unsaved modifications from prior writeAction calls. Native Read bypasses VFS and may return stale content.
 

@@ -88,7 +88,10 @@ for (path in listOf(
 
 ---
 
-## Find a File by Name — PREFERRED Over ProcessBuilder("find")
+## Find a File by Name — Use FilenameIndex via exec_code, NOT the Glob Tool or Bash find
+
+> **⚠️ Do NOT use the Glob tool or `ProcessBuilder("find")` for file discovery.** Glob scans the filesystem and is unreliable inside the container path layout. FilenameIndex is an O(1) IDE-indexed lookup that always works.
+
 ```kotlin
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope  // ← REQUIRED — missing this causes "unresolved reference"
