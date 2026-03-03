@@ -41,12 +41,14 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 val scope = GlobalSearchScope.projectScope(project)
-// ❌ WRONG: Glob("src/main/**/*.java") or Glob("src/main/**/*.yaml")
+// ❌ WRONG: Glob("src/main/**/*.java")  ← broad extension scan — NEVER do this
+// ❌ WRONG: Glob("src/main/**/*.yaml")  ← same, any extension
+// ❌ WRONG: Glob("**/UserService.java") ← specific file — also use FilenameIndex
 // ✅ RIGHT: FilenameIndex in exec_code
-val byName = readAction { FilenameIndex.getVirtualFilesByName("Application.java", scope) }
-byName.forEach { println(it.path) }
-val byExt = readAction { FilenameIndex.getAllFilesByExt(project, "yaml", scope) }
-byExt.forEach { println(it.path) }
+val javaFiles = readAction { FilenameIndex.getAllFilesByExt(project, "java", scope) }  // replaces Glob("**/*.java")
+val yamlFiles = readAction { FilenameIndex.getAllFilesByExt(project, "yaml", scope) }  // replaces Glob("**/*.yaml")
+val sqlFiles  = readAction { FilenameIndex.getAllFilesByExt(project, "sql", scope) }   // replaces Glob("**/*.sql")
+val byName = readAction { FilenameIndex.getVirtualFilesByName("UserService.java", scope) }  // replaces Glob("**/UserService.java")
 ```
 See `mcp-steroid://skill/execute-code-file-ops` for more file-discovery patterns.
 
