@@ -54,6 +54,11 @@ sealed class IntelliJProject{
         openFile = "DemoRider.Tests/LeaderboardTests.cs",
     )
 
+    object ThisLoggerProject : ProjectFromRepository(
+        "thislogger-project",
+        openFile = "src/main/kotlin/com/example/util/Logging.kt",
+    )
+
     object KeycloakProject : ProjectFromRemoteGit("https://github.com/keycloak/keycloak.git")
     object IntelliJMasterProject : ProjectFromIntelliJMasterZip(
         openFile = "platform/platform-tests/testSrc/com/intellij/openapi/vfs/newvfs/persistent/PersistentFsTest.java",
