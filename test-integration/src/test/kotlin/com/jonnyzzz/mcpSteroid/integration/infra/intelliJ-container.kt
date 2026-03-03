@@ -99,7 +99,7 @@ class IntelliJContainer(
      * actively kills it via steroid_execute_code so Gradle import can proceed.
      */
     fun waitForProjectReady(
-        timeoutMillis: Long = 600_000L,
+        timeoutMillis: Long = System.getProperty("test.integration.project.ready.timeout.ms")?.toLongOrNull() ?: 600_000L,
         pollIntervalMillis: Long = 1_000L,
         requireIndexingComplete: Boolean = true,
         performPostSetup: Boolean = true,
