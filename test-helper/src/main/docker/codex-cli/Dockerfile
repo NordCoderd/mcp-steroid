@@ -1,9 +1,9 @@
 FROM debian:bookworm-slim
 
-# Install Node.js 20
+# Install Node.js 20 and Maven (for arena test projects that require mvn)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        curl ca-certificates gnupg && \
+        curl ca-certificates gnupg maven && \
     mkdir -p /etc/apt/keyrings && \
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | \
         gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg && \
