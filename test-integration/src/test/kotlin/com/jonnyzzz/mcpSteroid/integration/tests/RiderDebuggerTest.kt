@@ -61,7 +61,7 @@ class RiderDebuggerTest {
             appendLine("A test file is already open in the editor. Use the debugger to find why it fails.")
             appendLine("You MUST use the debugger — do NOT just read source code and guess.")
             appendLine()
-            appendLine("Read `mcp-steroid://skill/debugger-skill` for the debugger API workflow.")
+            appendLine("Read `mcp-steroid://prompt/debugger-skill` for the debugger API workflow.")
             appendLine()
             appendLine("Do NOT use screenshots or UI input tools.")
             appendLine()
