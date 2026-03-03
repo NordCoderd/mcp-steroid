@@ -122,7 +122,10 @@ class GitDriver(
 
         val patchPath = "/tmp/_tmp_patch_${System.currentTimeMillis()}.diff"
         println("[GIT] Applying patch to $repoDir...")
-        driver.writeFileInContainer(patchPath, patchContent, executable = false)
+        // Ensure patch ends with a trailing newline — git apply requires it,
+        // but some dataset entries omit the final newline causing "corrupt patch" errors.
+        val normalizedPatch = if (patchContent.endsWith("\n")) patchContent else patchContent + "\n"
+        driver.writeFileInContainer(patchPath, normalizedPatch, executable = false)
 
         driver.startProcessInContainer {
             this
