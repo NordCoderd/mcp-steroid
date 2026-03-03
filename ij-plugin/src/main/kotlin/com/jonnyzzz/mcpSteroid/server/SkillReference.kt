@@ -33,6 +33,20 @@ class SkillReference {
         get() = mcpServer.skillUrl
 
     /**
+     * Per-call file discovery reminder — injected at the beginning of every
+     * steroid_execute_code response so agents see the right pattern BEFORE
+     * writing the next code snippet. Agents tend to default to Glob before
+     * reading the tool description, so this ensures the guidance is visible
+     * on every call.
+     */
+    val fileDiscoveryReminder: String = buildString {
+        appendLine("FILE DISCOVERY: Use FilenameIndex in exec_code — NEVER use Glob for file search by name or extension.")
+        appendLine("  val javaFiles = readAction { FilenameIndex.getAllFilesByExt(project, \"java\", GlobalSearchScope.projectScope(project)) }")
+        appendLine("  val byName    = readAction { FilenameIndex.getVirtualFilesByName(\"MyClass.java\", GlobalSearchScope.projectScope(project)) }")
+        append("  Full guide: mcp-steroid://skill/execute-code-tool-description")
+    }
+
+    /**
      * Brief reminder of critical rules - included in error responses.
      */
     val criticalRules = buildString {

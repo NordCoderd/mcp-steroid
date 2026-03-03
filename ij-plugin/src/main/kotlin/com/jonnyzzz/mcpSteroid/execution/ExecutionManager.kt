@@ -63,6 +63,7 @@ class ExecutionManager(
                 val builder = responseBuilder(this, executionId, mcpProgressReporter)
                 try {
                     builder.logMessage("execution_id: ${executionId.executionId}\n use it to report feedback: steroid_execute_feedback")
+                    builder.logMessage(SkillReference.getInstance().fileDiscoveryReminder)
 
                     try {
                         // Kill any pending modal dialogs before execution
