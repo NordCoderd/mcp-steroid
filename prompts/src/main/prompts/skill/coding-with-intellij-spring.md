@@ -189,15 +189,44 @@ for (path in listOf(
 // Only if all OK: proceed to Maven test run
 ```
 **Phase 5: Run the failing test class**
+
+> **⚠️ BANNED**: Do NOT use `ProcessBuilder("./mvnw", "test", ...)` for routine test runs — it spawns a child process inside IntelliJ's JVM causing classpath conflicts and 200k+ char output overflow. Use the Maven IDE runner below.
+
 ```kotlin
-val process = ProcessBuilder("./mvnw", "test", "-Dtest=AuthControllerTest", "-Dspotless.check.skip=true")
-    .directory(java.io.File(project.basePath!!))
-    .redirectErrorStream(true).start()
-val lines = process.inputStream.bufferedReader().readLines()
-val exitCode = process.waitFor()
-println("Exit: $exitCode | lines: ${lines.size}")
-println(lines.take(30).joinToString("\n"))   // Spring context / Testcontainers errors at top
-println(lines.takeLast(30).joinToString("\n")) // Maven BUILD summary at bottom
+// ⭐ PRIMARY: Maven IDE runner — structured pass/fail, no token overflow
+import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
+import org.jetbrains.idea.maven.execution.MavenRunnerParameters
+import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
+import com.intellij.execution.testframework.sm.runner.SMTestProxy
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.minutes
+val mavenResult = CompletableDeferred<Boolean>()
+val conn = project.messageBus.connect()
+conn.subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
+    override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) { conn.disconnect(); mavenResult.complete(testsRoot.isPassed) }
+    override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
+    override fun onTestFailed(test: SMTestProxy) { println("FAILED: ${test.name}") }
+    override fun onTestsCountInSuite(count: Int) {}
+    override fun onTestStarted(test: SMTestProxy) {}
+    override fun onTestFinished(test: SMTestProxy) {}
+    override fun onTestIgnored(test: SMTestProxy) {}
+    override fun onSuiteFinished(suite: SMTestProxy) {}
+    override fun onSuiteStarted(suite: SMTestProxy) {}
+    override fun onCustomProgressTestsCategory(categoryName: String?, count: Int) {}
+    override fun onCustomProgressTestStarted() {}
+    override fun onCustomProgressTestFailed() {}
+    override fun onCustomProgressTestFinished() {}
+    override fun onSuiteTreeNodeAdded(testProxy: SMTestProxy) {}
+    override fun onSuiteTreeStarted(suite: SMTestProxy) {}
+})
+MavenRunConfigurationType.runConfiguration(project,
+    MavenRunnerParameters(true, project.basePath!!, "pom.xml",
+        listOf("test", "-Dtest=AuthControllerTest", "-Dspotless.check.skip=true"), emptyList()),
+    null, null) {}
+val mvnPassed = withTimeout(5.minutes) { mavenResult.await() }
+println("Maven IDE runner: passed=$mvnPassed")
+// FALLBACK (pom.xml modified AND latch already timed out): use ProcessBuilder("./mvnw", ...) from the section below
 ```
 > **Key rules**:
 > - If `steroid_execute_code` returns an error: read the error message and **retry with fixed code** — do NOT fall back to native Write/Bash
@@ -1040,8 +1069,9 @@ val manager = MavenProjectsManager.getInstance(project)
 manager.scheduleUpdateAllMavenProjects(MavenSyncSpec.full("post-pom-edit", false))
 Observation.awaitConfiguration(project)   // suspends until Maven sync + indexing fully complete
 println("Maven sync and indexing complete — safe to run tests now")
-// ⚠️ If MavenSyncSpec cannot be resolved, fall back to:
-//   ProcessBuilder("./mvnw", "dependency:resolve").directory(java.io.File(project.basePath!!)).start().waitFor()
+// ⚠️ If MavenSyncSpec cannot be resolved, force a full project update instead:
+//   MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()
+// ❌ Do NOT use: ProcessBuilder("./mvnw", "dependency:resolve") — banned inside steroid_execute_code
 ```
 
 > **`Observation.awaitConfiguration()`** is the canonical way to await any background IDE activity
@@ -1151,7 +1181,13 @@ A fix is complete when code is correct and either:
 - target tests pass, or
 - target and baseline tests fail with the same infrastructure signature
 
+> **⚠️ WARNING**: The `runMavenTest` helper below uses `ProcessBuilder("./mvnw")` — a LAST-RESORT fallback.
+> **PREFER** `MavenRunConfigurationType.runConfiguration()` (see "Maven projects" section) for routine test runs.
+> Only use `runMavenTest` when you need to capture raw output lines to detect Docker/infrastructure errors
+> (e.g., `"Could not find a valid Docker environment"`) AND the Maven IDE runner's SMTRunnerEventsListener latch has timed out.
+
 ```kotlin
+// ⚠️ LAST-RESORT FALLBACK — use MavenRunConfigurationType.runConfiguration() for routine test runs
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -1202,21 +1238,19 @@ println("CODE_READY=$codeReady TARGET_PASSED=${target.passed} INFRA_BLOCKED=$inf
 println("VERIFICATION_DECISION=${if (complete) "COMPLETE" else "INCOMPLETE"}")
 ```
 
-#### Maven projects — `MavenRunConfigurationType.runConfiguration()`
+#### Maven projects — `MavenRunConfigurationType.runConfiguration()` ⭐ PRIMARY
 
-> **⚠️ CRITICAL — After editing pom.xml: do NOT use this IDE runner immediately.**
-> When `pom.xml` is modified, IntelliJ triggers a Maven project re-import that shows a
-> modal dialog. This dialog **blocks the latch for up to 600 seconds** — wasting an entire
-> agent turn. Multiply by 3 agents hitting the same issue = 1800 seconds lost.
+> **⚠️ CRITICAL — After editing pom.xml: trigger Maven sync first (see "Trigger Maven Re-import" section).**
+> When `pom.xml` is modified, IntelliJ may trigger a Maven re-import that shows a modal dialog.
+> To prevent the latch from blocking: first call `MavenProjectsManager.scheduleUpdateAllMavenProjects()` +
+> `Observation.awaitConfiguration()` to complete the sync, THEN use `MavenRunConfigurationType.runConfiguration()`.
 >
-> **Rule**: After editing `pom.xml`, use `ProcessBuilder("./mvnw", ...)` (see the
-> "Run Unit Tests via Maven Wrapper" section below) as your PRIMARY test runner.
-> The Maven IDE runner is reliable only when no build file was modified in the current session.
+> **Always pass `dialog_killer: true`** on the `steroid_execute_code` call to auto-dismiss any dialogs.
+> If the latch still times out after 2 minutes despite `dialog_killer: true`, fall back to
+> `ProcessBuilder("./mvnw", ...)` **as a last resort** — do not wait the full 10 minutes.
 >
-> If you do use the Maven IDE runner (e.g. for an unmodified project), always pass
-> `dialog_killer: true` on the `steroid_execute_code` call to auto-dismiss any dialogs.
-> If the latch still times out after 2 minutes, fall back to `ProcessBuilder("./mvnw", ...)`
-> immediately — do not wait the full 10 minutes.
+> **❌ BANNED**: Do NOT use `ProcessBuilder("./mvnw", "test", ...)` as PRIMARY.
+> The Maven IDE runner below is always the preferred approach.
 
 ```kotlin
 import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
@@ -1276,7 +1310,7 @@ val passed = withTimeout(5.minutes) { result.await() }
 println("Result: passed=$passed")
 ```
 
-> **⚠️ Docker / CI environments — use `dialog_killer: true`**: When running `MavenRunConfigurationType.runConfiguration()` in a Docker or CI container, Maven project-reimport dialogs can block the run silently for the full latch timeout (5 minutes wasted). Pass `dialog_killer: true` as the `steroid_execute_code` parameter to auto-dismiss these modals. If the latch still times out after 2-3 minutes despite `dialog_killer: true`, **stop waiting and fall back to `ProcessBuilder("./mvnw", ...)` immediately** — do not wait the full 5 minutes.
+> **⚠️ Docker / CI environments — use `dialog_killer: true`**: When running `MavenRunConfigurationType.runConfiguration()` in a Docker or CI container, Maven project-reimport dialogs can block the run silently for the full latch timeout (5 minutes wasted). Pass `dialog_killer: true` as the `steroid_execute_code` parameter to auto-dismiss these modals. If the latch still times out after 2-3 minutes despite `dialog_killer: true`, **stop waiting and use `ProcessBuilder("./mvnw", ...)` as a LAST-RESORT fallback** (see "Run Unit Tests via Maven Wrapper" section) — do not wait the full 5 minutes.
 
 #### Gradle projects — `GradleRunConfiguration.setRunAsTest(true)`
 
@@ -1359,9 +1393,17 @@ println("Test started — check IDE Test Results window")
 ```
 
 ---
-### Run Unit Tests via Maven Wrapper (PRIMARY after pom.xml edits; fallback otherwise)
+### Run Unit Tests via Maven Wrapper — ⚠️ LAST-RESORT FALLBACK ONLY
 
-**Use `./mvnw` as your PRIMARY test runner whenever you have edited `pom.xml`** in the current session — the Maven IDE runner triggers a re-import modal that blocks for up to 600 seconds after build file changes. For sessions where `pom.xml` was NOT modified, prefer the IDE runner above (avoids 200k-char output truncation).
+> **❌ BANNED as PRIMARY**: Do NOT use `ProcessBuilder("./mvnw", "test", ...)` as your primary test runner.
+> It spawns a child process inside IntelliJ's JVM causing classpath conflicts and 200k+ char token overflow.
+>
+> **✅ USE INSTEAD**: `MavenRunConfigurationType.runConfiguration()` (see "Maven projects" section above).
+>
+> **When ProcessBuilder("./mvnw") is permitted as LAST RESORT** — ALL conditions must be true:
+> 1. You just modified `pom.xml` in this session, AND
+> 2. You already called `MavenProjectsManager.scheduleUpdateAllMavenProjects()` + `Observation.awaitConfiguration()`, AND
+> 3. `MavenRunConfigurationType.runConfiguration()` with `dialog_killer: true` has already timed out (>2 min)
 
 > **⚠️ CRITICAL — Output Truncation Required**: Spring Boot integration test output routinely exceeds
 > **200k characters** (Spring context startup ~100 lines, Flyway migration logs, Testcontainers Docker
@@ -1369,7 +1411,7 @@ println("Test started — check IDE Test Results window")
 > **Always use `takeLast()` to read only the relevant tail**:
 
 ```kotlin
-// ⚠️ FALLBACK ONLY — use the JUnit or Maven IDE runner below when possible
+// ⚠️ LAST-RESORT FALLBACK — use MavenRunConfigurationType.runConfiguration() instead when possible
 // ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed in arena environments
 // ⚠️ NEVER print process.inputStream.bufferedReader().readText() — Spring Boot output can be 200k+ chars
 val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-Dspotless.check.skip=true", "-q")
@@ -1488,11 +1530,16 @@ println("Gradle result: success=$gradleSuccess")
 > `./gradlew :api:test --tests "com.example.api.ProductControllerTest" --no-daemon -q`
 > Do NOT use ProcessBuilder inside exec_code for this.
 
-### Run Gradle Tests via ProcessBuilder (fallback — use Bash tool instead when possible)
+### Run Gradle Tests via ProcessBuilder — ❌ BANNED inside exec_code
 
-> **⚠️ FALLBACK ONLY**: Prefer the ExternalSystemUtil approach above. If you must use ProcessBuilder
-> (e.g. when IDE runner hangs), note that this spawns a child Gradle process inside the IDE JVM.
-> When possible, use the Bash tool outside exec_code instead (avoids classpath conflicts).
+> **❌ BANNED**: Do NOT use `ProcessBuilder("./gradlew", ...)` inside `steroid_execute_code`.
+> This spawns a nested Gradle daemon from within the IDE JVM, causing classpath conflicts and resource exhaustion.
+>
+> **Allowed alternatives (in priority order):**
+> 1. `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` (see above) — PREFERRED
+> 2. Bash tool **outside** exec_code: `./gradlew :module:test --tests "..." --no-daemon`
+>
+> The code snippet below is retained for reference only. Do NOT write new code using this pattern.
 
 For **Gradle** projects, use `./gradlew` with `--tests` for targeted test class execution.
 
@@ -1592,7 +1639,14 @@ Before declaring "environment blocked", run one **baseline** integration test an
 integration test, then compare signatures. Same infra signature in both means the blocker is
 environmental, not patch-specific.
 
+> **⚠️ EXCEPTION**: The `runSingleMavenTest` helper below uses `ProcessBuilder("./mvnw")` specifically to
+> capture raw output lines and detect Docker infrastructure errors. This is the only valid use case for
+> `ProcessBuilder("./mvnw")` inside exec_code — detecting Docker infrastructure issues requires raw output.
+> For all other test execution, use `MavenRunConfigurationType.runConfiguration()`.
+
 ```kotlin
+// ⚠️ EXCEPTION: ProcessBuilder used here specifically for Docker infra detection via raw output lines
+// Do NOT use this pattern for routine test runs — use MavenRunConfigurationType.runConfiguration() instead
 import java.io.File
 
 fun runSingleMavenTest(testClass: String): List<String> {

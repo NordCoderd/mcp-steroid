@@ -70,6 +70,13 @@ println("Test imports (required class names):\n" + testImports?.joinToString("\n
 
 ---
 
+## Maven Build & Test Patterns
+
+For running Maven goals, tests, and syncing after pom.xml changes, see `mcp-steroid://skill/execute-code-maven`.
+Use `MavenRunner.getInstance(project).run(params, settings, callback)` — **not** `ProcessBuilder("./mvnw")`.
+
+---
+
 ## Add a Maven Dependency to pom.xml via VFS Text Replace
 
 PREFER this over native Edit tool — VFS write triggers IDE file-change notification immediately:

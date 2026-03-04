@@ -64,6 +64,33 @@ writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
 
 ---
 
+## ❌ BANNED: ProcessBuilder for Builds and Tests
+
+**`ProcessBuilder("./mvnw", ...)` and `ProcessBuilder("./gradlew", ...)` inside `steroid_execute_code` are BANNED** for build and test execution.
+
+**Why it's harmful:**
+- Spawns an external child process from within IntelliJ's JVM — bypasses all IDE process management
+- Causes classpath conflicts (child Maven/Gradle inherits IDE's classpath)
+- Produces 200k+ character output → MCP token limit overflow → lost agent turns
+- Prevents IntelliJ from tracking the build lifecycle
+
+**What's allowed instead:**
+
+| Task | Use instead of ProcessBuilder |
+|------|-------------------------------|
+| Run Maven tests | `MavenRunConfigurationType.runConfiguration()` |
+| Run Gradle tests | `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` |
+| Maven re-import after pom.xml edit | `MavenProjectsManager.scheduleUpdateAllMavenProjects()` + `Observation.awaitConfiguration()` |
+| Check Docker availability | `ProcessBuilder("docker", "info")` ✅ OK — no IntelliJ API exists for this |
+| `dependency:resolve` workaround | `MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()` |
+
+**ProcessBuilder("./mvnw") is permitted ONLY when:**
+1. pom.xml was just modified in this session, AND
+2. Maven sync was already triggered (`scheduleUpdateAllMavenProjects` + `awaitConfiguration`), AND
+3. `MavenRunConfigurationType.runConfiguration()` with `dialog_killer: true` has already timed out (>2 min)
+
+---
+
 ## ⚠️ Do NOT Configure JDKs/SDKs or Install Plugins
 
 This environment is pre-configured with the correct JDK and all required plugins. Do NOT call `ProjectJdkTable`, search hardcoded JVM paths, or attempt any JDK/SDK configuration — these calls either throw at runtime or silently do nothing, wasting a turn. Do NOT attempt `PluginsAdvertiser`, `PluginInstaller`, `PluginManagerCore` write APIs, or reflection-based plugin installation.

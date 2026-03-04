@@ -556,7 +556,11 @@ if (cmdClass != null) {
 ```
 ---
 
-## Docker-Unavailable Fallback: Compile Verification When Tests Cannot Run
+## Docker-Unavailable Fallback — ⚠️ EXCEPTION: ProcessBuilder Last Resort
+
+> **⚠️ EXCEPTION — ProcessBuilder is used below ONLY because no IntelliJ API can detect a Docker socket failure.**
+> For routine Maven test runs, use `MavenRunConfigurationType.runConfiguration()` or `MavenRunner` instead.
+> See `mcp-steroid://skill/execute-code-maven` for the correct primary patterns.
 
 When `./mvnw test` fails with `Could not find a valid Docker environment` or a `DockerException`,
 Testcontainers cannot start the database container. Your code changes may be correct even though
@@ -564,7 +568,7 @@ no test passed. Use this two-step verification:
 
 **Step 1 — Confirm it is a Docker-only failure** (not a compile or logic error):
 ```kotlin
-// Run this after a test failure to determine whether Docker is the sole blocker:
+// ⚠️ EXCEPTION: Docker-unavailable fallback only — use MavenRunConfigurationType.runConfiguration() for routine tests
 val proc = ProcessBuilder("./mvnw", "test", "-Dtest=MyIntegrationTest", "-Dspotless.check.skip=true")
     .directory(java.io.File(project.basePath!!)).redirectErrorStream(true).start()
 val lines = proc.inputStream.bufferedReader().readLines()
@@ -575,7 +579,7 @@ println(lines.takeLast(20).joinToString("\n"))
 ```
 **Step 2 — Verify compilation separately** (only when step 1 confirms Docker is the sole blocker):
 ```kotlin
-// Verify compile with test-compile (faster than full test, no Docker needed):
+// ⚠️ EXCEPTION: Docker-unavailable fallback only — use MavenRunConfigurationType.runConfiguration() for routine tests
 val proc = ProcessBuilder("./mvnw", "test-compile", "-Dspotless.check.skip=true")
     .directory(java.io.File(project.basePath!!)).redirectErrorStream(true).start()
 val lines = proc.inputStream.bufferedReader().readLines()

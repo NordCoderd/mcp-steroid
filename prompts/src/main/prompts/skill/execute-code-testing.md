@@ -40,9 +40,30 @@ else problems.forEach { (id, descs) -> descs.forEach { println("[$id] ${it.descr
 
 ---
 
+## Maven Patterns Reference
+
+For Maven-specific patterns (MavenRunner, MavenRunnerParameters, Maven sync after pom.xml changes), see `mcp-steroid://skill/execute-code-maven`.
+
+---
+
+## ❌ BANNED: Do NOT Use ProcessBuilder for Routine Maven/Gradle Builds or Tests
+
+**ProcessBuilder("./mvnw", ...)** spawns a child process inside IntelliJ's JVM — this bypasses IDE process management, causes classpath conflicts, and produces 200k+ char output that overflows MCP token limits.
+
+**Allowed alternatives (in priority order):**
+1. **Maven IDE runner** — `MavenRunConfigurationType.runConfiguration()` (see below) — structured pass/fail, no token overflow
+2. **Gradle IDE runner** — `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` (see below)
+3. **ProcessBuilder("./mvnw")** — ONLY when pom.xml was just modified AND the IDE runner's SMTRunnerEventsListener latch has already timed out
+
+**ProcessBuilder("docker", "info")** is acceptable — there is no IntelliJ API for checking Docker availability.
+
+---
+
 ## ⭐ PRIMARY: Maven IDE Runner — Structured Pass/Fail, No Token Overflow
 
-Use this for Maven test execution when pom.xml was NOT modified in this session. Always pass `dialog_killer: true` on the `steroid_execute_code` call to auto-dismiss modals:
+**⚠️ Do NOT use ProcessBuilder("./mvnw") for routine test runs — use this IDE runner instead.**
+
+Use this for Maven test execution. Always pass `dialog_killer: true` on the `steroid_execute_code` call to auto-dismiss modals:
 
 ```kotlin[IU]
 import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
@@ -81,9 +102,15 @@ println("Maven IDE runner: passed=$mvnPassed")
 
 ---
 
-## ⚠️ FALLBACK: ProcessBuilder("./mvnw") — Use ONLY When pom.xml Was Just Modified
+## ⚠️ LAST-RESORT FALLBACK: ProcessBuilder("./mvnw") — Two Conditions Must BOTH Be True
 
-After pom.xml changes, IntelliJ triggers a Maven re-import dialog that blocks the IDE runner latch for up to 600s:
+**Only use ProcessBuilder("./mvnw") when ALL of the following are true:**
+1. You just modified `pom.xml` in this session (IDE re-import dialog may block the runner latch), AND
+2. The Maven IDE runner (`MavenRunConfigurationType.runConfiguration()`) has already timed out or failed
+
+**If pom.xml was NOT modified: use the Maven IDE runner above — do NOT use ProcessBuilder.**
+
+After pom.xml changes, IntelliJ triggers a Maven re-import dialog that blocks the IDE runner latch for up to 600s. First try: `MavenRunConfigurationType.runConfiguration()` with `dialog_killer: true`. If the latch times out after 2 minutes, only then use ProcessBuilder:
 ```kotlin
 // ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed
 // ⚠️ CRITICAL: Spring Boot test output routinely exceeds 200k chars. NEVER print untruncated output.

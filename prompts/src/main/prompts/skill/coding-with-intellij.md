@@ -29,3 +29,17 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 | Reading files with `cat` | VFS and PSI APIs | Respects IDE's caching |
 | Manual text replacement | Refactoring APIs | Maintains code correctness |
 | Guessing code structure | Query project model | IDE has already indexed everything |
+| **`ProcessBuilder("./mvnw", "test", ...)`** | `MavenRunConfigurationType.runConfiguration()` | **❌ BANNED** — spawns child JVM process causing classpath conflicts + 200k char token overflow |
+| **`ProcessBuilder("./gradlew", "test", ...)`** | `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` | **❌ BANNED** — same reason; nested Gradle daemon inside IDE JVM |
+| **`ProcessBuilder("./mvnw", "dependency:resolve")`** | `MavenProjectsManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles()` | **❌ BANNED** — use IDE Maven sync API |
+
+## ❌ BANNED Anti-Patterns: ProcessBuilder for Builds
+
+**Never use `ProcessBuilder("./mvnw", ...)` or `ProcessBuilder("./gradlew", ...)` inside `steroid_execute_code`** for build or test execution. These patterns bypass IntelliJ's process management, cause classpath conflicts, and produce output that overflows MCP token limits.
+
+**Allowed ProcessBuilder uses** (no IntelliJ API equivalent):
+- `ProcessBuilder("docker", "info")` — check Docker availability
+- `ProcessBuilder("which", "docker")` — check if binary exists
+- `ProcessBuilder("git", "diff", ...)` — git operations (use ChangeListManager when possible)
+
+See [execute-code-overview](mcp-steroid://skill/execute-code-overview) for the full banned list and replacements.
