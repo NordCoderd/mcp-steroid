@@ -118,6 +118,9 @@ class ArenaTestRunner(
         appendLine("- Build system: **${testCase.buildSystem}**")
         appendLine("- Use the project wrapper only: `$buildWrapper`")
         appendLine("- Test-class command template: `$runClassCommand`")
+        if (testCase.buildSystem == "maven") {
+            appendLine("- **NEVER use `$buildWrapper install -am`** (also-make). The `-am` flag builds ALL upstream dependencies (potentially 48+ modules) and causes OOM in the container. Install only what you need: `$buildWrapper install -pl <module> -DskipTests`.")
+        }
         appendLine("- Check Docker once at start (`docker info`) **only if the FAIL_TO_PASS tests use `@Testcontainers`, extend `AbstractIT`/`IntegrationTest`, or mention Docker**. For pure file-creation scenarios (just new Java classes/records needed), skip the Docker check entirely — it adds 10-15s with no benefit.")
         appendLine("- If Docker is unavailable, **still attempt to run FAIL_TO_PASS tests** — many use H2 in-memory DB and work fine without Docker.")
         appendLine("  - Run the target test class: `$runClassCommand`")
