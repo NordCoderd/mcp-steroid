@@ -24,8 +24,8 @@ Combine readiness + Docker + VCS discovery in ONE call instead of 3 separate cal
 // Recommended FIRST exec_code call for any Spring Boot / Maven task:
 println("Project: ${project.name}")
 println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
-val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
-val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
+// Check Docker socket directly — no process spawn needed
+val dockerOk = java.io.File("/var/run/docker.sock").exists()
 println("Docker: $dockerOk")
 val changes = readAction {
     com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)

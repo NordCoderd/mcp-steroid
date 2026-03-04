@@ -38,8 +38,11 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 **Never use `ProcessBuilder("./mvnw", ...)` or `ProcessBuilder("./gradlew", ...)` inside `steroid_execute_code`** for build or test execution. These patterns bypass IntelliJ's process management, cause classpath conflicts, and produce output that overflows MCP token limits.
 
 **Allowed ProcessBuilder uses** (no IntelliJ API equivalent):
-- `ProcessBuilder("docker", "info")` — check Docker availability
-- `ProcessBuilder("which", "docker")` — check if binary exists
 - `ProcessBuilder("git", "diff", ...)` — git operations (use ChangeListManager when possible)
+
+**Docker availability** — check the socket directly, no process spawn needed:
+```kotlin
+val dockerOk = java.io.File("/var/run/docker.sock").exists()
+```
 
 See [execute-code-overview](mcp-steroid://skill/execute-code-overview) for the full banned list and replacements.

@@ -4,6 +4,8 @@ Use this when an integration test is running (or paused) inside Docker and you n
 
 ```kotlin
 import java.io.File
+import com.intellij.execution.configurations.GeneralCommandLine
+import com.intellij.execution.process.CapturingProcessHandler
 
 // Locate the most recent test session written by the integration test factory.
 // Sessions are stored under test-integration/build/test-logs/test/<run-dir>/session-info.txt
@@ -19,17 +21,17 @@ fun parseSessionInfo(dir: File): Map<String, String>? {
         .associate { it.substringBefore('=') to it.substringAfter('=') }
 }
 
+// ⚠️ NOTE: docker inspect/exec for container management has no IntelliJ API equivalent.
+// For simple availability check, prefer: java.io.File("/var/run/docker.sock").exists()
 fun isContainerRunning(containerId: String): Boolean {
-    val proc = ProcessBuilder("docker", "inspect", "--format={{.State.Running}}", containerId)
-        .redirectErrorStream(true).start()
-    proc.waitFor(5, java.util.concurrent.TimeUnit.SECONDS)
-    return proc.inputStream.bufferedReader().readText().trim() == "true"
+    val cl = GeneralCommandLine("docker", "inspect", "--format={{.State.Running}}", containerId).apply { redirectErrorStream = true }
+    val output = CapturingProcessHandler(cl).runProcess(5_000)
+    return output.stdout.trim() == "true"
 }
 
 fun dockerExec(containerId: String, display: String, cmd: String) {
-    ProcessBuilder("docker", "exec", containerId, "bash", "-c", "DISPLAY=$display $cmd")
-        .redirectErrorStream(true).start()
-        .waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
+    val cl = GeneralCommandLine("docker", "exec", containerId, "bash", "-c", "DISPLAY=$display $cmd").apply { redirectErrorStream = true }
+    CapturingProcessHandler(cl).runProcess(10_000)
 }
 
 // Find the latest running session

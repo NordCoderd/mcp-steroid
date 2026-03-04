@@ -55,7 +55,7 @@ For Maven-specific patterns (MavenRunner, MavenRunnerParameters, Maven sync afte
 2. **Gradle IDE runner** — `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` (see below)
 3. **ProcessBuilder("./mvnw")** — ONLY when pom.xml was just modified AND the IDE runner's SMTRunnerEventsListener latch has already timed out
 
-**ProcessBuilder("docker", "info")** is acceptable — there is no IntelliJ API for checking Docker availability.
+**ProcessBuilder("docker", ...)** is BANNED — use `java.io.File("/var/run/docker.sock").exists()` for Docker availability checks (no process spawn needed).
 
 ---
 
@@ -135,8 +135,8 @@ println(lines.takeLast(30).joinToString("\n"))
 
 ## Docker Pre-Check — Run Proactively When Tests Use @Testcontainers
 ```kotlin
-val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
-val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
+// Check Docker socket directly — no process spawn needed
+val dockerOk = java.io.File("/var/run/docker.sock").exists()
 println("Docker available: $dockerOk")
 // If ALL FAIL_TO_PASS tests contain @Import(TestcontainersConfiguration.class)
 //   OR extend AbstractIT/AbstractITBase/IntegrationTest, AND dockerOk=false →

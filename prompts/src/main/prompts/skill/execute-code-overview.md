@@ -81,7 +81,7 @@ writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
 | Run Maven tests | `MavenRunConfigurationType.runConfiguration()` |
 | Run Gradle tests | `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` |
 | Maven re-import after pom.xml edit | `MavenProjectsManager.scheduleUpdateAllMavenProjects()` + `Observation.awaitConfiguration()` |
-| Check Docker availability | `ProcessBuilder("docker", "info")` ✅ OK — no IntelliJ API exists for this |
+| Check Docker availability | `java.io.File("/var/run/docker.sock").exists()` — no process spawn needed |
 | `dependency:resolve` workaround | `MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()` |
 
 **ProcessBuilder("./mvnw") is permitted ONLY when:**

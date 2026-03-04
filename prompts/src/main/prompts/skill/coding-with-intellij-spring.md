@@ -13,8 +13,8 @@ This saves ~60s (3 round-trips × ~20s each) and gives you everything you need t
 // Recommended FIRST exec_code call — do NOT split into 3 separate calls:
 println("Project: ${project.name}, base: ${project.basePath}")
 println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
-val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
-val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
+// Check Docker socket directly — no process spawn needed
+val dockerOk = java.io.File("/var/run/docker.sock").exists()
 println("Docker: $dockerOk")
 val changes = readAction {
     com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
@@ -87,8 +87,7 @@ import com.intellij.openapi.vfs.VfsUtil
 // Call 1: readiness + Docker + VCS + test file content in ONE call
 println("Project: ${project.name}, base: ${project.basePath}")
 println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
-val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
-println("Docker: ${dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0}")
+println("Docker: ${java.io.File("/var/run/docker.sock").exists()}")
 // VCS check
 val changes = readAction {
     com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)
@@ -1203,7 +1202,8 @@ data class TestOutcome(
 }
 
 fun runMavenTest(testClass: String, timeoutSec: Long = 180): TestOutcome {
-    val process = ProcessBuilder("./mvnw", "test", "-Dtest=$testClass", "-q")
+    // ⚠️ LAST-RESORT FALLBACK — do NOT use -q: it suppresses "Tests run:" summary
+    val process = ProcessBuilder("./mvnw", "test", "-Dtest=$testClass", "-Dspotless.check.skip=true")
         .directory(File(project.basePath!!))
         .redirectErrorStream(true)
         .start()
@@ -1414,7 +1414,7 @@ println("Test started — check IDE Test Results window")
 // ⚠️ LAST-RESORT FALLBACK — use MavenRunConfigurationType.runConfiguration() instead when possible
 // ⚠️ Always use ./mvnw (Maven wrapper) not 'mvn' — system mvn is not installed in arena environments
 // ⚠️ NEVER print process.inputStream.bufferedReader().readText() — Spring Boot output can be 200k+ chars
-val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-Dspotless.check.skip=true", "-q")
+val process = ProcessBuilder("./mvnw", "test", "-Dtest=MyValidatorTest", "-Dspotless.check.skip=true")
     .directory(java.io.File(project.basePath!!))
     .redirectErrorStream(true).start()
 val lines = process.inputStream.bufferedReader().readLines()
@@ -1454,7 +1454,7 @@ println(lines.takeLast(30).joinToString("\n"))
 ```kotlin
 // Keyword-filtered Maven output — use when verbose Spring Boot output exceeds MCP token limit
 // even after take(30)+takeLast(30). Prevents multi-step Bash parsing recovery (saves 3-5 turns).
-val process = ProcessBuilder("./mvnw", "test", "-Dtest=OnlyOneTestClass", "-Dspotless.check.skip=true", "-q")
+val process = ProcessBuilder("./mvnw", "test", "-Dtest=OnlyOneTestClass", "-Dspotless.check.skip=true")
     .directory(java.io.File(project.basePath!!)).redirectErrorStream(true).start()
 val lines = process.inputStream.bufferedReader().readLines()
 val completed = process.waitFor(180, java.util.concurrent.TimeUnit.SECONDS)
@@ -1470,7 +1470,7 @@ lines.takeLast(15).forEach(::println)
 
 Similarly for `test-compile` (project-wide dependency check, faster than full test run):
 ```kotlin
-val process = ProcessBuilder("./mvnw", "test-compile", "-Dspotless.check.skip=true", "-q")
+val process = ProcessBuilder("./mvnw", "test-compile", "-Dspotless.check.skip=true")
     .directory(java.io.File(project.basePath!!))
     .redirectErrorStream(true).start()
 val lines = process.inputStream.bufferedReader().readLines()
@@ -1527,7 +1527,7 @@ println("Gradle result: success=$gradleSuccess")
 ```
 
 > If the IDE runner is not available or times out, use the Bash tool **outside exec_code**:
-> `./gradlew :api:test --tests "com.example.api.ProductControllerTest" --no-daemon -q`
+> `./gradlew :api:test --tests "com.example.api.ProductControllerTest" --no-daemon`
 > Do NOT use ProcessBuilder inside exec_code for this.
 
 ### Run Gradle Tests via ProcessBuilder — ❌ BANNED inside exec_code
@@ -1548,6 +1548,8 @@ For **Gradle** projects, use `./gradlew` with `--tests` for targeted test class 
 > **⚠️ UP-TO-DATE false-positive after writing new files**: After creating new source files via `writeAction { VfsUtil.saveText(...) }`, Gradle may report the test task as `UP-TO-DATE` and skip executing tests entirely — yet still exit with code 0 and print `BUILD SUCCESSFUL`. The task inputs appear unchanged from Gradle's perspective because the compilation cache was not invalidated. **Always add `--rerun-tasks` to the FIRST Gradle test invocation after writing new source files.** If you see `BUILD SUCCESSFUL` with no `Tests run:` line in the output, add `--rerun-tasks` and rerun.
 
 ```kotlin
+// ⚠️ BANNED inside steroid_execute_code — use ExternalSystemUtil.runTask() instead (see PRIMARY section above)
+// Retained for reference only — DO NOT COPY INTO exec_code
 // Run a specific test class in a specific Gradle submodule
 // ⚠️ After writing new source files: ALWAYS add --rerun-tasks to the first test run
 // to avoid the UP-TO-DATE false-positive (Gradle skips tests silently, exits 0)
@@ -1568,8 +1570,10 @@ println(lines.takeLast(30).joinToString("\n"))
 ```
 
 ```kotlin
+// ⚠️ BANNED inside steroid_execute_code — use ExternalSystemUtil.runTask() instead (see PRIMARY section above)
+// Retained for reference only — DO NOT COPY INTO exec_code
 // Run ALL tests in a module (when no specific class is needed):
-val proc = ProcessBuilder("./gradlew", ":product-service:test", "--no-daemon", "-q")
+val proc = ProcessBuilder("./gradlew", ":product-service:test", "--no-daemon")
     .directory(java.io.File(project.basePath!!))
     .redirectErrorStream(true).start()
 val lines = proc.inputStream.bufferedReader().readLines()
@@ -1602,9 +1606,9 @@ val dockerEnv = System.getenv().filter { (k, _) ->
 }
 println("Docker/TC env vars: $dockerEnv")
 println("docker.sock exists: ${java.io.File("/var/run/docker.sock").exists()}")
-val dockerBin = try {
-    ProcessBuilder("which", "docker").start().inputStream.bufferedReader().readText().trim()
-} catch (e: Exception) { "not found: $e" }
+// Check docker binary using native File.exists() — no process spawn needed
+val dockerBin = listOf("/usr/bin/docker", "/usr/local/bin/docker", "/opt/homebrew/bin/docker")
+    .firstOrNull { java.io.File(it).exists() } ?: "not found"
 println("docker binary: $dockerBin")
 println("dockerd exists: ${java.io.File("/usr/bin/dockerd").exists() || java.io.File("/usr/local/bin/dockerd").exists()}")
 println("podman exists: ${java.io.File("/usr/bin/podman").exists()}")
@@ -1622,8 +1626,8 @@ println("PATH: ${System.getenv("PATH")}")
 // STEP ZERO: combine IDE probe + Docker check in one call (before any implementation)
 println("Project: ${project.name} @ ${project.basePath}")
 println("Smart mode: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
-val dp = ProcessBuilder("docker", "info").redirectErrorStream(true).start()
-val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0
+// Check Docker socket directly — no process spawn needed
+val dockerOk = java.io.File("/var/run/docker.sock").exists()
 println("Docker available: $dockerOk")
 // Decision based on result:
 // dockerOk=true  → proceed normally; run @Testcontainers tests as final verification
@@ -1650,7 +1654,7 @@ environmental, not patch-specific.
 import java.io.File
 
 fun runSingleMavenTest(testClass: String): List<String> {
-    val process = ProcessBuilder("./mvnw", "test", "-Dtest=$testClass", "-q")
+    val process = ProcessBuilder("./mvnw", "test", "-Dtest=$testClass", "-Dspotless.check.skip=true")
         .directory(File(project.basePath!!))
         .redirectErrorStream(true)
         .start()

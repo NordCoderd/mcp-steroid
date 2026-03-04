@@ -42,19 +42,19 @@ class ReferencesSearchPromptTest {
         console.writeStep(1, "Building prompt for ReferencesSearch find-usages")
 
         val prompt = buildString {
-            appendLine("# Task: Find all usages of a method in the project using PSI")
+            appendLine("# Task: Find all usages of a function in the project using PSI")
             appendLine()
-            appendLine("Use `steroid_execute_code` to find all usages of any public method")
-            appendLine("in the class `DemoByJonnyzzz` in the project.")
+            appendLine("Use `steroid_execute_code` to find all usages of the `leaderboard` function")
+            appendLine("defined in `DemoByJonnyzzz.kt` in package `com.jonnyzzz.mcpSteroid.demo`.")
             appendLine()
             appendLine("Read `mcp-steroid://skill/coding-with-intellij-psi` for the correct find-usages pattern.")
             appendLine("Use `ReferencesSearch.search()` — do NOT grep source files or use the Glob tool.")
             appendLine()
             appendLine("Steps:")
-            appendLine("1. Find the class `DemoByJonnyzzz` using KotlinClassShortNameIndex or JavaPsiFacade.")
-            appendLine("2. Pick any one of its public methods.")
-            appendLine("3. Call `ReferencesSearch.search(method, projectScope()).findAll()` to get usages.")
-            appendLine("4. Print the count and locations of usages found.")
+            appendLine("1. Find the `leaderboard` Kt named function using FilenameIndex to locate the file,")
+            appendLine("   then navigate to it via PSI (KtFile → children → KtNamedFunction named 'leaderboard').")
+            appendLine("2. Call `ReferencesSearch.search(leaderboardFn, GlobalSearchScope.projectScope(project)).findAll()` to get usages.")
+            appendLine("3. Print the count and locations of usages found.")
             appendLine()
             appendLine("## Required Output")
             appendLine()
@@ -94,7 +94,7 @@ class ReferencesSearchPromptTest {
                 appendLine("Agent must use ReferencesSearch.search() inside steroid_execute_code.")
                 appendLine()
                 appendLine("Expected: 'ReferencesSearch' in exec_code body.")
-                appendLine("Got: ReferencesSearch used = false")
+                appendLine("Got: ReferencesSearch used = $usedReferencesSearch")
                 appendLine()
                 appendLine("The prompts in coding-with-intellij-psi.md need to explicitly steer agents")
                 appendLine("toward ReferencesSearch.search() instead of file grepping.")
@@ -123,6 +123,6 @@ class ReferencesSearchPromptTest {
         console.writeSuccess("Agent used ReferencesSearch for find-usages")
         console.writeHeader("PASSED")
 
-        println("[TEST] Claude used ReferencesSearch.search() to find usages of a DemoByJonnyzzz method")
+        println("[TEST] Claude used ReferencesSearch.search() to find usages of the leaderboard function")
     }
 }

@@ -42,13 +42,14 @@ class PsiClassLookupPromptTest {
         console.writeStep(1, "Building prompt for PSI class lookup")
 
         val prompt = buildString {
-            appendLine("# Task: Find a Kotlin class and list its methods using PSI")
+            appendLine("# Task: Find a Kotlin data class and list its methods using PSI")
             appendLine()
-            appendLine("Use `steroid_execute_code` to find the class named `DemoByJonnyzzz` in the project.")
+            appendLine("Use `steroid_execute_code` to find the class named `Player` in the project.")
+            appendLine("It is a Kotlin data class in `com.jonnyzzz.mcpSteroid.demo`.")
             appendLine("List all its public methods with their signatures.")
             appendLine()
             appendLine("Read `mcp-steroid://skill/coding-with-intellij-psi` for the correct PSI class lookup pattern.")
-            appendLine("Use `JavaPsiFacade.getInstance(project).findClass()` or `KotlinClassShortNameIndex.get()`")
+            appendLine("Use `JavaPsiFacade.getInstance(project).findClass()` or `KotlinClassShortNameIndex`")
             appendLine("— do NOT grep source files or use the Glob tool.")
             appendLine()
             appendLine("## Required Output")
@@ -123,6 +124,6 @@ class PsiClassLookupPromptTest {
         console.writeSuccess("Agent used PSI API for class lookup")
         console.writeHeader("PASSED")
 
-        println("[TEST] Claude used PSI class lookup API ($lookupApi) to find DemoByJonnyzzz")
+        println("[TEST] Claude used PSI class lookup API ($lookupApi) to find Player")
     }
 }
