@@ -25,6 +25,7 @@ Combine readiness + Docker + VCS discovery in ONE call instead of 3 separate cal
 println("Project: ${project.name}")
 println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
 // Check Docker socket directly — no process spawn needed
+// ❌ GeneralCommandLine("docker", ...) inside exec_code is BANNED — use Bash tool for docker inspect/exec
 val dockerOk = java.io.File("/var/run/docker.sock").exists()
 println("Docker: $dockerOk")
 val changes = readAction {

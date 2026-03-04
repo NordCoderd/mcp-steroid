@@ -82,7 +82,10 @@ writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
 | Run Gradle tests | `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` |
 | Maven re-import after pom.xml edit | `MavenProjectsManager.scheduleUpdateAllMavenProjects()` + `Observation.awaitConfiguration()` |
 | Check Docker availability | `java.io.File("/var/run/docker.sock").exists()` — no process spawn needed |
+| Docker inspect/exec operations | **Bash tool** (outside exec_code) — e.g. `docker inspect`, `docker exec` |
 | `dependency:resolve` workaround | `MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()` |
+
+**`GeneralCommandLine("docker", ...)` and `ProcessBuilder("docker", ...)` inside exec_code are BANNED** — same reason as `./mvnw`: child process inside IDE JVM causes classpath conflicts. Use the Bash tool outside exec_code instead.
 
 **ProcessBuilder("./mvnw") is permitted ONLY when:**
 1. pom.xml was just modified in this session, AND

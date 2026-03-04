@@ -55,7 +55,9 @@ For Maven-specific patterns (MavenRunner, MavenRunnerParameters, Maven sync afte
 2. **Gradle IDE runner** — `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` (see below)
 3. **ProcessBuilder("./mvnw")** — ONLY when pom.xml was just modified AND the IDE runner's SMTRunnerEventsListener latch has already timed out
 
-**ProcessBuilder("docker", ...)** is BANNED — use `java.io.File("/var/run/docker.sock").exists()` for Docker availability checks (no process spawn needed).
+**`GeneralCommandLine("docker", ...)` and `ProcessBuilder("docker", ...)` inside exec_code are BANNED** — same reason as `./mvnw`: they spawn a child process inside IntelliJ's JVM.
+- Docker socket availability: `java.io.File("/var/run/docker.sock").exists()` (no process spawn needed)
+- Docker CLI operations (inspect, exec, etc.): use the **Bash tool** outside exec_code
 
 ---
 

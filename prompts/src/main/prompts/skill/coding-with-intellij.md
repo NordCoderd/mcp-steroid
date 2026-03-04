@@ -45,4 +45,9 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 val dockerOk = java.io.File("/var/run/docker.sock").exists()
 ```
 
+**Docker CLI operations** (inspect, exec, etc.) — use the **Bash tool** outside exec_code:
+- `GeneralCommandLine("docker", ...)` inside exec_code is **BANNED** — same as ProcessBuilder
+- ✅ `docker inspect --format='{{.State.Running}}' <id>` → Bash tool
+- ✅ `docker exec <id> bash -c "..."` → Bash tool
+
 See [execute-code-overview](mcp-steroid://skill/execute-code-overview) for the full banned list and replacements.

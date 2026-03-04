@@ -4,8 +4,6 @@ Use this when an integration test is running (or paused) inside Docker and you n
 
 ```kotlin
 import java.io.File
-import com.intellij.execution.configurations.GeneralCommandLine
-import com.intellij.execution.process.CapturingProcessHandler
 
 // Locate the most recent test session written by the integration test factory.
 // Sessions are stored under test-integration/build/test-logs/test/<run-dir>/session-info.txt
@@ -21,30 +19,24 @@ fun parseSessionInfo(dir: File): Map<String, String>? {
         .associate { it.substringBefore('=') to it.substringAfter('=') }
 }
 
-// ⚠️ NOTE: docker inspect/exec for container management has no IntelliJ API equivalent.
-// For simple availability check, prefer: java.io.File("/var/run/docker.sock").exists()
-fun isContainerRunning(containerId: String): Boolean {
-    val cl = GeneralCommandLine("docker", "inspect", "--format={{.State.Running}}", containerId).withRedirectErrorStream(true)
-    val output = CapturingProcessHandler(cl).runProcess(5_000)
-    return output.stdout.trim() == "true"
-}
+// ❌ DO NOT use GeneralCommandLine("docker", ...) or ProcessBuilder("docker", ...) inside exec_code.
+//    These spawn a child process inside IntelliJ's JVM — same banned pattern as ProcessBuilder("./mvnw").
+// ✅ For docker inspect / docker exec: use the Bash tool OUTSIDE exec_code.
+// ✅ Docker socket availability check (no process spawn needed):
+val dockerAvailable = java.io.File("/var/run/docker.sock").exists()
+println("Docker socket available: $dockerAvailable")
 
-fun dockerExec(containerId: String, display: String, cmd: String) {
-    val cl = GeneralCommandLine("docker", "exec", containerId, "bash", "-c", "DISPLAY=$display $cmd").withRedirectErrorStream(true)
-    CapturingProcessHandler(cl).runProcess(10_000)
-}
-
-// Find the latest running session
+// Find the latest session with a session-info.txt file
 val session = sessionsRoot.listFiles()
     ?.filter { it.isDirectory && File(it, "session-info.txt").exists() }
     ?.sortedByDescending { it.lastModified() }
     ?.firstNotNullOfOrNull { dir ->
         val props = parseSessionInfo(dir) ?: return@firstNotNullOfOrNull null
         val containerId = props["CONTAINER_ID"] ?: return@firstNotNullOfOrNull null
-        if (!isContainerRunning(containerId)) return@firstNotNullOfOrNull null
+        if (containerId.isBlank()) return@firstNotNullOfOrNull null
         dir to props
     }
-    ?: error("No running test session found. Start an integration test first.\nLooked in: $sessionsRoot")
+    ?: error("No test session found. Start an integration test first.\nLooked in: $sessionsRoot")
 
 val (runDir, props) = session
 val containerId = props["CONTAINER_ID"]!!
@@ -58,25 +50,14 @@ println("Display  : $display")
 println("MCP      : $mcpUrl")
 println("Video    : $videoUrl")
 println()
-
-// Take a screenshot — saved to the mounted run directory, readable via the Read tool
-val screenshotDir = File(runDir, "screenshot").also { it.mkdirs() }
-val screenshotName = "debug-${System.currentTimeMillis()}.png"
-val containerPath = "/mcp-run-dir/screenshot/$screenshotName"
-val scrotResult = ProcessBuilder(
-    "docker", "exec", containerId, "bash", "-c",
-    "DISPLAY=$display scrot $containerPath 2>&1"
-).redirectErrorStream(true).start()
-scrotResult.waitFor(10, java.util.concurrent.TimeUnit.SECONDS)
-val scrotOut = scrotResult.inputStream.bufferedReader().readText()
-if (scrotResult.exitValue() != 0) println("scrot warning: $scrotOut")
-val hostScreenshot = File(runDir, "screenshot/$screenshotName")
-println("Screenshot: $hostScreenshot")
-println("(Use the Read tool to view the image)")
+println("=== Use the Bash tool for Docker operations ===")
+println("Check running : docker inspect --format='{{.State.Running}}' $containerId")
+println("Screenshot    : docker exec $containerId bash -c 'DISPLAY=$display scrot /mcp-run-dir/screenshot/debug-\$(date +%s).png 2>&1'")
+println("Keyboard input: docker exec $containerId bash -c 'DISPLAY=$display xdotool key ctrl+shift+a'")
+println("Mouse click   : docker exec $containerId bash -c 'DISPLAY=$display xdotool mousemove --sync 800 400 && xdotool click 1'")
 println()
-
-// Keyboard input: dockerExec(containerId, display, "xdotool key ctrl+shift+a")
-// Mouse click:    dockerExec(containerId, display, "xdotool mousemove --sync 800 400 && xdotool click 1")
+println("Screenshot files land in: $runDir/screenshot/")
+println("(Use the Read tool to view PNG images)")
 ```
 
 # See also
