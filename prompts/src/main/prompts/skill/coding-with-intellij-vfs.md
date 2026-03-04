@@ -169,9 +169,31 @@ VfsUtil.markDirtyAndRefresh(false, true, true,
 
 ---
 
-### Create Java/Kotlin Source Files (Preferred Pattern)
+### Create Java/Kotlin Source Files
 
-Use `VfsUtil.createDirectoryIfMissing` + `VfsUtil.saveText` — safer than shell heredocs and atomic.
+> **⚠️ PERFORMANCE: Prefer the Write tool or Bash over VFS file creation inside steroid_execute_code.**
+> Creating files via `writeAction { VfsUtil.createDirectoryIfMissing ... VfsUtil.saveText }` measured
+> **+47% slower** than using the Write tool or Bash directly (A/B runs: 533s vs 361s for microshop-2).
+> IntelliJ adds value for PSI navigation, Maven runner, compilation checks — NOT for writing files.
+>
+> **When to use VFS file creation (steroid_execute_code):**
+> - You need to create a file AND immediately read it back with PSI in the SAME call
+> - You need the VFS to register the file for an in-progress writeAction sequence
+>
+> **When to use Write tool / Bash (preferred for plain file creation):**
+> - Creating new source files, config files, SQL migrations, test fixtures
+> - Writing multiple files in bulk — Write tool has zero JVM overhead
+> - Any file creation not immediately followed by PSI operations in the same call
+>
+> After creating files with the Write tool/Bash, refresh VFS before using them with PSI:
+> ```kotlin
+> VfsUtil.markDirtyAndRefresh(false, true, true,
+>     LocalFileSystem.getInstance().findFileByPath(project.basePath!!)
+> )
+> ```
+
+Use `VfsUtil.createDirectoryIfMissing` + `VfsUtil.saveText` only when creating files inside
+steroid_execute_code is necessary (e.g., PSI operations follow immediately in the same call).
 
 **⚠️ ALL VFS mutation ops need writeAction**: `createChildData()`, `createChildFile()`, `createChildDirectory()`, `delete()`, `rename()`, `move()`, and `saveText()` ALL require writeAction. `createDirectoryIfMissing(VirtualFile parent, String relative)` also requires writeAction — use this overload inside writeAction. Note: `createDirectoryIfMissing(String absolutePath)` self-acquires a write lock internally (safe to call outside writeAction, but DO NOT call it inside writeAction). Put the ENTIRE create-directory-and-write sequence inside a SINGLE writeAction block using the VirtualFile overload:
 

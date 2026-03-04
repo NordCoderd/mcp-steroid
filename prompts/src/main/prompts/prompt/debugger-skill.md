@@ -26,9 +26,9 @@ Use IntelliJ debugger APIs from `steroid_execute_code` to control debug sessions
 IntelliJ API code with correct imports that you can directly adapt and pass to `steroid_execute_code`.
 Do NOT invent your own API calls -- the IntelliJ debugger API has tricky callback patterns.
 
-## Stateful exec_code workflow
+## Stateful steroid_execute_code workflow
 
-`exec_code` is stateful. Split debugger work into multiple short calls:
+`steroid_execute_code` is stateful. Split debugger work into multiple short calls:
 
 - Call #1: set breakpoints
 - Call #2: create run config (if needed) + start debug run

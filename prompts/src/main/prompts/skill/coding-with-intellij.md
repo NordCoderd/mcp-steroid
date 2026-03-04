@@ -19,19 +19,29 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 
 ## Quick Reference
 
-**The IDE knows the code better than any file search tool.**
+**The IDE knows the code better than any file search tool. Use it only where it adds value.**
 
-| Instead of... | Use IntelliJ API | Why? |
-|--------------|------------------|------|
-| `Glob("**/*.java")`, `Glob("**/*.yaml")` (extension scan) | `FilenameIndex.getAllFilesByExt(project, "java", scope)` via exec_code | O(1) IDE-indexed lookup vs O(n) filesystem scan; Glob is unreliable inside the container |
-| `Glob("**/UserService.java")` (exact filename) | `FilenameIndex.getVirtualFilesByName("UserService.java", scope)` via exec_code | O(1) IDE-indexed lookup vs O(n) filesystem scan |
-| `grep`, `find` | PSI search, Find Usages | Understands code structure |
-| Reading files with `cat` | VFS and PSI APIs | Respects IDE's caching |
+| Operation | Use IntelliJ API (steroid_execute_code) | Why? |
+|-----------|------------------------------|------|
+| Find files by extension | `FilenameIndex.getAllFilesByExt(project, "java", scope)` | O(1) indexed vs O(n) filesystem scan |
+| Find file by exact name | `FilenameIndex.getVirtualFilesByName("UserService.java", scope)` | O(1) indexed lookup |
+| Find all usages of symbol | `ReferencesSearch.search(element, scope)` | Understands code semantics |
 | Manual text replacement | Refactoring APIs | Maintains code correctness |
-| Guessing code structure | Query project model | IDE has already indexed everything |
-| **`ProcessBuilder("./mvnw", "test", ...)`** | `MavenRunConfigurationType.runConfiguration()` | **❌ BANNED** — spawns child JVM process causing classpath conflicts + 200k char token overflow |
-| **`ProcessBuilder("./gradlew", "test", ...)`** | `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` | **❌ BANNED** — same reason; nested Gradle daemon inside IDE JVM |
-| **`ProcessBuilder("./mvnw", "dependency:resolve")`** | `MavenProjectsManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles()` | **❌ BANNED** — use IDE Maven sync API |
+| Run Maven tests | `MavenRunConfigurationType.runConfiguration()` | **❌ BANNED otherwise** — ProcessBuilder overflows |
+| Run Gradle tests | `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` | **❌ BANNED otherwise** |
+| Maven dependency sync | `MavenProjectsManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles()` | **❌ BANNED otherwise** |
+
+**Operations that do NOT need steroid_execute_code — use native agent tools instead:**
+
+| Operation | Native Tool | Why NOT steroid_execute_code? |
+|-----------|-------------|-------------------|
+| **Create new files** | **Write tool** | steroid_execute_code file creation is **+47% slower** (A/B measured) |
+| Read a file | Read tool | Zero JVM overhead; steroid_execute_code adds ~12s per call |
+| List files | Glob tool | Zero overhead; steroid_execute_code not needed |
+| `grep`/search text | Grep tool | Zero overhead |
+| Docker availability | Bash tool | Just a socket check — no IntelliJ value |
+| Docker inspect/exec | Bash tool | No IntelliJ API equivalent; use Bash directly |
+| Simple file existence | Bash `test -f` | No IntelliJ value for POSIX checks |
 
 ## ❌ BANNED Anti-Patterns: ProcessBuilder for Builds
 
@@ -45,8 +55,8 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 val dockerOk = java.io.File("/var/run/docker.sock").exists()
 ```
 
-**Docker CLI operations** (inspect, exec, etc.) — use the **Bash tool** outside exec_code:
-- `GeneralCommandLine("docker", ...)` inside exec_code is **BANNED** — same as ProcessBuilder
+**Docker CLI operations** (inspect, exec, etc.) — use the **Bash tool** outside steroid_execute_code:
+- `GeneralCommandLine("docker", ...)` inside steroid_execute_code is **BANNED** — same as ProcessBuilder
 - ✅ `docker inspect --format='{{.State.Running}}' <id>` → Bash tool
 - ✅ `docker exec <id> bash -c "..."` → Bash tool
 

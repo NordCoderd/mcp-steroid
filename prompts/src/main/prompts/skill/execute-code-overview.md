@@ -1,6 +1,6 @@
 Execute Code: Overview & Key Rules
 
-Intro, sandbox bypass, file-ops rules, Read tool exception, retry rule, and Read/Edit constraint for steroid_execute_code.
+Intro, when to use steroid_execute_code vs native tools, file creation rule, retry rule, and Read/Edit constraint for steroid_execute_code.
 
 # Execute Code: Overview & Key Rules
 
@@ -13,44 +13,59 @@ This is a **stateful** API — everything you do changes the IDE state. The Inte
 
 ## ⚡ Bypasses Agent Sandbox
 
-Scripts run inside IntelliJ's JVM — unrestricted filesystem access. Use `steroid_execute_code` to read/write project files **INSTEAD** of agent-side file tools (those are sandboxed to `/home/agent` and cannot access `/mcp-run-dir/` or the project). Do NOT use shell heredocs for multi-line file creation — use VFS APIs instead.
+Scripts run inside IntelliJ's JVM — unrestricted filesystem access to `/mcp-run-dir/` and the project. Use `steroid_execute_code` for IntelliJ-specific operations (PSI, indexing, Maven runner, VCS). For plain file reads/writes, prefer the native Read/Write tools — they have zero JVM compilation overhead (~12s saved per call).
 
 ---
 
 ## EXCEPTION — Use Native Read Tool for Simple File Reads
 
-The native Read tool can access `/mcp-run-dir/` paths directly. For reading a single file's content, prefer the Read tool over `String(vf.contentsToByteArray(), vf.charset)` — it's faster (no compilation overhead). Reserve `exec_code` for operations that **REQUIRE** IntelliJ APIs: PSI analysis, compilation checks, test execution, find usages, refactoring, VCS inspection. If you just need to read file text, use the Read tool.
+The native Read tool can access `/mcp-run-dir/` paths directly. For reading a single file's content, prefer the Read tool over `String(vf.contentsToByteArray(), vf.charset)` — it's faster (no compilation overhead). Reserve `steroid_execute_code` for operations that **REQUIRE** IntelliJ APIs: PSI analysis, compilation checks, test execution, find usages, refactoring, VCS inspection. If you just need to read file text, use the Read tool.
 
 ---
 
-## ⚡ ALWAYS Use exec_code for File CREATION (not native Write)
+## ⚡ File Creation: Use the Write Tool (NOT steroid_execute_code)
 
-Native Write bypasses IDE indexing — IntelliJ won't know about new files until the next Maven/Gradle build cycle. `exec_code` with VFS APIs (`writeAction { VfsUtil.saveText(...) }`) creates files that IntelliJ indexes immediately, enabling instant compile verification before you run tests.
+**Creating files via steroid_execute_code (`writeAction { VfsUtil.saveText(...) }`) is measured +47% slower**
+than using the native Write tool — IntelliJ VFS overhead dominates file creation time.
 
-If an exec_code file-creation attempt errors, diagnose from the error message and retry — never fall back to native Write for new source files.
+**Use the Write tool for all file creation.** After writing files, trigger a VFS refresh
+if you need IntelliJ to index them for PSI/compilation:
+
+```kotlin
+// ONE steroid_execute_code call to refresh after bulk file creation via Write tool:
+import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.LocalFileSystem
+VfsUtil.markDirtyAndRefresh(false, true, true,
+    LocalFileSystem.getInstance().findFileByPath(project.basePath!!)
+)
+println("VFS refreshed — IntelliJ now sees new files")
+```
+
+**Exception**: Use steroid_execute_code VFS file creation ONLY when you must create a file AND
+immediately use PSI on it in the same steroid_execute_code call (e.g., create + run inspections atomically).
 
 ---
 
-## ⚡ After an exec_code Error: Diagnose and RETRY — Do NOT Fall Back to Native Tools
+## ⚡ After a steroid_execute_code Error: Diagnose and RETRY — Do NOT Fall Back to Native Tools
 
-A single exec_code failure does NOT mean exec_code is unreliable. Read the error message — it is almost always one of:
+A single steroid_execute_code failure does NOT mea steroid_execute_code is unreliable. Read the error message — it is almost always one of:
 - **(a)** Missing import (`unresolved reference 'GlobalSearchScope'` → add `import com.intellij.psi.search.GlobalSearchScope`)
 - **(b)** Threading violation (`Write access is allowed inside write-action only` → wrap in `writeAction { }`)
 - **(c)** Kotlin string syntax issue (`.class` reference or `$` in a double-quoted string → switch to triple-quoted strings)
 
-Fix the issue and resubmit. Switching to native Write/Bash after one exec_code failure bypasses IDE indexing and eliminates compile verification — **always retry exec_code first**.
+Fix the issue and resubmit. Switching to native Write/Bash after one steroid_execute_code failure bypasses IDE indexing and eliminates compile verification — **always retry steroid_execute_code first**.
 
 ---
 
-## ⚠️ exec_code VFS Reads Do NOT Satisfy the Native Edit Tool's Read-Before-Write Constraint
+## ⚠️ steroid_execute_code VFS Reads Do NOT Satisfy the Native Edit Tool's Read-Before-Write Constraint
 
-If you read a file via exec_code (`String(vf.contentsToByteArray(), vf.charset)`) and then try to use the native `Edit` tool on the same file, you will get `"File has not been read yet"`. These are tracked separately.
+If you read a file via steroid_execute_code (`String(vf.contentsToByteArray(), vf.charset)`) and then try to use the native `Edit` tool on the same file, you will get `"File has not been read yet"`. These are tracked separately.
 
 Options:
 - **(a)** Also issue a native `Read` tool call for that file before using `Edit`
-- **(b)** Use a `writeAction { }` block in exec_code to both read and write the file atomically — **PREFERRED** (saves a round-trip)
+- **(b)** Use a `writeAction { }` block in steroid_execute_code to both read and write the file atomically — **PREFERRED** (saves a round-trip)
 
-If you plan to modify a file via exec_code `writeAction { }`, do NOT also issue a native `Read` for that file — it wastes a turn and provides zero benefit. exec_code can read and write in a single call:
+If you plan to modify a file via steroid_execute_code `writeAction { }`, do NOT also issue a native `Read` for that file — it wastes a turn and provides zero benefit. steroid_execute_code can read and write in a single call:
 ```kotlin
 import com.intellij.openapi.vfs.VfsUtil
 
@@ -59,7 +74,7 @@ val content = String(vf.contentsToByteArray(), vf.charset)  // read OUTSIDE writ
 val updated = content.replace("oldMethod", "newMethod")
 check(updated != content) { "replace matched nothing — check whitespace" }
 writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
-// ↑ This replaces both Read + Edit tools in a single exec_code call
+// ↑ This replaces both Read + Edit tools in a single steroid_execute_code call
 ```
 
 ---
@@ -82,10 +97,10 @@ writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
 | Run Gradle tests | `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` |
 | Maven re-import after pom.xml edit | `MavenProjectsManager.scheduleUpdateAllMavenProjects()` + `Observation.awaitConfiguration()` |
 | Check Docker availability | `java.io.File("/var/run/docker.sock").exists()` — no process spawn needed |
-| Docker inspect/exec operations | **Bash tool** (outside exec_code) — e.g. `docker inspect`, `docker exec` |
+| Docker inspect/exec operations | **Bash tool** (outside steroid_execute_code) — e.g. `docker inspect`, `docker exec` |
 | `dependency:resolve` workaround | `MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()` |
 
-**`GeneralCommandLine("docker", ...)` and `ProcessBuilder("docker", ...)` inside exec_code are BANNED** — same reason as `./mvnw`: child process inside IDE JVM causes classpath conflicts. Use the Bash tool outside exec_code instead.
+**`GeneralCommandLine("docker", ...)` and `ProcessBuilder("docker", ...)` inside steroid_execute_code are BANNED** — same reason as `./mvnw`: child process inside IDE JVM causes classpath conflicts. Use the Bash tool outside steroid_execute_code instead.
 
 **ProcessBuilder("./mvnw") is permitted ONLY when:**
 1. pom.xml was just modified in this session, AND

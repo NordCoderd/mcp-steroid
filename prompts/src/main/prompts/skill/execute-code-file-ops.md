@@ -21,11 +21,11 @@ println("Smart mode: ${!com.intellij.openapi.project.DumbService.isDumb(project)
 
 Combine readiness + Docker + VCS discovery in ONE call instead of 3 separate calls (saves ~60s). **Skip the Docker check if the scenario is pure file-creation (no @Testcontainers, no Docker in FAIL_TO_PASS tests)** — the check adds 10-15s with no benefit for those cases:
 ```kotlin
-// Recommended FIRST exec_code call for any Spring Boot / Maven task:
+// Recommended FIRST steroid_execute_code call for any Spring Boot / Maven task:
 println("Project: ${project.name}")
 println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
 // Check Docker socket directly — no process spawn needed
-// ❌ GeneralCommandLine("docker", ...) inside exec_code is BANNED — use Bash tool for docker inspect/exec
+// ❌ GeneralCommandLine("docker", ...) inside steroid_execute_code is BANNED — use Bash tool for docker inspect/exec
 val dockerOk = java.io.File("/var/run/docker.sock").exists()
 println("Docker: $dockerOk")
 val changes = readAction {
@@ -64,7 +64,7 @@ println(String(appProps.contentsToByteArray(), appProps.charset))
 
 ## ⚡ Read Multiple Files in One Call — PREFERRED Over Separate Calls (Saves ~20s Per Call)
 
-> **⚠️ EXPLORATION RULE: Complete ALL exploration in AT MOST 2 exec_code calls.** (1) Test files + domain model in one batch. (2) Test infrastructure in a second batch only if needed. Do NOT issue one call per file group.
+> **⚠️ EXPLORATION RULE: Complete ALL exploration in AT MOST 2 steroid_execute_code calls.** (1) Test files + domain model in one batch. (2) Test infrastructure in a second batch only if needed. Do NOT issue one call per file group.
 ```kotlin
 // Batch exploration: replace 5-8 sequential steroid_execute_code calls with 1
 for (path in listOf(

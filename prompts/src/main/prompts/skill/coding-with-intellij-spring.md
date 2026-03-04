@@ -4,13 +4,13 @@ Comprehensive Java and Spring Boot patterns: Maven/Gradle, PSI class creation, S
 
 ## Java / Spring Boot Patterns
 
-**Step -1 — Combined startup call: readiness + Docker + VCS in ONE exec_code call**
+**Step -1 — Combined startup call: readiness + Docker + VCS in ONE steroid_execute_code call**
 
 For any Spring Boot / Maven task, combine your first three checks into a single call.
 This saves ~60s (3 round-trips × ~20s each) and gives you everything you need to plan exploration:
 
 ```kotlin
-// Recommended FIRST exec_code call — do NOT split into 3 separate calls:
+// Recommended FIRST steroid_execute_code call — do NOT split into 3 separate calls:
 println("Project: ${project.name}, base: ${project.basePath}")
 println("Smart: ${!com.intellij.openapi.project.DumbService.isDumb(project)}")
 // Check Docker socket directly — no process spawn needed
@@ -80,7 +80,7 @@ println("NEXT_MIGRATION_VERSION=V$nextVersion")
 
 When implementing a new Spring Boot feature from scratch (e.g., JWT authentication, a new service + controller), follow this workflow to minimize wasted turns:
 
-**Phase 1: Explore (1-2 exec_code calls)**
+**Phase 1: Explore (1-2 steroid_execute_code calls)**
 ```kotlin
 import com.intellij.openapi.vfs.VfsUtil
 
@@ -100,7 +100,7 @@ if (testVf != null) println("\n=== TEST ===\n" + String(testVf.contentsToByteArr
 val pomVf = findProjectFile("pom.xml")
 if (pomVf != null) println("\n=== pom.xml ===\n" + String(pomVf.contentsToByteArray(), pomVf.charset))
 ```
-**Phase 2: Add dependencies to pom.xml (1 exec_code call)**
+**Phase 2: Add dependencies to pom.xml (1 steroid_execute_code call)**
 ```kotlin
 import com.intellij.openapi.vfs.VfsUtil
 
@@ -131,7 +131,7 @@ writeAction { VfsUtil.saveText(pomFile, updated) }
 println("pom.xml updated")
 // Then trigger Maven sync (next step) before inspecting or compiling
 ```
-**Phase 3: Create source files via exec_code VFS APIs (1-2 calls)**
+**Phase 3: Create source files via steroid_execute_code VFS APIs (1-2 calls)**
 ```kotlin
 import com.intellij.openapi.vfs.VfsUtil
 import com.intellij.openapi.vfs.LocalFileSystem
@@ -229,9 +229,9 @@ println("Maven IDE runner: passed=$mvnPassed")
 ```
 > **Key rules**:
 > - If `steroid_execute_code` returns an error: read the error message and **retry with fixed code** — do NOT fall back to native Write/Bash
-> - If an exec_code error is about missing import → add the import and retry
-> - If an exec_code error is about `Write access allowed inside write-action only` → wrap VFS calls in `writeAction { }`
-> - If exec_code compilation fails with `.class` or `$` → use triple-quoted Kotlin strings for Java source content
+> - If a steroid_execute_code error is about missing import → add the import and retry
+> - If a steroid_execute_code error is about `Write access allowed inside write-action only` → wrap VFS calls in `writeAction { }`
+> - If steroid_execute_code compilation fails with `.class` or `$` → use triple-quoted Kotlin strings for Java source content
 ### Find All @Entity / @Service / @RestController Classes
 
 ```kotlin
@@ -315,7 +315,7 @@ println("Use: ${persistencePrefix}.persistence.Entity")
 > **⚠️ Safe Constructor/Signature Change Recipe**: `runInspectionsDirectly` is file-scoped and
 > does NOT catch cross-file compile errors from constructor changes. Before adding a parameter to
 > any constructor, record, or method signature: (1) run `ReferencesSearch` to find ALL call sites,
-> (2) update every call site in the same exec_code session, (3) then run `./mvnw compile -q` to
+> (2) update every call site in the same steroid_execute_code session, (3) then run `./mvnw compile -q` to
 > verify project-wide correctness. Skipping step 1 causes "cannot find symbol" errors that only
 > surface during test execution, not during file-level inspection.
 
@@ -681,7 +681,7 @@ yamlFiles.forEach { println(it.path + ": " + String(it.contentsToByteArray(), it
 ### Combine Discovery + Batch Update in ONE Call (Eliminates Two-Step Pattern)
 
 **Anti-pattern to avoid**: listing files first (call 1), then reading + updating each file (call 2 or more).
-**Preferred pattern**: find files that match, read content, apply updates — all in a single exec_code call.
+**Preferred pattern**: find files that match, read content, apply updates — all in a single steroid_execute_code call.
 
 This approach eliminates the most common wasteful two-step pattern seen in Spring Boot refactoring tasks
 (e.g., "update URL prefix in all controllers"). Instead of `FilenameIndex` → read each → decide → update,
@@ -712,7 +712,7 @@ println("Done — updated ${toUpdate.size} files")
 ```
 
 > **Rule**: If you can describe your task as "find files with X, then update them" — do it in **one**
-> exec_code call. Discovery + read + update in separate calls wastes ~20s per round-trip and provides
+> steroid_execute_code call. Discovery + read + update in separate calls wastes ~20s per round-trip and provides
 > no benefit since you're working with the same VFS state.
 
 ### Diagnosing String Replace Failures
@@ -1031,7 +1031,7 @@ if (psiClass != null) {
 
 ### Add Maven Dependencies to pom.xml via VFS (Reliable Pattern)
 
-**PREFER exec_code VFS write over native Edit tool** for pom.xml changes. VFS write triggers IDE file-change notification immediately, making Maven auto-import more reliable.
+**PREFER steroid_execute_code VFS write over native Edit tool** for pom.xml changes. VFS write triggers IDE file-change notification immediately, making Maven auto-import more reliable.
 
 ```kotlin
 // Step 1: Add dependency via VFS text replace
@@ -1489,7 +1489,7 @@ println(lines.takeLast(20).joinToString("\n"))
 > **⚠️ Anti-pattern**: Never use `ProcessBuilder("./gradlew", ...)` **inside** `steroid_execute_code`.
 > This spawns a nested Gradle daemon from within the IDE JVM, causing classpath conflicts and
 > resource exhaustion. Use the IntelliJ ExternalSystem API below instead. If the IDE runner is
-> unavailable, fall back to the Bash tool (outside exec_code) — NOT ProcessBuilder inside exec_code.
+> unavailable, fall back to the Bash tool (outside steroid_execute_code) — NOT ProcessBuilder inside steroid_execute_code.
 
 ```kotlin
 import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings
@@ -1526,18 +1526,18 @@ val gradleSuccess = withTimeout(5.minutes) { result.await() }
 println("Gradle result: success=$gradleSuccess")
 ```
 
-> If the IDE runner is not available or times out, use the Bash tool **outside exec_code**:
+> If the IDE runner is not available or times out, use the Bash tool **outside steroid_execute_code**:
 > `./gradlew :api:test --tests "com.example.api.ProductControllerTest" --no-daemon`
-> Do NOT use ProcessBuilder inside exec_code for this.
+> Do NOT use ProcessBuilder inside steroid_execute_code for this.
 
-### Run Gradle Tests via ProcessBuilder — ❌ BANNED inside exec_code
+### Run Gradle Tests via ProcessBuilder — ❌ BANNED inside steroid_execute_code
 
 > **❌ BANNED**: Do NOT use `ProcessBuilder("./gradlew", ...)` inside `steroid_execute_code`.
 > This spawns a nested Gradle daemon from within the IDE JVM, causing classpath conflicts and resource exhaustion.
 >
 > **Allowed alternatives (in priority order):**
 > 1. `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` (see above) — PREFERRED
-> 2. Bash tool **outside** exec_code: `./gradlew :module:test --tests "..." --no-daemon`
+> 2. Bash tool **outside** steroid_execute_code: `./gradlew :module:test --tests "..." --no-daemon`
 >
 > The code snippet below is retained for reference only. Do NOT write new code using this pattern.
 
@@ -1549,7 +1549,7 @@ For **Gradle** projects, use `./gradlew` with `--tests` for targeted test class 
 
 ```kotlin
 // ⚠️ BANNED inside steroid_execute_code — use ExternalSystemUtil.runTask() instead (see PRIMARY section above)
-// Retained for reference only — DO NOT COPY INTO exec_code
+// Retained for reference only — DO NOT COPY INTO steroid_execute_code
 // Run a specific test class in a specific Gradle submodule
 // ⚠️ After writing new source files: ALWAYS add --rerun-tasks to the first test run
 // to avoid the UP-TO-DATE false-positive (Gradle skips tests silently, exits 0)
@@ -1571,7 +1571,7 @@ println(lines.takeLast(30).joinToString("\n"))
 
 ```kotlin
 // ⚠️ BANNED inside steroid_execute_code — use ExternalSystemUtil.runTask() instead (see PRIMARY section above)
-// Retained for reference only — DO NOT COPY INTO exec_code
+// Retained for reference only — DO NOT COPY INTO steroid_execute_code
 // Run ALL tests in a module (when no specific class is needed):
 val proc = ProcessBuilder("./gradlew", ":product-service:test", "--no-daemon")
     .directory(java.io.File(project.basePath!!))
@@ -1645,7 +1645,7 @@ environmental, not patch-specific.
 
 > **⚠️ EXCEPTION**: The `runSingleMavenTest` helper below uses `ProcessBuilder("./mvnw")` specifically to
 > capture raw output lines and detect Docker infrastructure errors. This is the only valid use case for
-> `ProcessBuilder("./mvnw")` inside exec_code — detecting Docker infrastructure issues requires raw output.
+> `ProcessBuilder("./mvnw")` inside steroid_execute_code — detecting Docker infrastructure issues requires raw output.
 > For all other test execution, use `MavenRunConfigurationType.runConfiguration()`.
 
 ```kotlin

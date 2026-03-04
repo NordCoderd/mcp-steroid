@@ -19,9 +19,9 @@ fun parseSessionInfo(dir: File): Map<String, String>? {
         .associate { it.substringBefore('=') to it.substringAfter('=') }
 }
 
-// ❌ DO NOT use GeneralCommandLine("docker", ...) or ProcessBuilder("docker", ...) inside exec_code.
+// ❌ DO NOT use GeneralCommandLine("docker", ...) or ProcessBuilder("docker", ...) inside steroid_execute_code.
 //    These spawn a child process inside IntelliJ's JVM — same banned pattern as ProcessBuilder("./mvnw").
-// ✅ For docker inspect / docker exec: use the Bash tool OUTSIDE exec_code.
+// ✅ For docker inspect / docker exec: use the Bash tool OUTSIDE steroid_execute_code.
 // ✅ Docker socket availability check (no process spawn needed):
 val dockerAvailable = java.io.File("/var/run/docker.sock").exists()
 println("Docker socket available: $dockerAvailable")

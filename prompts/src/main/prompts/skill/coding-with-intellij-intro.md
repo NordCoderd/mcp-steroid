@@ -120,11 +120,11 @@ val classes = readAction {
 ```
 
 > **Bulk file creation triggers re-indexing**: Writing new files via `writeAction { VfsUtil.saveText(...) }` causes IntelliJ to re-index those files.
-> - **In a subsequent exec_code call**: Safe — `waitForSmartMode()` runs automatically at script start, so PSI is up-to-date by the time your code runs.
-> - **In the same exec_code call** (create files then immediately inspect them): call `waitForSmartMode()` explicitly after the `writeAction` block and before any `runInspectionsDirectly` / `ReferencesSearch` / `JavaPsiFacade.findClass()` calls on the new files.
+> - **In a subsequent steroid_execute_code call**: Safe — `waitForSmartMode()` runs automatically at script start, so PSI is up-to-date by the time your code runs.
+> - **In the same steroid_execute_code call** (create files then immediately inspect them): call `waitForSmartMode()` explicitly after the `writeAction` block and before any `runInspectionsDirectly` / `ReferencesSearch` / `JavaPsiFacade.findClass()` calls on the new files.
 >
 ```kotlin
-// Pattern: create files AND inspect in the SAME exec_code call
+// Pattern: create files AND inspect in the SAME steroid_execute_code call
 writeAction {
     val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
     val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example")
@@ -137,9 +137,9 @@ val problems = runInspectionsDirectly(vf)
 println(if (problems.isEmpty()) "OK" else problems.toString())
 ```
 >
-> **Best practice**: Create files in one exec_code call, then inspect in a separate exec_code call — `waitForSmartMode()` runs automatically between calls.
+> **Best practice**: Create files in one steroid_execute_code call, then inspect in a separate steroid_execute_code call — `waitForSmartMode()` runs automatically between calls.
 >
-> **⚠️ Create one file per exec_code call** when possible. Bundling multiple file creations in a single call makes error attribution hard: if the call throws an exception midway, it's unclear which files were created and which failed. Create files one at a time, verify existence (`findProjectFile(path) != null`), then proceed to the next.
+> **⚠️ Create one file per steroid_execute_code call** when possible. Bundling multiple file creations in a single call makes error attribution hard: if the call throws an exception midway, it's unclear which files were created and which failed. Create files one at a time, verify existence (`findProjectFile(path) != null`), then proceed to the next.
 
 ### Execution Flow
 

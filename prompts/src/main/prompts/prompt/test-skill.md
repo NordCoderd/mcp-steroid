@@ -23,9 +23,9 @@ Use IntelliJ test execution APIs from `steroid_execute_code` to run tests and in
 3) Execute a test configuration (example: `mcp-steroid://test/run-tests`).
 4) Navigate test tree and check individual test status (example: `mcp-steroid://test/tree-navigation`).
 
-## Stateful exec_code workflow
+## Stateful steroid_execute_code workflow
 
-`exec_code` is stateful. Split test execution into multiple short calls:
+`steroid_execute_code` is stateful. Split test execution into multiple short calls:
 
 - Call #1: list run configurations
 - Call #2: execute test configuration (ProgramRunnerUtil)

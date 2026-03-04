@@ -66,7 +66,7 @@ writeAction {
 
 ## Create/Write a Java or Kotlin Source File
 
-One file per exec_code call when possible (makes error attribution trivial):
+One file per steroid_execute_code call when possible (makes error attribution trivial):
 ```kotlin
 writeAction {
     // DEPRECATED: project.baseDir — use LocalFileSystem instead:
@@ -86,7 +86,7 @@ writeAction {
 }
 println("File created")
 // ⚠️ After bulk file creation: if you plan to run runInspectionsDirectly or
-// ReferencesSearch on the new files in THIS SAME exec_code call, call waitForSmartMode()
+// ReferencesSearch on the new files in THIS SAME steroid_execute_code call, call waitForSmartMode()
 // between writeAction and the inspection call.
 ```
 

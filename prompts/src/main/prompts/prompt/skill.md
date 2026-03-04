@@ -1421,7 +1421,7 @@ Use MCP `resources/list` and `resources/read` instead of HTTP fetching when poss
 Recommended resources:
 - Use `resources/list` to discover all available resources
 - `mcp-steroid://prompt/skill` - Full SKILL.md content as a resource
-- `mcp-steroid://prompt/debugger-skill` - Debugger workflow guide + stateful exec_code notes
+- `mcp-steroid://prompt/debugger-skill` - Debugger workflow guide + stateful steroid_execute_code notes
 - `mcp-steroid://ide/overview` - IDE usage overview and patterns
 - `mcp-steroid://lsp/overview` - LSP-style workflows and examples
 - `mcp-steroid://debugger/overview` - Debugger workflows and runnable examples

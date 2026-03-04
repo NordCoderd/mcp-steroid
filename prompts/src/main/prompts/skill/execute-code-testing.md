@@ -55,9 +55,9 @@ For Maven-specific patterns (MavenRunner, MavenRunnerParameters, Maven sync afte
 2. **Gradle IDE runner** — `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` (see below)
 3. **ProcessBuilder("./mvnw")** — ONLY when pom.xml was just modified AND the IDE runner's SMTRunnerEventsListener latch has already timed out
 
-**`GeneralCommandLine("docker", ...)` and `ProcessBuilder("docker", ...)` inside exec_code are BANNED** — same reason as `./mvnw`: they spawn a child process inside IntelliJ's JVM.
+**`GeneralCommandLine("docker", ...)` and `ProcessBuilder("docker", ...)` inside steroid_execute_code are BANNED** — same reason as `./mvnw`: they spawn a child process inside IntelliJ's JVM.
 - Docker socket availability: `java.io.File("/var/run/docker.sock").exists()` (no process spawn needed)
-- Docker CLI operations (inspect, exec, etc.): use the **Bash tool** outside exec_code
+- Docker CLI operations (inspect, exec, etc.): use the **Bash tool** outside steroid_execute_code
 
 ---
 
@@ -152,7 +152,7 @@ println("Docker available: $dockerOk")
 
 ## Gradle Test Runner
 
-PREFERRED over `ProcessBuilder("./gradlew")` inside exec_code — the latter spawns a nested Gradle daemon from within the IDE JVM, causing classpath conflicts:
+PREFERRED over `ProcessBuilder("./gradlew")` inside steroid_execute_code — the latter spawns a nested Gradle daemon from within the IDE JVM, causing classpath conflicts:
 
 ```kotlin[IU]
 import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings

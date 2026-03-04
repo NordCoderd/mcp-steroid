@@ -34,17 +34,15 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - `Write access is allowed from write thread only` → wrap in `writeAction { }`
 - `Read access is allowed from inside read-action only` → wrap the PSI/VFS call in `readAction { }`. Example: `val vf = readAction { FilenameIndex.getVirtualFilesByName("Foo.java", GlobalSearchScope.projectScope(project)).firstOrNull() }`
 
-**NEVER use exec_code just to read files you already know the path for**: Use the native Read/Glob/Grep tools to read file *content* by known path — they have zero compilation overhead (~0s vs ~8s per exec_code call). Reserve exec_code for: writing files via VFS, PSI queries, test execution, compile checks. The only exception is reading files that were modified in this session via writeAction — in that case use `String(vf.contentsToByteArray(), vf.charset)` to see in-memory VFS state.
+**NEVER use steroid_execute_code just to read files you already know the path for**: Use the native Read/Glob/Grep tools to read file *content* by known path — they have zero compilation overhead (~0s vs ~8s per steroid_execute_code call). Reserve steroid_execute_code for: writing files via VFS, PSI queries, test execution, compile checks. The only exception is reading files that were modified in this session via writeAction — in that case use `String(vf.contentsToByteArray(), vf.charset)` to see in-memory VFS state.
 
-**Use exec_code + FilenameIndex for ANY file discovery** — by exact filename OR by extension. **Never use the Glob tool for discovery.** Glob scans the filesystem and is unreliable inside the container path layout; FilenameIndex is an O(1) IDE-indexed lookup.
+**INSIDE steroid_execute_code: use FilenameIndex for file discovery** — by exact filename OR by extension. FilenameIndex is an O(1) IDE-indexed lookup, much faster than filesystem traversal. Use the native Glob/Grep tools for file discovery OUTSIDE steroid_execute_code.
 ```kotlin
 import com.intellij.psi.search.FilenameIndex
 import com.intellij.psi.search.GlobalSearchScope
 val scope = GlobalSearchScope.projectScope(project)
-// ❌ WRONG: Glob("src/main/**/*.java")  ← broad extension scan — NEVER do this
-// ❌ WRONG: Glob("src/main/**/*.yaml")  ← same, any extension
-// ❌ WRONG: Glob("**/UserService.java") ← specific file — also use FilenameIndex
-// ✅ RIGHT: FilenameIndex in exec_code
+// ❌ WRONG inside steroid_execute_code: filesystem scan is slow and may miss indexed files
+// ✅ RIGHT: FilenameIndex in steroid_execute_code
 val javaFiles = readAction { FilenameIndex.getAllFilesByExt(project, "java", scope) }  // replaces Glob("**/*.java")
 val yamlFiles = readAction { FilenameIndex.getAllFilesByExt(project, "yaml", scope) }  // replaces Glob("**/*.yaml")
 val sqlFiles  = readAction { FilenameIndex.getAllFilesByExt(project, "sql", scope) }   // replaces Glob("**/*.sql")
@@ -52,7 +50,7 @@ val byName = readAction { FilenameIndex.getVirtualFilesByName("UserService.java"
 ```
 See `mcp-steroid://skill/execute-code-file-ops` for more file-discovery patterns.
 
-**Prefer VFS read over native Read tool** (only when you already have an exec_code call for other work): use `val vf = findProjectFile("path/File.java")!!; String(vf.contentsToByteArray(), vf.charset)` to see unsaved modifications from prior writeAction calls. Native Read bypasses VFS and may return stale content.
+**Prefer VFS read over native Read tool** (only when you already have a steroid_execute_code call for other work): use `val vf = findProjectFile("path/File.java")!!; String(vf.contentsToByteArray(), vf.charset)` to see unsaved modifications from prior writeAction calls. Native Read bypasses VFS and may return stale content.
 
 **Best Practice: Use Sub-Agents**
 For complex IntelliJ API work, delegate to a sub-agent:
