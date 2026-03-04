@@ -94,6 +94,10 @@ object DpaiaCuratedCases {
      * Selected via dataset analysis (group4-analyze-dataset.py) covering 3 new repos and diverse
      * task types. See docs/dpaia-runs/EXEC-SUMMARY.md for selection rationale.
      *
+     * **4 new cases (Batch 3, 2026-03-04):**
+     * Two brand-new repos (piggymetrics, spring-petclinic-microservices) plus two large multi-file
+     * refactors where semantic IDE analysis provides the highest measurable advantage.
+     *
      * | instanceId                              | Repo                    | FTP | Files | Why MCP helps                                   |
      * |-----------------------------------------|-------------------------|-----|-------|--------------------------------------------------|
      * | dpaia__spring__petclinic-36             | spring-petclinic (NEW)  |  4  |   8   | Add email field: entity+schema+form across layers|
@@ -104,6 +108,10 @@ object DpaiaCuratedCases {
      * | dpaia__spring__boot__microshop-2        | spring-boot-microshop   |  4  |  10   | Add productId validation across all microservices|
      * | dpaia__spring__petclinic-27             | spring-petclinic (NEW)  |  3  |   4   | Build REST endpoints for owners/pets/visits      |
      * | dpaia__spring__petclinic__rest-3        | spring-petclinic-rest   |  3  |   5   | Cache eviction + scheduled invalidation          |
+     * | dpaia__piggymetrics-6                   | piggymetrics (NEW)      |306  |   6   | TestContainers migration; multi-module Maven nav |
+     * | dpaia__spring__petclinic__microservices-5 | petclinic-microservices (NEW) | 167 | 3 | Circuit breaker+timeout; Resilience4j API nav  |
+     * | dpaia__spring__petclinic__rest-37       | spring-petclinic-rest   |352  |  23   | Pagination across all REST endpoints; 37 KB      |
+     * | dpaia__spring__petclinic-71             | spring-petclinic        |286  |  23   | JPA→R2DBC reactive migration; semantic analysis  |
      */
     val PRIMARY_COMPARISON_CASES: List<String> = listOf(
         // Batch 1: original 4 cases
@@ -129,5 +137,20 @@ object DpaiaCuratedCases {
         "dpaia__spring__petclinic-27",
         // spring-petclinic-rest — add cache eviction + scheduled invalidation (Cache, 5 files)
         "dpaia__spring__petclinic__rest-3",
+
+        // Batch 3: 4 new cases — 2 brand-new repos + 2 large multi-file refactors (2026-03-04)
+        // NEW repo: piggymetrics — switch from flapdoodle to TestContainers across 6 files (ftp=306)
+        // Multi-module Maven project; IDE navigation needed to find + update all test base classes
+        "dpaia__piggymetrics-6",
+        // NEW repo: spring-petclinic-microservices — add circuit breaker + timeout to feign clients (ftp=167)
+        // Resilience4j annotations + config; IDE type-checks Spring Cloud API across microservices
+        "dpaia__spring__petclinic__microservices-5",
+        // spring-petclinic-rest — implement pagination for all pet endpoints; 23 files, 37 KB, ftp=352
+        // Highest FTP in batch; consistent Pageable adoption requires IDE Find Usages across all controllers
+        "dpaia__spring__petclinic__rest-37",
+        // spring-petclinic — migrate persistence layer from JPA to R2DBC; 23 files, 37 KB, ftp=286
+        // Architectural refactor: replace JpaRepository + @Entity with ReactiveCrudRepository + R2DBC;
+        // IDE semantic analysis distinguishes reactive vs blocking APIs at every callsite
+        "dpaia__spring__petclinic-71",
     )
 }
