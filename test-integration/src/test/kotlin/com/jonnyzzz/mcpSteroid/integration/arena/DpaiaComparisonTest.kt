@@ -91,11 +91,12 @@ class DpaiaComparisonTest {
             projectGuestDir = ARENA_WORKSPACE,
         )
 
+        val caseConfig = DpaiaCuratedCases.CASE_CONFIGS[testCase.instanceId] ?: DpaiaCuratedCases.CaseConfig()
         val result = runner.runTest(
             testCase = testCase,
             agent = agent,
             withMcp = withMcp,
-            timeoutSeconds = 900,
+            timeoutSeconds = caseConfig.agentTimeoutSeconds,
         )
 
         // Log both outcomes — the comparison value is in the printed metrics.
@@ -128,13 +129,23 @@ class DpaiaComparisonTest {
         @JvmStatic
         val lifetimeWithoutMcp by lazy { CloseableStackHost() }
 
+        /**
+         * Maximum project-ready timeout across all configured cases.
+         * Ensures the IDE startup wait covers the slowest case (e.g. microshop-18 with 20-min timeout).
+         */
+        private val maxProjectReadyTimeoutMs: Long =
+            DpaiaCuratedCases.PRIMARY_COMPARISON_CASES
+                .mapNotNull { DpaiaCuratedCases.CASE_CONFIGS[it]?.projectReadyTimeoutMs }
+                .maxOrNull()
+                ?: DpaiaCuratedCases.CaseConfig().projectReadyTimeoutMs
+
         /** Container where agents connect to MCP Steroid via HTTP. */
         val sessionWithMcp by lazy {
             IntelliJContainer.create(
                 lifetimeWithMcp,
                 consoleTitle = "comparison-mcp",
                 aiMode = AiMode.AI_MCP,
-            ).waitForProjectReady()
+            ).waitForProjectReady(timeoutMillis = maxProjectReadyTimeoutMs)
         }
 
         /** Container where agents have NO MCP Steroid — baseline/control group. */
@@ -143,7 +154,7 @@ class DpaiaComparisonTest {
                 lifetimeWithoutMcp,
                 consoleTitle = "comparison-none",
                 mcpConnectionMode = McpConnectionMode.None,
-            ).waitForProjectReady()
+            ).waitForProjectReady(timeoutMillis = maxProjectReadyTimeoutMs)
         }
 
         private val dataset by lazy {

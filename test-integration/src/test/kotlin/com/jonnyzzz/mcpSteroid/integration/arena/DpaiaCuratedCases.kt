@@ -18,6 +18,30 @@ package com.jonnyzzz.mcpSteroid.integration.arena
  */
 object DpaiaCuratedCases {
 
+    /**
+     * Per-case configuration overrides for resource-intensive test cases.
+     *
+     * @param projectReadyTimeoutMs  Timeout for [IntelliJContainer.waitForProjectReady], ms. Default 600 000 (10 min).
+     * @param agentTimeoutSeconds    Agent run timeout passed to [ArenaTestRunner.runTest]. Default 900 (15 min).
+     */
+    data class CaseConfig(
+        val projectReadyTimeoutMs: Long = 600_000L,
+        val agentTimeoutSeconds: Long = 900L,
+    )
+
+    /**
+     * Timeout/agent overrides keyed by instance ID.
+     *
+     * - **microshop-18**: 23-module project; default 10-min IDE-ready timeout is too short → 20 min.
+     * - **petclinic-rest-3**: cache-eviction task; NONE agent needs more wall time → 90 min.
+     */
+    val CASE_CONFIGS: Map<String, CaseConfig> = mapOf(
+        "dpaia__spring__boot__microshop-18" to CaseConfig(projectReadyTimeoutMs = 1_200_000L),
+        "dpaia__spring__petclinic__rest-3"  to CaseConfig(agentTimeoutSeconds = 5_400L),
+    )
+
+
+
     /** The default simple case — used as a quick smoke test. */
     const val DEFAULT_SIMPLE = "dpaia__empty__maven__springboot3-3"
 
