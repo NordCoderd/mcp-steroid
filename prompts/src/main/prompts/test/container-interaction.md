@@ -24,13 +24,13 @@ fun parseSessionInfo(dir: File): Map<String, String>? {
 // ⚠️ NOTE: docker inspect/exec for container management has no IntelliJ API equivalent.
 // For simple availability check, prefer: java.io.File("/var/run/docker.sock").exists()
 fun isContainerRunning(containerId: String): Boolean {
-    val cl = GeneralCommandLine("docker", "inspect", "--format={{.State.Running}}", containerId).apply { redirectErrorStream = true }
+    val cl = GeneralCommandLine("docker", "inspect", "--format={{.State.Running}}", containerId).withRedirectErrorStream(true)
     val output = CapturingProcessHandler(cl).runProcess(5_000)
     return output.stdout.trim() == "true"
 }
 
 fun dockerExec(containerId: String, display: String, cmd: String) {
-    val cl = GeneralCommandLine("docker", "exec", containerId, "bash", "-c", "DISPLAY=$display $cmd").apply { redirectErrorStream = true }
+    val cl = GeneralCommandLine("docker", "exec", containerId, "bash", "-c", "DISPLAY=$display $cmd").withRedirectErrorStream(true)
     CapturingProcessHandler(cl).runProcess(10_000)
 }
 

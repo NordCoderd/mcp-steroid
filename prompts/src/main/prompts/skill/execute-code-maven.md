@@ -8,7 +8,7 @@ Running Maven builds and tests via IntelliJ Maven APIs instead of ProcessBuilder
 
 Use `MavenRunner` for all Maven goal execution — it runs inside the IDE JVM, reuses IntelliJ's Maven installation, and avoids spawning a separate process:
 
-```kotlin
+```kotlin[IU]
 import org.jetbrains.idea.maven.execution.MavenRunner
 import org.jetbrains.idea.maven.execution.MavenRunnerParameters
 import org.jetbrains.idea.maven.execution.MavenRunnerSettings
@@ -35,7 +35,7 @@ println("Maven goal completed: $ok")
 ```
 
 **Import paths:**
-```kotlin
+```kotlin[IU]
 import org.jetbrains.idea.maven.execution.MavenRunner             // project service
 import org.jetbrains.idea.maven.execution.MavenRunnerParameters   // goal + working dir
 import org.jetbrains.idea.maven.execution.MavenRunnerSettings     // properties, skip flags
@@ -50,7 +50,7 @@ import org.jetbrains.idea.maven.buildtool.MavenSyncSpec            // full/incre
 
 For Maven test execution with explicit pass/fail result, use `MavenRunConfigurationType.runConfiguration` + `SMTRunnerEventsListener`. See **`mcp-steroid://skill/execute-code-testing`** for the complete pattern. Summary:
 
-```kotlin
+```kotlin[IU]
 import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
 import org.jetbrains.idea.maven.execution.MavenRunnerParameters
 import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
@@ -91,7 +91,7 @@ println("Maven test: passed=$passed")
 
 After modifying `pom.xml`, trigger a full Maven re-import and wait for completion before compiling or running tests:
 
-```kotlin
+```kotlin[IU]
 import org.jetbrains.idea.maven.project.MavenProjectsManager
 import org.jetbrains.idea.maven.buildtool.MavenSyncSpec  // package: buildtool (NOT project) — IU-253+
 import com.intellij.platform.backend.observation.Observation
@@ -112,7 +112,7 @@ println("Maven sync complete — new deps resolved, safe to compile/inspect")
 - ⚠️ `MavenSyncSpec` is in package `org.jetbrains.idea.maven.buildtool` — NOT `.project`
 
 **Partial sync — only specific pom files:**
-```kotlin
+```kotlin[IU]
 import org.jetbrains.idea.maven.project.MavenProjectsManager
 import org.jetbrains.idea.maven.buildtool.MavenSyncSpec
 
@@ -130,7 +130,7 @@ MavenProjectsManager.getInstance(project).scheduleUpdateMavenProjects(
 
 Pass `-Dtest=ClassName` via `MavenRunnerSettings.mavenProperties`:
 
-```kotlin
+```kotlin[IU]
 import org.jetbrains.idea.maven.execution.MavenRunner
 import org.jetbrains.idea.maven.execution.MavenRunnerParameters
 import org.jetbrains.idea.maven.execution.MavenRunnerSettings
@@ -168,7 +168,7 @@ Use `ProcessBuilder("./mvnw")` **only** when:
 
 In all other cases, **use `MavenRunner` or `MavenRunConfigurationType`**.
 
-```kotlin
+```kotlin[IU]
 // ⚠️ ONLY when Maven sync unavailable — e.g. immediately after pom.xml edit before sync
 // ⚠️ ./mvnw (wrapper) not 'mvn' — system mvn is typically not installed
 // ⚠️ Spring Boot test output can exceed 200k chars — NEVER print untruncated output
