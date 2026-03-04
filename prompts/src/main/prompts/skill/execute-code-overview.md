@@ -48,7 +48,7 @@ immediately use PSI on it in the same steroid_execute_code call (e.g., create + 
 
 ## ⚡ After a steroid_execute_code Error: Diagnose and RETRY — Do NOT Fall Back to Native Tools
 
-A single steroid_execute_code failure does NOT mea steroid_execute_code is unreliable. Read the error message — it is almost always one of:
+A single steroid_execute_code failure does NOT mean steroid_execute_code is unreliable. Read the error message — it is almost always one of:
 - **(a)** Missing import (`unresolved reference 'GlobalSearchScope'` → add `import com.intellij.psi.search.GlobalSearchScope`)
 - **(b)** Threading violation (`Write access is allowed inside write-action only` → wrap in `writeAction { }`)
 - **(c)** Kotlin string syntax issue (`.class` reference or `$` in a double-quoted string → switch to triple-quoted strings)

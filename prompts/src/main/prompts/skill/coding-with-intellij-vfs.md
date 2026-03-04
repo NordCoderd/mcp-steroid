@@ -186,11 +186,14 @@ VfsUtil.markDirtyAndRefresh(false, true, true,
 > - Any file creation not immediately followed by PSI operations in the same call
 >
 > After creating files with the Write tool/Bash, refresh VFS before using them with PSI:
-> ```kotlin
-> VfsUtil.markDirtyAndRefresh(false, true, true,
->     LocalFileSystem.getInstance().findFileByPath(project.basePath!!)
-> )
-> ```
+
+```kotlin
+import com.intellij.openapi.vfs.VfsUtil
+import com.intellij.openapi.vfs.LocalFileSystem
+VfsUtil.markDirtyAndRefresh(false, true, true,
+    LocalFileSystem.getInstance().findFileByPath(project.basePath!!)
+)
+```
 
 Use `VfsUtil.createDirectoryIfMissing` + `VfsUtil.saveText` only when creating files inside
 steroid_execute_code is necessary (e.g., PSI operations follow immediately in the same call).

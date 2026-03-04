@@ -19,7 +19,7 @@ println("Smart mode: ${!com.intellij.openapi.project.DumbService.isDumb(project)
 
 ## ⚡ Spring Boot / Maven Combined Startup Call
 
-Combine readiness + Docker + VCS discovery in ONE call instead of 3 separate calls (saves ~60s). **Skip the Docker check if the scenario is pure file-creation (no @Testcontainers, no Docker in FAIL_TO_PASS tests)** — the check adds 10-15s with no benefit for those cases:
+Combine readiness + Docker + VCS discovery in ONE call instead of 3 separate calls (saves ~60s). **Keep this call IDE-only**: Docker socket check + VCS modified files query. Do NOT batch file reads into this call — use Read/Glob tools for those (zero overhead). **Skip the Docker check if the scenario is pure file-creation (no @Testcontainers, no Docker in FAIL_TO_PASS tests)** — the check adds 10-15s with no benefit for those cases:
 ```kotlin
 // Recommended FIRST steroid_execute_code call for any Spring Boot / Maven task:
 println("Project: ${project.name}")
@@ -89,9 +89,11 @@ for (path in listOf(
 
 ---
 
-## Find Files — By Name OR By Extension (use FilenameIndex, NOT Glob or Bash find)
+## Find Files — By Name OR By Extension (use FilenameIndex INSIDE steroid_execute_code)
 
-> **⚠️ NEVER use the Glob tool or `ProcessBuilder("find")` for file discovery** — not for `*.java`, not for `*.yaml`, not for any pattern. Glob scans the filesystem and is unreliable inside the container path layout. FilenameIndex is an O(1) IDE-indexed lookup that always works.
+> **INSIDE steroid_execute_code**: use `FilenameIndex` for file discovery — O(1) IDE-indexed lookup, always correct regardless of container path layout. Do NOT use `ProcessBuilder("find")` inside steroid_execute_code.
+>
+> **OUTSIDE steroid_execute_code** (agent level): use the native `Glob` and `Grep` tools — zero JVM overhead. Only use steroid_execute_code + FilenameIndex when you also need PSI or other IDE operations in the same call.
 
 | What you want | ❌ Wrong | ✅ Right |
 |---|---|---|
