@@ -275,7 +275,7 @@ Agents (especially Gemini) may find the right answer internally but not include 
 ### Test Suite Runtimes
 
 - **`./gradlew :ij-plugin:test`** (full suite, clean): ~13–14 minutes
-- **`./gradlew :ij-plugin:test --tests '*KtBlock*'`** (KtBlocks compilation only): ~7 minutes
+- **`./gradlew :prompts:test --tests '*KtBlock*'`** (KtBlocks compilation only): ~7 minutes (note: KtBlocks tests are in `:prompts:test`, not `:ij-plugin:test`)
 - **Suspiciously fast results** (e.g., 500 tests in 14 seconds): this is **stale Gradle test cache** — results from a previous run are being replayed. Run with `--rerun-tasks` or delete `ij-plugin/build/test-results/` to force a fresh run.
 
 ### IntelliJ Index Corruption
