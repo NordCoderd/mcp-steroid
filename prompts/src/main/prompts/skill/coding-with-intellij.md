@@ -40,7 +40,7 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 | Read a file | Read tool | Zero JVM overhead; steroid_execute_code adds ~12s per call |
 | List files | Glob tool | Zero overhead; steroid_execute_code not needed |
 | `grep`/search text | Grep tool | Zero overhead |
-| **Run Maven/Gradle** | **Bash `./mvnw`** | Use Bash when IDE build tracking not required; ProcessBuilder inside steroid_execute_code is **BANNED** |
+| **Run Maven/Gradle** | **`MavenRunner`/`ExternalSystemUtil` inside steroid_execute_code, or Bash `./mvnw` outside** | ProcessBuilder inside steroid_execute_code is **BANNED** — use IDE runners or Bash tool |
 | Docker availability | Bash tool | Just a socket check — no IntelliJ value |
 | Docker inspect/exec | Bash tool | No IntelliJ API equivalent; use Bash directly |
 | Simple file existence | Bash `test -f` | No IntelliJ value for POSIX checks |

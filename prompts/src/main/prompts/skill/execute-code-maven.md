@@ -162,9 +162,10 @@ println("Test run completed: $ok")
 
 ## ⚠️ ProcessBuilder("./mvnw") — LAST RESORT ONLY
 
-Use `ProcessBuilder("./mvnw")` **only** when:
-- `pom.xml` was just modified AND Maven sync has not completed yet
-- `MavenSyncSpec` cannot be resolved (wrong IU version)
+Use `ProcessBuilder("./mvnw")` **only** when ALL of the following are true:
+1. `pom.xml` was just modified in this session, AND
+2. Maven sync was already triggered (`scheduleUpdateAllMavenProjects` + `awaitConfiguration`), AND
+3. `MavenRunConfigurationType.runConfiguration()` with `dialog_killer: true` has already timed out (>2 min)
 
 In all other cases, **use `MavenRunner` or `MavenRunConfigurationType`**.
 
