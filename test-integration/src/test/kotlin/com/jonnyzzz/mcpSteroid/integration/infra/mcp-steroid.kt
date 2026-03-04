@@ -576,7 +576,11 @@ try {
     fun killStartupDialogs(guestProjectDir: String) {
         try {
             val projects = mcpListProjects()
-            val projectName = projects.firstOrNull { it.path == guestProjectDir }?.name ?: return
+            // The "Open or Import Project" dialog can appear before the project at guestProjectDir
+            // is registered in IntelliJ's project list (the dialog blocks project initialization).
+            // Fall back to any available project so the AWT window scan still runs.
+            val projectName = (projects.firstOrNull { it.path == guestProjectDir }
+                ?: projects.firstOrNull())?.name ?: return
 
             val code = """
 import com.intellij.openapi.ui.DialogWrapper
@@ -585,14 +589,43 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.application.asContextElement
 import kotlinx.coroutines.withContext
+import java.awt.Container
 import java.awt.Dialog
 import java.awt.Window
+import javax.swing.JButton
+
+fun findButtons(container: Container): List<JButton> {
+    val result = mutableListOf<JButton>()
+    for (component in container.components) {
+        if (component is JButton) result += component
+        if (component is Container) result += findButtons(component)
+    }
+    return result
+}
 
 withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
     val closed = mutableListOf<String>()
     for (window in Window.getWindows()) {
         if (!window.isShowing) continue
         val title = (window as? Dialog)?.title ?: (window as? java.awt.Frame)?.title ?: "(no title)"
+        // "Open or Import Project" dialog: canceling aborts the Maven import.
+        // Instead, click the first affirmative button (e.g. "Open as Maven Project").
+        val isOpenImportDialog = title.contains("Open", ignoreCase = true) &&
+            (title.contains("Import", ignoreCase = true) || title.contains("or", ignoreCase = true))
+        if (isOpenImportDialog) {
+            val buttons = findButtons(window as Container)
+            val affirmativeBtn = buttons.firstOrNull { btn ->
+                val text = btn.text ?: ""
+                (text.contains("Open", ignoreCase = true) || text.contains("Maven", ignoreCase = true) ||
+                    text.contains("Gradle", ignoreCase = true) || text.contains("Import", ignoreCase = true)) &&
+                    !text.contains("Cancel", ignoreCase = true)
+            }
+            if (affirmativeBtn != null) {
+                affirmativeBtn.doClick()
+                closed += "ClickedOpen[${'$'}{affirmativeBtn.text}]:${'$'}title"
+                continue
+            }
+        }
         if (window is DialogWrapperDialog) {
             val dw = window.dialogWrapper
             if (dw != null && dw.isModal) {

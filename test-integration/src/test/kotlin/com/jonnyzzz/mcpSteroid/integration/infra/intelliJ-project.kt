@@ -584,11 +584,27 @@ sealed class IntelliJProject{
                       </component>
                     </project>
                 """.trimIndent()
+                // modules.xml signals to IntelliJ that this is an existing IntelliJ project,
+                // preventing the blocking "Open or Import Project" dialog that appears when
+                // a directory has both pom.xml and build.gradle (ambiguous build system).
+                // Without modules.xml IntelliJ shows the wizard before any project frame is
+                // created; misc.xml alone is not sufficient in IntelliJ 2025.3.
+                val modulesXml = """
+                    <?xml version="1.0" encoding="UTF-8"?>
+                    <project version="4">
+                      <component name="ProjectModuleManager">
+                        <modules />
+                      </component>
+                    </project>
+                """.trimIndent()
                 val script = """
                     set -euo pipefail
                     mkdir -p "$ideaDir"
                     cat > "$ideaDir/misc.xml" << 'XMLEOF'
 $miscXml
+XMLEOF
+                    cat > "$ideaDir/modules.xml" << 'XMLEOF'
+$modulesXml
 XMLEOF
                 """.trimIndent()
                 container.startProcessInContainer {
