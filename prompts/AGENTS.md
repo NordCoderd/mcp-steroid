@@ -2,6 +2,36 @@
 
 This guide explains the prompt file format, build-time processing, and IDE-conditional content system.
 
+## Prompt Content Principles
+
+**Core goal: Promote IntelliJ where it makes a difference.**
+
+IntelliJ MCP Steroid's unique value is IDE-level intelligence: code navigation, PSI tree access,
+refactoring, compilation, test execution, indexing. Prompts must steer agents toward these APIs.
+
+**Use IntelliJ for:**
+- Finding files → `FilenameIndex.getVirtualFilesByName()` (O(1) indexed lookup)
+- Class lookup → `JavaPsiFacade.findClass()`, `KotlinShortNamesCache`
+- Find usages → `ReferencesSearch.search()`
+- Running Maven/Gradle builds → `MavenRunner`, `ExternalSystemUtil.runTask()`
+- Compilation feedback → `ProblemHighlightFilter`, compiler errors via IDE
+- Navigation → PSI, `GotoDeclarationHandler`, `DefinitionsScopedSearch`
+
+**Do NOT use IntelliJ (steroid_execute_code) for:**
+- Reading file content → use the MCP `Read` tool instead
+- Listing files → use the MCP `Glob` tool instead
+- Running arbitrary processes → avoid process spawning from within the IDE JVM entirely
+- Checking Docker socket → `java.io.File("/var/run/docker.sock").exists()` is native Java, no IntelliJ needed
+- Simple file existence checks → `java.io.File(path).exists()` is fine as native Java
+
+**ProcessBuilder / GeneralCommandLine ban:**
+- `ProcessBuilder` is banned in all prompt code examples — it spawns processes from the IDE JVM,
+  bypasses IntelliJ's process management, causes classpath conflicts, and produces token-limit-busting output.
+- `GeneralCommandLine` (IntelliJ wrapper for external processes) is also discouraged for cases where
+  native Java APIs exist (file checks, socket checks). Use `GeneralCommandLine` only when an external
+  tool must genuinely be invoked AND no IDE API exists AND no native Java API exists.
+- Exception: `MavenRunner`, `ExternalSystemUtil` — these are IDE-managed process launchers, not raw process spawns.
+
 ## File Format
 
 All prompt `.md` files live under `prompts/src/main/prompts/`. They are organized into folders
