@@ -90,22 +90,22 @@ def frange(start, stop, step):
 
 
 # ----- Layout configuration -----
-# Title "MCP Steroid" + QR cursor block on same line
-TITLE_BASELINE_Y = 378
-TITLE_FONT_SIZE = 36
-TITLE_TEXT_WIDTH = 240     # estimated rendered width of "MCP Steroid" bold 36px
-QR_BLOCK_SIZE = 40         # slightly taller than cap-height — bold cursor block
-QR_GAP = 3                 # tight gap, like a real cursor
+# Title "MCP Steroid" + QR symbol on same baseline
+TITLE_BASELINE_Y = 385
+TITLE_FONT_SIZE = 44
+TITLE_TEXT_WIDTH = 272     # estimated rendered width of "MCP Steroid" bold 44px
+QR_BLOCK_SIZE = 32         # cap-height sized symbol (~0.73 * font-size)
+QR_GAP = -1                # negative = overlap slightly, like a tight kerned glyph
 COMBINED_WIDTH = TITLE_TEXT_WIDTH + QR_GAP + QR_BLOCK_SIZE
-TITLE_X = 220 - COMBINED_WIDTH / 2   # left edge of title text
+TITLE_X = 220 - COMBINED_WIDTH / 2
 QR_BLOCK_X = TITLE_X + TITLE_TEXT_WIDTH + QR_GAP
-QR_BLOCK_Y = TITLE_BASELINE_Y - 30   # top-aligned with ascenders
+QR_BLOCK_Y = TITLE_BASELINE_Y - QR_BLOCK_SIZE + 1  # bottom-aligned with baseline
 
 # Tagline
-TAGLINE_Y = 412
+TAGLINE_Y = 420
 
 # Small social sub-text
-SOCIAL_Y = 440
+SOCIAL_Y = 448
 
 # QR code
 QR_URL = "https://mcp-steroid.jonnyzzz.com/#qr1"
@@ -267,9 +267,8 @@ print(f"# ViewBox: {vb_x:.0f} {vb_y:.0f} {vb_w:.0f} {vb_h:.0f}", file=sys.stderr
 
 # ===== Generate QR code SVG path =====
 
-def generate_qr_light_path(url, x, y, size):
-    """Generate SVG path for QR code LIGHT modules (for inverted/cursor-block rendering).
-    The background rect is filled with gradient; light cells are white knockouts."""
+def generate_qr_dark_path(url, x, y, size):
+    """Generate SVG path for QR code DARK modules (standard rendering on white block)."""
     qr = qrcode.QRCode(version=None, error_correction=qrcode.constants.ERROR_CORRECT_M,
                         box_size=1, border=1)
     qr.add_data(url)
@@ -280,13 +279,13 @@ def generate_qr_light_path(url, x, y, size):
     rects = []
     for row in range(n):
         for col in range(n):
-            if not matrix[row][col]:  # light modules → white
+            if matrix[row][col]:  # dark modules
                 rx = x + col * cell
                 ry = y + row * cell
                 rects.append(f"M{rx:.2f},{ry:.2f}h{cell:.2f}v{cell:.2f}h{-cell:.2f}z")
     return " ".join(rects)
 
-qr_light_path = generate_qr_light_path(QR_URL, QR_BLOCK_X, QR_BLOCK_Y, QR_BLOCK_SIZE)
+qr_dark_path = generate_qr_dark_path(QR_URL, QR_BLOCK_X, QR_BLOCK_Y, QR_BLOCK_SIZE)
 
 # ===== Emit complete SVG =====
 
