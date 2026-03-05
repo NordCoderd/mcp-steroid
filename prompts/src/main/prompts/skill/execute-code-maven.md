@@ -223,6 +223,82 @@ mismatches — only setting `JAVA_HOME` in the shell environment fixes it. Use `
 
 ---
 
+## Fix: "Project JDK is not defined" Banner (IntelliJ IDEA)
+
+When IntelliJ shows a yellow "Project JDK is not defined" notification in the editor,
+Maven builds and inspections will fail. Fix it immediately before doing any other work.
+
+**For Maven/Gradle projects**: the correct JDK is the one Maven/Gradle uses for import —
+typically whatever `JAVA_HOME` is set to. Using a different JDK can cause language-level
+mismatches and re-import failures.
+
+**Step 1: Check existing registered SDKs first**
+
+IntelliJ may already have a Java SDK registered from a previous session or auto-detection.
+Reuse it instead of scanning the filesystem:
+
+```kotlin[IU]
+import com.intellij.openapi.projectRoots.JavaSdk
+import com.intellij.openapi.projectRoots.ProjectJdkTable
+import com.intellij.openapi.projectRoots.ex.JavaSdkUtil
+import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.openapi.application.edtWriteAction
+import com.intellij.platform.backend.observation.Observation
+
+// 1. Use already-registered Java SDK if available (no filesystem search needed)
+val registeredSdk = ProjectJdkTable.getInstance().allJdks
+    .firstOrNull { it.sdkType is JavaSdk }
+
+// 2. Otherwise: find a JDK on disk — use same JDK as Maven (JAVA_HOME), then scan /usr/lib/jvm/
+val jdkPath = if (registeredSdk == null) {
+    val candidates = listOfNotNull(
+        System.getenv("JAVA_HOME"),
+        *java.io.File("/usr/lib/jvm").listFiles()
+            ?.filter { it.isDirectory }
+            ?.sortedByDescending { it.name }
+            ?.map { it.absolutePath }?.toTypedArray() ?: emptyArray(),
+        System.getProperty("java.home"),   // IntelliJ's own JBR — always present as last resort
+    )
+    candidates.firstOrNull { java.io.File(it, "bin/java").exists() }
+} else null
+
+val currentSdk = ProjectRootManager.getInstance(project).projectSdk
+when {
+    currentSdk != null -> println("Project SDK already set: ${currentSdk.name}")
+    registeredSdk != null -> {
+        edtWriteAction { JavaSdkUtil.applyJdkToProject(project, registeredSdk) }
+        println("Applied registered SDK: ${registeredSdk.name}")
+    }
+    jdkPath != null -> {
+        val sdk = edtWriteAction {
+            com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
+                .createAndAddSDK(jdkPath, JavaSdk.getInstance())
+        }
+        if (sdk != null) {
+            edtWriteAction { JavaSdkUtil.applyJdkToProject(project, sdk) }
+            println("Registered and applied SDK from: $jdkPath")
+        }
+    }
+    else -> println("ERROR: No JDK found. Check /usr/lib/jvm/ and JAVA_HOME.")
+}
+
+// 3. Trigger Maven re-sync — Maven import may have failed without JDK
+if (ProjectRootManager.getInstance(project).projectSdk != null) {
+    import org.jetbrains.idea.maven.project.MavenProjectsManager
+    import org.jetbrains.idea.maven.buildtool.MavenSyncSpec
+    MavenProjectsManager.getInstance(project)
+        .scheduleUpdateAllMavenProjects(MavenSyncSpec.full("after-jdk-fix", explicit = true))
+    Observation.awaitConfiguration(project)
+    println("Maven re-sync complete")
+}
+```
+
+**When to run this**: Before any Maven or inspection call if the editor shows the JDK banner.
+**Why same JDK as Maven**: Maven was configured for `JAVA_HOME` — using a different JDK causes
+language-level mismatches and re-import failures.
+
+---
+
 ## What NOT to Do
 
 - **❌ `ProcessBuilder("./mvnw")` as primary pattern** — banned. Use `MavenRunner` or `MavenRunConfigurationType`.
