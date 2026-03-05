@@ -293,54 +293,56 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg"
      width="{vb_w:.0f}" height="{vb_h:.0f}"
      viewBox="{vb_x:.1f} {vb_y:.1f} {vb_w:.1f} {vb_h:.1f}" fill="none">
   <defs>
-    <linearGradient id="brandGradient" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#6B57FF"/>
-      <stop offset="100%" stop-color="#FE2857"/>
+    <!-- Background gradient: purple → pink (diagonal) -->
+    <linearGradient id="bgGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7C3AED"/>
+      <stop offset="100%" stop-color="#E84D8A"/>
     </linearGradient>
-    <filter id="logoShadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#9B88B7" flood-opacity="0.22"/>
-      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#B7A6CC" flood-opacity="0.30"/>
-    </filter>
+    <!-- Circle fill gradient (slightly shifted for depth) -->
+    <linearGradient id="circleGradient" x1="0.2" y1="0" x2="0.9" y2="1">
+      <stop offset="0%" stop-color="#8B5CF6"/>
+      <stop offset="100%" stop-color="#E8508B"/>
+    </linearGradient>
     <clipPath id="stickerClip">
       <path d="{cut_path}"/>
     </clipPath>
   </defs>
 
-  <!-- Die-cut outline -->
+  <!-- Die-cut body: gradient background -->
   <path d="{cut_path}"
-        fill="white" stroke="#D5CDDF" stroke-width="1"/>
+        fill="url(#bgGradient)" stroke="none"/>
 
   <g clip-path="url(#stickerClip)">
-    <!-- Shadow ring -->
-    <circle cx="220" cy="190" r="148" fill="#A994C3" fill-opacity="0.10"/>
+    <!-- Semi-transparent ring behind logo circle -->
+    <circle cx="220" cy="190" r="155" fill="white" fill-opacity="0.08"/>
 
-    <!-- Logo circle -->
-    <circle cx="220" cy="185" r="140" fill="white" stroke="#E8E2EE" stroke-width="1.2" filter="url(#logoShadow)"/>
+    <!-- Logo circle with gradient fill -->
+    <circle cx="220" cy="185" r="140" fill="url(#circleGradient)" stroke="white" stroke-opacity="0.25" stroke-width="1.5"/>
 
-    <!-- Lightning Bolt -->
+    <!-- Lightning Bolt — WHITE -->
     <g transform="translate(220, 185) scale(8) translate(-20, -20)">
-      <path d="M22 23H26L18 30V22H14L22 10V23Z" fill="url(#brandGradient)"/>
+      <path d="M22 23H26L18 30V22H14L22 10V23Z" fill="white"/>
     </g>
 
-    <!-- Title "MCP Steroid" + QR cursor block -->
+    <!-- Title "MCP Steroid" — WHITE -->
     <text x="{TITLE_X}" y="{TITLE_BASELINE_Y}" text-anchor="start"
           font-family="-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif"
-          font-weight="700" font-size="{TITLE_FONT_SIZE}" fill="url(#brandGradient)" letter-spacing="-0.5">MCP Steroid</text>
+          font-weight="700" font-size="{TITLE_FONT_SIZE}" fill="white" letter-spacing="-0.5">MCP Steroid</text>
 
-    <!-- QR cursor block: gradient background with white QR knockouts -->
+    <!-- QR cursor block: white background, dark QR modules -->
     <rect x="{QR_BLOCK_X}" y="{QR_BLOCK_Y}" width="{QR_BLOCK_SIZE}" height="{QR_BLOCK_SIZE}"
-          rx="2" fill="url(#brandGradient)"/>
-    <path d="{qr_light_path}" fill="white"/>
+          rx="2" fill="white" fill-opacity="0.9"/>
+    <path d="{qr_dark_path}" fill="url(#bgGradient)" fill-opacity="0.85"/>
 
-    <!-- Tagline -->
+    <!-- Tagline — white, slightly transparent -->
     <text x="220" y="{TAGLINE_Y}" text-anchor="middle"
           font-family="\'JetBrains Mono\', monospace"
-          font-weight="400" font-size="13" fill="#666666">Give AI the whole IDE, not just the files</text>
+          font-weight="400" font-size="13" fill="white" fill-opacity="0.85">Give AI the whole IDE, not just the files</text>
 
-    <!-- Small social sub-text -->
+    <!-- Small social sub-text — white, more transparent -->
     <text x="220" y="{SOCIAL_Y}" text-anchor="middle"
           font-family="\'JetBrains Mono\', monospace"
-          font-weight="400" font-size="10" fill="#AAAAAA">@jonnyzzz · linkedin.com/in/jonnyzzz</text>
+          font-weight="400" font-size="10" fill="white" fill-opacity="0.55">@jonnyzzz · linkedin.com/in/jonnyzzz</text>
   </g>
 </svg>'''
 
