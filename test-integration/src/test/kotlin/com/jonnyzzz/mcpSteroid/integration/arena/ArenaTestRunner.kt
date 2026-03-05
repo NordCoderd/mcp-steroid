@@ -138,7 +138,8 @@ class ArenaTestRunner(
 
         if (withMcp) {
             appendLine("- IntelliJ MCP is available; the project is already open and indexed.")
-            appendLine("- Use `steroid_execute_code` for IDE actions and command execution.")
+            appendLine("- Use `steroid_execute_code` for **IDE-specific operations only**: VCS diff (`ChangeListManager`), PSI queries, type hierarchy, cross-file reference search (`ReferencesSearch`), and compile error inspection (`runInspectionsDirectly`, `ProjectTaskManager.buildAllModules`).")
+            appendLine("- **Run Maven/Gradle tests with the Bash tool** — do NOT use `steroid_execute_code` to run `./mvnw` or `./gradlew`. The `ProcessBuilder` pattern inside steroid is banned (classpath conflicts + token overflow). Just run: `./mvnw test -Dtest=MyTest` from Bash.")
             appendLine("- Keep one stable `task_id` for this task.")
             appendLine("- **Project name in IntelliJ is always `project-home`** — use this exact name in every `steroid_execute_code` call. Never use the GitHub repo name (e.g. \"petclinic\", \"spring-petclinic\") as the project name.")
             appendLine("- **The IDE is already configured** — do NOT attempt JDK/SDK setup, do NOT install plugins. Start immediately with your first real task call.")
@@ -167,11 +168,12 @@ class ArenaTestRunner(
             appendLine("- **`findProjectFile()` pitfall for resource files**: `findProjectFile(\"filename\")` (just a filename) returns null — it needs the full relative path (e.g., `\"src/main/resources/application.properties\"`). For files under `src/main/resources/`, use `FilenameIndex.getVirtualFilesByName(\"application.properties\", scope).firstOrNull { it.path.contains(\"src/main/resources\") }` instead of `findProjectFile()`.")
             appendLine("- **FAIL_TO_PASS test files may not exist on disk**: If a FAIL_TO_PASS test file returns empty or NOT FOUND when you try to read it, it is a **new file added by the test patch** that needs the implementation to make sense. Do NOT block on reading it. Use the class name and problem statement to understand what needs to be implemented.")
             appendLine("- **Research budget**: Complete ALL exploration in AT MOST 2 `steroid_execute_code` calls. After 2 research calls, start writing implementation. If a file is empty or missing, pivot immediately to the problem statement and FAIL_TO_PASS class names — they describe what must be implemented even when source files can't be read.")
+            appendLine("- **Skip steroid entirely for simple multi-file edits**: If the task is purely modifying existing files (URL prefix changes, annotation additions, constant renames) and files are in predictable locations — use `Grep` + `Read` + `Edit` directly, ZERO steroid calls. Only open steroid when you need type hierarchy, cross-module search, or compile error inspection that Grep cannot provide.")
             appendLine("- **First call recipe** — combine readiness + Docker + VCS changes in ONE `steroid_execute_code` call (saves ~60s vs 3 separate calls):")
             appendLine("  ```kotlin")
             appendLine("  println(\"Project: ${'$'}{project.name}, base: ${'$'}{project.basePath}\")")
-            appendLine("  val dp = ProcessBuilder(\"docker\", \"info\").redirectErrorStream(true).start()")
-            appendLine("  val dockerOk = dp.waitFor(10, java.util.concurrent.TimeUnit.SECONDS) && dp.exitValue() == 0")
+            appendLine("  // Docker socket check — no process spawn needed (ProcessBuilder inside steroid is banned)")
+            appendLine("  val dockerOk = java.io.File(\"/var/run/docker.sock\").exists()")
             appendLine("  println(\"Docker: ${'$'}dockerOk\")")
             appendLine("  val changes = readAction {")
             appendLine("      com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)")
@@ -183,12 +185,28 @@ class ArenaTestRunner(
             appendLine("  //   val vf = findProjectFile(path) ?: run { println(\"NOT FOUND: \$path\"); continue }")
             appendLine("  //   val c = VfsUtil.loadText(vf); if (c.isEmpty()) { println(\"EMPTY: \$path\"); continue }")
             appendLine("  ```")
-            appendLine("  If `dockerOk=false`: still **run the FAIL_TO_PASS tests first** (many use H2, no Docker needed).")
-            appendLine("  Only fall back to `runInspectionsDirectly` if the test explicitly fails with a Docker connection error.")
+            appendLine("  If `dockerOk=false`: still **run the FAIL_TO_PASS tests first via Bash** (many use H2, no Docker needed).")
+            appendLine("  Only treat Docker as a blocker if the test explicitly fails with a `DockerException` / `Could not find a valid Docker environment` error.")
         } else {
             appendLine("- IntelliJ MCP tools are unavailable in this run.")
             appendLine("- Use shell commands only (`bash`, `cat`, `find`, `grep`, `$buildWrapper`).")
             appendLine("- Do not call `steroid_*` tools.")
+        }
+
+        // Task-type-specific hints — applied for both MCP and NONE agents
+        val isR2dbc = testCase.tags.any { it.contains("r2dbc", ignoreCase = true) }
+                || testCase.problemStatement.contains("r2dbc", ignoreCase = true)
+                || testCase.problemStatement.contains("reactive", ignoreCase = true) && testCase.problemStatement.contains("repository", ignoreCase = true)
+        if (isR2dbc) {
+            appendLine()
+            appendLine("## R2DBC-Specific Notes (CRITICAL)")
+            appendLine()
+            appendLine("- **`@OneToMany` / `@OneToOne` / `@ManyToMany` are NOT supported in Spring Data R2DBC.** Each entity must stand alone. Load related entities with separate repository queries (e.g. `petRepository.findByOwner(ownerId)`) — do NOT use JPA-style join annotations.")
+            appendLine("- **`@Id` must be `org.springframework.data.annotation.Id`**, NOT `jakarta.persistence.Id`. Mixing them causes silent failures.")
+            appendLine("- **`@Column` syntax differs**: `@Column(\"column_name\")` (string arg), NOT `@Column(name=\"...\")` (JPA-style named attribute).")
+            appendLine("- **`ReactiveCrudRepository<T, ID>` / `R2dbcRepository<T, ID>`** replaces `JpaRepository`. All methods return `Mono<T>` or `Flux<T>`. Tests must use `.block()` or `StepVerifier`.")
+            appendLine("- **`@Transactional` from `org.springframework.transaction.annotation.Transactional`** — same annotation, works with R2DBC if the reactive transaction manager is configured.")
+            appendLine("- **No `@GeneratedValue` with `GenerationType.IDENTITY` auto-mapping** for all DBs — verify schema uses the right sequence/auto-increment strategy.")
         }
 
         appendLine()
