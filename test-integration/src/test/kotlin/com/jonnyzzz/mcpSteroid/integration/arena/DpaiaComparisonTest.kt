@@ -134,10 +134,10 @@ class DpaiaComparisonTest {
          * Ensures the IDE startup wait covers the slowest case (e.g. microshop-18 with 20-min timeout).
          */
         private val maxProjectReadyTimeoutMs: Long =
-            DpaiaCuratedCases.PRIMARY_COMPARISON_CASES
-                .mapNotNull { DpaiaCuratedCases.CASE_CONFIGS[it]?.projectReadyTimeoutMs }
-                .maxOrNull()
-                ?: DpaiaCuratedCases.CaseConfig().projectReadyTimeoutMs
+            DpaiaCuratedCases.PRIMARY_COMPARISON_CASES.maxOf { id ->
+                DpaiaCuratedCases.CASE_CONFIGS[id]?.projectReadyTimeoutMs
+                    ?: DpaiaCuratedCases.CaseConfig().projectReadyTimeoutMs
+            }
 
         /** Container where agents connect to MCP Steroid via HTTP. */
         val sessionWithMcp by lazy {

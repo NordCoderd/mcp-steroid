@@ -80,10 +80,11 @@ class DpaiaArenaTest {
                         projectGuestDir = ideProjectDir,
                     )
 
+                    val caseConfig = DpaiaCuratedCases.CASE_CONFIGS[testCase.instanceId] ?: DpaiaCuratedCases.CaseConfig()
                     val result = runner.runTest(
                         testCase = testCase,
                         agent = agent,
-                        timeoutSeconds = 1800,
+                        timeoutSeconds = caseConfig.agentTimeoutSeconds,
                         // No prewarm needed: project was deployed before IntelliJ started
                         // and is already fully indexed via waitForProjectReady() in @BeforeAll.
                         predeployedProjectDir = ideProjectDir,

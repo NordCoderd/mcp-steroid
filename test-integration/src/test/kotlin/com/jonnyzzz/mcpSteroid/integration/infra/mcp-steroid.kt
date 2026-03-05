@@ -569,11 +569,12 @@ import java.awt.Dialog
 import java.awt.Window
 import javax.swing.JButton
 
-fun findButtons(container: Container): List<JButton> {
+fun findButtons(container: Container, depth: Int = 20): List<JButton> {
+    if (depth <= 0) return emptyList()
     val result = mutableListOf<JButton>()
     for (component in container.components) {
         if (component is JButton) result += component
-        if (component is Container) result += findButtons(component)
+        if (component is Container) result += findButtons(component, depth - 1)
     }
     return result
 }

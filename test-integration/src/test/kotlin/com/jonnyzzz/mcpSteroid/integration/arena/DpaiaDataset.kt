@@ -138,7 +138,7 @@ object DpaiaDatasetLoader {
             problemStatement = obj.string("problem_statement"),
             version = obj.string("version"),
             isMaven = obj.string("is_maven").equals("true", ignoreCase = true),
-            buildSystem = obj.string("build_system"),
+            buildSystem = obj.string("build_system").lowercase(),
             testArgs = obj.stringOrEmpty("test_args"),
         )
     }

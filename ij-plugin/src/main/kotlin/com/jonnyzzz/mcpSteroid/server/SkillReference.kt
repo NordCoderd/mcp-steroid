@@ -40,7 +40,7 @@ class SkillReference {
      * on every call.
      */
     val fileDiscoveryReminder: String = buildString {
-        appendLine("FILE DISCOVERY: Use FilenameIndex in exec_code — NEVER use Glob for file search by name or extension.")
+        appendLine("FILE DISCOVERY: Use FilenameIndex in steroid_execute_code — NEVER use Glob for file search by name or extension.")
         appendLine("  val javaFiles = readAction { FilenameIndex.getAllFilesByExt(project, \"java\", GlobalSearchScope.projectScope(project)) }")
         appendLine("  val byName    = readAction { FilenameIndex.getVirtualFilesByName(\"MyClass.java\", GlobalSearchScope.projectScope(project)) }")
         append("  Full guide: mcp-steroid://skill/execute-code-tool-description")
