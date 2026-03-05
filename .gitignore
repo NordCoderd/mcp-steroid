@@ -29,6 +29,9 @@ Thumbs.db
 integration-test/tmp/
 integration-test/*.tmp
 
+# DPAIA run output directories (agent stdout/stderr/stream logs)
+runs/run_*/
+
 # NPX package artifacts
 npx/node_modules/
 npx/dist/
