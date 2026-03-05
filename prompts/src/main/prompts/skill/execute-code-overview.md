@@ -21,6 +21,18 @@ Scripts run inside IntelliJ's JVM — unrestricted filesystem access to `/mcp-ru
 
 The native Read tool can access `/mcp-run-dir/` paths directly. For reading a single file's content, prefer the Read tool over `String(vf.contentsToByteArray(), vf.charset)` — it's faster (no compilation overhead). Reserve `steroid_execute_code` for operations that **REQUIRE** IntelliJ APIs: PSI analysis, compilation checks, test execution, find usages, refactoring, VCS inspection. If you just need to read file text, use the Read tool.
 
+**BANNED: Using steroid_execute_code to read files you know the path of.**
+
+```kotlin
+// ❌ BANNED — costs 8-15s for zero benefit
+val content = String(findProjectFile("src/main/java/Foo.java")!!.contentsToByteArray())
+// ✅ CORRECT — use Read tool directly (0s overhead)
+// Read: src/main/java/Foo.java
+```
+
+This mistake caused 15-80s overhead in case analyses. The Read tool reads files in ~0s.
+steroid_execute_code compiles and runs Kotlin, adding 8-15s per call.
+
 ---
 
 ## ⚡ File Creation: Use the Write Tool (NOT steroid_execute_code)

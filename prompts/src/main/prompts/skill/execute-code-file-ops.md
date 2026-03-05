@@ -17,6 +17,33 @@ println("Smart mode: ${!com.intellij.openapi.project.DumbService.isDumb(project)
 
 ---
 
+## ⚠️ When to SKIP the Initial Check Entirely
+
+The first-call readiness probe costs **13-17s minimum** (steroid_list_projects + execute_code
+round-trip). For short tasks (<3 min total), this is 10-15% overhead. **Skip it when ALL of:**
+
+- Task is pure file editing (add field, add annotation, add method, add endpoint)
+- No Docker/TestContainers in the test suite (`grep -r Testcontainers src/` → none)
+- No compilation-unknown situation (you know the project structure from Glob/Read)
+- Project is single-module or you already know which module to edit
+
+**Skip pattern** — go straight to Read/Glob/Edit:
+```text
+# CORRECT for simple tasks: no steroid call needed
+# 1. Find files with Glob
+# 2. Read with Read tool
+# 3. Edit with Edit tool
+# 4. Verify with: ./mvnw -pl <module> test -Dtest=<TestClass>
+```
+
+**Use initial check when:**
+- Need Docker availability (TestContainers test)
+- Need VCS diff to understand what test expects you to implement
+- Need to verify project loads before long-running coding session
+- Project structure is unknown and Glob alone can't identify the relevant modules
+
+---
+
 ## ⚡ Spring Boot / Maven Combined Startup Call
 
 Combine readiness + Docker + VCS discovery in ONE call instead of 3 separate calls (saves ~60s). **Keep this call IDE-only**: Docker socket check + VCS modified files query. Do NOT batch file reads into this call — use Read/Glob tools for those (zero overhead). **Skip the Docker check if the scenario is pure file-creation (no @Testcontainers, no Docker in FAIL_TO_PASS tests)** — the check adds 10-15s with no benefit for those cases:
