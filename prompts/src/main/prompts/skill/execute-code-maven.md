@@ -240,24 +240,26 @@ Reuse it instead of scanning the filesystem:
 ```kotlin[IU]
 import com.intellij.openapi.projectRoots.JavaSdk
 import com.intellij.openapi.projectRoots.ProjectJdkTable
+import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
 import com.intellij.openapi.projectRoots.ex.JavaSdkUtil
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.application.edtWriteAction
 import com.intellij.platform.backend.observation.Observation
+import org.jetbrains.idea.maven.project.MavenProjectsManager
+import org.jetbrains.idea.maven.buildtool.MavenSyncSpec
 
-// 1. Use already-registered Java SDK if available (no filesystem search needed)
-val registeredSdk = ProjectJdkTable.getInstance().allJdks
-    .firstOrNull { it.sdkType is JavaSdk }
+// 1. Use already-registered Java SDK if available (preferred — no filesystem scan needed)
+// getSdksOfType() is the correct API; allJdks includes all types (JavaScript, Python, etc.)
+val registeredSdk = ProjectJdkTable.getInstance().getSdksOfType(JavaSdk.getInstance()).firstOrNull()
 
-// 2. Otherwise: find a JDK on disk — use same JDK as Maven (JAVA_HOME), then scan /usr/lib/jvm/
+// 2. Otherwise: find JDK on disk — same JDK Maven uses (JAVA_HOME), then scan /usr/lib/jvm/
 val jdkPath = if (registeredSdk == null) {
     val candidates = listOfNotNull(
         System.getenv("JAVA_HOME"),
         *java.io.File("/usr/lib/jvm").listFiles()
-            ?.filter { it.isDirectory }
-            ?.sortedByDescending { it.name }
+            ?.filter { it.isDirectory }?.sortedByDescending { it.name }
             ?.map { it.absolutePath }?.toTypedArray() ?: emptyArray(),
-        System.getProperty("java.home"),   // IntelliJ's own JBR — always present as last resort
+        System.getProperty("java.home"),   // IntelliJ JBR — always present, last resort
     )
     candidates.firstOrNull { java.io.File(it, "bin/java").exists() }
 } else null
@@ -270,22 +272,20 @@ when {
         println("Applied registered SDK: ${registeredSdk.name}")
     }
     jdkPath != null -> {
-        val sdk = edtWriteAction {
-            com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
-                .createAndAddSDK(jdkPath, JavaSdk.getInstance())
-        }
+        // Check for duplicate before creating (createAndAddSDK does NOT deduplicate by path)
+        val existing = ProjectJdkTable.getInstance().getSdksOfType(JavaSdk.getInstance())
+            .firstOrNull { it.homePath == jdkPath }
+        val sdk = existing ?: edtWriteAction { SdkConfigurationUtil.createAndAddSDK(jdkPath, JavaSdk.getInstance()) }
         if (sdk != null) {
             edtWriteAction { JavaSdkUtil.applyJdkToProject(project, sdk) }
-            println("Registered and applied SDK from: $jdkPath")
-        }
+            println("Applied SDK from: $jdkPath (${sdk.name})")
+        } else println("ERROR: createAndAddSDK returned null for $jdkPath")
     }
-    else -> println("ERROR: No JDK found. Check /usr/lib/jvm/ and JAVA_HOME.")
+    else -> println("ERROR: No JDK found. Contents of /usr/lib/jvm: ${java.io.File("/usr/lib/jvm").list()?.toList()}")
 }
 
-// 3. Trigger Maven re-sync — Maven import may have failed without JDK
+// 3. Trigger Maven re-sync — initial import may have failed without a JDK
 if (ProjectRootManager.getInstance(project).projectSdk != null) {
-    import org.jetbrains.idea.maven.project.MavenProjectsManager
-    import org.jetbrains.idea.maven.buildtool.MavenSyncSpec
     MavenProjectsManager.getInstance(project)
         .scheduleUpdateAllMavenProjects(MavenSyncSpec.full("after-jdk-fix", explicit = true))
     Observation.awaitConfiguration(project)

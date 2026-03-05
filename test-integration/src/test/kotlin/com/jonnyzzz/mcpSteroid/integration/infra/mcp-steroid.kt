@@ -423,32 +423,30 @@ val jdkPath = allCandidates.firstOrNull { java.io.File(it, "bin/java").exists() 
 var jdkWasSet = false
 
 // Also check ProjectJdkTable for any already-registered Java SDK
+// getSdksOfType() is preferred over filtering allJdks (which includes all SDK types)
 val registeredJavaSdk = com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance()
-    .allJdks.firstOrNull { it.sdkType is com.intellij.openapi.projectRoots.JavaSdk }
+    .getSdksOfType(JavaSdk.getInstance()).firstOrNull()
 
 val currentSdk = ProjectRootManager.getInstance(project).projectSdk
 if (currentSdk != null) {
     println("[JDK-SETUP] Project SDK already set: ${'$'}{currentSdk.name}")
 } else if (registeredJavaSdk != null) {
     // Re-use a JDK already registered in the IDE's SDK table (avoids filesystem scan)
-    println("[JDK-SETUP] Using already-registered Java SDK: ${'$'}{registeredJavaSdk.name}")
+    println("[JDK-SETUP] Using already-registered Java SDK: ${'$'}{registeredJavaSdk.name} at ${'$'}{registeredJavaSdk.homePath}")
     edtWriteAction { JavaSdkUtil.applyJdkToProject(project, registeredJavaSdk) }
     jdkWasSet = true
 } else if (jdkPath == null) {
-    println("[JDK-SETUP] WARNING: No JDK found. Checked: ${'$'}{allCandidates.filter { java.io.File(it, \"bin/java\").exists().not() }.take(5)}")
+    println("[JDK-SETUP] WARNING: No JDK found.")
     println("[JDK-SETUP] Actual /usr/lib/jvm contents: ${'$'}{java.io.File(\"/usr/lib/jvm\").listFiles()?.map { it.name } ?: \"(dir not found)\"}")
+    println("[JDK-SETUP] java.home (IntelliJ JBR): ${'$'}{System.getProperty(\"java.home\")}")
 } else {
     println("[JDK-SETUP] No project SDK set — registering ${'$'}jdkPath ...")
-    // SdkConfigurationUtil.createAndAddSDK creates the SDK and adds it to ProjectJdkTable atomically.
-    // JavaSdkUtil.applyJdkToProject sets it as project SDK and also configures the language level.
-    // Both require EDT + write action, which edtWriteAction provides.
-    val sdk = edtWriteAction {
-        SdkConfigurationUtil.createAndAddSDK(jdkPath, JavaSdk.getInstance())
-    }
+    // Check for duplicate first — createAndAddSDK does NOT deduplicate by homePath
+    val existing = com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance()
+        .getSdksOfType(JavaSdk.getInstance()).firstOrNull { it.homePath == jdkPath }
+    val sdk = existing ?: edtWriteAction { SdkConfigurationUtil.createAndAddSDK(jdkPath, JavaSdk.getInstance()) }
     if (sdk != null) {
-        edtWriteAction {
-            JavaSdkUtil.applyJdkToProject(project, sdk)
-        }
+        edtWriteAction { JavaSdkUtil.applyJdkToProject(project, sdk) }
         println("[JDK-SETUP] Project SDK set to ${'$'}{sdk.name} from ${'$'}jdkPath")
         jdkWasSet = true
     } else {
