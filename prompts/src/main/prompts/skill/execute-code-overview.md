@@ -13,7 +13,7 @@ This is a **stateful** API — everything you do changes the IDE state. The Inte
 
 ## ⚡ Bypasses Agent Sandbox
 
-Scripts run inside IntelliJ's JVM — unrestricted filesystem access to `/mcp-run-dir/` and the project. Use `steroid_execute_code` for IntelliJ-specific operations (PSI, indexing, Maven runner, VCS). For plain file reads/writes, prefer the native Read/Write tools — they have zero JVM compilation overhead (~12s saved per call).
+Scripts run inside IntelliJ's JVM — unrestricted filesystem access to `/mcp-run-dir/` and the project. Use `steroid_execute_code` for IntelliJ-specific operations (PSI, indexing, VCS, compile checks, find usages). For plain file reads/writes, prefer the native Read/Write tools — they have zero JVM compilation overhead (~12s saved per call). **To run Maven/Gradle tests, use the Bash tool** (`./mvnw test -Dtest=...`) — do NOT run `ProcessBuilder("./mvnw")` inside steroid_execute_code.
 
 ---
 

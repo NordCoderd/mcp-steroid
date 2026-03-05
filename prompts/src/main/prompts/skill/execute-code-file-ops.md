@@ -28,7 +28,7 @@ round-trip). For short tasks (<3 min total), this is 10-15% overhead. **Skip it 
 - Project is single-module or you already know which module to edit
 
 **Skip pattern** — go straight to Read/Glob/Edit:
-```text
+```
 # CORRECT for simple tasks: no steroid call needed
 # 1. Find files with Glob
 # 2. Read with Read tool

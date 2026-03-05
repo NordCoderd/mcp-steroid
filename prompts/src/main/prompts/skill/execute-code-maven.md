@@ -195,12 +195,12 @@ or `Unsupported class file major version`, the root cause is often a JDK version
 Fix it BEFORE making any other changes.
 
 **Step 1: Detect available JDKs in the container**
-```bash
+```
 ls /usr/lib/jvm/ 2>/dev/null || ls /Library/Java/JavaVirtualMachines/ 2>/dev/null
 ```
 
 **Step 2: Try the correct JDK**
-```bash
+```
 # Example: project requires Java 17 but default is Java 21 or 25
 export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-arm64  # or temurin-17-amd64, java-17-openjdk, etc.
 export PATH=$JAVA_HOME/bin:$PATH
@@ -208,7 +208,7 @@ java -version   # confirm JDK version
 ```
 
 **Step 3: Run Maven with explicit JAVA_HOME**
-```bash
+```
 JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-arm64 mvn -pl ts-common install -DskipTests
 ```
 

@@ -52,7 +52,7 @@ For Maven-specific patterns (MavenRunner, MavenRunnerParameters, Maven sync afte
 until you have a targeted-test PASS.**
 
 **Maven multi-module:**
-```bash
+```
 # ✅ CORRECT — run only the modified module's tests (~15-20s)
 ./mvnw -pl visits-service test -Dtest=VisitControllerTest
 ./mvnw -pl visits-service test  # all tests in module (~20s)
@@ -62,7 +62,7 @@ until you have a targeted-test PASS.**
 ```
 
 **Gradle multi-project:**
-```bash
+```
 # ✅ CORRECT — run only the subproject you changed (~15s)
 ./gradlew :visits-service:test --tests '*VisitControllerTest*'
 ./gradlew :visits-service:test  # all tests in subproject (~20s)
@@ -72,7 +72,7 @@ until you have a targeted-test PASS.**
 ```
 
 **Single-module Maven (petclinic-rest, etc.):**
-```bash
+```
 # Target a specific test class to verify your change (~10s)
 ./mvnw test -Dtest=PetRestControllerTests
 
@@ -86,21 +86,27 @@ until you have a targeted-test PASS.**
 - After all targeted tests pass: optionally run `./mvnw test` once for final verification
 - Never run full suite on the first attempt — always target first
 
-**Using IDE-based test runner (preferred for single-file verification):**
-```kotlin
-// Run a specific test class via IntelliJ — instant result, no Maven overhead
-// See mcp-steroid://skill/execute-code-testing for IDE test execution patterns
+**Preferred: run targeted tests via the Bash tool** (outside steroid_execute_code):
 ```
+# Maven
+./mvnw test -Dtest=VisitControllerTest -Dspotless.check.skip=true
+# Gradle
+./gradlew :visits-service:test --tests '*VisitControllerTest*' --rerun-tasks
+```
+Use the IntelliJ Maven/Gradle runner (below) only when you need test results inside a steroid_execute_code workflow.
 
 ---
 
 ## ❌ BANNED: Do NOT Use ProcessBuilder for Routine Maven/Gradle Builds or Tests
 
+**This section applies to running Maven/Gradle INSIDE `steroid_execute_code`.** Running Maven/Gradle via the **Bash tool** (outside steroid_execute_code) is always correct and is the preferred approach for simple test runs — use it first.
+
 **ProcessBuilder("./mvnw", ...)** spawns a child process inside IntelliJ's JVM — this bypasses IDE process management, causes classpath conflicts, and produces 200k+ char output that overflows MCP token limits.
 
-**Allowed alternatives (in priority order):**
-1. **Maven IDE runner** — `MavenRunConfigurationType.runConfiguration()` (see below) — structured pass/fail, no token overflow
-2. **Gradle IDE runner** — `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID` (see below)
+**Alternatives (in priority order):**
+0. **Bash tool** (PREFERRED, OUTSIDE steroid_execute_code) — run `./mvnw test -Dtest=MyTest` or `./gradlew :module:test --tests '*MyTest*'` directly from the Bash tool. Zero IntelliJ overhead. This is the first choice for any test execution that does not require IDE-integrated results.
+1. **Maven IDE runner** (inside steroid_execute_code) — `MavenRunConfigurationType.runConfiguration()` — use when you need pass/fail result inside a steroid_execute_code workflow
+2. **Gradle IDE runner** (inside steroid_execute_code) — `ExternalSystemUtil.runTask()` with `GradleConstants.SYSTEM_ID`
 3. **ProcessBuilder("./mvnw")** — ONLY when pom.xml was just modified AND the IDE runner's SMTRunnerEventsListener latch has already timed out
 
 **`GeneralCommandLine("docker", ...)` and `ProcessBuilder("docker", ...)` inside steroid_execute_code are BANNED** — same reason as `./mvnw`: they spawn a child process inside IntelliJ's JVM.
