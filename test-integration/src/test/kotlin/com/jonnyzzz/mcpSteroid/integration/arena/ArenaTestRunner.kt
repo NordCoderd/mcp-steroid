@@ -120,6 +120,8 @@ class ArenaTestRunner(
         appendLine("- Test-class command template: `$runClassCommand`")
         if (testCase.buildSystem == "maven") {
             appendLine("- **NEVER use `$buildWrapper install -am`** (also-make). The `-am` flag builds ALL upstream dependencies (potentially 48+ modules) and causes OOM in the container. Install only what you need: `$buildWrapper install -pl <module> -DskipTests`.")
+            appendLine("- **Maven + Lombok/Spring Boot 2.x failures**: If Maven fails with Lombok annotation errors (`bad class file`, `class file has wrong version`, or `com.sun.tools.javac.code.Symbol` errors), the default JAVA_HOME (Java 21) may be incompatible. Run `ls /usr/lib/jvm/` to find available JDKs, then try: `JAVA_HOME=/usr/lib/jvm/temurin-17-<arch> $buildWrapper ...`. Do NOT use `steroid_execute_code` or IntelliJ compiler to fix Maven compilation failures — bash + correct JAVA_HOME is always faster.")
+            appendLine("- **Maven missing module dependency** (e.g. `Could not resolve .../ts-common...`): install only that module: `JAVA_HOME=... $buildWrapper install -pl <missing-module> -DskipTests -Dspotless.check.skip=true`. Do NOT use IntelliJ APIs to resolve Maven module dependencies.")
         }
         appendLine("- Check Docker once at start (`docker info`) **only if the FAIL_TO_PASS tests use `@Testcontainers`, extend `AbstractIT`/`IntegrationTest`, or mention Docker**. For pure file-creation scenarios (just new Java classes/records needed), skip the Docker check entirely — it adds 10-15s with no benefit.")
         appendLine("- If Docker is unavailable, **still attempt to run FAIL_TO_PASS tests** — many use H2 in-memory DB and work fine without Docker.")
@@ -137,6 +139,7 @@ class ArenaTestRunner(
             appendLine("- IntelliJ MCP is available; the project is already open and indexed.")
             appendLine("- Use `steroid_execute_code` for IDE actions and command execution.")
             appendLine("- Keep one stable `task_id` for this task.")
+            appendLine("- **Project name in IntelliJ is always `project-home`** — use this exact name in every `steroid_execute_code` call. Never use the GitHub repo name (e.g. \"petclinic\", \"spring-petclinic\") as the project name.")
             appendLine("- **The IDE is already configured** — do NOT attempt JDK/SDK setup, do NOT install plugins. Start immediately with your first real task call.")
             appendLine("- **Check VCS changes on your FIRST call** (via `ChangeListManager.getInstance(project).allChanges`) to detect any prior agent work — do NOT assume a clean slate when there are multiple agent sessions.")
             appendLine("- **Validation/service changes → regression risk**: When you add a validation rule to an existing service method (e.g., `saveUser()`, `createOwner()`), EVERY other test that calls this method with data that now fails validation will break. BEFORE declaring success, scan for all test call sites: `PsiSearchHelper.getInstance(project).processAllFilesWithWord(\"saveUser\", scope, { f -> ...; true }, true)`. Common regression culprits: `Abstract*Tests`, `*JdbcTests`, `*JpaTests`, `*SpringDataJpaTests` — update their test data (e.g. passwords, names) to satisfy the new rule.")
