@@ -417,7 +417,7 @@ val dynamicCandidates = run {
 }
 // Final fallback: IntelliJ's own bundled JBR — always present, guaranteed to have bin/java
 val jbrPath = System.getProperty("java.home")
-println("[JDK-SETUP] Scanning: static=${staticCandidates.size}, dynamic=${dynamicCandidates.size}, jbr=${'$'}jbrPath")
+println("[JDK-SETUP] Scanning: static=${'$'}{staticCandidates.size}, dynamic=${'$'}{dynamicCandidates.size}, jbr=${'$'}jbrPath")
 val allCandidates = staticCandidates + dynamicCandidates + listOfNotNull(jbrPath)
 val jdkPath = allCandidates.firstOrNull { java.io.File(it, "bin/java").exists() }
 var jdkWasSet = false
