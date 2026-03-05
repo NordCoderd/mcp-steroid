@@ -19,6 +19,7 @@ Never include AI as co-author or mention AI in commit messages.
 - Log new ideas/tasks in TODO* files (TODO.md, TODO-*.md)
 - **No infrastructure workarounds**: when tests fail due to infrastructure limitations (missing Docker socket, missing CLI, wrong JDK), fix the infrastructure — mount Docker socket, install Docker CLI, configure JDK. Do NOT add code that detects the limitation and silently skips tests or changes behavior. A failing test that reveals a real problem is better than a passing test that hides it.
 - **Prefer Kotlin Coroutines native APIs over Java threading primitives**: use `CompletableDeferred<T>` + `withTimeout(duration) { deferred.await() }` instead of `CountDownLatch`. Use `Channel<T>` for streaming. Use `suspendCancellableCoroutine` for one-shot callbacks. `CountDownLatch` / `Semaphore` / `Object.wait()` are banned in new coroutine code — they block threads and are not cancellation-aware.
+- **NEVER run `test-integration` tests in parallel** — each test starts a full Docker IntelliJ container. Running two or more concurrently exhausts RAM/CPU (IDE windows never appear, containers OOM). Always run one `./gradlew :test-integration:test --tests '...'` at a time. Wait for it to finish completely before starting the next. This applies to all Docker-based tests: DPAIA arena, debugger demo, playground, CLI agent tests.
 
 ## Workflow
 
@@ -239,7 +240,7 @@ Rendered as `[thinking] first-non-blank-line`.
 
 #### Integration Test Strategy
 
-- **Run one heavy test at a time** — running multiple 20-minute IDE tests concurrently causes resource exhaustion (IDE window never appears, timeouts)
+- **ONLY 1 test-integration test at a time** — each test spins up a full Docker IntelliJ container. Running two simultaneously exhausts memory and CPU: the second IDE window never appears, containers get OOM-killed (exit 137), and both tests fail. Always wait for the current test to finish before starting another.
 - **Infrastructure failures are transient** — "Failed waiting for IntelliJ IDEA window" or "Failed waiting for Project import" are usually environment issues; retry individually with a cooldown
 - One-at-a-time run: `./gradlew :test-integration:test --tests '*DebuggerDemoTest.claude*'`
 
