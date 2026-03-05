@@ -46,6 +46,54 @@ For Maven-specific patterns (MavenRunner, MavenRunnerParameters, Maven sync afte
 
 ---
 
+## ⚡ Run Module-Targeted Tests, NOT the Full Suite (saves 40-120s per run)
+
+**Rule: Always target the specific module(s) you modified. Never run the full test suite
+until you have a targeted-test PASS.**
+
+**Maven multi-module:**
+```bash
+# ✅ CORRECT — run only the modified module's tests (~15-20s)
+./mvnw -pl visits-service test -Dtest=VisitControllerTest
+./mvnw -pl visits-service test  # all tests in module (~20s)
+
+# ❌ WRONG — runs all modules (~90s), most irrelevant to your change
+./mvnw test
+```
+
+**Gradle multi-project:**
+```bash
+# ✅ CORRECT — run only the subproject you changed (~15s)
+./gradlew :visits-service:test --tests '*VisitControllerTest*'
+./gradlew :visits-service:test  # all tests in subproject (~20s)
+
+# ❌ WRONG — runs all subprojects (~90s+)
+./gradlew test
+```
+
+**Single-module Maven (petclinic-rest, etc.):**
+```bash
+# Target a specific test class to verify your change (~10s)
+./mvnw test -Dtest=PetRestControllerTests
+
+# Only run full suite if targeted tests pass and you want final confidence
+./mvnw test
+```
+
+**When to use each:**
+- After adding a new method or annotation: run the test class for that layer only
+- After modifying entity/DTO: run entity tests + the controller test that uses it
+- After all targeted tests pass: optionally run `./mvnw test` once for final verification
+- Never run full suite on the first attempt — always target first
+
+**Using IDE-based test runner (preferred for single-file verification):**
+```kotlin
+// Run a specific test class via IntelliJ — instant result, no Maven overhead
+// See mcp-steroid://skill/execute-code-testing for IDE test execution patterns
+```
+
+---
+
 ## ❌ BANNED: Do NOT Use ProcessBuilder for Routine Maven/Gradle Builds or Tests
 
 **ProcessBuilder("./mvnw", ...)** spawns a child process inside IntelliJ's JVM — this bypasses IDE process management, causes classpath conflicts, and produces 200k+ char output that overflows MCP token limits.
