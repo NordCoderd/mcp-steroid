@@ -18,26 +18,105 @@ package com.jonnyzzz.mcpSteroid.integration.arena
  */
 object DpaiaCuratedCases {
 
+    /** Classifies the primary challenge driving agent effort for a test case. */
+    enum class TaskType {
+        /** Agent must find and modify many spread-out locations. IDE navigation pays off. */
+        NAVIGATE_MODIFY,
+        /** Agent mostly knows what to write from training; search scope is narrow. */
+        IMPLEMENT_SCRATCH,
+        /** Mixed characteristics. */
+        MIXED,
+    }
+
+    /** Observed MCP benefit based on A/B comparison data. */
+    enum class McpBenefit {
+        /** MCP measurably faster (>10% time or log lines). */
+        HIGH,
+        /** MCP slower or no advantage (<10% delta). */
+        LOW,
+        /** Not yet measured. */
+        UNKNOWN,
+    }
+
     /**
      * Per-case configuration overrides for resource-intensive test cases.
      *
      * @param projectReadyTimeoutMs  Timeout for [IntelliJContainer.waitForProjectReady], ms. Default 600 000 (10 min).
      * @param agentTimeoutSeconds    Agent run timeout passed to [ArenaTestRunner.runTest]. Default 900 (15 min).
+     * @param taskType               Primary challenge type driving agent effort.
+     * @param mcpBenefit             Observed MCP benefit from A/B comparison runs.
      */
     data class CaseConfig(
         val projectReadyTimeoutMs: Long = 600_000L,
         val agentTimeoutSeconds: Long = 900L,
+        val taskType: TaskType = TaskType.MIXED,
+        val mcpBenefit: McpBenefit = McpBenefit.UNKNOWN,
     )
 
     /**
-     * Timeout/agent overrides keyed by instance ID.
+     * Per-case configuration overrides keyed by instance ID.
+     *
+     * Includes resource limits and A/B classification data from 16-case comparison run (2026-03-05).
      *
      * - **microshop-18**: 23-module project; default 10-min IDE-ready timeout is too short → 20 min.
      * - **petclinic-rest-3**: cache-eviction task; NONE agent needs more wall time → 90 min.
+     * - **petclinic-71**: JPA→R2DBC migration; both agents timed out at 30 min → 90 min.
      */
     val CASE_CONFIGS: Map<String, CaseConfig> = mapOf(
-        "dpaia__spring__boot__microshop-18" to CaseConfig(projectReadyTimeoutMs = 1_200_000L),
-        "dpaia__spring__petclinic__rest-3"  to CaseConfig(agentTimeoutSeconds = 5_400L),
+        // Batch 1
+        "dpaia__feature__service-125" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.HIGH,
+        ),
+        "dpaia__empty__maven__springboot3-1" to CaseConfig(
+            taskType = TaskType.IMPLEMENT_SCRATCH, mcpBenefit = McpBenefit.HIGH,
+        ),
+        "dpaia__feature__service-25" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.HIGH,
+        ),
+        "dpaia__spring__petclinic__rest-14" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.LOW,
+        ),
+        // Batch 2
+        "dpaia__spring__petclinic-36" to CaseConfig(
+            taskType = TaskType.IMPLEMENT_SCRATCH, mcpBenefit = McpBenefit.LOW,
+        ),
+        "dpaia__jhipster__sample__app-3" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.HIGH,
+        ),
+        "dpaia__train__ticket-1" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.UNKNOWN,
+        ),
+        "dpaia__train__ticket-31" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.LOW,
+        ),
+        "dpaia__spring__boot__microshop-18" to CaseConfig(
+            projectReadyTimeoutMs = 1_200_000L,
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.UNKNOWN,
+        ),
+        "dpaia__spring__boot__microshop-2" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.HIGH,
+        ),
+        "dpaia__spring__petclinic-27" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.HIGH,
+        ),
+        "dpaia__spring__petclinic__rest-3" to CaseConfig(
+            agentTimeoutSeconds = 5_400L,
+            taskType = TaskType.IMPLEMENT_SCRATCH, mcpBenefit = McpBenefit.LOW,
+        ),
+        // Batch 3
+        "dpaia__piggymetrics-6" to CaseConfig(
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.UNKNOWN,
+        ),
+        "dpaia__spring__petclinic__microservices-5" to CaseConfig(
+            taskType = TaskType.IMPLEMENT_SCRATCH, mcpBenefit = McpBenefit.LOW,
+        ),
+        "dpaia__spring__petclinic__rest-37" to CaseConfig(
+            taskType = TaskType.IMPLEMENT_SCRATCH, mcpBenefit = McpBenefit.LOW,
+        ),
+        "dpaia__spring__petclinic-71" to CaseConfig(
+            agentTimeoutSeconds = 5_400L,
+            taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.UNKNOWN,
+        ),
     )
 
 
