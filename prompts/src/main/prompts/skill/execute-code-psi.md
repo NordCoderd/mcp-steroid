@@ -180,3 +180,50 @@ val nextVersion = readAction {
 }
 println("NEXT_MIGRATION=V" + nextVersion)
 ```
+
+---
+
+## ⚡ Module-Scoped Search for Large Multi-Module Projects
+
+For projects with >10 Maven/Gradle modules, always scope searches to the relevant module.
+Project-wide search across 48 modules returns 10-50× more results and takes proportionally longer.
+
+```kotlin[IU]
+import com.intellij.openapi.module.ModuleUtilCore
+import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.JavaPsiFacade
+
+// Step 1: Find the module containing your target file
+// Option A: from a known VirtualFile
+val vf = findProjectFile("ts-payment-service/src/main/java/PaymentService.java")!!
+val module = readAction { ModuleUtilCore.findModuleForFile(vf, project) }
+    ?: error("File not in any module")
+// Option B (alternative): by module name
+// val module = com.intellij.openapi.module.ModuleManager.getInstance(project)
+//     .modules.firstOrNull { it.name.contains("payment", ignoreCase = true) }
+//     ?: error("Module not found")
+println("Module: ${module.name}")
+
+// Step 2: Create a module-scoped search scope
+val scope = GlobalSearchScope.moduleWithDependenciesScope(module)  // module + transitive deps
+// val scope = GlobalSearchScope.moduleScope(module)               // module only (no deps)
+
+// Use with FilenameIndex — only returns files in this module
+val files = readAction { FilenameIndex.getVirtualFilesByName("PaymentService.java", scope) }
+println("Found ${files.size} files in module scope")
+
+// Step 3: Scope PSI/reference searches — find usages only in the relevant module
+val targetClass = readAction {
+    JavaPsiFacade.getInstance(project).findClass("com.example.PaymentService", scope)
+}
+val usages = readAction {
+    ReferencesSearch.search(targetClass!!, scope).toList()
+}
+println("${usages.size} usages in module")
+```
+
+**Rule**: For projects with >5 modules, ALWAYS use `moduleWithDependenciesScope` instead of
+`GlobalSearchScope.projectScope(project)`. The project scope searches all 48 modules; module
+scope searches 1-3 relevant ones.
