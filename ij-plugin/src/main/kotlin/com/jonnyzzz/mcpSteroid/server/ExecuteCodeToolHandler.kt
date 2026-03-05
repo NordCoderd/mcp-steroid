@@ -120,10 +120,13 @@ class ExecuteCodeToolHandler : McpRegistrar {
             )
         }
 
-        val project = readAction {
-            getInstance().openProjects.find { it.name == projectName }
+        val (project, availableNames) = readAction {
+            val openProjects = getInstance().openProjects
+            openProjects.find { it.name == projectName } to openProjects.map { it.name }
         }
-            ?: return errorResult("Project not found: $projectName")
+        if (project == null) {
+            return errorResult("Project not found: \"$projectName\". Available projects: $availableNames")
+        }
 
         val execCodeParams = ExecCodeParams(
             taskId = taskId,
