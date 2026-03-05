@@ -357,36 +357,20 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 // 1. Detect and register system JDK if project SDK is unset
-// For Maven/Gradle projects the project JDK should match what Maven/Gradle uses for import.
-// Maven uses JAVA_HOME (or the configured jdkForImporter). Gradle uses the Gradle JVM setting.
+// For Maven/Gradle projects the project JDK should match JAVA_HOME (what Maven/Gradle default to).
 // Priority order:
-//   a) Maven's configured jdkForImporter (the JDK Maven used for import)
-//   b) JAVA_HOME env (same JDK Maven/Gradle uses by default)
-//   c) Known fixed paths: Temurin 21/25/17/11 (amd64/arm64/aarch64), OpenJDK
-//   d) Dynamic scan of /usr/lib/jvm/ (catches non-standard naming)
-//   e) ProjectJdkTable — use any already-registered Java SDK
-//   f) IntelliJ's own JBR at java.home (always present, last resort)
+//   a) JAVA_HOME env (same JDK Maven/Gradle uses by default)
+//   b) Known fixed paths: Temurin 21/25/17/11 (amd64/arm64/aarch64), OpenJDK
+//   c) Dynamic scan of /usr/lib/jvm/ (catches non-standard naming)
+//   d) ProjectJdkTable — use any already-registered Java SDK
+//   e) IntelliJ's own JBR at java.home (always present, last resort)
 //
 // Using the same JDK as Maven/Gradle is important: Maven is already configured for that JDK,
 // and using a different one can cause language-level mismatches or re-import failures.
 
-// Check Maven's configured JDK path (same JDK Maven used for project import)
-val mavenJdkPath = try {
-    val mavenSettings = org.jetbrains.idea.maven.project.MavenProjectsManager.getInstance(project).generalSettings
-    val importerJdk = mavenSettings.jdkForImporter
-    if (!importerJdk.isNullOrBlank() && java.io.File(importerJdk, "bin/java").exists()) {
-        println("[JDK-SETUP] Maven jdkForImporter: ${'$'}importerJdk")
-        importerJdk
-    } else null
-} catch (e: Exception) {
-    println("[JDK-SETUP] Could not read Maven JDK setting: ${'$'}{e.message}")
-    null
-}
-
 val javaHome = System.getenv("JAVA_HOME")
 println("[JDK-SETUP] JAVA_HOME env: ${'$'}{javaHome ?: "(not set)"}")
 val staticCandidates = listOfNotNull(
-    mavenJdkPath,                          // Maven's configured JDK (highest priority)
     javaHome,                              // JAVA_HOME env (what Maven/Gradle default to)
     "/usr/lib/jvm/temurin-21-amd64",
     "/usr/lib/jvm/temurin-21-arm64",
@@ -436,9 +420,11 @@ if (currentSdk != null) {
     edtWriteAction { JavaSdkUtil.applyJdkToProject(project, registeredJavaSdk) }
     jdkWasSet = true
 } else if (jdkPath == null) {
+    val jvmContents = java.io.File("/usr/lib/jvm").listFiles()?.map { it.name }?.toString() ?: "(dir not found)"
+    val jbrHome = System.getProperty("java.home")
     println("[JDK-SETUP] WARNING: No JDK found.")
-    println("[JDK-SETUP] Actual /usr/lib/jvm contents: ${'$'}{java.io.File(\"/usr/lib/jvm\").listFiles()?.map { it.name } ?: \"(dir not found)\"}")
-    println("[JDK-SETUP] java.home (IntelliJ JBR): ${'$'}{System.getProperty(\"java.home\")}")
+    println("[JDK-SETUP] Actual /usr/lib/jvm contents: ${'$'}jvmContents")
+    println("[JDK-SETUP] java.home (IntelliJ JBR): ${'$'}jbrHome")
 } else {
     println("[JDK-SETUP] No project SDK set — registering ${'$'}jdkPath ...")
     // Check for duplicate first — createAndAddSDK does NOT deduplicate by homePath
@@ -470,7 +456,7 @@ if (jdkWasSet && pomFile.exists()) {
 // 3. Wait for all pending configuration (Maven/Gradle sync) to complete
 println("[JDK-SETUP] Waiting for project configuration (Maven/Gradle sync)...")
 val configured = withTimeoutOrNull(8 * 60 * 1000L) {
-    Observation.awaitConfiguration(project) { msg -> println("[CONFIG] ${'$'}msg") }
+    Observation.awaitConfiguration(project)
 }
 if (configured == null) {
     println("[JDK-SETUP] WARNING: Configuration timed out after 8 minutes")
