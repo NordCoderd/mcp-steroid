@@ -417,6 +417,33 @@ fun IntelliJContainer.Companion.create(
         }
     }
 
+    if (mountDockerSocket) {
+        // Fix docker socket permissions: the GID of /var/run/docker.sock on the host
+        // won't match the GID of the 'docker' group inside the container (created by
+        // groupadd without a specific GID). chmod 666 makes it accessible to the agent user.
+        val fixDockerSocketResult = container.startProcessInContainer {
+            this
+                .user("0:0")
+                .args(
+                    "bash", "-lc",
+                    """
+                    set -euo pipefail
+                    if [ ! -S "/var/run/docker.sock" ]; then
+                      echo "Mounted Docker socket is missing: /var/run/docker.sock" >&2
+                      exit 1
+                    fi
+                    chmod 666 /var/run/docker.sock
+                    """.trimIndent()
+                )
+                .timeoutSeconds(10)
+                .description("Fix docker socket permissions for TestContainers")
+                .quietly()
+        }.awaitForProcessFinish()
+        require(fixDockerSocketResult.exitCode == 0) {
+            "Failed to fix docker socket permissions: ${fixDockerSocketResult.stderr}"
+        }
+    }
+
     if (sshAgentSocketFile != null) {
         val initSshAgentSocketResult = container.startProcessInContainer {
             this

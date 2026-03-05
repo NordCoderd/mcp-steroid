@@ -145,6 +145,7 @@ class DpaiaComparisonTest {
                 lifetimeWithMcp,
                 consoleTitle = "comparison-mcp",
                 aiMode = AiMode.AI_MCP,
+                mountDockerSocket = true,
             ).waitForProjectReady(timeoutMillis = maxProjectReadyTimeoutMs)
         }
 
@@ -154,6 +155,7 @@ class DpaiaComparisonTest {
                 lifetimeWithoutMcp,
                 consoleTitle = "comparison-none",
                 mcpConnectionMode = McpConnectionMode.None,
+                mountDockerSocket = true,
             ).waitForProjectReady(timeoutMillis = maxProjectReadyTimeoutMs)
         }
 
