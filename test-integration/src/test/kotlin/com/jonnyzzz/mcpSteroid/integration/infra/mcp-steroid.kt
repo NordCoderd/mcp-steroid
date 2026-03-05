@@ -357,12 +357,40 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
 // 1. Detect and register system JDK if project SDK is unset
-// Covers Eclipse Temurin 21/25/17/11/8 installed via Adoptium APT, on both amd64 and arm64.
-// Also covers standard Debian/Ubuntu openjdk paths and the JAVA_HOME environment variable.
-val jdkCandidates = listOfNotNull(
-    System.getenv("JAVA_HOME"),           // Check JAVA_HOME first (most reliable)
+// For Maven/Gradle projects the project JDK should match what Maven/Gradle uses for import.
+// Maven uses JAVA_HOME (or the configured jdkForImporter). Gradle uses the Gradle JVM setting.
+// Priority order:
+//   a) Maven's configured jdkForImporter (the JDK Maven used for import)
+//   b) JAVA_HOME env (same JDK Maven/Gradle uses by default)
+//   c) Known fixed paths: Temurin 21/25/17/11 (amd64/arm64/aarch64), OpenJDK
+//   d) Dynamic scan of /usr/lib/jvm/ (catches non-standard naming)
+//   e) ProjectJdkTable — use any already-registered Java SDK
+//   f) IntelliJ's own JBR at java.home (always present, last resort)
+//
+// Using the same JDK as Maven/Gradle is important: Maven is already configured for that JDK,
+// and using a different one can cause language-level mismatches or re-import failures.
+
+// Check Maven's configured JDK path (same JDK Maven used for project import)
+val mavenJdkPath = try {
+    val mavenSettings = org.jetbrains.idea.maven.project.MavenProjectsManager.getInstance(project).generalSettings
+    val importerJdk = mavenSettings.jdkForImporter
+    if (!importerJdk.isNullOrBlank() && java.io.File(importerJdk, "bin/java").exists()) {
+        println("[JDK-SETUP] Maven jdkForImporter: ${'$'}importerJdk")
+        importerJdk
+    } else null
+} catch (e: Exception) {
+    println("[JDK-SETUP] Could not read Maven JDK setting: ${'$'}{e.message}")
+    null
+}
+
+val javaHome = System.getenv("JAVA_HOME")
+println("[JDK-SETUP] JAVA_HOME env: ${'$'}{javaHome ?: "(not set)"}")
+val staticCandidates = listOfNotNull(
+    mavenJdkPath,                          // Maven's configured JDK (highest priority)
+    javaHome,                              // JAVA_HOME env (what Maven/Gradle default to)
     "/usr/lib/jvm/temurin-21-amd64",
     "/usr/lib/jvm/temurin-21-arm64",
+    "/usr/lib/jvm/temurin-21-aarch64",    // Adoptium may use aarch64 on some systems
     "/usr/lib/jvm/temurin-25-amd64",
     "/usr/lib/jvm/temurin-25-arm64",
     "/usr/lib/jvm/temurin-17-amd64",
@@ -374,17 +402,41 @@ val jdkCandidates = listOfNotNull(
     "/usr/lib/jvm/java-17-openjdk-amd64",
     "/usr/lib/jvm/java-17-openjdk-arm64",
     "/usr/lib/jvm/temurin-21",
-    "/usr/lib/jvm/java-21",               // Standard Debian/Ubuntu apt install openjdk-21-jdk
+    "/usr/lib/jvm/java-21",
     "/usr/lib/jvm/java-17",
 )
-val jdkPath = jdkCandidates.firstOrNull { java.io.File(it, "bin/java").exists() }
+// Dynamic scan: find all directories under /usr/lib/jvm/ that contain bin/java
+val dynamicCandidates = run {
+    val jvmRoot = java.io.File("/usr/lib/jvm")
+    if (jvmRoot.isDirectory) {
+        (jvmRoot.listFiles() ?: emptyArray<java.io.File>())
+            .filter { it.isDirectory }
+            .sortedByDescending { it.name }   // prefer newer versions
+            .map { it.absolutePath }
+    } else emptyList()
+}
+// Final fallback: IntelliJ's own bundled JBR — always present, guaranteed to have bin/java
+val jbrPath = System.getProperty("java.home")
+println("[JDK-SETUP] Scanning: static=${staticCandidates.size}, dynamic=${dynamicCandidates.size}, jbr=${'$'}jbrPath")
+val allCandidates = staticCandidates + dynamicCandidates + listOfNotNull(jbrPath)
+val jdkPath = allCandidates.firstOrNull { java.io.File(it, "bin/java").exists() }
 var jdkWasSet = false
+
+// Also check ProjectJdkTable for any already-registered Java SDK
+val registeredJavaSdk = com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance()
+    .allJdks.firstOrNull { it.sdkType is com.intellij.openapi.projectRoots.JavaSdk }
 
 val currentSdk = ProjectRootManager.getInstance(project).projectSdk
 if (currentSdk != null) {
     println("[JDK-SETUP] Project SDK already set: ${'$'}{currentSdk.name}")
+} else if (registeredJavaSdk != null) {
+    // Re-use a JDK already registered in the IDE's SDK table (avoids filesystem scan)
+    println("[JDK-SETUP] Using already-registered Java SDK: ${'$'}{registeredJavaSdk.name}")
+    edtWriteAction { JavaSdkUtil.applyJdkToProject(project, registeredJavaSdk) }
+    jdkWasSet = true
 } else if (jdkPath == null) {
-    println("[JDK-SETUP] WARNING: No JDK found at: ${'$'}jdkCandidates")
+    println("[JDK-SETUP] WARNING: No JDK found. Checked: ${'$'}{allCandidates.filter { java.io.File(it, \"bin/java\").exists().not() }.take(5)}")
+    println("[JDK-SETUP] Actual /usr/lib/jvm contents: ${'$'}{java.io.File(\"/usr/lib/jvm\").listFiles()?.map { it.name } ?: \"(dir not found)\"}")
 } else {
     println("[JDK-SETUP] No project SDK set — registering ${'$'}jdkPath ...")
     // SdkConfigurationUtil.createAndAddSDK creates the SDK and adds it to ProjectJdkTable atomically.
