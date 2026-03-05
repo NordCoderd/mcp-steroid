@@ -1,0 +1,95 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="470" height="600" viewBox="-15 -10 470 600" fill="none">
+  <defs>
+    <linearGradient id="brandGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6B57FF"/>
+      <stop offset="100%" stop-color="#FE2857"/>
+    </linearGradient>
+    <filter id="logoShadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#9B88B7" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#B7A6CC" flood-opacity="0.30"/>
+    </filter>
+    <filter id="stickerShadow" x="-10%" y="-5%" width="120%" height="115%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+    <clipPath id="stickerClip">
+      <use href="#cutPath"/>
+    </clipPath>
+  </defs>
+
+  <!--
+    Curvy spline die-cut outline: 12-segment cubic bezier with gentle undulations.
+    ~40-50px padding from content. Tangent-continuous at joints for smooth flow.
+    The outline gently waves in and out creating an organic silhouette.
+  -->
+  <path id="cutPath"
+        d="M 220 -4
+           C 295 -6, 370 5, 410 48
+           C 445 85, 448 135, 440 178
+           C 432 220, 438 262, 442 300
+           C 446 340, 432 380, 418 410
+           C 404 440, 412 470, 405 498
+           C 395 530, 350 558, 295 572
+           C 260 580, 240 582, 220 582
+           C 200 582, 180 580, 145 572
+           C 90 558, 45 530, 35 498
+           C 28 470, 36 440, 22 410
+           C 8 380, -6 340, -2 300
+           C 2 262, 8 220, 0 178
+           C -8 135, -5 85, 30 48
+           C 70 5, 145 -6, 220 -4 Z"
+        fill="white" fill-opacity="0.93"
+        stroke="#D0C4DB" stroke-width="1.2"
+        filter="url(#stickerShadow)"/>
+
+  <!-- Dashed cut guide (slightly outside the white body) -->
+  <path d="M 220 -4
+           C 295 -6, 370 5, 410 48
+           C 445 85, 448 135, 440 178
+           C 432 220, 438 262, 442 300
+           C 446 340, 432 380, 418 410
+           C 404 440, 412 470, 405 498
+           C 395 530, 350 558, 295 572
+           C 260 580, 240 582, 220 582
+           C 200 582, 180 580, 145 572
+           C 90 558, 45 530, 35 498
+           C 28 470, 36 440, 22 410
+           C 8 380, -6 340, -2 300
+           C 2 262, 8 220, 0 178
+           C -8 135, -5 85, 30 48
+           C 70 5, 145 -6, 220 -4 Z"
+        fill="none" stroke="#C0B4CE" stroke-width="0.6" stroke-dasharray="6,4"/>
+
+  <g clip-path="url(#stickerClip)">
+    <!-- Soft shadow ring -->
+    <circle cx="220" cy="190" r="148" fill="#A994C3" fill-opacity="0.10"/>
+
+    <!-- Logo circle -->
+    <circle cx="220" cy="185" r="140" fill="white" stroke="#E8E2EE" stroke-width="1.2" filter="url(#logoShadow)"/>
+
+    <!-- Lightning Bolt -->
+    <g transform="translate(220, 185) scale(8) translate(-20, -20)">
+      <path d="M22 23H26L18 30V22H14L22 10V23Z" fill="url(#brandGradient)"/>
+    </g>
+
+    <!-- Title -->
+    <text x="220" y="390" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+          font-weight="700" font-size="36" fill="url(#brandGradient)" letter-spacing="-0.5">MCP Steroid</text>
+
+    <!-- Tagline -->
+    <text x="220" y="425" text-anchor="middle"
+          font-family="'JetBrains Mono', 'JetBrains-Mono-Regular', monospace"
+          font-weight="400" font-size="13.5" fill="#666666">Give AI the whole IDE, not just the files</text>
+
+    <!-- Subtle separator -->
+    <line x1="130" y1="456" x2="310" y2="456" stroke="#E8E2EE" stroke-width="1"/>
+
+    <!-- Social -->
+    <text x="220" y="489" text-anchor="middle"
+          font-family="'JetBrains Mono', 'JetBrains-Mono-Regular', monospace"
+          font-weight="400" font-size="12" fill="#888888">follow @jonnyzzz</text>
+    <text x="220" y="513" text-anchor="middle"
+          font-family="'JetBrains Mono', 'JetBrains-Mono-Regular', monospace"
+          font-weight="400" font-size="12" fill="#888888">linkedin.com/in/jonnyzzz</text>
+  </g>
+</svg>

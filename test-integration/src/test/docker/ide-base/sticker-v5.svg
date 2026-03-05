@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="610" viewBox="-20 -15 480 610" fill="none">
+  <defs>
+    <linearGradient id="brandGradient" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6B57FF"/>
+      <stop offset="100%" stop-color="#FE2857"/>
+    </linearGradient>
+    <filter id="logoShadow" x="-30%" y="-30%" width="160%" height="160%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#9B88B7" flood-opacity="0.22"/>
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#B7A6CC" flood-opacity="0.30"/>
+    </filter>
+    <filter id="stickerShadow" x="-10%" y="-5%" width="120%" height="115%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="#000" flood-opacity="0.10"/>
+    </filter>
+    <clipPath id="stickerClip">
+      <use href="#cutPath"/>
+    </clipPath>
+  </defs>
+
+  <!--
+    Higher-arity spline: 16-segment cubic bezier with pronounced undulations.
+    More organic/cloud-like silhouette. ~50px padding. Each side has 4 gentle
+    convex bumps creating a smooth, flowing outline.
+  -->
+  <path id="cutPath"
+        d="M 220 -8
+           C 270 -10, 330 -5, 375 18
+           C 420 42, 445 78, 448 118
+           C 451 158, 438 188, 440 218
+           C 442 248, 450 280, 448 315
+           C 446 350, 435 378, 425 405
+           C 415 432, 418 458, 408 485
+           C 395 518, 365 545, 325 560
+           C 285 578, 250 585, 220 585
+           C 190 585, 155 578, 115 560
+           C 75 545, 45 518, 32 485
+           C 22 458, 25 432, 15 405
+           C 5 378, -6 350, -8 315
+           C -10 280, -2 248, 0 218
+           C 2 188, -11 158, -8 118
+           C -5 78, 20 42, 65 18
+           C 110 -5, 170 -10, 220 -8 Z"
+        fill="white" fill-opacity="0.91"
+        stroke="#C8BCDA" stroke-width="1.5"
+        filter="url(#stickerShadow)"/>
+
+  <!-- Thin dashed cut guide -->
+  <path d="M 220 -8
+           C 270 -10, 330 -5, 375 18
+           C 420 42, 445 78, 448 118
+           C 451 158, 438 188, 440 218
+           C 442 248, 450 280, 448 315
+           C 446 350, 435 378, 425 405
+           C 415 432, 418 458, 408 485
+           C 395 518, 365 545, 325 560
+           C 285 578, 250 585, 220 585
+           C 190 585, 155 578, 115 560
+           C 75 545, 45 518, 32 485
+           C 22 458, 25 432, 15 405
+           C 5 378, -6 350, -8 315
+           C -10 280, -2 248, 0 218
+           C 2 188, -11 158, -8 118
+           C -5 78, 20 42, 65 18
+           C 110 -5, 170 -10, 220 -8 Z"
+        fill="none" stroke="#B8ACCC" stroke-width="0.5" stroke-dasharray="5,3"/>
+
+  <g clip-path="url(#stickerClip)">
+    <circle cx="220" cy="190" r="148" fill="#A994C3" fill-opacity="0.10"/>
+    <circle cx="220" cy="185" r="140" fill="white" stroke="#E8E2EE" stroke-width="1.2" filter="url(#logoShadow)"/>
+
+    <g transform="translate(220, 185) scale(8) translate(-20, -20)">
+      <path d="M22 23H26L18 30V22H14L22 10V23Z" fill="url(#brandGradient)"/>
+    </g>
+
+    <text x="220" y="390" text-anchor="middle"
+          font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+          font-weight="700" font-size="36" fill="url(#brandGradient)" letter-spacing="-0.5">MCP Steroid</text>
+
+    <text x="220" y="425" text-anchor="middle"
+          font-family="'JetBrains Mono', 'JetBrains-Mono-Regular', monospace"
+          font-weight="400" font-size="13.5" fill="#666666">Give AI the whole IDE, not just the files</text>
+
+    <line x1="130" y1="456" x2="310" y2="456" stroke="#E8E2EE" stroke-width="1"/>
+
+    <text x="220" y="489" text-anchor="middle"
+          font-family="'JetBrains Mono', 'JetBrains-Mono-Regular', monospace"
+          font-weight="400" font-size="12" fill="#888888">follow @jonnyzzz</text>
+    <text x="220" y="513" text-anchor="middle"
+          font-family="'JetBrains Mono', 'JetBrains-Mono-Regular', monospace"
+          font-weight="400" font-size="12" fill="#888888">linkedin.com/in/jonnyzzz</text>
+  </g>
+</svg>
