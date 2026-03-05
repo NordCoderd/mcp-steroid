@@ -322,13 +322,14 @@ if (toInstall.isEmpty()) {
     }
 
     /**
-     * Set up the project JDK (if not already set) and wait for Maven/Gradle import to complete.
+     * Apply the project JDK (if not already set) and wait for Maven/Gradle import to complete.
      *
-     * Finds an Eclipse Temurin JDK (21/25/17/11, amd64 or arm64) at known Debian container paths, registers it with
-     * [ProjectJdkTable], and sets it as the project SDK. If the JDK was just set and
-     * a pom.xml exists, triggers a Maven re-sync (the initial import may have failed without JDK).
-     * Finally, suspends via [Observation.awaitConfiguration] until all pending configuration
-     * activities (Maven sync, Gradle import) finish.
+     * JDKs are pre-registered in jdk.table.xml before the IDE starts (see [IntelliJDriver.writeJdkTable]).
+     * This function:
+     * 1. Finds the pre-registered SDK matching JAVA_HOME (or any valid one)
+     * 2. Sets it as the project SDK if not already configured
+     * 3. Triggers Maven re-sync if JDK was just applied (initial import may have failed without JDK)
+     * 4. Waits for Maven/Gradle configuration to complete via Observation.awaitConfiguration
      *
      * Safe to call when JDK is already configured or when no import is pending — both are no-ops.
      *
@@ -348,7 +349,6 @@ if (toInstall.isEmpty()) {
 
         val code = """
 import com.intellij.openapi.projectRoots.JavaSdk
-import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
 import com.intellij.openapi.projectRoots.ex.JavaSdkUtil
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.application.edtWriteAction
@@ -356,113 +356,52 @@ import com.intellij.platform.backend.observation.Observation
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
-// 1. Detect and register system JDK if project SDK is unset
-// For Maven/Gradle projects the project JDK should match JAVA_HOME (what Maven/Gradle default to).
-// Priority order:
-//   a) JAVA_HOME env (same JDK Maven/Gradle uses by default)
-//   b) Known fixed paths: Temurin 21/25/17/11 (amd64/arm64/aarch64), OpenJDK
-//   c) Dynamic scan of /usr/lib/jvm/ (catches non-standard naming)
-//   d) ProjectJdkTable — use any already-registered Java SDK
-//   e) IntelliJ's own JBR at java.home (always present, last resort)
-//
-// Using the same JDK as Maven/Gradle is important: Maven is already configured for that JDK,
-// and using a different one can cause language-level mismatches or re-import failures.
+// JDKs were pre-registered in jdk.table.xml before IDE startup.
+// Find the registered SDK matching JAVA_HOME (same JDK Maven uses), or any with a valid homePath.
+val javaHome = System.getenv("JAVA_HOME") ?: ""
+val allRegisteredSdks = com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance()
+    .getSdksOfType(JavaSdk.getInstance())
+println("[JDK-SETUP] JAVA_HOME=${'$'}javaHome, registered SDKs: ${'$'}{allRegisteredSdks.map { it.name }}")
 
-val javaHome = System.getenv("JAVA_HOME")
-println("[JDK-SETUP] JAVA_HOME env: ${'$'}{javaHome ?: "(not set)"}")
-val staticCandidates = listOfNotNull(
-    javaHome,                              // JAVA_HOME env (what Maven/Gradle default to)
-    "/usr/lib/jvm/temurin-21-amd64",
-    "/usr/lib/jvm/temurin-21-arm64",
-    "/usr/lib/jvm/temurin-21-aarch64",    // Adoptium may use aarch64 on some systems
-    "/usr/lib/jvm/temurin-25-amd64",
-    "/usr/lib/jvm/temurin-25-arm64",
-    "/usr/lib/jvm/temurin-17-amd64",
-    "/usr/lib/jvm/temurin-17-arm64",
-    "/usr/lib/jvm/temurin-11-amd64",
-    "/usr/lib/jvm/temurin-11-arm64",
-    "/usr/lib/jvm/java-21-openjdk-amd64",
-    "/usr/lib/jvm/java-21-openjdk-arm64",
-    "/usr/lib/jvm/java-17-openjdk-amd64",
-    "/usr/lib/jvm/java-17-openjdk-arm64",
-    "/usr/lib/jvm/temurin-21",
-    "/usr/lib/jvm/java-21",
-    "/usr/lib/jvm/java-17",
-)
-// Dynamic scan: find all directories under /usr/lib/jvm/ that contain bin/java
-val dynamicCandidates = run {
-    val jvmRoot = java.io.File("/usr/lib/jvm")
-    if (jvmRoot.isDirectory) {
-        (jvmRoot.listFiles() ?: emptyArray<java.io.File>())
-            .filter { it.isDirectory }
-            .sortedByDescending { it.name }   // prefer newer versions
-            .map { it.absolutePath }
-    } else emptyList()
+val registeredJavaSdk = allRegisteredSdks.firstOrNull { sdk ->
+    sdk.homePath != null && sdk.homePath == javaHome
+} ?: allRegisteredSdks.firstOrNull { sdk ->
+    val home = sdk.homePath ?: return@firstOrNull false
+    java.io.File(home, "bin/java").exists()
 }
-// Final fallback: IntelliJ's own bundled JBR — always present, guaranteed to have bin/java
-val jbrPath = System.getProperty("java.home")
-println("[JDK-SETUP] Scanning: static=${'$'}{staticCandidates.size}, dynamic=${'$'}{dynamicCandidates.size}, jbr=${'$'}jbrPath")
-val allCandidates = staticCandidates + dynamicCandidates + listOfNotNull(jbrPath)
-val jdkPath = allCandidates.firstOrNull { java.io.File(it, "bin/java").exists() }
+
 var jdkWasSet = false
-
-// Also check ProjectJdkTable for any already-registered Java SDK
-// getSdksOfType() is preferred over filtering allJdks (which includes all SDK types)
-val registeredJavaSdk = com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance()
-    .getSdksOfType(JavaSdk.getInstance()).firstOrNull()
-
 val currentSdk = ProjectRootManager.getInstance(project).projectSdk
 if (currentSdk != null) {
     println("[JDK-SETUP] Project SDK already set: ${'$'}{currentSdk.name}")
 } else if (registeredJavaSdk != null) {
-    // Re-use a JDK already registered in the IDE's SDK table (avoids filesystem scan)
-    println("[JDK-SETUP] Using already-registered Java SDK: ${'$'}{registeredJavaSdk.name} at ${'$'}{registeredJavaSdk.homePath}")
+    println("[JDK-SETUP] Applying SDK: ${'$'}{registeredJavaSdk.name} at ${'$'}{registeredJavaSdk.homePath}")
     edtWriteAction { JavaSdkUtil.applyJdkToProject(project, registeredJavaSdk) }
     jdkWasSet = true
-} else if (jdkPath == null) {
-    val jvmContents = java.io.File("/usr/lib/jvm").listFiles()?.map { it.name }?.toString() ?: "(dir not found)"
-    val jbrHome = System.getProperty("java.home")
-    println("[JDK-SETUP] WARNING: No JDK found.")
-    println("[JDK-SETUP] Actual /usr/lib/jvm contents: ${'$'}jvmContents")
-    println("[JDK-SETUP] java.home (IntelliJ JBR): ${'$'}jbrHome")
 } else {
-    println("[JDK-SETUP] No project SDK set — registering ${'$'}jdkPath ...")
-    // Check for duplicate first — createAndAddSDK does NOT deduplicate by homePath
-    val existing = com.intellij.openapi.projectRoots.ProjectJdkTable.getInstance()
-        .getSdksOfType(JavaSdk.getInstance()).firstOrNull { it.homePath == jdkPath }
-    val sdk = existing ?: edtWriteAction { SdkConfigurationUtil.createAndAddSDK(jdkPath, JavaSdk.getInstance()) }
-    if (sdk != null) {
-        edtWriteAction { JavaSdkUtil.applyJdkToProject(project, sdk) }
-        println("[JDK-SETUP] Project SDK set to ${'$'}{sdk.name} from ${'$'}jdkPath")
-        jdkWasSet = true
-    } else {
-        println("[JDK-SETUP] WARNING: SdkConfigurationUtil.createAndAddSDK returned null for ${'$'}jdkPath")
-    }
+    println("[JDK-SETUP] WARNING: No valid registered Java SDK found — jdk.table.xml may be missing")
 }
 
-// 2. Trigger Maven re-sync if JDK was just registered (first import may have failed without JDK)
+// Trigger Maven re-sync if JDK was just set (first Maven import may have run without a JDK)
 val pomFile = java.io.File(project.basePath ?: "", "pom.xml")
 if (jdkWasSet && pomFile.exists()) {
     try {
         println("[JDK-SETUP] Triggering Maven re-sync after JDK setup...")
-        val mavenManager = org.jetbrains.idea.maven.project.MavenProjectsManager.getInstance(project)
-        mavenManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles()
+        org.jetbrains.idea.maven.project.MavenProjectsManager.getInstance(project)
+            .forceUpdateAllProjectsOrFindAllAvailablePomFiles()
         delay(2_000L)  // Give Maven time to register its activity before awaiting
     } catch (e: Exception) {
         println("[JDK-SETUP] Maven re-sync failed: ${'$'}{e.message}")
     }
 }
 
-// 3. Wait for all pending configuration (Maven/Gradle sync) to complete
+// Wait for all pending configuration (Maven/Gradle sync) to complete
 println("[JDK-SETUP] Waiting for project configuration (Maven/Gradle sync)...")
 val configured = withTimeoutOrNull(8 * 60 * 1000L) {
     Observation.awaitConfiguration(project)
 }
-if (configured == null) {
-    println("[JDK-SETUP] WARNING: Configuration timed out after 8 minutes")
-} else {
-    println("[JDK-SETUP] Project configuration complete")
-}
+println(if (configured == null) "[JDK-SETUP] WARNING: Configuration timed out after 8 minutes"
+        else "[JDK-SETUP] Project configuration complete")
 "done"
 """.trimIndent()
 

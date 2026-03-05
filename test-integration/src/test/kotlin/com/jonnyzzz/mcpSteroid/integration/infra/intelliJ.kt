@@ -66,6 +66,7 @@ class IntelliJDriver(
         writeStartupProperties()
         writeEarlyAccessRegistry()
         writeAiPromoState()
+        writeJdkTable()
         generateVmOptions()
 
         driver.log("Starting ${ideProduct.displayName}...")
@@ -305,6 +306,96 @@ class IntelliJDriver(
             "$configGuestDir/options/AIOnboardingPromoWindowAdvisor.xml",
             xml,
         )
+    }
+
+    /**
+     * Pre-register all Temurin JDKs installed in the container in IntelliJ's global SDK table.
+     *
+     * Writes `$configGuestDir/options/jdk.table.xml` before the IDE starts so that:
+     * - Maven/Gradle import has a valid JDK from the very first run (no "Project SDK not defined")
+     * - `ProjectJdkTable.getInstance().getSdksOfType(JavaSdk)` returns populated results
+     * - The mcpSetupJdkAndWaitForImport runtime call only needs to call `applyJdkToProject`,
+     *   not scan the filesystem or call createAndAddSDK.
+     *
+     * Detects the container CPU architecture first (x86_64 → amd64, aarch64 → arm64) so that
+     * only the correct-arch JDK paths are registered.
+     */
+    private fun writeJdkTable() {
+        // Detect container CPU architecture
+        val uname = driver.startProcessInContainer {
+            this.args("uname", "-m").timeoutSeconds(5).quietly().description("detect container arch")
+        }.awaitForProcessFinish()
+        val temurinArch = when (uname.stdout.trim()) {
+            "aarch64", "arm64" -> "arm64"
+            else -> "amd64"
+        }
+
+        // Modules to include for Java 9+ classpath (covers Spring Boot / Jakarta EE)
+        val jrt9Modules = listOf(
+            "java.base", "java.compiler", "java.desktop", "java.instrument",
+            "java.logging", "java.management", "java.naming", "java.net.http",
+            "java.rmi", "java.scripting", "java.se", "java.security.jgss",
+            "java.sql", "java.xml", "jdk.unsupported",
+        )
+
+        fun jdk9PlusEntry(name: String, path: String, version: String): String {
+            val roots = jrt9Modules.joinToString("\n") { mod ->
+                "            <root url=\"jrt://$path!/$mod\" type=\"simple\" />"
+            }
+            return """
+    <jdk version="2">
+      <name value="$name" />
+      <type value="JavaSDK" />
+      <version value="$version" />
+      <homePath value="$path" />
+      <roots>
+        <annotationsPath><root type="composite" /></annotationsPath>
+        <classPath>
+          <root type="composite">
+$roots
+          </root>
+        </classPath>
+        <javadocPath><root type="composite" /></javadocPath>
+        <sourcePath><root type="composite" /></sourcePath>
+      </roots>
+    </jdk>"""
+        }
+
+        fun jdk8Entry(name: String, path: String): String = """
+    <jdk version="2">
+      <name value="$name" />
+      <type value="JavaSDK" />
+      <version value="java version &quot;1.8&quot;" />
+      <homePath value="$path" />
+      <roots>
+        <annotationsPath><root type="composite" /></annotationsPath>
+        <classPath>
+          <root type="composite">
+            <root url="jar://$path/jre/lib/rt.jar!/" type="simple" />
+            <root url="jar://$path/lib/tools.jar!/" type="simple" />
+          </root>
+        </classPath>
+        <javadocPath><root type="composite" /></javadocPath>
+        <sourcePath><root type="composite" /></sourcePath>
+      </roots>
+    </jdk>"""
+
+        val entries = buildString {
+            appendLine(jdk8Entry("temurin-8-$temurinArch", "/usr/lib/jvm/temurin-8-$temurinArch"))
+            appendLine(jdk9PlusEntry("temurin-11-$temurinArch", "/usr/lib/jvm/temurin-11-$temurinArch", "java version \"11\""))
+            appendLine(jdk9PlusEntry("temurin-17-$temurinArch", "/usr/lib/jvm/temurin-17-$temurinArch", "java version \"17\""))
+            appendLine(jdk9PlusEntry("temurin-21-$temurinArch", "/usr/lib/jvm/temurin-21-$temurinArch", "java version \"21\""))
+            appendLine(jdk9PlusEntry("temurin-25-$temurinArch", "/usr/lib/jvm/temurin-25-$temurinArch", "java version \"25\""))
+        }
+
+        val xml = """<?xml version="1.0" encoding="UTF-8"?>
+<application>
+  <component name="ProjectJdkTable">
+$entries  </component>
+</application>
+"""
+        driver.writeFileInContainer("$configGuestDir/options/jdk.table.xml", xml)
+        println("[IDE-AGENT] Pre-registered Temurin JDKs (8/11/17/21/25) for arch=$temurinArch in jdk.table.xml")
     }
 
     private fun writeTrustedPaths() {
