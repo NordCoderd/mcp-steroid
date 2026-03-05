@@ -188,6 +188,41 @@ println(lines.takeLast(30).joinToString("\n"))
 
 ---
 
+## JAVA_HOME / Multi-JDK Troubleshooting
+
+When Maven fails with `Fatal error compiling`, `cannot find symbol`, `POM not found for parent`,
+or `Unsupported class file major version`, the root cause is often a JDK version mismatch.
+Fix it BEFORE making any other changes.
+
+**Step 1: Detect available JDKs in the container**
+```bash
+ls /usr/lib/jvm/ 2>/dev/null || ls /Library/Java/JavaVirtualMachines/ 2>/dev/null
+```
+
+**Step 2: Try the correct JDK**
+```bash
+# Example: project requires Java 17 but default is Java 21 or 25
+export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-arm64  # or temurin-17-amd64, java-17-openjdk, etc.
+export PATH=$JAVA_HOME/bin:$PATH
+java -version   # confirm JDK version
+```
+
+**Step 3: Run Maven with explicit JAVA_HOME**
+```bash
+JAVA_HOME=/usr/lib/jvm/temurin-17-jdk-arm64 mvn -pl ts-common install -DskipTests
+```
+
+**When to do this first:**
+- Multi-module project with a `common` or `parent` module that fails to install
+- Error message mentions `Unsupported class file major version` (version mismatch)
+- Maven cannot resolve `../pom.xml` or parent POM in a fresh container
+- Project's `pom.xml` declares `<java.version>17</java.version>` but `java -version` shows 21+
+
+**Do NOT use steroid_execute_code for Maven JAVA_HOME issues.** The IDE cannot fix JDK
+mismatches — only setting `JAVA_HOME` in the shell environment fixes it. Use `Bash` tool.
+
+---
+
 ## What NOT to Do
 
 - **❌ `ProcessBuilder("./mvnw")` as primary pattern** — banned. Use `MavenRunner` or `MavenRunConfigurationType`.
