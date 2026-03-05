@@ -286,6 +286,18 @@ class DpaiaClaudeComparisonTest {
                 val testMetrics = extractTestMetrics(rawOutput)
                 val toolStats = extractToolCallStats(rawOutput)
 
+                // Fallback: count steroid_execute_code from decoded agent log when NDJSON parsing
+                // found no tool calls (e.g. agent failed early or output format was unexpected).
+                val steroidCallsFromLog: Int? = if (toolStats == null) {
+                    session.runDirInContainer.listFiles { f ->
+                        f.name.startsWith("agent-claude-code-") &&
+                                f.name.endsWith("-decoded.txt") &&
+                                f.lastModified() >= startMs
+                    }?.maxByOrNull { it.lastModified() }?.readLines()?.count { line ->
+                        line.startsWith(">>") && line.contains("steroid_execute_code")
+                    }
+                } else null
+
                 println("[CLAUDE-CMP] Completed: ${testCase.instanceId} [$modeLabel]")
                 println("[CLAUDE-CMP]   Total time:   ${totalMs / 1000}s (agent: ${result.agentDurationMs / 1000}s)")
                 println("[CLAUDE-CMP]   Exit code:    ${result.agentResult.exitCode}")
@@ -323,7 +335,7 @@ class DpaiaClaudeComparisonTest {
                     agentSummary = result.evaluation.agentSummary,
                     tokenUsage = tokens,
                     testMetrics = testMetrics,
-                    steroidCallCount = toolStats?.steroidCallCount,
+                    steroidCallCount = toolStats?.steroidCallCount ?: steroidCallsFromLog,
                     totalToolCalls = toolStats?.totalToolCalls,
                     toolErrorCount = toolStats?.toolErrorCount,
                 )
@@ -533,7 +545,26 @@ class DpaiaClaudeComparisonTest {
             val jsonFile = File(outDir, "claude-comparison-report.json")
 
             mdFile.writeText(mdReport)
-            jsonFile.writeText(jsonReport)
+
+            // Merge new records with any existing report to preserve data from previous runs.
+            // Records with the same (instanceId, mode) pair are replaced; others are kept.
+            val newArray = Json.parseToJsonElement(jsonReport).jsonArray
+            val existingArray = if (jsonFile.exists()) {
+                try { Json.parseToJsonElement(jsonFile.readText()).jsonArray }
+                catch (e: Exception) { buildJsonArray { } }
+            } else buildJsonArray { }
+            val newKeys = newArray.map {
+                it.jsonObject["instanceId"]?.jsonPrimitive?.content to it.jsonObject["mode"]?.jsonPrimitive?.content
+            }.toSet()
+            val mergedArray = buildJsonArray {
+                for (elem in existingArray) {
+                    val key = elem.jsonObject["instanceId"]?.jsonPrimitive?.content to
+                            elem.jsonObject["mode"]?.jsonPrimitive?.content
+                    if (key !in newKeys) add(elem)
+                }
+                for (elem in newArray) add(elem)
+            }
+            jsonFile.writeText(Json { prettyPrint = true }.encodeToString(JsonElement.serializer(), mergedArray))
 
             println("[CLAUDE-CMP] ========================================")
             println("[CLAUDE-CMP] COMPARISON REPORT WRITTEN:")
