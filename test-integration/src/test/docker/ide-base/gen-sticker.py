@@ -104,8 +104,8 @@ QR_BLOCK_Y = TITLE_BASELINE_Y - QR_BLOCK_SIZE + 1  # bottom-aligned with baselin
 # Tagline
 TAGLINE_Y = 420
 
-# Small social sub-text
-SOCIAL_Y = 448
+# Small "by @jonnyzzz" credit
+CREDIT_Y = 444
 
 # QR code
 QR_URL = "https://mcp-steroid.jonnyzzz.com/#qr1"
@@ -124,8 +124,8 @@ boundary.extend(rect_pts(TITLE_X - 2, TITLE_BASELINE_Y - 32,
 # Tagline — monospace 13.5px, 42 chars
 boundary.extend(rect_pts(70, TAGLINE_Y - 12, 370, TAGLINE_Y + 4, step=2))
 
-# Small social sub-text — mono 10px, ~37 chars → ~230px
-boundary.extend(rect_pts(105, SOCIAL_Y - 8, 335, SOCIAL_Y + 4, step=2))
+# Small credit "by @jonnyzzz" — mono 9px, ~13 chars → ~75px
+boundary.extend(rect_pts(182, CREDIT_Y - 7, 258, CREDIT_Y + 3, step=2))
 
 # Virtual flat-top boundary to break concentricity with logo circle
 boundary.extend(rect_pts(110, 28, 330, 38, step=2))
@@ -367,10 +367,10 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg"
           font-family="\'JetBrains Mono\', monospace"
           font-weight="400" font-size="13" fill="white" fill-opacity="0.85">Give AI the whole IDE, not just the files</text>
 
-    <!-- Small social sub-text — white, more transparent -->
-    <text x="220" y="{SOCIAL_Y}" text-anchor="middle"
+    <!-- Small credit -->
+    <text x="220" y="{CREDIT_Y}" text-anchor="middle"
           font-family="\'JetBrains Mono\', monospace"
-          font-weight="400" font-size="10" fill="white" fill-opacity="0.55">@jonnyzzz · linkedin.com/in/jonnyzzz</text>
+          font-weight="400" font-size="9" fill="white" fill-opacity="0.45">by @jonnyzzz</text>
   </g>
 </svg>'''
 
