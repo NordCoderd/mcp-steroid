@@ -254,6 +254,30 @@ for i in range(n):
 path_parts.append("Z")
 cut_path = "\n           ".join(path_parts)
 
+# ===== Generate inner shape (shrunk inward by white border width) =====
+WHITE_BORDER_SVG = 18  # white border width in SVG units (~1.8mm)
+
+inner_outline = []
+for i in range(NUM_ANGLES):
+    angle = 2 * math.pi * i / NUM_ANGLES
+    r = max(0, smoothed_dist[i] + OFFSET_SVG - WHITE_BORDER_SVG)
+    x = CX + r * math.cos(angle)
+    y = CY + r * math.sin(angle)
+    inner_outline.append((x, y))
+
+inner_parts = [f"M {inner_outline[0][0]:.2f},{inner_outline[0][1]:.2f}"]
+for i in range(len(inner_outline)):
+    p0 = inner_outline[(i - 1) % n]
+    p1 = inner_outline[i]
+    p2 = inner_outline[(i + 1) % n]
+    p3 = inner_outline[(i + 2) % n]
+    cp1, cp2 = catmull_rom_to_cubic(p0, p1, p2, p3)
+    inner_parts.append(
+        f"C {cp1[0]:.2f},{cp1[1]:.2f} {cp2[0]:.2f},{cp2[1]:.2f} {p2[0]:.2f},{p2[1]:.2f}"
+    )
+inner_parts.append("Z")
+inner_path = "\n           ".join(inner_parts)
+
 # Compute viewBox from outline bounds
 xs = [p[0] for p in outline]
 ys = [p[1] for p in outline]
@@ -308,8 +332,12 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg"
     </clipPath>
   </defs>
 
-  <!-- Die-cut body: gradient background -->
+  <!-- Die-cut body: white outer -->
   <path d="{cut_path}"
+        fill="white" stroke="#E0D8E8" stroke-width="0.5"/>
+
+  <!-- Inner gradient fill -->
+  <path d="{inner_path}"
         fill="url(#bgGradient)" stroke="none"/>
 
   <g clip-path="url(#stickerClip)">
