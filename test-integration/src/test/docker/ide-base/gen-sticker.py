@@ -19,15 +19,14 @@ NUM_ANGLES = 256          # Number of sample angles (output resolution)
 OFFSET_MM = 9.0           # Offset from content boundary in mm
 STICKER_HEIGHT_MM = 60.0  # Physical target height in mm
 VIEWBOX_HEIGHT = 580.0    # SVG viewBox height units
-SMOOTH_WINDOW = 40        # Smoothing kernel half-width (higher = rounder, less concentric with circle)
+SMOOTH_WINDOW = 30        # Smoothing kernel half-width (text-only layout needs moderate smoothing)
 
 # Derived
 MM_PER_UNIT = STICKER_HEIGHT_MM / VIEWBOX_HEIGHT   # ~0.103 mm per SVG unit
 OFFSET_SVG = OFFSET_MM / MM_PER_UNIT               # ~68 SVG units
 
-# Center of all content — shifted down from geometric centroid so the cut
-# doesn't run concentrically with the logo circle at the top
-CX, CY = 220.0, 270.0
+# Center of all content (text-only layout, no logo circle)
+CX, CY = 220.0, 230.0
 
 
 # ===== Content shape definitions =====
@@ -89,46 +88,39 @@ def frange(start, stop, step):
     return vals
 
 
-# ----- Layout configuration -----
-# Title "MCP Steroid" + QR symbol on same baseline
-TITLE_BASELINE_Y = 385
-TITLE_FONT_SIZE = 44
-TITLE_TEXT_WIDTH = 272     # estimated rendered width of "MCP Steroid" bold 44px
-QR_BLOCK_SIZE = 32         # cap-height sized symbol (~0.73 * font-size)
+# ----- Layout configuration (v5: text-only, no logo circle) -----
+# Title "MCP Steroid" + QR symbol on same baseline — hero element
+TITLE_BASELINE_Y = 220
+TITLE_FONT_SIZE = 52
+TITLE_TEXT_WIDTH = 320     # estimated rendered width of "MCP Steroid" bold 52px
+QR_BLOCK_SIZE = 38         # cap-height sized symbol (~0.73 * font-size)
 QR_GAP = -1                # negative = overlap slightly, like a tight kerned glyph
 COMBINED_WIDTH = TITLE_TEXT_WIDTH + QR_GAP + QR_BLOCK_SIZE
-TITLE_X = 220 - COMBINED_WIDTH / 2
+TITLE_X = CX - COMBINED_WIDTH / 2
 QR_BLOCK_X = TITLE_X + TITLE_TEXT_WIDTH + QR_GAP
-QR_BLOCK_Y = TITLE_BASELINE_Y - QR_BLOCK_SIZE + 1  # bottom-aligned with baseline
+QR_BLOCK_Y = TITLE_BASELINE_Y - QR_BLOCK_SIZE + 2  # bottom-aligned with baseline
 
 # Tagline
-TAGLINE_Y = 420
+TAGLINE_Y = 258
 
 # Small "by @jonnyzzz" credit
-CREDIT_Y = 444
+CREDIT_Y = 282
 
 # QR code
 QR_URL = "https://mcp-steroid.jonnyzzz.com/#qr1"
 
-# ----- Collect all boundary points -----
+# ----- Collect all boundary points (v5: text-only) -----
 boundary = []
 
-# Logo circle with shadow/glow
-boundary.extend(circle_pts(220, 185, 152))   # circle + subtle shadow edge
-boundary.extend(circle_pts(220, 193, 148))   # shadow offset center
+# Title "MCP Steroid" + QR cursor block (treated as one wide element) — hero
+boundary.extend(rect_pts(TITLE_X - 4, TITLE_BASELINE_Y - 40,
+                         QR_BLOCK_X + QR_BLOCK_SIZE + 4, TITLE_BASELINE_Y + 8, step=2))
 
-# Title "MCP Steroid" + QR cursor block (treated as one wide element)
-boundary.extend(rect_pts(TITLE_X - 2, TITLE_BASELINE_Y - 32,
-                         QR_BLOCK_X + QR_BLOCK_SIZE + 2, TITLE_BASELINE_Y + 6, step=2))
-
-# Tagline — monospace 13.5px, 42 chars
+# Tagline — monospace 13px, ~42 chars
 boundary.extend(rect_pts(70, TAGLINE_Y - 12, 370, TAGLINE_Y + 4, step=2))
 
 # Small credit "by @jonnyzzz" — mono 9px, ~13 chars → ~75px
 boundary.extend(rect_pts(182, CREDIT_Y - 7, 258, CREDIT_Y + 3, step=2))
-
-# Virtual flat-top boundary to break concentricity with logo circle
-boundary.extend(rect_pts(110, 28, 330, 38, step=2))
 
 print(f"# Sampled {len(boundary)} boundary points", file=sys.stderr)
 
@@ -322,11 +314,6 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg"
       <stop offset="0%" stop-color="#7C3AED"/>
       <stop offset="100%" stop-color="#E84D8A"/>
     </linearGradient>
-    <!-- Circle fill gradient (slightly shifted for depth) -->
-    <linearGradient id="circleGradient" x1="0.2" y1="0" x2="0.9" y2="1">
-      <stop offset="0%" stop-color="#8B5CF6"/>
-      <stop offset="100%" stop-color="#E8508B"/>
-    </linearGradient>
     <clipPath id="stickerClip">
       <path d="{cut_path}"/>
     </clipPath>
@@ -341,34 +328,25 @@ svg = f'''<svg xmlns="http://www.w3.org/2000/svg"
         fill="url(#bgGradient)" stroke="none"/>
 
   <g clip-path="url(#stickerClip)">
-    <!-- Semi-transparent ring behind logo circle -->
-    <circle cx="220" cy="190" r="155" fill="white" fill-opacity="0.08"/>
-
-    <!-- Logo circle with gradient fill -->
-    <circle cx="220" cy="185" r="140" fill="url(#circleGradient)" stroke="white" stroke-opacity="0.25" stroke-width="1.5"/>
-
-    <!-- Lightning Bolt — WHITE -->
-    <g transform="translate(220, 185) scale(8) translate(-20, -20)">
-      <path d="M22 23H26L18 30V22H14L22 10V23Z" fill="white"/>
-    </g>
-
-    <!-- Title "MCP Steroid" — WHITE -->
+    <!-- Title "MCP Steroid" — WHITE, hero element -->
     <text x="{TITLE_X}" y="{TITLE_BASELINE_Y}" text-anchor="start"
           font-family="-apple-system, BlinkMacSystemFont, \'Segoe UI\', Roboto, Helvetica, Arial, sans-serif"
           font-weight="700" font-size="{TITLE_FONT_SIZE}" fill="white" letter-spacing="-0.5">MCP Steroid</text>
 
-    <!-- QR cursor block: white background, dark QR modules -->
+    <!-- QR cursor block: semi-transparent white background for readability -->
+    <rect x="{QR_BLOCK_X - 1}" y="{QR_BLOCK_Y - 1}" width="{QR_BLOCK_SIZE + 2}" height="{QR_BLOCK_SIZE + 2}"
+          rx="3" fill="white" fill-opacity="0.2"/>
     <rect x="{QR_BLOCK_X}" y="{QR_BLOCK_Y}" width="{QR_BLOCK_SIZE}" height="{QR_BLOCK_SIZE}"
-          rx="2" fill="white" fill-opacity="0.9"/>
+          rx="2" fill="white" fill-opacity="0.92"/>
     <path d="{qr_dark_path}" fill="url(#bgGradient)" fill-opacity="0.85"/>
 
     <!-- Tagline — white, slightly transparent -->
-    <text x="220" y="{TAGLINE_Y}" text-anchor="middle"
+    <text x="{CX}" y="{TAGLINE_Y}" text-anchor="middle"
           font-family="\'JetBrains Mono\', monospace"
           font-weight="400" font-size="13" fill="white" fill-opacity="0.85">Give AI the whole IDE, not just the files</text>
 
     <!-- Small credit -->
-    <text x="220" y="{CREDIT_Y}" text-anchor="middle"
+    <text x="{CX}" y="{CREDIT_Y}" text-anchor="middle"
           font-family="\'JetBrains Mono\', monospace"
           font-weight="400" font-size="9" fill="white" fill-opacity="0.45">by @jonnyzzz</text>
   </g>
