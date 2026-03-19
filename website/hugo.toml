@@ -40,13 +40,17 @@ disableKinds = ['taxonomy', 'term']
     url = "/docs/strategy/"
     weight = 4
   [[menus.main]]
-    name = "Slack Community"
-    url = "https://mcp-steroid.slack.com"
+    name = "Support"
+    url = "https://jonnyzzz.com/support/"
     weight = 5
+  [[menus.main]]
+    name = "Discord"
+    url = "https://discord.gg/e9qgQ7NeTC"
+    weight = 6
   [[menus.main]]
     name = "GitHub Issues"
     url = "https://github.com/jonnyzzz/mcp-steroid/issues"
-    weight = 6
+    weight = 7
 
 [params]
   description = "MCP Steroid is a Model Context Protocol server for JetBrains IDEs. It exposes IntelliJ Platform APIs, visual state, and runtime environment to any MCP-compatible AI agent via Kotlin code execution and screenshot capture."
