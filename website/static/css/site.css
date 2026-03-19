@@ -500,6 +500,19 @@ padding: 0.25rem 0.75rem;
 border-radius: 20px;
 font-size: 0.9rem;
 margin-bottom: 0.75rem;
+text-decoration: none;
+    }
+    a.version-badge:hover {
+text-decoration: none;
+background: rgba(107, 87, 255, 0.5);
+    }
+    .version-badge-sup {
+font-size: 0.35em;
+vertical-align: super;
+margin-bottom: 0;
+-webkit-text-fill-color: var(--color-code);
+background-clip: unset;
+-webkit-background-clip: unset;
     }
 .cta-card {
 background: rgba(255, 255, 255, 0.06);
@@ -1288,6 +1301,7 @@ h1 {
     color: #e25555;
     vertical-align: middle;
     margin-right: 0.25rem;
+    display: inline;
 }
 .heart-icon-btn {
     color: #e25555;
