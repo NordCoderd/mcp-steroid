@@ -40,6 +40,10 @@ jobs:
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
 
+      - name: Prepare mcp-steroid-public directory
+        working-directory: website
+        run: git init mcp-steroid-public
+
       - name: Build website
         working-directory: website
         run: make build
