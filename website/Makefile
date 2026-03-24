@@ -21,12 +21,9 @@ RELEASE_ZIP_URL := $(shell gh release view $(VERSION) --repo jonnyzzz/mcp-steroi
 setup:
 	git clone git@github.com:jonnyzzz/mcp-steroid.git mcp-steroid-public
 
-# Ensure the public repository is cloned (auto-setup)
+# Ensure the output directory exists (auto-setup)
 ensure-public-repo:
-	@if [ ! -d "mcp-steroid-public/.git" ]; then \
-		echo "Public repository not found, cloning..."; \
-		git clone git@github.com:jonnyzzz/mcp-steroid.git mcp-steroid-public; \
-	fi
+	@mkdir -p mcp-steroid-public
 
 # Update version in hugo.toml, generate version.json
 update-config: ensure-public-repo
