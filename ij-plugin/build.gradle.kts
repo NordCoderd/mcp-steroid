@@ -170,11 +170,6 @@ intellijPlatform {
 tasks {
     test {
         useJUnit()
-        // Docker CLI tests require Docker and API keys — excluded from default run.
-        // Run explicitly with: ./gradlew :ij-plugin:test --tests '*CliClaudeIntegrationTest*'
-        exclude("**/CliClaudeIntegrationTest.class")
-        exclude("**/CliCodexIntegrationTest.class")
-        exclude("**/CliGeminiIntegrationTest.class")
     }
 
     patchPluginXml {
