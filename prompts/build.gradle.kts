@@ -51,6 +51,7 @@ dependencies {
 val generatedSources = layout.buildDirectory.dir("generated/kotlin/prompts")
 val generatedTestSources = layout.buildDirectory.dir("generated/kotlin-test/prompts")
 val licensePromptsDir = layout.buildDirectory.dir("license-prompts")
+val apiPromptsDir = layout.buildDirectory.dir("api-prompts")
 
 val prepareLicensePrompt by tasks.registering {
     val websiteEula = rootProject.layout.projectDirectory.file("EULA")
@@ -65,18 +66,43 @@ val prepareLicensePrompt by tasks.registering {
     }
 }
 
+val prepareApiPrompts by tasks.registering {
+    val sourceFile = rootProject.layout.projectDirectory.file(
+        "ij-plugin/src/main/kotlin/com/jonnyzzz/mcpSteroid/execution/McpScriptContext.kt"
+    )
+    val outputFile = apiPromptsDir.map { it.file("skill/execute-code-script-context.md") }
+    inputs.file(sourceFile)
+    outputs.file(outputFile)
+    doLast {
+        val kotlinSource = sourceFile.asFile.readText()
+        val article = buildString {
+            appendLine("Script Context API Reference")
+            appendLine()
+            appendLine("Complete API reference for McpScriptContext — the interface available to all steroid_execute_code scripts via implicit receiver.")
+            appendLine()
+            appendLine("```kotlin")
+            append(kotlinSource)
+            appendLine("```")
+        }
+        val out = outputFile.get().asFile
+        out.parentFile.mkdirs()
+        out.writeText(article)
+    }
+}
+
 val generatePrompts by tasks.registering(JavaExec::class) {
-    dependsOn(prepareLicensePrompt)
+    dependsOn(prepareLicensePrompt, prepareApiPrompts)
     classpath = promptGeneratorClasspath
     mainClass.set("com.jonnyzzz.mcpSteroid.promptgen.MainKt")
     args(
         "--input-dir", layout.projectDirectory.dir("src/main/prompts").asFile.absolutePath,
         "--output-dir", generatedSources.get().asFile.absolutePath,
         "--test-output-dir", generatedTestSources.get().asFile.absolutePath,
-        "--extra-input-dirs", licensePromptsDir.get().asFile.absolutePath,
+        "--extra-input-dirs", "${licensePromptsDir.get().asFile.absolutePath},${apiPromptsDir.get().asFile.absolutePath}",
     )
     inputs.dir(layout.projectDirectory.dir("src/main/prompts"))
     inputs.dir(licensePromptsDir)
+    inputs.dir(apiPromptsDir)
     outputs.dir(generatedSources)
     outputs.dir(generatedTestSources)
 }
