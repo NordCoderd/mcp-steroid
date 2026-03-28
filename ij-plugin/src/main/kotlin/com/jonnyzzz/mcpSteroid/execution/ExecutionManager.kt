@@ -86,7 +86,7 @@ class ExecutionManager(
                         yield()
                     }
 
-                    builder.logProgress("Review Result: $finalResult")
+                    log.info("Review result for $executionId: $finalResult")
                     yield()
 
                     // Run execution with progress reporting
