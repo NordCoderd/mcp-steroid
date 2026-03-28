@@ -45,9 +45,10 @@ For a quick release without the full Docker build matrix, use Claude Code agents
    git tag -a "v<version>" -m "release: <version>" HEAD && git push origin "v<version>"
    cd website && git tag -a "v<version>" -m "release: <version>" HEAD && git push origin "v<version>"
    ```
-6. **Update website**: Create release page at `website/website/content/releases/<version>.md`, update `website/website/hugo.toml` whatsnew entry, run `cd website/website && make build`. **Note:** `make build` downloads the release ZIP to extract the plugin version, so step 4 must complete first.
-7. **Mark older releases obsolete**: `gh release edit <old-version> --repo jonnyzzz/mcp-steroid --notes-file <updated-body-with-obsolete-banner>`.
-8. **Publish website**: `cd website && git add -A && git commit -m "release: <version> website" && git push`
+6. **Update website homepage**: In `website/website/hugo.toml`, update `params.version` to the new version and add a `[[params.whatsnew]]` entry at the top. Commit and push in `website/`.
+7. **Update website release page**: Create `website/website/content/releases/<version>.md`, run `cd website/website && make build`. **Note:** `make build` downloads the release ZIP to extract the plugin version, so step 4 must complete first.
+8. **Mark older releases obsolete**: `gh release edit <old-version> --repo jonnyzzz/mcp-steroid --notes-file <updated-body-with-obsolete-banner>`.
+9. **Publish website**: `cd website && git add -A && git commit -m "release: <version> website" && git push`
 
 Steps 2+3 can run in parallel. Steps 6–8 require step 4 (GitHub release must exist for website build). The `CLAUDECODE` env var must be unset for nested Claude Code invocations via `run-agent.sh`.
 
