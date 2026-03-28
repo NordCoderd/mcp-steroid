@@ -1,6 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.updates
 
+import com.intellij.ide.BrowserUtil
+import com.intellij.notification.NotificationAction
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
 import com.intellij.openapi.Disposable
@@ -121,7 +123,9 @@ class UpdateChecker(
                 )
             })",
             NotificationType.INFORMATION
-        ).notify(null)
+        ).addAction(NotificationAction.createSimpleExpiring("Download") {
+            BrowserUtil.browse("https://mcp-steroid.jonnyzzz.com/releases/")
+        }).notify(null)
     }
 
     private fun buildUserAgent(pluginVersion: String, ijBuild: String): String {
