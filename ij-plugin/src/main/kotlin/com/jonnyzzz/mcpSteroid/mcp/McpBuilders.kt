@@ -29,32 +29,18 @@ class ToolCallBuilder {
     }
 
     fun build(): ToolCallResult {
-        // Consolidate consecutive text items into a single text block.
+        // Merge all text items into a single ContentItem.Text.
         // Some MCP clients (e.g. Claude CLI) only render the first text content item
-        // when isError=true, so merging ensures the full output is always visible.
+        // when isError=true, so a single merged text ensures the full output is visible.
+        // Non-text items (images, resources) are kept as separate content items.
+        val textParts = contents.filterIsInstance<ContentItem.Text>()
+        val nonTextParts = contents.filter { it !is ContentItem.Text }
+
         val merged = mutableListOf<ContentItem>()
-        val textBuffer = StringBuilder()
-
-        fun flushText() {
-            if (textBuffer.isNotEmpty()) {
-                merged += ContentItem.Text(textBuffer.toString())
-                textBuffer.clear()
-            }
+        if (textParts.isNotEmpty()) {
+            merged += ContentItem.Text(textParts.joinToString("\n") { it.text })
         }
-
-        for (item in contents) {
-            when (item) {
-                is ContentItem.Text -> {
-                    if (textBuffer.isNotEmpty()) textBuffer.append('\n')
-                    textBuffer.append(item.text)
-                }
-                else -> {
-                    flushText()
-                    merged += item
-                }
-            }
-        }
-        flushText()
+        merged += nonTextParts
 
         return ToolCallResult(
             content = merged,
