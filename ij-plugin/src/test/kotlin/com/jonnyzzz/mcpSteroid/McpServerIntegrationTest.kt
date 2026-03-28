@@ -16,6 +16,7 @@ import io.ktor.client.engine.cio.CIO
 import io.ktor.client.request.*
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.*
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -992,21 +993,26 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
         val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
 
-        // Print the actual response for visibility
         println("=== PROGRESS WITH TOKEN RESPONSE ===")
         println("isError: ${execResult.isError}")
-        println("Progress Token: $progressToken")
         println("Output:")
         println(execOutput)
         println("=== END RESPONSE ===")
 
-        // Execution should succeed
         assertFalse("Execution should succeed", execResult.isError)
 
-        // Output should contain our completion message
         assertTrue(
             "Output should contain completion message, got: $execOutput",
             execOutput.contains("COMPLETED: Task with progress token")
+        )
+
+        // Progress messages from progress() calls are added to the tool result via logProgress().
+        // This is the delivery mechanism for HTTP clients (streaming clients get separate notifications).
+        assertTrue(
+            "Output should contain progress messages from script, got: $execOutput",
+            execOutput.contains("Starting with progress token")
+                    || execOutput.contains("Middle step")
+                    || execOutput.contains("Final step")
         )
     }
 
@@ -1567,6 +1573,224 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             "POST response should include protocol version header",
             MCP_PROTOCOL_VERSION,
             postResponse.headers[McpHttpTransport.PROTOCOL_VERSION_HEADER]
+        )
+    }
+
+    /**
+     * Tests that a type mismatch compilation error produces an error response
+     * with the actual compiler error message visible in the output.
+     *
+     * Uses the same code snippet as CliClaudeIntegrationTest.testCompilationErrorsDelivered
+     * to verify the server-side behavior independently of any AI agent.
+     */
+    fun testTypeMismatchCompilationErrorContainsErrorMessage(): Unit = timeoutRunBlocking(60.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+        val sessionId = startSession(server)
+
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-type-mismatch")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", """
+                        val x: String = 123
+                        println(x)
+                    """.trimIndent())
+                    put("reason", "Test type mismatch error message delivery")
+                    put("task_id", "type-mismatch-error-test")
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+
+        val debug = Json { prettyPrint = true }.encodeToString(execRpc)
+        println("The whole output: $debug")
+
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        println("=== TYPE MISMATCH ERROR RESPONSE ===")
+        println("isError: ${execResult.isError}")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        assertTrue("Execution should be marked as error", execResult.isError)
+
+        // The actual kotlinc error message must be present, not just generic "error"
+        assertTrue(
+            "Output should contain 'type mismatch' from the compiler, got: $execOutput",
+            execOutput.contains("type mismatch", ignoreCase = true)
+                    || execOutput.contains("Type mismatch", ignoreCase = true)
+        )
+        assertTrue(
+            "Output should mention the expected type (String), got: $execOutput",
+            execOutput.contains("String")
+        )
+        assertTrue(
+            "Output should mention the actual type (Int), got: $execOutput",
+            execOutput.contains("Int")
+        )
+    }
+
+    /**
+     * Tests that compilation errors are included in the tool result content items even
+     * when a progress token is provided. The tool result is the delivery mechanism for
+     * HTTP clients — all logMessage/logProgress/reportFailed content is added to it
+     * synchronously before the HTTP response is sent.
+     */
+    fun testCompilationErrorWithProgressToken(): Unit = timeoutRunBlocking(60.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+        val sessionId = startSession(server)
+
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-compile-error-progress")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", """
+                        val x: String = 123
+                        println(x)
+                    """.trimIndent())
+                    put("reason", "Test compilation error with progress token")
+                    put("task_id", "compile-error-progress-test")
+                    putJsonObject("_meta") {
+                        put("progressToken", "progress-compile-error-${UUID.randomUUID()}")
+                    }
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        println("=== COMPILATION ERROR WITH PROGRESS TOKEN ===")
+        println("isError: ${execResult.isError}")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        assertTrue("Execution should be marked as error", execResult.isError)
+
+        // Compilation error details must be in the tool result content
+        assertTrue(
+            "Output should contain 'type mismatch' from the compiler, got: $execOutput",
+            execOutput.contains("type mismatch", ignoreCase = true)
+        )
+        assertTrue(
+            "Output should mention the expected type (String), got: $execOutput",
+            execOutput.contains("String")
+        )
+        assertTrue(
+            "Output should mention the actual type (Int), got: $execOutput",
+            execOutput.contains("Int")
+        )
+
+        // The FAILED marker should also be in the result (from reportFailed)
+        assertTrue(
+            "Output should contain FAILED marker, got: $execOutput",
+            execOutput.contains("FAILED:")
+        )
+    }
+
+    /**
+     * Tests that compiler warnings are delivered in the tool result alongside the execution output.
+     *
+     * The code uses an unchecked cast (List<Any> to List<String>) which produces a compiler
+     * warning on stderr. The test verifies that warnings appear in the tool result content items
+     * together with the successful execution output.
+     *
+     * Uses the same code snippet as CliClaudeIntegrationTest.testCompilationWarningsDelivered.
+     */
+    fun testCompilationWarningsDeliveredOnSuccess(): Unit = timeoutRunBlocking(60.seconds) {
+        val server = SteroidsMcpServer.getInstance()
+        server.startServerIfNeeded()
+        val sessionId = startSession(server)
+
+        val execRequest = buildJsonObject {
+            put("jsonrpc", "2.0")
+            put("id", "exec-warnings")
+            put("method", "tools/call")
+            putJsonObject("params") {
+                put("name", "steroid_execute_code")
+                putJsonObject("arguments") {
+                    put("project_name", project.name)
+                    put("code", """
+                        val items: List<Any> = listOf("hello", "world")
+                        @Suppress("NOTHING_TO_SUPPRESS")
+                        val strings: List<String> = items as List<String>
+                        println("WARNING_TEST_VALUE: " + strings.joinToString(","))
+                    """.trimIndent())
+                    put("reason", "Test compiler warning delivery")
+                    put("task_id", "warnings-test")
+                }
+            }
+        }.toString()
+
+        val execResponse = client.post(server.mcpUrl) {
+            contentType(ContentType.Application.Json)
+            accept(ContentType.Application.Json)
+            header(McpHttpTransport.SESSION_HEADER, sessionId)
+            setBody(execRequest)
+        }
+
+        assertEquals(HttpStatusCode.OK, execResponse.status)
+        val execRpc = McpJson.decodeFromString<JsonRpcResponse>(execResponse.bodyAsText())
+        assertNull("JSON-RPC should not have protocol error", execRpc.error)
+
+        val execResult = McpJson.decodeFromJsonElement<ToolCallResult>(execRpc.result!!)
+        val execOutput = execResult.content.filterIsInstance<ContentItem.Text>().joinToString("\n") { it.text }
+
+        println("=== COMPILER WARNINGS RESPONSE ===")
+        println("isError: ${execResult.isError}")
+        println("Output:")
+        println(execOutput)
+        println("=== END RESPONSE ===")
+
+        // Code should compile and execute successfully
+        assertFalse("Execution should succeed (warnings don't block compilation), got: $execOutput", execResult.isError)
+
+        // The println output should be present
+        assertTrue(
+            "Output should contain the execution result, got: $execOutput",
+            execOutput.contains("WARNING_TEST_VALUE: hello,world")
+        )
+
+        // Compiler warnings should be present in the tool result
+        assertTrue(
+            "Output should contain compiler warnings (unchecked cast or @Suppress warning), got: $execOutput",
+            execOutput.contains("warning", ignoreCase = true)
+                    || execOutput.contains("Unchecked cast", ignoreCase = true)
+                    || execOutput.contains("Compiler Errors/Warnings", ignoreCase = true)
         )
     }
 
