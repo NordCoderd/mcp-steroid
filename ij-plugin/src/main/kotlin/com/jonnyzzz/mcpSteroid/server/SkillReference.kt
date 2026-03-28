@@ -7,6 +7,7 @@ import com.jonnyzzz.mcpSteroid.prompts.generated.debugger.OverviewPromptArticle 
 import com.jonnyzzz.mcpSteroid.prompts.generated.ide.OverviewPromptArticle as IdeOverview
 import com.jonnyzzz.mcpSteroid.prompts.generated.lsp.OverviewPromptArticle as LspOverview
 import com.jonnyzzz.mcpSteroid.prompts.generated.prompt.SkillPromptArticle
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeToolDescriptionPromptArticle
 
 /**
  * Application service providing MCP resource references and brief tips for LLM agents.
@@ -43,7 +44,7 @@ class SkillReference {
         appendLine("FILE DISCOVERY: Use FilenameIndex in steroid_execute_code — NEVER use Glob for file search by name or extension.")
         appendLine("  val javaFiles = readAction { FilenameIndex.getAllFilesByExt(project, \"java\", GlobalSearchScope.projectScope(project)) }")
         appendLine("  val byName    = readAction { FilenameIndex.getVirtualFilesByName(\"MyClass.java\", GlobalSearchScope.projectScope(project)) }")
-        append("  Full guide: mcp-steroid://skill/execute-code-tool-description")
+        append("  Full guide: ${ExecuteCodeToolDescriptionPromptArticle().uri}")
     }
 
     /**
