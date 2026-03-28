@@ -143,6 +143,158 @@ class CodeWrapperForCompilationTest {
     }
 
     @Test
+    fun `imports intermixed with code are extracted and lines remapped`() {
+        val code = """
+            import java.io.File
+            val x = 1
+            import java.util.Date
+            val y = x + 1
+            import java.net.URL
+            println(y)
+        """.trimIndent()
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        assertEquals(listOf("import java.io.File", "import java.util.Date", "import java.net.URL"), extracted.importLines)
+        assertEquals(listOf(1, 3, 5), extracted.importLineNumbers)
+        assertEquals(listOf("val x = 1", "val y = x + 1", "println(y)"), extracted.otherLines)
+        assertEquals(listOf(2, 4, 6), extracted.otherLineNumbers)
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // 3 imports (N=3), code lines start at 23+3=26
+        // otherLine[0]="val x = 1" (orig 2) -> wrapped 26
+        // otherLine[1]="val y = x + 1" (orig 4) -> wrapped 27
+        // otherLine[2]="println(y)" (orig 6) -> wrapped 28
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:27:5: error: something on y")
+        assertEquals("input.kt:4:5: error: something on y", remapped)
+
+        // import lines: wrapped 15->orig 1, 16->orig 3, 17->orig 5
+        val remappedImport = result.lineMapping.remapCompilerOutput("input.kt:16:8: error: unresolved")
+        assertEquals("input.kt:3:8: error: unresolved", remappedImport)
+    }
+
+    @Test
+    fun `inline functions and lambdas preserve line mapping`() {
+        val code = """
+            val items = listOf(1, 2, 3)
+            val mapped = items.map { it * 2 }
+            val filtered = mapped.filter {
+                it > 3
+            }
+            val result = filtered.joinToString(",")
+            val bad: String = result.length
+            println(result)
+        """.trimIndent()
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // No imports (N=0), code starts at line 23
+        // Line 23->orig 1, 24->2, 25->3, 26->4, 27->5, 28->6, 29->7, 30->8
+        // Error on "val bad: String = result.length" -> orig line 7
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:29:23: error: type mismatch")
+        assertEquals("input.kt:7:23: error: type mismatch", remapped)
+    }
+
+    @Test
+    fun `multi-line string literal preserves line mapping`() {
+        val code = "val text = \"\"\"\n    line 1\n    line 2\n    line 3\n\"\"\".trimIndent()\nval bad: Int = text\nprintln(text)"
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // No imports, code starts at line 23
+        // val text = """   -> orig 1, line 23
+        //     line 1        -> orig 2, line 24
+        //     line 2        -> orig 3, line 25
+        //     line 3        -> orig 4, line 26
+        // """.trimIndent()  -> orig 5, line 27
+        // val bad: Int = text -> orig 6, line 28
+        // println(text)     -> orig 7, line 29
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:28:20: error: type mismatch")
+        assertEquals("input.kt:6:20: error: type mismatch", remapped)
+    }
+
+    @Test
+    fun `imports inside triple-quoted strings are not extracted`() {
+        val code = "val sql = \"\"\"\n    import something\n    SELECT * FROM table\n\"\"\".trimIndent()\nimport java.io.File\nval f: Int = File(\"x\")\nprintln(f)"
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        // "import something" inside triple-quoted string is NOT an import
+        // "import java.io.File" on line 5 IS an import
+        assertEquals(listOf("import java.io.File"), extracted.importLines)
+        assertEquals(listOf(5), extracted.importLineNumbers)
+
+        // Other lines: lines 1-4 (the triple-quoted string) + line 6 + line 7
+        assertEquals(6, extracted.otherLines.size)
+        assertEquals(listOf(1, 2, 3, 4, 6, 7), extracted.otherLineNumbers)
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // 1 import (N=1), code starts at 24
+        // otherLine[4]="val f: Int = File(\"x\")" (orig 6) -> wrapped 28
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:28:18: error: type mismatch")
+        assertEquals("input.kt:6:18: error: type mismatch", remapped)
+    }
+
+    @Test
+    fun `complex code with closures and multiple errors`() {
+        val code = """
+            import java.util.concurrent.atomic.AtomicInteger
+
+            val counter = AtomicInteger(0)
+            val incrementer: () -> Unit = {
+                counter.incrementAndGet()
+            }
+
+            val result: String = counter.get()
+            val items = listOf("a", "b", "c")
+            val joined: Int = items.joinToString()
+
+            incrementer()
+            println(counter.get())
+        """.trimIndent()
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // 1 import (N=1), code starts at 24
+        // otherLines: ""(2), "val counter..."(3), "val incrementer..."(4), "counter.inc..."(5),
+        //   "}"(6), ""(7), "val result: String..."(8), "val items..."(9), "val joined: Int..."(10),
+        //   ""(11), "incrementer()"(12), "println..."(13)
+        // otherLine[6] = "val result: String = counter.get()" (orig 8) -> wrapped 30
+        // otherLine[8] = "val joined: Int = items.joinToString()" (orig 10) -> wrapped 32
+        val compilerOutput = """
+            input.kt:30:26: error: type mismatch: expected 'String', actual 'Int'
+            input.kt:32:24: error: type mismatch: expected 'Int', actual 'String'
+        """.trimIndent()
+        val remapped = result.lineMapping.remapCompilerOutput(compilerOutput)
+        val expected = """
+            input.kt:8:26: error: type mismatch: expected 'String', actual 'Int'
+            input.kt:10:24: error: type mismatch: expected 'Int', actual 'String'
+        """.trimIndent()
+        assertEquals(expected, remapped)
+    }
+
+    @Test
+    fun `many imports scattered through code`() {
+        val code = """
+            import java.io.File
+            import java.util.Date
+            val a = 1
+            import java.net.URL
+            import java.util.UUID
+            val b = 2
+            import kotlin.math.sqrt
+            val c: String = a + b
+        """.trimIndent()
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        assertEquals(5, extracted.importLines.size)
+        assertEquals(listOf(1, 2, 4, 5, 7), extracted.importLineNumbers)
+        assertEquals(listOf("val a = 1", "val b = 2", "val c: String = a + b"), extracted.otherLines)
+        assertEquals(listOf(3, 6, 8), extracted.otherLineNumbers)
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // 5 imports (N=5), code starts at 23+5=28
+        // otherLine[2]="val c: String = a + b" (orig 8) -> wrapped 30
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:30:21: error: type mismatch")
+        assertEquals("input.kt:8:21: error: type mismatch", remapped)
+    }
+
+    @Test
     fun `extractImports backward compatibility`() {
         val code = """
             import foo.Bar
