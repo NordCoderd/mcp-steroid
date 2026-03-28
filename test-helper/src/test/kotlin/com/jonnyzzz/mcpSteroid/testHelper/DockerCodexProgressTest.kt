@@ -24,10 +24,10 @@ class DockerCodexProgressTest {
         val result = codexSession.runPrompt(
             prompt = "List files in current directory. You must use a tool call (for example, run a shell command) to get the result.",
             timeoutSeconds = 30
-        ).awaitForProcessFinishRaw()
+        ).awaitForProcessFinish()
             .assertExitCode(0) { "Codex command should succeed" }
 
-        val events = parseNdjsonEvents(result.stdout)
+        val events = parseNdjsonEvents(result.rawStdout)
         assertTrue(events.isNotEmpty(), "Raw output should contain NDJSON events")
         assertTrue(events.size > 1, "Expected multiple NDJSON events, found ${events.size}")
 

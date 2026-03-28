@@ -25,10 +25,10 @@ class DockerGeminiProgressTest {
                 You must use a tool call (for example, a shell command) to get the result.
             """.trimIndent(),
             timeoutSeconds = 30
-        ).awaitForProcessFinishRaw()
+        ).awaitForProcessFinish()
             .assertExitCode(0) { "Gemini command should succeed" }
 
-        val events = parseNdjsonEvents(result.stdout)
+        val events = parseNdjsonEvents(result.rawStdout)
         assertTrue(events.isNotEmpty(), "Raw output should contain stream-json NDJSON events")
         assertTrue(events.size > 1, "Expected multiple stream-json events, found ${events.size}")
 

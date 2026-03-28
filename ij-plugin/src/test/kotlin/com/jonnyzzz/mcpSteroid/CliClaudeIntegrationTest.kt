@@ -132,15 +132,12 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
             timeoutSeconds = 240
         )
 
-        // Get raw NDJSON output — this contains tool_result events with compilation errors
-        val rawResult = startedProcess.awaitForProcessFinishRaw()
-
-        // Filtered output — the ClaudeOutputFilter renders tool_result as "<< ERROR ..."
+        // awaitForProcessFinish() returns AiProcessResult with both filtered and raw output
         val result = startedProcess.awaitForProcessFinish()
         val combinedOutput = result.stdout + "\n" + result.stderr
 
         println("=== RAW NDJSON lines with tool_result or type mismatch ===")
-        rawResult.stdout.lineSequence()
+        result.rawStdout.lineSequence()
             .filter { it.contains("type mismatch", ignoreCase = true) || it.contains("tool_result", ignoreCase = true) }
             .forEach { println("  $it") }
         println("=== END RAW ===")
@@ -153,7 +150,7 @@ class CliClaudeIntegrationTest : CliIntegrationTestBase() {
 
         // The compilation error must be in the raw NDJSON stream.
         // This proves the MCP server returned the error and Claude CLI emitted it.
-        val rawOutput = rawResult.stdout + "\n" + rawResult.stderr
+        val rawOutput = result.rawStdout + "\n" + result.stderr
         assertTrue(
             "Raw NDJSON should contain 'type mismatch' from the compiler (server-side delivery check)\n" +
                     "If this fails, the MCP server or Claude CLI is not emitting the tool result.\n$rawOutput",

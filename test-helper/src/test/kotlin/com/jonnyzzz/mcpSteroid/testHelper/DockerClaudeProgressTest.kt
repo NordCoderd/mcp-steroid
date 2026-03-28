@@ -40,25 +40,23 @@ class DockerClaudeProgressTest {
         val claudeSession = DockerClaudeSession.create(stack)
 
         // Run a simple prompt that will trigger tool usage.
-        // awaitForProcessFinishRaw() returns the raw NDJSON stream-json output,
-        // before ClaudeOutputFilter post-processing. We need it to assert on the
-        // protocol-level events. assertExitCode(0) on the raw result validates success.
-        val aiProcess = claudeSession.runPrompt(
+        // awaitForProcessFinish() returns AiProcessResult with both filtered and raw output.
+        // We use rawStdout to assert on the protocol-level NDJSON events.
+        val result = claudeSession.runPrompt(
             prompt = "List all files in the current directory using bash commands. Show me the full output.",
             timeoutSeconds = 60
-        )
-        val rawResult = aiProcess.awaitForProcessFinishRaw()
+        ).awaitForProcessFinish()
             .assertExitCode(0) { "Claude command should succeed: $stderr" }
 
         // Verify raw output contains NDJSON progress events
         assertTrue(
-            rawResult.stdout.contains("\"type\""),
+            result.rawStdout.contains("\"type\""),
             "Raw output should contain NDJSON events with 'type' field"
         )
 
         // Verify tool_use events are present in raw output
         // Claude stream-json emits events like {"type":"content_block_start","content_block":{"type":"tool_use",...}}
-        val hasToolUse = rawResult.stdout.contains("tool_use")
+        val hasToolUse = result.rawStdout.contains("tool_use")
         assertTrue(
             hasToolUse,
             "Raw output should contain tool_use events showing tool calls in progress"
@@ -66,7 +64,7 @@ class DockerClaudeProgressTest {
 
         // Verify we get actual progress events, not just the final result
         // The raw output should have multiple JSON lines (NDJSON)
-        val jsonLineCount = rawResult.stdout.lines().count { line ->
+        val jsonLineCount = result.rawStdout.lines().count { line ->
             line.trim().startsWith("{") && line.trim().endsWith("}")
         }
         assertTrue(
@@ -75,7 +73,7 @@ class DockerClaudeProgressTest {
         )
 
         // Verify the filtered output is human-readable text (not raw NDJSON)
-        val filteredOutput = aiProcess.outputFilter.filterText(rawResult.stdout)
+        val filteredOutput = result.stdout
         assertTrue(
             filteredOutput.isNotBlank(),
             "Filtered output should contain the final answer text"
