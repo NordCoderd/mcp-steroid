@@ -361,7 +361,7 @@ fi
 
 if [[ "$RUN_PUBLISH" == "1" ]]; then
   validate_publish_inputs
-  gh release create "$RELEASE_TAG" "$RELEASE_ZIP_FILE" "$ROOT_DIR/website/LICENSE" \
+  gh release create "$RELEASE_TAG" "$RELEASE_ZIP_FILE" "$ROOT_DIR/website/EULA" \
     --repo jonnyzzz/mcp-steroid \
     --target "$RELEASE_TARGET" \
     --notes-file "$RELEASE_NOTES_FILE"

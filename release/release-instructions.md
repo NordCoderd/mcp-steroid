@@ -171,10 +171,10 @@ release/scripts/run-release.sh --no-dry-run --publish --skip-build --skip-notes 
 Target command when enabled:
 
 ```bash
-gh release create <tag> <stable-plugin-zip> website/LICENSE --repo jonnyzzz/mcp-steroid --notes-file <notes-file>
+gh release create <tag> <stable-plugin-zip> website/EULA --repo jonnyzzz/mcp-steroid --notes-file <notes-file>
 ```
 
-The `website/LICENSE` file is uploaded as a separate release asset so the EULA is directly accessible from the GitHub release page.
+The `website/EULA` file is uploaded as a separate release asset so the EULA is directly accessible from the GitHub release page.
 
 Required inputs for publish stage:
 
