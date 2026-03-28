@@ -171,16 +171,30 @@ release/scripts/run-release.sh --no-dry-run --publish --skip-build --skip-notes 
 Target command when enabled:
 
 ```bash
-gh release create <tag> <stable-plugin-zip> website/EULA#LICENSE --repo jonnyzzz/mcp-steroid --notes-file <notes-file>
+cp website/EULA /tmp/LICENSE
+gh release create <tag> <stable-plugin-zip> /tmp/LICENSE \
+  --repo jonnyzzz/mcp-steroid \
+  --target "$(git -C website rev-parse HEAD)" \
+  --notes-file <notes-file>
 ```
 
-The `website/EULA` file is uploaded as `LICENSE` release asset (using `#LICENSE` rename syntax) so the EULA is directly accessible from the GitHub release page.
+**EULA as LICENSE**: The `gh` CLI uses the source filename as the asset name. The `file#name` rename syntax does NOT work. Copy `website/EULA` to a temp file named `LICENSE` before upload so the asset appears as `LICENSE` on the release page.
+
+**Release target**: The release is created on the public repo (`jonnyzzz/mcp-steroid`), so `--target` must be a commit from that repo (use `git -C website rev-parse HEAD`).
+
+**Tagging**: After publish, create matching tags in both repos:
+```bash
+git tag -a "v<version>" -m "release: <version>" HEAD && git push origin "v<version>"
+git -C website tag -a "v<version>" -m "release: <version>" HEAD && git push origin "v<version>"
+```
+
+**Immutable releases**: Once published on `jonnyzzz/mcp-steroid`, releases cannot be modified or have assets added. If you need to fix a release, delete it and recreate. Tags locked by immutable releases cannot be reused.
 
 Required inputs for publish stage:
 
-- **Tag**: defaults to `<version>` derived from `VERSION` file (e.g., `0.88.0`, no `v` prefix)
-- **Tag target**: defaults to recorded version-bump commit (`release/state/version-bump.env`) and falls back to `HEAD`
-- **Notes file**: defaults to `release/notes/<version>.md` (for example `release/notes/0.88.0.md`)
+- **Tag**: defaults to `v<VERSION>` derived from `VERSION` file (e.g., `v0.91.0`)
+- **Tag target**: the HEAD commit of the `website/` (public repo) clone
+- **Notes file**: defaults to `release/notes/<version>.md` (for example `release/notes/0.91.0.md`)
 - **Plugin ZIP**: defaults to `release/out/plugin-idea-2025.3.1.zip`
 - `gh` CLI must be installed and authenticated (`gh auth status`)
 - Notes file and ZIP file must exist before publish stage starts

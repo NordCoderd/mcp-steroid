@@ -361,10 +361,27 @@ fi
 
 if [[ "$RUN_PUBLISH" == "1" ]]; then
   validate_publish_inputs
-  gh release create "$RELEASE_TAG" "$RELEASE_ZIP_FILE" "$ROOT_DIR/website/EULA#LICENSE" \
+  # gh uses the source filename as the asset name.
+  # Copy EULA to a temp dir as "LICENSE" so the asset appears as "LICENSE".
+  EULA_TMP_DIR="$(mktemp -d)"
+  EULA_AS_LICENSE="$EULA_TMP_DIR/LICENSE"
+  cp "$ROOT_DIR/website/EULA" "$EULA_AS_LICENSE"
+  trap 'rm -rf "$EULA_TMP_DIR"' EXIT
+
+  # Resolve publish target from the website (public) repo
+  PUBLISH_TARGET="$(git -C "$ROOT_DIR/website" rev-parse HEAD)"
+
+  gh release create "$RELEASE_TAG" "$RELEASE_ZIP_FILE" "$EULA_AS_LICENSE" \
     --repo jonnyzzz/mcp-steroid \
-    --target "$RELEASE_TARGET" \
+    --target "$PUBLISH_TARGET" \
     --notes-file "$RELEASE_NOTES_FILE"
+
+  # Tag both repos
+  git tag -a "$RELEASE_TAG" -m "release: $VERSION" HEAD 2>/dev/null || true
+  git push origin "$RELEASE_TAG" 2>/dev/null || true
+  git -C "$ROOT_DIR/website" tag -a "$RELEASE_TAG" -m "release: $VERSION" HEAD 2>/dev/null || true
+  git -C "$ROOT_DIR/website" push origin "$RELEASE_TAG" 2>/dev/null || true
+
   echo "Publish stage completed."
 else
   echo "Publish stage skipped."

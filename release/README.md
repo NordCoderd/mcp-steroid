@@ -10,19 +10,46 @@ This directory contains release orchestration assets for `mcp-steroid`:
 - `notes/` — committed versioned release notes (`release/notes/<version>.md`) used by build/publish.
 - `out/` — deterministic output directory for release artifacts.
 
+### Repository Layout
+
+- **Main repo** (`jonnyzzz/intellij-mcp-steroids`, private): plugin source, build, tests
+- **Public repo** (`jonnyzzz/mcp-steroid`): GitHub releases, website, EULA, VERSION
+- **Local**: `website/` directory is a clone of the public repo (gitignored from main)
+
+Both repos have matching `VERSION` files and release tags.
+
 ### Quick Release (Shorter Path)
 
 For a quick release without the full Docker build matrix, use Claude Code agents directly:
 
-1. **Bump version**: Edit `VERSION` file, commit.
-2. **Collect release notes**: Run `./run-agent.sh claude . /tmp/notes-prompt.md` (unset `CLAUDECODE` env var if running from within Claude Code).
-3. **Build**: Run `./run-agent.sh claude . /tmp/build-prompt.md` — executes `./gradlew clean build buildPlugin -x :test-integration:test -Pmcp.release.build=true -Pmcp.release.notes.version=<version>`.
-4. **Upload to GitHub**: `gh release create <version> release/out/<zip> --repo jonnyzzz/mcp-steroid --title "<version>" --notes-file /tmp/release-body.md`
-5. **Update website**: Create release page at `website/website/content/releases/<version>.md`, update `website/website/hugo.toml` whatsnew entry, run `cd website/website && make build`. **Note:** `make build` downloads the release ZIP to extract the plugin version, so step 4 must complete first.
-6. **Mark older releases obsolete**: `gh release edit <old-version> --repo jonnyzzz/mcp-steroid --notes-file <updated-body-with-obsolete-banner>`.
-7. **Publish website**: Commit and push in `website/` (the public repo clone).
+1. **Bump version**: Edit `VERSION` in both main repo root and `website/VERSION`, commit both.
+2. **Collect release notes**: Write `release/notes/<version>.md`.
+3. **Build**: `./gradlew clean :ij-plugin:buildPlugin -Pmcp.release.build=true -Pmcp.release.notes.version=<version> -x :test-integration:test`
+4. **Publish to GitHub** (on the public repo `jonnyzzz/mcp-steroid`):
+   ```bash
+   # Copy EULA as LICENSE (gh uses source filename as asset name)
+   cp website/EULA /tmp/LICENSE
 
-Steps 2+3 can run in parallel. Steps 5–7 require step 4 (GitHub release must exist for website build). The `CLAUDECODE` env var must be unset for nested Claude Code invocations via `run-agent.sh`.
+   # Create release targeting the public repo commit
+   gh release create "v<version>" \
+     ij-plugin/build/distributions/mcp-steroid-*.zip \
+     /tmp/LICENSE \
+     --repo jonnyzzz/mcp-steroid \
+     --target "$(git -C website rev-parse HEAD)" \
+     --title "<version>" \
+     --notes-file release/notes/<version>.md
+   ```
+   **EULA handling**: The `gh` CLI uses the source filename as the asset name. Since we want the asset named `LICENSE` (not `EULA`), copy `website/EULA` to a temp file named `LICENSE` before upload. The `file#name` rename syntax does NOT work with `gh release create`.
+5. **Tag both repos**:
+   ```bash
+   git tag -a "v<version>" -m "release: <version>" HEAD && git push origin "v<version>"
+   cd website && git tag -a "v<version>" -m "release: <version>" HEAD && git push origin "v<version>"
+   ```
+6. **Update website**: Create release page at `website/website/content/releases/<version>.md`, update `website/website/hugo.toml` whatsnew entry, run `cd website/website && make build`. **Note:** `make build` downloads the release ZIP to extract the plugin version, so step 4 must complete first.
+7. **Mark older releases obsolete**: `gh release edit <old-version> --repo jonnyzzz/mcp-steroid --notes-file <updated-body-with-obsolete-banner>`.
+8. **Publish website**: `cd website && git add -A && git commit -m "release: <version> website" && git push`
+
+Steps 2+3 can run in parallel. Steps 6–8 require step 4 (GitHub release must exist for website build). The `CLAUDECODE` env var must be unset for nested Claude Code invocations via `run-agent.sh`.
 
 ### Full Release (Docker Matrix)
 
@@ -61,9 +88,10 @@ release/scripts/run-release.sh --no-dry-run --publish
 
 Publish safety defaults:
 
-- Uses tag `<VERSION>` (no `v` prefix) and targets the recorded version-bump commit SHA
+- Uses tag `v<VERSION>` and targets the recorded version-bump commit SHA
 - Refuses `--publish` together with `--skip-build` or `--skip-notes` unless `--allow-existing-artifacts` is passed
 - Refuses to publish if the GitHub release tag already exists
+- **Immutable releases**: once published on `jonnyzzz/mcp-steroid`, releases cannot be modified or have assets added. If you need to fix a release, delete it and recreate. Tags locked by immutable releases cannot be reused — use a different tag format (e.g. `v0.91.0` vs `0.91.0`).
 
 Container builds use an isolated `.intellijPlatform` Docker volume to prevent host-OS IDE cache conflicts.
 
@@ -77,6 +105,8 @@ Builder container API key forwarding:
 
 ### Website & Plugin Repository
 
+The `website/` directory is a clone of the public repo (`jonnyzzz/mcp-steroid`). The Hugo site sources live in `website/website/`.
+
 The website build (`cd website/website && make build`) automatically generates:
 
 - `version.json` — current version for in-IDE update checker
@@ -85,7 +115,7 @@ The website build (`cd website/website && make build`) automatically generates:
 The `updatePlugins.xml` generation pipeline:
 
 1. Makefile queries `gh` for the release ZIP download URL (no fallback — build fails if `gh` unavailable or release not found)
-2. `scripts/generate-update-plugins-xml.py` (run via `uv`) downloads the ZIP, extracts `ij-plugin-*.jar`, reads `META-INF/plugin.xml` to get the exact plugin version (e.g. `0.89.0-b8388824`) and `since-build`
+2. `scripts/generate-update-plugins-xml.py` (run via `uv`) downloads the ZIP, extracts `ij-plugin-*.jar`, reads `META-INF/plugin.xml` to get the exact plugin version (e.g. `0.91.0-13655642`) and `since-build`
 3. Validates URL format (HTTPS, GitHub release pattern, version present) and generates XML with the artifact's actual version
 
 This ensures `updatePlugins.xml` always matches the published artifact. Always points to the latest release only.
@@ -96,6 +126,9 @@ Custom plugin repository URL: `https://mcp-steroid.jonnyzzz.com/updatePlugins.xm
 
 ### Post-Release Checklist
 
+- [ ] VERSION bumped in both repos (main + website)
+- [ ] Release tags created in both repos (`git tag -a "v<version>"`)
+- [ ] GitHub release has both assets: plugin ZIP + LICENSE (EULA)
 - [ ] Older GitHub releases marked obsolete (prepend banner pointing to latest)
 - [ ] Website release pages for older versions auto-show obsolete banner (handled by `layouts/releases/single.html`)
 - [ ] Releases list page shows latest prominently, older releases in separate section
