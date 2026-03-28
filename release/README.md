@@ -115,7 +115,7 @@ The website build (`cd website/website && make build`) automatically generates:
 
 The `updatePlugins.xml` generation pipeline:
 
-1. Makefile queries `gh` for the release ZIP download URL (no fallback — build fails if `gh` unavailable or release not found)
+1. Makefile queries `gh` for the release ZIP download URL, trying `v<VERSION>` tag first then `<VERSION>` (no fallback — build fails if `gh` unavailable or release not found)
 2. `scripts/generate-update-plugins-xml.py` (run via `uv`) downloads the ZIP, extracts `ij-plugin-*.jar`, reads `META-INF/plugin.xml` to get the exact plugin version (e.g. `0.91.0-13655642`) and `since-build`
 3. Validates URL format (HTTPS, GitHub release pattern, version present) and generates XML with the artifact's actual version
 
