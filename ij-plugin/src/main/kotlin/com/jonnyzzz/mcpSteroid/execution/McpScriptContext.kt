@@ -3,24 +3,14 @@ package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.guessProjectDir
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiManager
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.psi.search.GlobalSearchScope
 import kotlinx.serialization.json.JsonElement
-import java.io.File
-import java.nio.file.FileSystems
-import java.nio.file.Path
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import com.intellij.openapi.application.readAction as intellijReadAction
-import com.intellij.openapi.application.writeAction as intellijWriteAction
-import com.intellij.openapi.application.smartReadAction as intellijSmartReadAction
 
 /**
  * Context provided to exec_code scripts.
@@ -52,7 +42,6 @@ import com.intellij.openapi.application.smartReadAction as intellijSmartReadActi
  *
  * NEVER use runBlocking - it causes deadlocks.
  */
-@Suppress("unused")
 interface McpScriptContext {
     /** The IntelliJ Project this execution is associated with */
     val project: Project
@@ -285,7 +274,7 @@ interface McpScriptContext {
      *
      * @see com.intellij.openapi.application.readAction
      */
-    suspend fun <T> readAction(action: () -> T): T = intellijReadAction(action)
+    suspend fun <T> readAction(action: () -> T): T
 
     /**
      * Execute a block under write lock on EDT.
@@ -299,7 +288,7 @@ interface McpScriptContext {
      *
      * @see com.intellij.openapi.application.writeAction
      */
-    suspend fun <T> writeAction(action: () -> T): T = intellijWriteAction(action)
+    suspend fun <T> writeAction(action: () -> T): T
 
     /**
      * Execute a read action that automatically waits for smart mode.
@@ -313,7 +302,7 @@ interface McpScriptContext {
      *
      * @see com.intellij.openapi.application.smartReadAction
      */
-    suspend fun <T> smartReadAction(action: () -> T): T = intellijSmartReadAction(project, action)
+    suspend fun <T> smartReadAction(action: () -> T): T
 
     // ============================================================
     // Search Scopes - Convenience Methods
@@ -327,7 +316,7 @@ interface McpScriptContext {
      * FilenameIndex.getFilesByName(project, "build.gradle.kts", scope)
      * ```
      */
-    fun projectScope(): GlobalSearchScope = GlobalSearchScope.projectScope(project)
+    fun projectScope(): GlobalSearchScope
 
     /**
      * Get a search scope covering project files AND all libraries.
@@ -337,7 +326,7 @@ interface McpScriptContext {
      * JavaPsiFacade.getInstance(project).findClass("java.util.List", scope)
      * ```
      */
-    fun allScope(): GlobalSearchScope = GlobalSearchScope.allScope(project)
+    fun allScope(): GlobalSearchScope
 
     // ============================================================
     // File Access - Convenience Methods
@@ -354,8 +343,7 @@ interface McpScriptContext {
      * }
      * ```
      */
-    fun findFile(absolutePath: String): VirtualFile? =
-        LocalFileSystem.getInstance().findFileByPath(absolutePath)
+    fun findFile(absolutePath: String): VirtualFile?
 
     /**
      * Find a PsiFile by an absolute path.
@@ -367,10 +355,7 @@ interface McpScriptContext {
      * println(psiFile?.name)
      * ```
      */
-    suspend fun findPsiFile(absolutePath: String): PsiFile? {
-        val vf = findFile(absolutePath) ?: return null
-        return readAction { PsiManager.getInstance(project).findFile(vf) }
-    }
+    suspend fun findPsiFile(absolutePath: String): PsiFile?
 
     /**
      * Find a VirtualFile relative to the project base path.
@@ -380,10 +365,7 @@ interface McpScriptContext {
      * val vf = findProjectFile("src/main/kotlin/MyClass.kt")
      * ```
      */
-    fun findProjectFile(relativePath: String): VirtualFile? {
-        val basePath = project.basePath ?: return null
-        return findFile("$basePath/$relativePath")
-    }
+    fun findProjectFile(relativePath: String): VirtualFile?
 
     /**
      * Find project files by a glob pattern relative to the project root.
@@ -395,41 +377,7 @@ interface McpScriptContext {
      *
      * Returns files sorted by absolute path for deterministic results.
      */
-    suspend fun findProjectFiles(globPattern: String): List<VirtualFile> {
-        if (globPattern.isBlank()) return emptyList()
-
-        val projectRoot = project.guessProjectDir()
-            ?: project.basePath?.let(::findFile)
-            ?: return emptyList()
-
-        val primaryMatcher = try {
-            FileSystems.getDefault().getPathMatcher("glob:$globPattern")
-        } catch (_: IllegalArgumentException) {
-            return emptyList()
-        }
-
-        val fallbackMatcher = runCatching {
-            val adjusted = globPattern.replace('/', File.separatorChar)
-            if (adjusted == globPattern) null else FileSystems.getDefault().getPathMatcher("glob:$adjusted")
-        }.getOrNull()
-
-        return readAction {
-            val matches = mutableListOf<VirtualFile>()
-            VfsUtilCore.iterateChildrenRecursively(projectRoot, null) { file ->
-                val relativePathText = VfsUtilCore.getRelativePath(file, projectRoot, '/')
-                    ?: return@iterateChildrenRecursively true
-                val relativePath = runCatching { Path.of(relativePathText) }
-                    .getOrElse { return@iterateChildrenRecursively true }
-
-                if (primaryMatcher.matches(relativePath) || (fallbackMatcher?.matches(relativePath) == true)) {
-                    matches += file
-                }
-                true
-            }
-
-            matches.sortedBy { it.path }
-        }
-    }
+    suspend fun findProjectFiles(globPattern: String): List<VirtualFile>
 
     /**
      * Find a PsiFile relative to the project base path.
@@ -439,8 +387,5 @@ interface McpScriptContext {
      * val psiFile = findProjectPsiFile("src/main/kotlin/MyClass.kt")
      * ```
      */
-    suspend fun findProjectPsiFile(relativePath: String): PsiFile? {
-        val basePath = project.basePath ?: return null
-        return findPsiFile("$basePath/$relativePath")
-    }
+    suspend fun findProjectPsiFile(relativePath: String): PsiFile?
 }

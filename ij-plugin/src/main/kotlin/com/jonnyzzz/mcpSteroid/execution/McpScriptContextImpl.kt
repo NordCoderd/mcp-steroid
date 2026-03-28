@@ -17,7 +17,6 @@ import com.intellij.util.PairProcessor
 import com.intellij.codeInsight.daemon.HighlightDisplayKey
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileEditorManager
@@ -25,8 +24,13 @@ import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.project.guessProjectDir
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiFile
+import com.intellij.psi.search.GlobalSearchScope
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import com.jonnyzzz.mcpSteroid.vision.VisionService
@@ -36,10 +40,16 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.JsonElement
+import java.io.File
+import java.nio.file.FileSystems
+import java.nio.file.Path
 import java.util.Base64
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.coroutines.resume
 import kotlin.time.Duration
+import com.intellij.openapi.application.readAction as intellijReadAction
+import com.intellij.openapi.application.writeAction as intellijWriteAction
+import com.intellij.openapi.application.smartReadAction as intellijSmartReadAction
 
 /**
  * Implementation of McpScriptContext.
@@ -327,5 +337,81 @@ class McpScriptContextImpl(
             results.mapKeys { (wrapper, _) -> wrapper.shortName }
                 .filterValues { it.isNotEmpty() }
         }
+    }
+
+    // ============================================================
+    // Read/Write Actions - Convenience Wrappers
+    // ============================================================
+
+    override suspend fun <T> readAction(action: () -> T): T = intellijReadAction(action)
+
+    override suspend fun <T> writeAction(action: () -> T): T = intellijWriteAction(action)
+
+    override suspend fun <T> smartReadAction(action: () -> T): T = intellijSmartReadAction(project, action)
+
+    // ============================================================
+    // Search Scopes
+    // ============================================================
+
+    override fun projectScope(): GlobalSearchScope = GlobalSearchScope.projectScope(project)
+
+    override fun allScope(): GlobalSearchScope = GlobalSearchScope.allScope(project)
+
+    // ============================================================
+    // File Access
+    // ============================================================
+
+    override fun findFile(absolutePath: String): VirtualFile? =
+        LocalFileSystem.getInstance().findFileByPath(absolutePath)
+
+    override suspend fun findPsiFile(absolutePath: String): PsiFile? {
+        val vf = findFile(absolutePath) ?: return null
+        return readAction { PsiManager.getInstance(project).findFile(vf) }
+    }
+
+    override fun findProjectFile(relativePath: String): VirtualFile? {
+        val basePath = project.basePath ?: return null
+        return findFile("$basePath/$relativePath")
+    }
+
+    override suspend fun findProjectFiles(globPattern: String): List<VirtualFile> {
+        if (globPattern.isBlank()) return emptyList()
+
+        val projectRoot = project.guessProjectDir()
+            ?: project.basePath?.let(::findFile)
+            ?: return emptyList()
+
+        val primaryMatcher = try {
+            FileSystems.getDefault().getPathMatcher("glob:$globPattern")
+        } catch (_: IllegalArgumentException) {
+            return emptyList()
+        }
+
+        val fallbackMatcher = runCatching {
+            val adjusted = globPattern.replace('/', File.separatorChar)
+            if (adjusted == globPattern) null else FileSystems.getDefault().getPathMatcher("glob:$adjusted")
+        }.getOrNull()
+
+        return readAction {
+            val matches = mutableListOf<VirtualFile>()
+            VfsUtilCore.iterateChildrenRecursively(projectRoot, null) { file ->
+                val relativePathText = VfsUtilCore.getRelativePath(file, projectRoot, '/')
+                    ?: return@iterateChildrenRecursively true
+                val relativePath = runCatching { Path.of(relativePathText) }
+                    .getOrElse { return@iterateChildrenRecursively true }
+
+                if (primaryMatcher.matches(relativePath) || (fallbackMatcher?.matches(relativePath) == true)) {
+                    matches += file
+                }
+                true
+            }
+
+            matches.sortedBy { it.path }
+        }
+    }
+
+    override suspend fun findProjectPsiFile(relativePath: String): PsiFile? {
+        val basePath = project.basePath ?: return null
+        return findPsiFile("$basePath/$relativePath")
     }
 }
