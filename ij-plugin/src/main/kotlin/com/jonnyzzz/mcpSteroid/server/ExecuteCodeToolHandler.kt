@@ -139,7 +139,7 @@ class ExecuteCodeToolHandler : McpRegistrar {
 
         val result = project
             .service<ExecutionManager>()
-            .executeWithProgress(execCodeParams)
+            .executeWithProgress(execCodeParams, context.mcpProgressReporter)
 
         runCatching {
             analyticsBeacon.capture(

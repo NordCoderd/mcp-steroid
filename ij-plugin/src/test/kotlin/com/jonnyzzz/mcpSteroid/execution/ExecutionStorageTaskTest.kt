@@ -8,6 +8,7 @@ import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.getExecutionIdFromResult
 import com.jonnyzzz.mcpSteroid.setServerPortProperties
 import com.jonnyzzz.mcpSteroid.testExecParams
+import com.jonnyzzz.mcpSteroid.server.NoOpProgressReporter
 import com.jonnyzzz.mcpSteroid.storage.storagePaths
 import java.nio.file.Path
 import kotlin.io.path.exists
@@ -31,7 +32,7 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
 
     fun testSuccessFileAndWrappedScriptCreated(): Unit = timeoutRunBlocking(30.seconds) {
         val code = "println(\"Success Test\")"
-        val result = manager.executeWithProgress(testExecParams(code))
+        val result = manager.executeWithProgress(testExecParams(code), NoOpProgressReporter)
 
         assertFalse("Execution should not fail", result.isError)
 
@@ -51,7 +52,7 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
 
     fun testCompilationErrorInOutputJsonl(): Unit = timeoutRunBlocking(30.seconds) {
         val invalidCode = "invalid kotlin code here"
-        val result = manager.executeWithProgress(testExecParams(invalidCode))
+        val result = manager.executeWithProgress(testExecParams(invalidCode), NoOpProgressReporter)
 
         assertTrue("Execution should fail", result.isError)
 
@@ -84,7 +85,7 @@ class ExecutionStorageTaskTest : BasePlatformTestCase() {
             return@$labelName
         """.trimIndent()
 
-        val result = manager.executeWithProgress(testExecParams(invalidCode))
+        val result = manager.executeWithProgress(testExecParams(invalidCode), NoOpProgressReporter)
         assertTrue("Execution should fail", result.isError)
 
         val output = result.content

@@ -13,7 +13,6 @@ import com.jonnyzzz.mcpSteroid.mcp.builder
 import com.jonnyzzz.mcpSteroid.review.ReviewManager
 import com.jonnyzzz.mcpSteroid.server.ExecCodeParams
 import com.jonnyzzz.mcpSteroid.server.McpProgressReporter
-import com.jonnyzzz.mcpSteroid.server.NoOpProgressReporter
 import com.jonnyzzz.mcpSteroid.server.SkillReference
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
@@ -45,7 +44,7 @@ class ExecutionManager(
 
     suspend fun executeWithProgress(
         exec: ExecCodeParams,
-        mcpProgressReporter: McpProgressReporter = NoOpProgressReporter,
+        mcpProgressReporter: McpProgressReporter,
     ): ToolCallResult {
         return coroutineScope {
             val executionId = project.executionStorage.writeNewExecution(exec)
