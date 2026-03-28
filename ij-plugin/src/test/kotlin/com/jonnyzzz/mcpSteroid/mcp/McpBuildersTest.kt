@@ -42,7 +42,7 @@ class McpBuildersTest {
     @Test
     fun `build with error flag and multiple texts produces single merged text`() {
         val result = ToolCallResult.builder()
-            .addTextContent("execution_id: test-exec-1\n use it to report feedback: steroid_execute_feedback")
+            .addTextContent("execution_id: test-exec-1")
             .addTextContent("Compiler Errors/Warnings:\nerror: type mismatch")
             .addTextContent("HINT: check your types")
             .addTextContent("FAILED: kotlinc exited with code: 1")

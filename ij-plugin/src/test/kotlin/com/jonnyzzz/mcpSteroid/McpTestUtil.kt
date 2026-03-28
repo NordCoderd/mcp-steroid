@@ -118,16 +118,11 @@ fun testExecParams(
  * The structuredContent is a JSON object with executionId as a key.
  */
 fun getExecutionIdFromResult(result: ToolCallResult): String {
-    val executionId = result.content.mapNotNull {
-        if (it is ContentItem.Text) {
-            val prefix = "execution_id:"
-            if (it.text.startsWith(prefix, ignoreCase = true)) {
-                return@mapNotNull it.text.removePrefix(prefix).trim()
-                    .substringBefore("\n").trim()
-            }
-        }
-        null
-    }.distinct().singleOrNull() ?: error("No execution Id in result")
+    val prefix = "execution_id:"
+    val executionId = result.content.filterIsInstance<ContentItem.Text>().firstNotNullOfOrNull { item ->
+        val match = Regex("""execution_id:\s*([\w-]+)""").find(item.text)
+        match?.groupValues?.get(1)
+    } ?: error("No execution_id in result")
     println("Result: $executionId")
     return executionId
 }

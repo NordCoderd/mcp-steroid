@@ -88,7 +88,7 @@ class CodexOutputFilterTest {
     @Test
     fun `test mcp_tool_call actual Codex format - item completed`() {
         // Actual Codex output for mcp_tool_call completed: result has content array
-        val input = """{"type":"item.completed","item":{"id":"item_5","type":"mcp_tool_call","server":"mcp-steroid","tool":"steroid_execute_code","arguments":{"project_name":"demo","task_id":"t1","reason":"Test the feature","code":"println(1)"},"result":{"content":[{"type":"text","text":"execution_id: eid_123\n use it to report feedback: steroid_execute_feedback"},{"type":"text","text":"Result: 1"}],"structured_content":null},"error":null,"status":"completed"}}"""
+        val input = """{"type":"item.completed","item":{"id":"item_5","type":"mcp_tool_call","server":"mcp-steroid","tool":"steroid_execute_code","arguments":{"project_name":"demo","task_id":"t1","reason":"Test the feature","code":"println(1)"},"result":{"content":[{"type":"text","text":"execution_id: eid_123"},{"type":"text","text":"Result: 1"}],"structured_content":null},"error":null,"status":"completed"}}"""
         val output = runFilter(input)
         assertTrue(output.contains("<< steroid_execute_code [item_5]"), "Should show tool name: $output")
         assertTrue(output.contains("execution_id: eid_123"), "Should extract content text: $output")

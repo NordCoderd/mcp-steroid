@@ -93,7 +93,7 @@ class VisionScreenshotToolHandler : McpRegistrar {
         }
 
         try {
-            log("execution_id: ${executionId.executionId}\n use it to report feedback: steroid_execute_feedback")
+            log("execution_id: ${executionId.executionId}")
             log("WARNING: Heavy endpoint. Prefer steroid_execute_code for regular automation.")
 
             val artifacts = VisionService.capture(project, executionId, windowId)
