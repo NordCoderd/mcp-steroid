@@ -53,6 +53,16 @@ class CliGeminiIntegrationTest : CliIntegrationTestBase() {
         super.testSystemPropertyCanBeRead()
     }
 
+    override fun testCompilationErrorsDelivered() {
+        //needed to make test runner work
+        super.testCompilationErrorsDelivered()
+    }
+
+    override fun testCompilationWarningsDelivered() {
+        //needed to make test runner work
+        super.testCompilationWarningsDelivered()
+    }
+
     override fun testExecSessionReset() {
         //the test is ignored
         //needed to make test runner work
