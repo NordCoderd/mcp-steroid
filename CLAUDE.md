@@ -425,7 +425,7 @@ Atomic commits, descriptive messages (what and why). Test and build before commi
 
 ## Website
 
-Hugo site at `website/`. Build: `cd website && make build`. Dev: `make dev`. See [website/CLAUDE.md](website/CLAUDE.md).
+`website/` is a separate git repo clone (jonnyzzz/mcp-steroid public repo). It contains the Hugo site sources in `website/website/`. The `website/` folder is gitignored from the main repo.
 
 ## IntelliJ Source Research
 
