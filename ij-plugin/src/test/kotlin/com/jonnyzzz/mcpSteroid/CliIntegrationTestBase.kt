@@ -179,9 +179,14 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
         println(combinedOutput)
         println("=== END ===")
 
+        // Assert on compiler-specific text that ONLY appears in the kotlinc error output,
+        // not in the tool call reason or task ID. The compiler says:
+        // "error: initializer type mismatch: expected 'String', actual 'Int'."
         assertTrue(
-            "Output should contain 'type mismatch' from the compiler error\n$combinedOutput",
-            combinedOutput.contains("type mismatch", ignoreCase = true),
+            "Output should contain compiler error with expected/actual types.\n" +
+                    "If this fails, the agent cannot see the compilation error details.\n$combinedOutput",
+            combinedOutput.contains("expected", ignoreCase = true)
+                    && combinedOutput.contains("actual", ignoreCase = true),
         )
     }
 
