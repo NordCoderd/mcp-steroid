@@ -53,25 +53,15 @@ val generatedTestSources = layout.buildDirectory.dir("generated/kotlin-test/prom
 val licensePromptsDir = layout.buildDirectory.dir("license-prompts")
 
 val prepareLicensePrompt by tasks.registering {
-    val websiteLicense = rootProject.layout.projectDirectory.file("website/LICENSE")
+    val websiteEula = rootProject.layout.projectDirectory.file("EULA")
     val outputFile = licensePromptsDir.map { it.file("license/LICENSE.md") }
-    inputs.file(websiteLicense)
+    inputs.file(websiteEula)
     outputs.file(outputFile)
     doLast {
-        val licenseText = websiteLicense.asFile.readText()
-        // Strip the first two lines (title + blank) from the raw LICENSE;
-        // the article header below re-introduces the title and adds a description.
-        val body = licenseText.lines().drop(2).joinToString("\n")
-        val article = buildString {
-            appendLine("MCP Steroid Plugin - End User License Agreement (EULA)")
-            appendLine()
-            appendLine("End User License Agreement for the MCP Steroid Plugin")
-            appendLine()
-            append(body)
-        }
+        val eulaText = websiteEula.asFile.readText()
         val out = outputFile.get().asFile
         out.parentFile.mkdirs()
-        out.writeText(article)
+        out.writeText(eulaText)
     }
 }
 
