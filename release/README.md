@@ -18,9 +18,9 @@ For a quick release without the full Docker build matrix, use Claude Code agents
 2. **Collect release notes**: Run `./run-agent.sh claude . /tmp/notes-prompt.md` (unset `CLAUDECODE` env var if running from within Claude Code).
 3. **Build**: Run `./run-agent.sh claude . /tmp/build-prompt.md` — executes `./gradlew clean build buildPlugin -x :test-integration:test -Pmcp.release.build=true -Pmcp.release.notes.version=<version>`.
 4. **Upload to GitHub**: `gh release create <version> release/out/<zip> --repo jonnyzzz/mcp-steroid --title "<version>" --notes-file /tmp/release-body.md`
-5. **Update website**: Create release page at `website/content/releases/<version>.md`, update `hugo.toml` whatsnew entry, run `cd website && make build`. **Note:** `make build` downloads the release ZIP to extract the plugin version, so step 4 must complete first.
+5. **Update website**: Create release page at `website/website/content/releases/<version>.md`, update `website/website/hugo.toml` whatsnew entry, run `cd website/website && make build`. **Note:** `make build` downloads the release ZIP to extract the plugin version, so step 4 must complete first.
 6. **Mark older releases obsolete**: `gh release edit <old-version> --repo jonnyzzz/mcp-steroid --notes-file <updated-body-with-obsolete-banner>`.
-7. **Publish website**: Commit and push in `website/mcp-steroid-public/`.
+7. **Publish website**: Commit and push in `website/` (the public repo clone).
 
 Steps 2+3 can run in parallel. Steps 5–7 require step 4 (GitHub release must exist for website build). The `CLAUDECODE` env var must be unset for nested Claude Code invocations via `run-agent.sh`.
 
@@ -77,7 +77,7 @@ Builder container API key forwarding:
 
 ### Website & Plugin Repository
 
-The website build (`cd website && make build`) automatically generates:
+The website build (`cd website/website && make build`) automatically generates:
 
 - `version.json` — current version for in-IDE update checker
 - `updatePlugins.xml` — IntelliJ custom plugin repository XML
@@ -100,4 +100,4 @@ Custom plugin repository URL: `https://mcp-steroid.jonnyzzz.com/updatePlugins.xm
 - [ ] Website release pages for older versions auto-show obsolete banner (handled by `layouts/releases/single.html`)
 - [ ] Releases list page shows latest prominently, older releases in separate section
 - [ ] `updatePlugins.xml` points to the new release (verified by `make build`)
-- [ ] Website published (`cd website/mcp-steroid-public && git add docs && git commit && git push`)
+- [ ] Website published (`cd website && git add -A && git commit && git push`)

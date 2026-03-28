@@ -24,7 +24,7 @@ Tasks:
 5. Do not run publish/deploy.
 
 After edits:
-- Run `cd website && make build` and report success/failure.
+- Run `cd website/website && make build` and report success/failure.
 
 Return:
 - changed files list
