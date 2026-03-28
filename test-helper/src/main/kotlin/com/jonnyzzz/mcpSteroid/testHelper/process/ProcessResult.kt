@@ -67,3 +67,18 @@ fun <T : ProcessResult> T.assertNoMessageInOutput(messageRegex: String): T = app
         }
     }
 }
+
+/**
+ * Result from running an AI agent process.
+ * Contains both filtered (human-readable) output and raw (NDJSON) output.
+ */
+class AiProcessResult(
+    override val exitCode: Int?,
+    override val stdout: String,
+    override val stderr: String,
+    /** Raw unfiltered stdout (NDJSON) before output filter was applied */
+    val rawStdout: String,
+) : ProcessResult {
+    override fun toString(): String =
+        "AiProcessResult(exitCode=$exitCode, stdout=${stdout.take(500)}, stderr=${stderr.take(500)})"
+}
