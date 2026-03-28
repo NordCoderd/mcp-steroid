@@ -203,7 +203,31 @@ Required inputs for publish stage:
 
 This stage remains disabled in dry-run mode regardless of the `--publish` flag. In dry-run mode, version remains unchanged and no GitHub release is created.
 
-### Stage 5: Website Release Page Update via Agent
+### Stage 4b: Upload to JetBrains Marketplace
+
+After the GitHub release is published, upload the plugin to JetBrains Marketplace:
+
+```bash
+release/scripts/publish-marketplace.sh <plugin-zip>
+```
+
+Requires `~/.marketplace` file with JetBrains Marketplace permanent token (one line). The script uses the `xmlId` parameter (`com.jonnyzzz.mcp-steroid`) for the upload API. The plugin enters the JetBrains review queue and will be listed once approved.
+
+Plugin page: https://plugins.jetbrains.com/plugin/30019-mcp-steroid
+
+### Stage 5: Website Updates
+
+Two website updates are needed:
+
+**5a. Homepage version and whatsnew** — In `website/website/hugo.toml`:
+- Update `params.version` to the new version
+- Add a `[[params.whatsnew]]` entry at the top with date and summary
+
+**5b. Release page** — Create `website/website/content/releases/<version>.md` following the pattern of previous releases. Include: version, date, download links (with SHA-256), highlights, and the standard feedback/support sections.
+
+Commit and push in the `website/` repo after both updates.
+
+### Stage 6: Website Build and Publish via Agent
 
 Create/update release page content with another agent run:
 
