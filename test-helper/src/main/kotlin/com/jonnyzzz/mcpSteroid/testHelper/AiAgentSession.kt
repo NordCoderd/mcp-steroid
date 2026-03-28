@@ -3,7 +3,6 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.filter.AgentProgressOutputFilter
-import com.jonnyzzz.mcpSteroid.testHelper.process.AiProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 
 interface AiAgentSession {

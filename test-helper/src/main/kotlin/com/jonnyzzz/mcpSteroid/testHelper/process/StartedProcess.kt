@@ -1,6 +1,7 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.testHelper.process
 
+import com.jonnyzzz.mcpSteroid.testHelper.AiProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.AiStartedProcess
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
