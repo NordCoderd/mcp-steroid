@@ -9,7 +9,7 @@ Never include AI as co-author or mention AI in commit messages.
 - Use IntelliJ MCP for everything where you can
 - Never ignore warnings or errors — fix them properly
 - No test-only branches (`isUnitTestMode`) — use correct IntelliJ actions (`writeIntentReadAction`, `writeCommandAction`)
-- Tests must show reality — a failing test is better than a fake passing test
+- Tests must show reality — a failing test is better than a fake passing test. **Never remove, disable, or weaken a failing test**; fix the underlying issue instead
 - No `@Suppress("DEPRECATION")` — find the non-deprecated replacement
 - Prefer JSON libraries for JSON parsing/manipulation; only static final JSON constants may be hand-written as raw JSON strings
 - **BANNED:** `runCatching{}.onFailure{}` — use `try { } catch (e: Exception) { }` instead. Other `runCatching` uses (`.getOrNull()`, `.getOrDefault()`) are fine
