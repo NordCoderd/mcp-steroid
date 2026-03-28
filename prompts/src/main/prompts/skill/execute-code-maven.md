@@ -29,7 +29,7 @@ val settings: MavenRunnerSettings = runner.settings.clone()
 settings.mavenProperties["spotless.check.skip"] = "true"
 runner.run(params, settings) { done.complete(true) }
 // Note: callback fires only on exit code 0. If Maven fails, the deferred never completes.
-// For pass/fail semantics use MavenRunConfigurationType + SMTRunnerEventsListener (see execute-code-testing.md).
+// For pass/fail semantics use MavenRunConfigurationType + SMTRunnerEventsListener (see coding-with-intellij-spring.md).
 val ok = withTimeout(5.minutes) { done.await() }
 println("Maven goal completed: $ok")
 ```
@@ -48,7 +48,7 @@ import org.jetbrains.idea.maven.buildtool.MavenSyncSpec            // full/incre
 
 ## Structured Pass/Fail for Test Runs — SMTRunnerEventsListener
 
-For Maven test execution with explicit pass/fail result, use `MavenRunConfigurationType.runConfiguration` + `SMTRunnerEventsListener`. See **`mcp-steroid://skill/execute-code-testing`** for the complete pattern. Summary:
+For Maven test execution with explicit pass/fail result, use `MavenRunConfigurationType.runConfiguration` + `SMTRunnerEventsListener`. See **`mcp-steroid://skill/coding-with-intellij-spring`** for the complete pattern. Summary:
 
 ```kotlin[IU]
 import org.jetbrains.idea.maven.execution.MavenRunConfigurationType

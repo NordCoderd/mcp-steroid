@@ -48,7 +48,7 @@ val yamlFiles = readAction { FilenameIndex.getAllFilesByExt(project, "yaml", sco
 val sqlFiles  = readAction { FilenameIndex.getAllFilesByExt(project, "sql", scope) }   // replaces Glob("**/*.sql")
 val byName = readAction { FilenameIndex.getVirtualFilesByName("UserService.java", scope) }  // replaces Glob("**/UserService.java")
 ```
-See `mcp-steroid://skill/execute-code-file-ops` for more file-discovery patterns.
+See `mcp-steroid://skill/coding-with-intellij-vfs` for more file-discovery patterns.
 
 **Prefer VFS read over native Read tool** (only when you already have a steroid_execute_code call for other work): use `val vf = findProjectFile("path/File.java")!!; String(vf.contentsToByteArray(), vf.charset)` to see unsaved modifications from prior writeAction calls. Native Read bypasses VFS and may return stale content.
 

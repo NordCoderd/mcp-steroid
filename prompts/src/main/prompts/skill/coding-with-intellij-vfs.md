@@ -1,6 +1,6 @@
 Coding with IntelliJ: Document, Editor & VFS Operations
 
-Document and editor manipulation, VFS read/write, file creation, LocalFileSystem, and VfsUtil patterns.
+Document and editor manipulation, VFS read/write, file creation, LocalFileSystem, VfsUtil, findProjectFile pitfall, and batch file reads.
 
 ## Document and Editor Operations
 
@@ -286,5 +286,54 @@ java.io.File("/path/to/project/src/main/java/com/example/Product.java").also { i
 LocalFileSystem.getInstance().refreshAndFindFileByPath("/path/to/project/src/main/java/com/example/Product.java")
 println("File created and VFS refreshed")
 ```
+
+---
+
+## Read a Project File via findProjectFile
+
+```kotlin
+val vf = findProjectFile("src/main/resources/application.properties")!!
+val text = String(vf.contentsToByteArray(), vf.charset)
+println(text)
+```
+
+**⚠️ `findProjectFile()` pitfall for resource files**: requires the **FULL relative path** from the project root (e.g., `"src/main/resources/application.properties"`). Calling it with just a filename **always returns null** — causing NPE on `!!`. For files under `src/main/resources/`, use `FilenameIndex.getVirtualFilesByName()` which searches by filename:
+```kotlin
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
+val scope = GlobalSearchScope.projectScope(project)
+val appProps = readAction {
+    FilenameIndex.getVirtualFilesByName("application.properties", scope)
+        .firstOrNull { it.path.contains("src/main/resources") }
+} ?: error("application.properties not found in src/main/resources")
+println(String(appProps.contentsToByteArray(), appProps.charset))
+```
+
+---
+
+## Read Multiple Files in One Call — Saves ~20s Per Call
+
+> **⚠️ EXPLORATION RULE: Complete ALL exploration in AT MOST 2 steroid_execute_code calls.** (1) Test files + domain model in one batch. (2) Test infrastructure in a second batch only if needed. Do NOT issue one call per file group.
+```kotlin
+// Batch exploration: replace 5-8 sequential steroid_execute_code calls with 1
+for (path in listOf(
+    "pom.xml",
+    "src/main/java/com/example/domain/CommentService.java",
+    "src/main/java/com/example/domain/CommentRepository.java",
+    "src/test/java/com/example/api/CommentControllerTest.java"
+)) {
+    val vf = findProjectFile(path) ?: run { println("NOT FOUND: $path"); continue }
+    val content = String(vf.contentsToByteArray(), vf.charset)
+    // IMPORTANT: distinguish three states:
+    //   NOT FOUND  → file doesn't exist at all (test_patch may add it later)
+    //   EMPTY      → file exists but has no content (patch not yet applied, or placeholder)
+    //   HAS_CONTENT → readable; process normally
+    if (content.isEmpty()) { println("EMPTY (file exists but no content — may be a new file from test_patch not yet applied): $path"); continue }
+    println("\n=== $path ===")
+    println(content)
+}
+```
+
+> **No redundant re-reads**: Files you read this session remain in your conversation history. Do NOT re-read them when switching task phases or `task_id`. Only re-read a file if you explicitly modified it.
 
 ---

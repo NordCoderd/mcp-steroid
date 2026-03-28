@@ -1,39 +1,6 @@
-Execute Code: Overview & Key Rules
+Execute Code: Additional Rules
 
-Intro, when to use steroid_execute_code vs native tools, file creation rule, retry rule, and Read/Edit constraint for steroid_execute_code.
-
-# Execute Code: Overview & Key Rules
-
-WHAT: Finally SEE IntelliJ-based IDEs — not just read code. The only MCP server with visual understanding and full IDE control.
-HOW: Execute Kotlin code directly in IntelliJ's runtime with full API access.
-
-This is a **stateful** API — everything you do changes the IDE state. The IntelliJ IDE is running exclusively for you. Use it aggressively instead of manual file operations.
-
----
-
-## ⚡ Bypasses Agent Sandbox
-
-Scripts run inside IntelliJ's JVM — unrestricted filesystem access to `/mcp-run-dir/` and the project. Use `steroid_execute_code` for IntelliJ-specific operations (PSI, indexing, VCS, compile checks, find usages). For plain file reads/writes, prefer the native Read/Write tools — they have zero JVM compilation overhead (~12s saved per call). **To run Maven/Gradle tests, use the Bash tool** (`./mvnw test -Dtest=...`) — do NOT run `ProcessBuilder("./mvnw")` inside steroid_execute_code.
-
----
-
-## EXCEPTION — Use Native Read Tool for Simple File Reads
-
-The native Read tool can access `/mcp-run-dir/` paths directly. For reading a single file's content, prefer the Read tool over `String(vf.contentsToByteArray(), vf.charset)` — it's faster (no compilation overhead). Reserve `steroid_execute_code` for operations that **REQUIRE** IntelliJ APIs: PSI analysis, compilation checks, test execution, find usages, refactoring, VCS inspection. If you just need to read file text, use the Read tool.
-
-**BANNED: Using steroid_execute_code to read files you know the path of.**
-
-```kotlin
-// ❌ BANNED — costs 8-15s for zero benefit
-val content = String(findProjectFile("src/main/java/Foo.java")!!.contentsToByteArray())
-// ✅ CORRECT — use Read tool directly (0s overhead)
-// Read: src/main/java/Foo.java
-```
-
-This mistake caused 15-80s overhead in case analyses. The Read tool reads files in ~0s.
-steroid_execute_code compiles and runs Kotlin, adding 8-15s per call.
-
----
+File creation, Edit tool constraint, ProcessBuilder ban, JDK/plugin restrictions, and required imports for steroid_execute_code.
 
 ## ⚡ File Creation: Use the Write Tool (NOT steroid_execute_code)
 
@@ -55,17 +22,6 @@ println("VFS refreshed — IntelliJ now sees new files")
 
 **Exception**: Use steroid_execute_code VFS file creation ONLY when you must create a file AND
 immediately use PSI on it in the same steroid_execute_code call (e.g., create + run inspections atomically).
-
----
-
-## ⚡ After a steroid_execute_code Error: Diagnose and RETRY — Do NOT Fall Back to Native Tools
-
-A single steroid_execute_code failure does NOT mean steroid_execute_code is unreliable. Read the error message — it is almost always one of:
-- **(a)** Missing import (`unresolved reference 'GlobalSearchScope'` → add `import com.intellij.psi.search.GlobalSearchScope`)
-- **(b)** Threading violation (`Write access is allowed inside write-action only` → wrap in `writeAction { }`)
-- **(c)** Kotlin string syntax issue (`.class` reference or `$` in a double-quoted string → switch to triple-quoted strings)
-
-Fix the issue and resubmit. Switching to native Write/Bash after one steroid_execute_code failure bypasses IDE indexing and eliminates compile verification — **always retry steroid_execute_code first**.
 
 ---
 

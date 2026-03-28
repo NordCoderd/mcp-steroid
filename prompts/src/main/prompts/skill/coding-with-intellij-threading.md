@@ -1,28 +1,57 @@
 Coding with IntelliJ: Threading and Read/Write Actions
 
-IntelliJ threading model, read/write action patterns, smart mode, modal dialogs, and ModalityState usage.
+IntelliJ threading model, read/write action patterns, smart mode, VFS mutation rules, modal dialogs, and ModalityState usage.
 
-## Threading and Read/Write Actions
+## Rules
 
-> **⚠️ THREADING RULE — NEVER SKIP**: Any PSI access (JavaPsiFacade, PsiShortNamesCache, PsiManager.findFile, module roots, annotations, etc.) **MUST** be wrapped in `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately at runtime — they are not silently ignored. This is the most common first-attempt error when writing IntelliJ scripts.
+### ⚠️ THREADING RULE — NEVER SKIP
+
+Any PSI access (`JavaPsiFacade`, `PsiShortNamesCache`, `PsiManager.findFile`, `ProjectRootManager.contentSourceRoots`, module roots, annotations, etc.) **MUST** be wrapped in `readAction { }`. Modifications require `writeAction { }`. Threading violations throw immediately at runtime — they are not silently ignored. **This applies to ALL PSI calls including your very first exploration call** (e.g. listing source roots). This is the most common first-attempt error.
 
 ### IntelliJ Threading Model
 
-IntelliJ Platform has strict threading rules:
-
-1. **EDT (Event Dispatch Thread)** - UI updates only
+1. **EDT (Event Dispatch Thread)** — UI updates only
 2. **Read actions** required for PSI/VFS reads
 3. **Write actions** required for PSI/VFS writes
 4. **Smart mode** required for index-dependent operations
 
 **See**: [IntelliJ Threading Rules](https://plugins.jetbrains.com/docs/intellij/general-threading-rules.html)
 
-### Using Built-in Read Actions
+### Quick Start
+
+Your code is a **suspend function body** (never use `runBlocking`):
+- Use `readAction { }` for PSI/VFS reads, `writeAction { }` for modifications
+- `waitForSmartMode()` runs automatically before your script
+- Available: `project`, `println()`, `printJson()`, `printException()`, `progress()`
+
+**⚠️ Helper functions that call `readAction`/`writeAction` MUST be `suspend fun`** — a regular `fun` that calls these gets a compile error: `"suspension functions can only be called within coroutine body"`. This applies to ALL suspend-context APIs: `readAction`, `writeAction`, `smartReadAction`, `waitForSmartMode`, `runInspectionsDirectly`.
+
+### writeAction { } Is NOT a Coroutine Scope
+
+Calling `readAction { }` or ANY suspend function inside `writeAction { }` throws `suspension functions can only be called within coroutine body` at **runtime** (not compile time). **ALWAYS read first (outside), then write (inside)**. Use `edtWriteAction { }` if you genuinely need suspend calls inside a write block.
+
+### ALL VFS Mutation Ops Need writeAction
+
+`createDirectoryIfMissing()`, `createChildData()`, `createChildFile()`, `createChildDirectory()`, `delete()`, `rename()`, `move()`, and `saveText()` ALL require `writeAction`. Put the ENTIRE create-directory-and-write sequence inside a SINGLE `writeAction` block.
+
+### Smart Mode
+
+During indexing, the IDE is in "dumb mode" — many APIs are unavailable. Use `smartReadAction` when you need both smart mode and read access. `waitForSmartMode()` is called automatically before your script starts.
+
+### Modal Dialogs and ModalityState
+
+When a modal dialog is open, the default EDT dispatcher (`Dispatchers.EDT`) will **not execute** your code. Use `ModalityState.any()` to run on EDT regardless of modal state.
+
+**Use `ModalityState.any()` for:** enumerating windows/dialogs, taking screenshots, closing dialogs programmatically.
+**Don't use it for:** normal UI operations (use plain `Dispatchers.EDT`), read/write actions (use `readAction`/`writeAction`).
+
+---
+
+## Examples
+
+### readAction
 
 ```kotlin
-import com.intellij.openapi.vfs.LocalFileSystem
-
-// CORRECT - Use built-in readAction (no import needed)
 val virtualFile = LocalFileSystem.getInstance().findFileByPath("/path/to/File.kt")!!
 val psiFile = readAction {
     PsiManager.getInstance(project).findFile(virtualFile)
@@ -30,73 +59,101 @@ val psiFile = readAction {
 println("PSI file: ${psiFile?.name}")
 ```
 
-### Using Built-in Write Actions
-
-```kotlin
-import com.intellij.openapi.vfs.LocalFileSystem
-import com.intellij.openapi.command.WriteCommandAction
-
-val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")!!
-val document = FileDocumentManager.getInstance().getDocument(vf)!!
-
-// CORRECT - Use built-in writeAction (no import needed)
-writeAction {
-    document.setText("new content")
-}
-
-// For command-wrapped writes (shows in undo stack)
-WriteCommandAction.runWriteCommandAction(project) {
-    document.replaceString(0, 0, "// Added comment\n")
-}
-```
-
-**⚠️ writeAction { } is NOT a coroutine scope**: Calling `readAction { }`, `VfsUtil.saveText()`, or ANY suspend function inside `writeAction { }` throws:
-```
-suspension functions can only be called within coroutine body
-```
-This error appears at **runtime** (not at compile time), so it's easy to miss. The fix is simple — always **read first, write second**:
-
-```kotlin
-// WRONG — readAction inside writeAction causes runtime error:
-//
-//   writeAction {
-//       val text = readAction { String(vf.contentsToByteArray(), vf.charset) }  // ERROR: suspend function in non-coroutine
-//       VfsUtil.saveText(vf, text.replace("old", "new"))
-//   }
-//
-// This fails at runtime because writeAction { } is NOT a coroutine scope,
-// and readAction is a suspend function. See CORRECT version below.
-```
-
-```kotlin
-// CORRECT — read outside, write inside
-val vf = findProjectFile("src/main/resources/application.properties")!!
-val text = String(vf.contentsToByteArray(), vf.charset)  // read OUTSIDE writeAction
-val updated = text.replace("\"api\"", "\"/api/v1\"")
-writeAction { VfsUtil.saveText(vf, updated) }   // write INSIDE — no suspend calls allowed here
-```
-
-**Note**: `String(vf.contentsToByteArray(), vf.charset)` is a regular call (not suspend) — it's safe to call outside any action. `VfsUtil.saveText(vf, text)` is also a regular function but requires a write lock, so it must go inside `writeAction { }`.
-
-If you genuinely need suspend calls inside a write block, use `edtWriteAction { }` instead of `writeAction { }` — it is a suspend function that acquires the write lock.
-
-### Smart Read Actions (Recommended)
-
-Use `smartReadAction` when you need both smart mode and read access:
+### smartReadAction
 
 ```kotlin[IU]
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
 
-// RECOMMENDED - Combines waitForSmartMode() + readAction in one call
 val classes = smartReadAction {
     KotlinClassShortNameIndex.get("MyService", project, projectScope())
 }
 println("Found ${classes.size} classes")
 ```
 
-### Smart Mode vs Dumb Mode
+### writeAction — Read Outside, Write Inside
 
-During indexing, the IDE is in "dumb mode" - many APIs are unavailable:
+```kotlin
+val vf = findProjectFile("src/main/java/com/example/Foo.java")!!
+val content = String(vf.contentsToByteArray(), vf.charset)  // read OUTSIDE writeAction
+
+// ⚠️ BEFORE content.replace() — ALWAYS print the excerpt BEFORE THE FIRST ATTEMPT:
+val idx = content.indexOf("methodName")
+println("EXCERPT:\n" + content.substring(idx, (idx + 250).coerceAtMost(content.length)))
+
+val updated = content.replace("oldString", "newString")
+check(updated != content) { "content.replace matched nothing — whitespace mismatch!" }
+writeAction { VfsUtil.saveText(vf, updated) }    // write INSIDE — no suspend calls allowed
+
+// After bulk VFS edits, flush to disk before running git/shell subprocesses:
+LocalFileSystem.getInstance().refresh(false)
+```
+
+### WriteCommandAction (Undo Stack)
+
+```kotlin
+val vf = LocalFileSystem.getInstance().findFileByPath("/path/to/file.kt")!!
+val document = FileDocumentManager.getInstance().getDocument(vf)!!
+
+import com.intellij.openapi.command.WriteCommandAction
+
+WriteCommandAction.runWriteCommandAction(project) {
+    document.replaceString(0, 0, "// Added comment\n")
+}
+```
+
+### VFS Mutation — Directory + File Creation
+
+```kotlin
+val content = "package com.example.model;\npublic class Product { }"
+writeAction {
+    val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+    val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example/model")
+    val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")
+    VfsUtil.saveText(f, content)
+}
+// WRONG: createDirectoryIfMissing OUTSIDE writeAction → "Write access is allowed inside write-action only"
+```
+
+### Create/Write a Source File
+
+One file per steroid_execute_code call when possible (makes error attribution trivial):
+```kotlin
+writeAction {
+    val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+    val dir = VfsUtil.createDirectoryIfMissing(root, "src/main/java/com/example/model")
+    val f = dir.findChild("Product.java") ?: dir.createChildData(this, "Product.java")
+    // Use joinToString() — NOT a triple-quoted string with 'import' at line start
+    // ⚠️ VfsUtil.saveText() REPLACES THE ENTIRE FILE — for adding a single method,
+    // use PSI writeCommandAction + factory.createMethodFromText() instead (see guide).
+    VfsUtil.saveText(f, listOf(
+        "package com.example.model;",
+        "import" + " jakarta.persistence.Entity;",
+        "import" + " jakarta.persistence.Id;",
+        "@Entity public class Product { @Id private Long id; }"
+    ).joinToString("\n"))
+}
+println("File created")
+// After bulk file creation: call waitForSmartMode() before runInspectionsDirectly or ReferencesSearch
+```
+
+### ModalityState Usage
+
+```kotlin
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+// Runs on EDT even when a modal dialog is showing
+withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
+    val isModal = ModalityState.current() != ModalityState.nonModal()
+    println("Modal dialog showing: $isModal")
+}
+```
+
+### DumbService Check
+
 ```kotlin
 import com.intellij.openapi.project.DumbService
 
@@ -107,48 +164,26 @@ if (DumbService.isDumb(project)) {
 }
 ```
 
-**Good news**: `waitForSmartMode()` is called automatically before your script starts!
-
-### Modal Dialogs and ModalityState
-
-When a modal dialog is open in the IDE, the default EDT dispatcher (`Dispatchers.EDT`) will
-**not execute** your code — it waits until the dialog is dismissed. To interact with the IDE
-while a modal dialog is present, use `ModalityState.any()`:
-```kotlin
-import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.asContextElement
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-
-// ✓ CORRECT - Runs on EDT even when a modal dialog is showing
-withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-    // Enumerate windows, inspect dialogs, close dialogs, etc.
-}
-```
-
-**When to use `ModalityState.any()`:**
-- Enumerating open windows or dialogs while a modal is present
-- Taking screenshots when a dialog is blocking the IDE
-- Closing modal dialogs programmatically (e.g., `dialog.close(...)`)
-- Any EDT work that must run regardless of modal state
-
-**When NOT to use it:**
-- Normal UI operations — use plain `Dispatchers.EDT` instead
-- Read/write actions — use `readAction { }` / `writeAction { }` instead
-
-**Detecting modal dialogs:**
-```kotlin
-import com.intellij.openapi.application.EDT
-import com.intellij.openapi.application.ModalityState
-import com.intellij.openapi.application.asContextElement
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-
-withContext(Dispatchers.EDT + ModalityState.any().asContextElement()) {
-    val isModal = ModalityState.current() != ModalityState.nonModal()
-    println("Modal dialog showing: $isModal")
-}
-```
-
 ---
+
+## Pitfalls
+
+### Import-in-Strings
+
+Never put `import foo.Bar;` at the start of a line inside a triple-quoted Kotlin string. The script preprocessor extracts those lines as Kotlin imports, causing compile errors. Use `"import" + " foo.Bar;"` or `joinToString` to build the content, or use `java.io.File(path).writeText(content)` as an alternative.
+
+### Generating Java Code Inline — `.class` and Dollar-Sign
+
+Java code often contains `.class` references and dollar-sign characters. In double-quoted Kotlin strings, `.class)` can be mis-parsed and a bare dollar sign triggers string interpolation. Use `java.io.File(path).writeText()` with string concatenation:
+```kotlin
+java.io.File("${project.basePath}/src/main/java/com/example/SecurityConfig.java").writeText(
+    "package com.example;\n" +
+    "import" + " org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;\n" +
+    "public class SecurityConfig {\n" +
+    "    public void configure(HttpSecurity http) throws Exception {\n" +
+    "        http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);\n" +
+    "    }\n" +
+    "}"
+)
+// For dollar signs in Java string literals: use "${'\$'}Bearer"
+```

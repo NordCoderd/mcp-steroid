@@ -173,7 +173,7 @@ class ThisLoggerComparisonTest {
             appendLine()
             if (withMcp) {
                 appendLine("Use `steroid_execute_code` to search the project via IntelliJ APIs.")
-                appendLine("Read `mcp-steroid://skill/execute-code-file-ops` for the preferred pattern.")
+                appendLine("Read `mcp-steroid://skill/coding-with-intellij-vfs` for the preferred pattern.")
                 appendLine()
                 appendLine("Recommended approach inside steroid_execute_code:")
                 appendLine("  import com.intellij.psi.search.FilenameIndex")
