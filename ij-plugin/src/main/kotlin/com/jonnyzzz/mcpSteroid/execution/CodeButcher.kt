@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.execution
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.jonnyzzz.mcpSteroid.koltinc.CodeWrapperForCompilation
+import com.jonnyzzz.mcpSteroid.koltinc.LineMapping
 
 inline val codeButcher: CodeButcher get() = service()
 
@@ -17,6 +18,7 @@ class CodeButcher {
         val classFqn: String,
         val methodName: String = CodeWrapperForCompilation.DEFAULT_METHOD_NAME,
         val code: String,
+        val lineMapping: LineMapping = LineMapping.IDENTITY,
     )
 
     /**
@@ -31,6 +33,6 @@ class CodeButcher {
             scriptBuilderFqn = mcpScriptBuilderFqn,
             addBlockName = mcpScriptBuilderAddBlock,
         )
-        return ScriptCoordinates(classFqn = result.classFqn, methodName = result.methodName, code = result.code)
+        return ScriptCoordinates(classFqn = result.classFqn, methodName = result.methodName, code = result.code, lineMapping = result.lineMapping)
     }
 }

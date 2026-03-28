@@ -83,8 +83,13 @@ class CodeEvalManager(
             )
 
             run {
-                val compilerOutput = kotlincResult.stdout.trim()
-                val compilerError = kotlincResult.stderr.trim()
+                val rawCompilerOutput = kotlincResult.stdout.trim()
+                val rawCompilerError = kotlincResult.stderr.trim()
+
+                // Remap line numbers from wrapped-file coordinates to user-code coordinates
+                // so agents see meaningful line references instead of wrapper boilerplate offsets.
+                val compilerOutput = wrappedCode.lineMapping.remapCompilerOutput(rawCompilerOutput)
+                val compilerError = wrappedCode.lineMapping.remapCompilerOutput(rawCompilerError)
 
                 if (compilerOutput.isNotEmpty()) {
                     resultBuilder.logProgress("Compiler Output:\n$compilerOutput")
@@ -97,11 +102,12 @@ class CodeEvalManager(
                     resultBuilder.logMessage("Compiler Errors/Warnings:\n$compilerError")
                 }
 
-                if (compilerOutput.isNotEmpty() || compilerError.isNotEmpty()) {
+                if (rawCompilerOutput.isNotEmpty() || rawCompilerError.isNotEmpty()) {
+                    // Write raw (non-remapped) output to storage for debugging purposes
                     project.executionStorage.writeCodeExecutionData(
                         executionId,
                         "kotlinc.txt",
-                        "${kotlincResult.exitCode}\n--- STDOUT ---\n$compilerOutput\n\n--- STDERR ---\n$compilerError"
+                        "${kotlincResult.exitCode}\n--- STDOUT ---\n$rawCompilerOutput\n\n--- STDERR ---\n$rawCompilerError"
                     )
                 }
 
@@ -115,7 +121,7 @@ class CodeEvalManager(
                         val hint = SkillReference.getInstance().errorHint(hintSource)
                         resultBuilder.logMessage("HINT: $hint")
                     }
-                    resultBuilder.reportFailed("kotlinc exited with code: ${kotlincResult.exitCode}\n${kotlincResult.stderr}")
+                    resultBuilder.reportFailed("kotlinc exited with code: ${kotlincResult.exitCode}\n$compilerError")
                     return null
                 }
             }
