@@ -127,7 +127,7 @@ class ExecutionManager(
     }
 
     private fun responseBuilder(parentScope: CoroutineScope, executionId: ExecutionId, mcpProgress: McpProgressReporter) = object : ExecutionResultBuilder {
-        private val responseBuilder = ToolCallResult.builder().setExecutionId(executionId)
+        private val responseBuilder = ToolCallResult.builder()
         // Supervised job for tracking storage writes - must be completed before build() returns
         private val storageJob = SupervisorJob()
         // Create child scope with proper context: inherit parent + add our elements

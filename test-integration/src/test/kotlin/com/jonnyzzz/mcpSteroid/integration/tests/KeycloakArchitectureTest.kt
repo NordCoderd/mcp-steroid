@@ -60,7 +60,7 @@ class KeycloakArchitectureTest {
             appendLine("You MUST use steroid_execute_code to search and navigate the code.")
             appendLine("Do NOT rely on general knowledge — find actual file paths and class names in the project.")
             appendLine("After your first steroid_execute_code call, include this in your final response:")
-            appendLine("TOOL_EVIDENCE: <copy the line starting with Execution ID: ...>")
+            appendLine("TOOL_EVIDENCE: <copy the line starting with execution_id: ...>")
             appendLine()
             appendLine("At the end, output these markers on separate lines:")
             appendLine("AUTH_FLOW_FOUND: yes")
@@ -111,7 +111,7 @@ class KeycloakArchitectureTest {
             appendLine("You MUST use steroid_execute_code to search and navigate the code.")
             appendLine("Do NOT rely on general knowledge — find actual file paths in the project.")
             appendLine("After your first steroid_execute_code call, include this in your final response:")
-            appendLine("TOOL_EVIDENCE: <copy the line starting with Execution ID: ...>")
+            appendLine("TOOL_EVIDENCE: <copy the line starting with execution_id: ...>")
             appendLine()
             appendLine("At the end, output these markers on separate lines:")
             appendLine("MODULE_STRUCTURE_FOUND: yes")
@@ -167,7 +167,7 @@ class KeycloakArchitectureTest {
             appendLine("You MUST use steroid_execute_code to search and navigate the code.")
             appendLine("Do NOT rely on general knowledge — find actual file paths and class names in the project.")
             appendLine("After your first steroid_execute_code call, include this in your final response:")
-            appendLine("TOOL_EVIDENCE: <copy the line starting with Execution ID: ...>")
+            appendLine("TOOL_EVIDENCE: <copy the line starting with execution_id: ...>")
             appendLine()
             appendLine("At the end, output these markers on separate lines:")
             appendLine("SPI_FOUND: yes")
@@ -208,7 +208,6 @@ class KeycloakArchitectureTest {
 
     private fun assertUsedExecuteCodeEvidence(combined: String) {
         val toolEvidencePatterns = listOf(
-            "Execution ID:",
             "execution_id:",
             "tool mcp-steroid.steroid_execute_code",
             "steroid_execute_code(",

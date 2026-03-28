@@ -84,7 +84,7 @@ class VisionScreenshotToolHandler : McpRegistrar {
         )
         project.executionStorage.writeCodeExecutionData(executionId, "reason.txt", reason)
 
-        val builder = ToolCallResult.builder().setExecutionId(executionId)
+        val builder = ToolCallResult.builder()
         suspend fun log(message: String) {
             val text = message
             builder.addTextContent(text)

@@ -120,9 +120,10 @@ fun testExecParams(
 fun getExecutionIdFromResult(result: ToolCallResult): String {
     val executionId = result.content.mapNotNull {
         if (it is ContentItem.Text) {
-            val prefix = "Execution ID:"
+            val prefix = "execution_id:"
             if (it.text.startsWith(prefix, ignoreCase = true)) {
                 return@mapNotNull it.text.removePrefix(prefix).trim()
+                    .substringBefore("\n").trim()
             }
         }
         null

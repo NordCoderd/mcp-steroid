@@ -500,7 +500,7 @@ class ServerRegistry(val config: ProxyConfig, private val traffic: TrafficLogger
             val obj = item as? JsonObject ?: continue
             if (obj["type"]?.jsonPrimitive?.contentOrNull != "text") continue
             val text = obj["text"]?.jsonPrimitive?.contentOrNull ?: continue
-            val match = Regex("Execution ID:\\s*([\\w-]+)").find(text) ?: continue
+            val match = Regex("execution_id:\\s*([\\w-]+)").find(text) ?: continue
             executionIndex[match.groupValues[1]] = serverId
         }
     }

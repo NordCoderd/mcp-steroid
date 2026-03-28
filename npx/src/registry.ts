@@ -545,7 +545,7 @@ class ServerRegistry {
     for (const item of result.content) {
       if (!item || item.type !== "text") continue;
       if (typeof item.text !== "string") continue;
-      const match = item.text.match(/Execution ID:\s*([\w-]+)/);
+      const match = item.text.match(/execution_id:\s*([\w-]+)/);
       if (match) {
         this.executionIndex.set(match[1], serverId);
       }

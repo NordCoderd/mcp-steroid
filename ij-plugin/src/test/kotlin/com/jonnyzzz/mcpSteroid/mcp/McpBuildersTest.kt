@@ -1,7 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.mcp
 
-import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -43,7 +42,6 @@ class McpBuildersTest {
     @Test
     fun `build with error flag and multiple texts produces single merged text`() {
         val result = ToolCallResult.builder()
-            .setExecutionId(ExecutionId("test-exec-1"))
             .addTextContent("Compiler Errors/Warnings:\nerror: type mismatch")
             .addTextContent("HINT: check your types")
             .addTextContent("FAILED: kotlinc exited with code: 1")
@@ -56,7 +54,6 @@ class McpBuildersTest {
         assertEquals("Should have exactly 1 text item even with isError", 1, textItems.size)
 
         val text = textItems.single().text
-        assertTrue("Should contain execution ID", text.contains("Execution ID: test-exec-1"))
         assertTrue("Should contain type mismatch error", text.contains("type mismatch"))
         assertTrue("Should contain FAILED marker", text.contains("FAILED:"))
     }

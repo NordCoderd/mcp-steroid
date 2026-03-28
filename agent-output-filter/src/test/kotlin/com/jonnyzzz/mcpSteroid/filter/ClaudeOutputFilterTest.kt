@@ -232,9 +232,9 @@ class ClaudeOutputFilterTest {
 
     @Test
     fun `new format - user tool_result string content`() {
-        val input = """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_x","content":"Execution ID: eid_123\nDone"}]}}"""
+        val input = """{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"toolu_x","content":"execution_id: eid_123\nDone"}]}}"""
         val output = runFilter(input)
-        assertTrue(output.contains("<< Execution ID: eid_123"), "Should show first line of result on << line: $output")
+        assertTrue(output.contains("<< execution_id: eid_123"), "Should show first line of result on << line: $output")
         assertTrue(output.contains("Done"), "Should include all content lines: $output")
     }
 
