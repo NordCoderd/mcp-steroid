@@ -295,6 +295,157 @@ class CodeWrapperForCompilationTest {
     }
 
     @Test
+    fun `import keyword inside regular double-quoted string is not extracted`() {
+        val code = """
+            val msg = "import java.io.File"
+            val x: Int = msg
+        """.trimIndent()
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        // "import java.io.File" is inside a double-quoted string on a line that starts with val
+        // so it should NOT be extracted as an import
+        assertEquals(emptyList<String>(), extracted.importLines)
+        assertEquals(listOf("val msg = \"import java.io.File\"", "val x: Int = msg"), extracted.otherLines)
+        assertEquals(listOf(1, 2), extracted.otherLineNumbers)
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // No imports (N=0), code starts at 23
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:24:18: error: type mismatch")
+        assertEquals("input.kt:2:18: error: type mismatch", remapped)
+    }
+
+    @Test
+    fun `import keyword inside single-quoted char is not extracted`() {
+        // This is contrived but tests that 'i' char literal doesn't confuse the parser
+        val code = """
+            val c = 'i'
+            import java.io.File
+            val f: Int = File("x")
+        """.trimIndent()
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        assertEquals(listOf("import java.io.File"), extracted.importLines)
+        assertEquals(listOf(2), extracted.importLineNumbers)
+        assertEquals(listOf("val c = 'i'", "val f: Int = File(\"x\")"), extracted.otherLines)
+        assertEquals(listOf(1, 3), extracted.otherLineNumbers)
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // 1 import (N=1), code starts at 24
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:25:18: error: type mismatch")
+        assertEquals("input.kt:3:18: error: type mismatch", remapped)
+    }
+
+    @Test
+    fun `import inside triple-quoted string spanning multiple lines is not extracted`() {
+        val code = "val sql = \"\"\"\n    import users\n    import orders\n    SELECT * FROM users\n\"\"\".trimIndent()\nimport java.io.File\nval f: Int = File(\"x\")"
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        // "import users" on line 2 and "import orders" on line 3 are inside """
+        // "import java.io.File" on line 6 is a real import
+        assertEquals(listOf("import java.io.File"), extracted.importLines)
+        assertEquals(listOf(6), extracted.importLineNumbers)
+        assertEquals(6, extracted.otherLines.size)
+        assertEquals(listOf(1, 2, 3, 4, 5, 7), extracted.otherLineNumbers)
+    }
+
+    @Test
+    fun `dollar triple-quoted string does not confuse parser`() {
+        // Kotlin $""" is just $ followed by """ — the triple quotes still count
+        val code = "val s = \$\"\"\"\n    import fake\n    real content\n\"\"\"\nimport java.io.File\nval x: Int = \"hello\""
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        // $""" opens a triple-quoted string, """ on line 4 closes it
+        // "import fake" on line 2 is inside the string — not extracted
+        // "import java.io.File" on line 5 is real
+        assertEquals(listOf("import java.io.File"), extracted.importLines)
+        assertEquals(listOf(5), extracted.importLineNumbers)
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // 1 import, code starts at 24
+        // otherLines: line 1 ($"""), line 2 (import fake), line 3 (real content), line 4 ("""), line 6 (val x)
+        // otherLine[4] = "val x: Int = \"hello\"" (orig 6) -> wrapped 28
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:28:18: error: type mismatch")
+        assertEquals("input.kt:6:18: error: type mismatch", remapped)
+    }
+
+    @Test
+    fun `string interpolation with import keyword is not extracted`() {
+        val code = """
+            val pkg = "java.io"
+            val msg = "need to import ${'$'}{pkg}.File"
+            import java.io.File
+            val f: Int = File("x")
+        """.trimIndent()
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        // Line 2 contains "import" but inside a string, and the line starts with "val"
+        // Line 3 is a real import
+        assertEquals(listOf("import java.io.File"), extracted.importLines)
+        assertEquals(listOf(3), extracted.importLineNumbers)
+        assertEquals(listOf("val pkg = \"java.io\"", "val msg = \"need to import \${pkg}.File\"", "val f: Int = File(\"x\")"), extracted.otherLines)
+        assertEquals(listOf(1, 2, 4), extracted.otherLineNumbers)
+    }
+
+    @Test
+    fun `triple-quoted string opened and closed on same line does not affect subsequent imports`() {
+        val code = "val s = \"\"\"import fake\"\"\"\nimport java.io.File\nval x: Int = s"
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        // Line 1: """import fake""" — opens AND closes triple-quote on same line (count goes 0->1->2, even)
+        // Line 2: import java.io.File — NOT inside triple-quote, real import
+        assertEquals(listOf("import java.io.File"), extracted.importLines)
+        assertEquals(listOf(2), extracted.importLineNumbers)
+        assertEquals(listOf("val s = \"\"\"import fake\"\"\"", "val x: Int = s"), extracted.otherLines)
+        assertEquals(listOf(1, 3), extracted.otherLineNumbers)
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // 1 import (N=1), code starts at 24
+        // otherLine[1] = "val x: Int = s" (orig 3) -> wrapped 25
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:25:18: error: type mismatch")
+        assertEquals("input.kt:3:18: error: type mismatch", remapped)
+    }
+
+    @Test
+    fun `nested triple-quoted strings track state correctly`() {
+        // Two triple-quoted strings in sequence
+        val code = "val a = \"\"\"first\"\"\"\nval b = \"\"\"second\"\"\"\nimport java.io.File\nval x: Int = a"
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        // Line 1: """first""" — triple-quote count: 0->1->2 (even, not inside)
+        // Line 2: """second""" — triple-quote count: 2->3->4 (even, not inside)
+        // Line 3: real import
+        assertEquals(listOf("import java.io.File"), extracted.importLines)
+        assertEquals(listOf(3), extracted.importLineNumbers)
+        assertEquals(listOf("val a = \"\"\"first\"\"\"", "val b = \"\"\"second\"\"\"", "val x: Int = a"), extracted.otherLines)
+        assertEquals(listOf(1, 2, 4), extracted.otherLineNumbers)
+    }
+
+    @Test
+    fun `multiline triple-quoted string with import on boundary lines`() {
+        val code = "import java.util.Date\nval s = \"\"\"\nimport fake.one\nimport fake.two\n\"\"\"\nimport java.io.File\nval d: Int = Date()"
+
+        val extracted = CodeWrapperForCompilation.extractImportsWithLineNumbers(code)
+        // Line 1: real import
+        // Line 2: val s = """ — opens triple-quote (count 0->1, odd = inside)
+        // Line 3: import fake.one — INSIDE triple-quote, NOT extracted
+        // Line 4: import fake.two — INSIDE triple-quote, NOT extracted
+        // Line 5: """ — closes triple-quote (count 1->2, even = outside)
+        // Line 6: real import
+        // Line 7: code with error
+        assertEquals(listOf("import java.util.Date", "import java.io.File"), extracted.importLines)
+        assertEquals(listOf(1, 6), extracted.importLineNumbers)
+        assertEquals(5, extracted.otherLines.size)
+        assertEquals(listOf(2, 3, 4, 5, 7), extracted.otherLineNumbers)
+
+        val result = CodeWrapperForCompilation.wrap("Test", code)
+        // 2 imports (N=2), code starts at 25
+        // otherLines: line 2 (val s="""), line 3 (import fake.one), line 4 (import fake.two), line 5 ("""), line 7 (val d)
+        // otherLine[4] = "val d: Int = Date()" (orig 7) -> wrapped 29
+        val remapped = result.lineMapping.remapCompilerOutput("input.kt:29:18: error: type mismatch")
+        assertEquals("input.kt:7:18: error: type mismatch", remapped)
+    }
+
+    @Test
     fun `extractImports backward compatibility`() {
         val code = """
             import foo.Bar
