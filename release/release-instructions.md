@@ -223,7 +223,7 @@ Two website updates are needed:
 - Update `params.version` to the new version
 - Add a `[[params.whatsnew]]` entry at the top with date and summary
 
-**5b. Release page** — Create `website/website/content/releases/<version>.md` following the pattern of previous releases. Include: version, date, download links (with SHA-256), highlights, and the standard feedback/support sections.
+**5b. Release page** — Create `website/website/content/releases/<version>.md` following the pattern of previous releases. Include: version, date, download links (with SHA-256), highlights, and the standard feedback/support sections. The EULA link must point to the LICENSE asset on the GitHub release (`https://github.com/jonnyzzz/mcp-steroid/releases/download/v<version>/LICENSE`), not to the website.
 
 Commit and push in the `website/` repo after both updates.
 
