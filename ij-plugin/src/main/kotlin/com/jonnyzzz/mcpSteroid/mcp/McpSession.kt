@@ -171,6 +171,23 @@ class McpSession(
     fun getPendingRequestIds(): Set<String> = pendingRequests.keys.toSet()
 
     /**
+     * Drain all buffered notifications without closing the channel.
+     * Returns notifications that were buffered at the time of the call.
+     */
+    fun drainNotifications(): List<JsonRpcNotification> {
+        val result = mutableListOf<JsonRpcNotification>()
+        while (true) {
+            val received = notificationChannel.tryReceive()
+            if (received.isSuccess) {
+                result.add(received.getOrThrow())
+            } else {
+                break
+            }
+        }
+        return result
+    }
+
+    /**
      * Close the session.
      */
     fun close() {

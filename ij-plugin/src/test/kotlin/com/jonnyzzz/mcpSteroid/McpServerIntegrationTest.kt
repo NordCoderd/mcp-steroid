@@ -1014,6 +1014,32 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                     || execOutput.contains("Middle step")
                     || execOutput.contains("Final step")
         )
+
+        // Verify progress notifications were sent to the session's notification channel
+        val mcpSession = server.getServer().sessionManager.getSession(sessionId!!)
+        assertNotNull("Session should still exist", mcpSession)
+        val notifications = mcpSession!!.drainNotifications()
+        val progressNotifications = notifications.filter { it.method == McpMethods.PROGRESS }
+
+        println("--- Progress notifications (${progressNotifications.size}) ---")
+        for (n in progressNotifications) {
+            val p = McpJson.decodeFromJsonElement<ProgressParams>(n.params!!)
+            println("  [${p.progress}] ${p.message}")
+        }
+
+        assertTrue(
+            "At least one progress notification should have been sent, got ${progressNotifications.size}",
+            progressNotifications.isNotEmpty()
+        )
+
+        for (notification in progressNotifications) {
+            val notifParams = McpJson.decodeFromJsonElement<ProgressParams>(notification.params!!)
+            assertEquals(
+                "Progress notification should use the provided token",
+                JsonPrimitive(progressToken),
+                notifParams.progressToken
+            )
+        }
     }
 
     /**
@@ -1658,6 +1684,8 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         server.startServerIfNeeded()
         val sessionId = startSession(server)
 
+        val progressToken = "progress-compile-error-${UUID.randomUUID()}"
+
         val execRequest = buildJsonObject {
             put("jsonrpc", "2.0")
             put("id", "exec-compile-error-progress")
@@ -1673,7 +1701,7 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                     put("reason", "Test compilation error with progress token")
                     put("task_id", "compile-error-progress-test")
                     putJsonObject("_meta") {
-                        put("progressToken", "progress-compile-error-${UUID.randomUUID()}")
+                        put("progressToken", progressToken)
                     }
                 }
             }
@@ -1720,6 +1748,32 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
             "Output should contain FAILED marker, got: $execOutput",
             execOutput.contains("FAILED:")
         )
+
+        // Verify progress notifications were sent to the session's notification channel
+        val mcpSession = server.getServer().sessionManager.getSession(sessionId)
+        assertNotNull("Session should still exist", mcpSession)
+        val notifications = mcpSession!!.drainNotifications()
+        val progressNotifications = notifications.filter { it.method == McpMethods.PROGRESS }
+
+        println("--- Progress notifications (${progressNotifications.size}) ---")
+        for (n in progressNotifications) {
+            val p = McpJson.decodeFromJsonElement<ProgressParams>(n.params!!)
+            println("  [${p.progress}] ${p.message}")
+        }
+
+        assertTrue(
+            "At least one progress notification should have been sent for compilation error, got ${progressNotifications.size}",
+            progressNotifications.isNotEmpty()
+        )
+
+        for (notification in progressNotifications) {
+            val notifParams = McpJson.decodeFromJsonElement<ProgressParams>(notification.params!!)
+            assertEquals(
+                "Progress notification should use the provided token",
+                JsonPrimitive(progressToken),
+                notifParams.progressToken
+            )
+        }
     }
 
     /**
@@ -1735,6 +1789,8 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
         val server = SteroidsMcpServer.getInstance()
         server.startServerIfNeeded()
         val sessionId = startSession(server)
+
+        val progressToken = "progress-warnings-${UUID.randomUUID()}"
 
         val execRequest = buildJsonObject {
             put("jsonrpc", "2.0")
@@ -1752,6 +1808,9 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                     """.trimIndent())
                     put("reason", "Test compiler warning delivery")
                     put("task_id", "warnings-test")
+                    putJsonObject("_meta") {
+                        put("progressToken", progressToken)
+                    }
                 }
             }
         }.toString()
@@ -1792,6 +1851,32 @@ class McpServerIntegrationTest : BasePlatformTestCase() {
                     || execOutput.contains("Unchecked cast", ignoreCase = true)
                     || execOutput.contains("Compiler Errors/Warnings", ignoreCase = true)
         )
+
+        // Verify progress notifications were sent to the session's notification channel
+        val mcpSession = server.getServer().sessionManager.getSession(sessionId)
+        assertNotNull("Session should still exist", mcpSession)
+        val notifications = mcpSession!!.drainNotifications()
+        val progressNotifications = notifications.filter { it.method == McpMethods.PROGRESS }
+
+        println("--- Progress notifications (${progressNotifications.size}) ---")
+        for (n in progressNotifications) {
+            val p = McpJson.decodeFromJsonElement<ProgressParams>(n.params!!)
+            println("  [${p.progress}] ${p.message}")
+        }
+
+        assertTrue(
+            "At least one progress notification should have been sent for successful execution, got ${progressNotifications.size}",
+            progressNotifications.isNotEmpty()
+        )
+
+        for (notification in progressNotifications) {
+            val notifParams = McpJson.decodeFromJsonElement<ProgressParams>(notification.params!!)
+            assertEquals(
+                "Progress notification should use the provided token",
+                JsonPrimitive(progressToken),
+                notifParams.progressToken
+            )
+        }
     }
 
 }
