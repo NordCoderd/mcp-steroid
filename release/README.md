@@ -40,17 +40,22 @@ For a quick release without the full Docker build matrix, use Claude Code agents
      --notes-file release/notes/<version>.md
    ```
    **EULA handling**: The `gh` CLI uses the source filename as the asset name. Since we want the asset named `LICENSE` (not `EULA`), copy `website/EULA` to a temp file named `LICENSE` before upload. The `file#name` rename syntax does NOT work with `gh release create`.
-5. **Tag both repos**:
+5. **Upload to JetBrains Marketplace**:
+   ```bash
+   release/scripts/publish-marketplace.sh ij-plugin/build/distributions/mcp-steroid-*.zip
+   ```
+   Requires `~/.marketplace` file containing the JetBrains Marketplace permanent token (one line).
+6. **Tag both repos**:
    ```bash
    git tag -a "v<version>" -m "release: <version>" HEAD && git push origin "v<version>"
    cd website && git tag -a "v<version>" -m "release: <version>" HEAD && git push origin "v<version>"
    ```
-6. **Update website homepage**: In `website/website/hugo.toml`, update `params.version` to the new version and add a `[[params.whatsnew]]` entry at the top. Commit and push in `website/`.
-7. **Update website release page**: Create `website/website/content/releases/<version>.md`, run `cd website/website && make build`. **Note:** `make build` downloads the release ZIP to extract the plugin version, so step 4 must complete first.
-8. **Mark older releases obsolete**: `gh release edit <old-version> --repo jonnyzzz/mcp-steroid --notes-file <updated-body-with-obsolete-banner>`.
-9. **Publish website**: `cd website && git add -A && git commit -m "release: <version> website" && git push`
+7. **Update website homepage**: In `website/website/hugo.toml`, update `params.version` to the new version and add a `[[params.whatsnew]]` entry at the top. Commit and push in `website/`.
+8. **Update website release page**: Create `website/website/content/releases/<version>.md`, run `cd website/website && make build`. **Note:** `make build` downloads the release ZIP to extract the plugin version, so step 4 must complete first.
+9. **Mark older releases obsolete**: `gh release edit <old-version> --repo jonnyzzz/mcp-steroid --notes-file <updated-body-with-obsolete-banner>`.
+10. **Publish website**: `cd website && git add -A && git commit -m "release: <version> website" && git push`
 
-Steps 2+3 can run in parallel. Steps 6–8 require step 4 (GitHub release must exist for website build). The `CLAUDECODE` env var must be unset for nested Claude Code invocations via `run-agent.sh`.
+Steps 2+3 can run in parallel. Steps 7–10 require step 4 (GitHub release must exist for website build). The `CLAUDECODE` env var must be unset for nested Claude Code invocations via `run-agent.sh`.
 
 ### Full Release (Docker Matrix)
 
@@ -130,6 +135,8 @@ Custom plugin repository URL: `https://mcp-steroid.jonnyzzz.com/updatePlugins.xm
 - [ ] VERSION bumped in both repos (main + website)
 - [ ] Release tags created in both repos (`git tag -a "v<version>"`)
 - [ ] GitHub release has both assets: plugin ZIP + LICENSE (EULA)
+- [ ] Plugin uploaded to JetBrains Marketplace (`release/scripts/publish-marketplace.sh`)
+- [ ] Website homepage version and whatsnew updated (`hugo.toml`)
 - [ ] Older GitHub releases marked obsolete (prepend banner pointing to latest)
 - [ ] Website release pages for older versions auto-show obsolete banner (handled by `layouts/releases/single.html`)
 - [ ] Releases list page shows latest prominently, older releases in separate section

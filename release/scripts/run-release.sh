@@ -382,6 +382,9 @@ if [[ "$RUN_PUBLISH" == "1" ]]; then
   git -C "$ROOT_DIR/website" tag -a "$RELEASE_TAG" -m "release: $VERSION" HEAD 2>/dev/null || true
   git -C "$ROOT_DIR/website" push origin "$RELEASE_TAG" 2>/dev/null || true
 
+  # Upload to JetBrains Marketplace
+  release/scripts/publish-marketplace.sh "$RELEASE_ZIP_FILE"
+
   echo "Publish stage completed."
 else
   echo "Publish stage skipped."
