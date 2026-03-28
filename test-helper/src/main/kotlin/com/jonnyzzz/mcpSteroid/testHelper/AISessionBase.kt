@@ -7,8 +7,7 @@ import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.StartContainerRequest
 import com.jonnyzzz.mcpSteroid.testHelper.docker.buildDockerImage
 import com.jonnyzzz.mcpSteroid.testHelper.docker.startDockerContainerAndDispose
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResultValue
+import com.jonnyzzz.mcpSteroid.testHelper.process.AiProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 
 abstract class AIContainerBase(
@@ -60,17 +59,14 @@ abstract class AIAgentCompanion<T : Any>(val dockerFileBase: String) {
             override val outputFilter: AgentProgressOutputFilter
                 get() = this@AIAgentCompanion.outputFilter
 
-            override fun awaitForProcessFinishRaw(): ProcessResult {
-                return this@toAiStartedProcess.awaitForProcessFinish()
-            }
+            override fun awaitForProcessFinish(): AiProcessResult {
+                val rawResult = this@toAiStartedProcess.awaitForProcessFinish()
 
-            override fun awaitForProcessFinish(): ProcessResult {
-                val rawResult = awaitForProcessFinishRaw()
-
-                return ProcessResultValue(
+                return AiProcessResult(
                     exitCode = rawResult.exitCode ?: error("Process ${this@toAiStartedProcess} finished with exit code ${rawResult.exitCode}"),
                     stdout = this.outputFilter.filterText(rawResult.stdout),
                     stderr = rawResult.stderr,
+                    rawStdout = rawResult.stdout,
                 )
             }
 

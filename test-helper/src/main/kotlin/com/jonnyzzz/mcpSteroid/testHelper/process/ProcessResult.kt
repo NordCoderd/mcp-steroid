@@ -10,7 +10,7 @@ interface ProcessResult {
     val stderr: String
 }
 
-fun ProcessResult.assertOutputContains(vararg expectedOutput: String, message: String = "") = apply {
+fun <T : ProcessResult> T.assertOutputContains(vararg expectedOutput: String, message: String = ""): T = apply {
     for (s in expectedOutput) {
         check(stdout.contains(s) || stderr.contains(s)) {
             "Process $message output must contain $s\n$this"
@@ -18,19 +18,19 @@ fun ProcessResult.assertOutputContains(vararg expectedOutput: String, message: S
     }
 }
 
-fun ProcessResult.assertExitCode(expectedExitCode: Int, message: String = "") = apply {
+fun <T : ProcessResult> T.assertExitCode(expectedExitCode: Int, message: String = ""): T = apply {
     check(exitCode == expectedExitCode) {
         "Process $message exit code is $exitCode != $expectedExitCode\n$this"
     }
 }
 
-fun ProcessResult.assertExitCode(expectedExitCode: Int, message: ProcessResult.() -> String) = apply {
+fun <T : ProcessResult> T.assertExitCode(expectedExitCode: Int, message: ProcessResult.() -> String): T = apply {
     check(exitCode == expectedExitCode) {
         "Process ${message()} exit code is $exitCode != $expectedExitCode\n$this"
     }
 }
 
-fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
+fun <T : ProcessResult> T.assertNoErrorsInOutput(message: String): T = apply {
     val combined = stdout + "\n" + stderr
 
     // Check for explicit ERROR patterns (case-insensitive)
@@ -51,7 +51,7 @@ fun ProcessResult.assertNoErrorsInOutput(message: String) = apply {
     }
 }
 
-fun ProcessResult.assertNoMessageInOutput(messageRegex: String) = apply {
+fun <T : ProcessResult> T.assertNoMessageInOutput(messageRegex: String): T = apply {
     val combined = stdout + "\n" + stderr
 
     // Check for explicit ERROR patterns (case-insensitive)
@@ -67,3 +67,15 @@ fun ProcessResult.assertNoMessageInOutput(messageRegex: String) = apply {
         }
     }
 }
+
+/**
+ * Result from running an AI agent process.
+ * Contains both filtered (human-readable) output and raw (NDJSON) output.
+ */
+class AiProcessResult(
+    override val exitCode: Int?,
+    override val stdout: String,
+    override val stderr: String,
+    /** Raw unfiltered stdout (NDJSON) before output filter was applied */
+    val rawStdout: String,
+) : ProcessResult

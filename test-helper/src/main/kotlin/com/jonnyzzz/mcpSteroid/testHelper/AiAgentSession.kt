@@ -3,7 +3,7 @@ package com.jonnyzzz.mcpSteroid.testHelper
 
 import com.jonnyzzz.mcpSteroid.aiAgents.StdioMcpCommand
 import com.jonnyzzz.mcpSteroid.filter.AgentProgressOutputFilter
-import com.jonnyzzz.mcpSteroid.testHelper.process.ProcessResult
+import com.jonnyzzz.mcpSteroid.testHelper.process.AiProcessResult
 import com.jonnyzzz.mcpSteroid.testHelper.process.StartedProcess
 
 interface AiAgentSession {
@@ -26,8 +26,5 @@ interface AiAgentSession {
 interface AiStartedProcess : StartedProcess {
     val outputFilter: AgentProgressOutputFilter
 
-    /**
-     * Returns unprocessed messages
-     */
-    fun awaitForProcessFinishRaw(): ProcessResult
+    override fun awaitForProcessFinish(): AiProcessResult
 }
