@@ -21,12 +21,9 @@ RELEASE_ZIP_URL := $(shell gh release view $(VERSION) --repo jonnyzzz/mcp-steroi
 setup:
 	git clone git@github.com:jonnyzzz/mcp-steroid.git mcp-steroid-public
 
-# Ensure the public repository is cloned (auto-setup)
+# Ensure the output directory exists (auto-setup)
 ensure-public-repo:
-	@if [ ! -d "mcp-steroid-public/.git" ]; then \
-		echo "Public repository not found, cloning..."; \
-		git clone git@github.com:jonnyzzz/mcp-steroid.git mcp-steroid-public; \
-	fi
+	@mkdir -p mcp-steroid-public
 
 # Update version in hugo.toml, generate version.json
 update-config: ensure-public-repo
@@ -38,18 +35,18 @@ update-config: ensure-public-repo
 	@echo "Generating updatePlugins.xml (url: $(RELEASE_ZIP_URL))"
 	@./scripts/generate-update-plugins-xml.sh "$(VERSION)" "$(RELEASE_ZIP_URL)" > static/updatePlugins.xml
 	@xmllint --noout static/updatePlugins.xml 2>/dev/null && echo "updatePlugins.xml is valid XML" || echo "WARNING: xmllint not available, skipping XML validation"
-	@mkdir -p mcp-steroid-public/website
+	@mkdir -p mcp-steroid-public/mcp-steroid-plugin
 
 # Start development server with live reload
 dev: update-config
 	docker compose up dev
 
-# Build the site to mcp-steroid-public/website
+# Build the site to mcp-steroid-public/mcp-steroid-plugin
 build: update-config
 	@# Remove symlinks in output dir — they escape Docker mount boundary and break Hugo stat
-	@find mcp-steroid-public/website -type l -delete 2>/dev/null || true
+	@find mcp-steroid-public/mcp-steroid-plugin -type l -delete 2>/dev/null || true
 	docker compose run --rm build
 
 # Clean generated files (recreated by build)
 clean:
-	find mcp-steroid-public/website -mindepth 1 -delete 2>/dev/null || true
+	find mcp-steroid-public/mcp-steroid-plugin -mindepth 1 -delete 2>/dev/null || true
