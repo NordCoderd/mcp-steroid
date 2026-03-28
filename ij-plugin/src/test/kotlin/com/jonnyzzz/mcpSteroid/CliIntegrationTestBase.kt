@@ -285,7 +285,6 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
 
         val combinedOutput = buildString {
             appendLine(result.stdout)
-            appendLine(result.stdout)
             appendLine(result.stderr)
         }
 

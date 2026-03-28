@@ -78,4 +78,7 @@ class AiProcessResult(
     override val stderr: String,
     /** Raw unfiltered stdout (NDJSON) before output filter was applied */
     val rawStdout: String,
-) : ProcessResult
+) : ProcessResult {
+    override fun toString(): String =
+        "AiProcessResult(exitCode=$exitCode, stdout=${stdout.take(500)}, stderr=${stderr.take(500)})"
+}

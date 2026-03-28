@@ -93,13 +93,11 @@ class McpToolRegistry {
         return try {
             definition.handler(toolCallContext)
         } catch (e: Exception) {
-            ToolCallResult(
-                content = listOf(
-                    ContentItem.Text(text = "Tool execution error: ${e.message}"),
-                    ContentItem.Text(text = "Stacktrace: " + e.stackTraceToString()),
-                ),
-                isError = true
-            )
+            ToolCallResult.builder()
+                .addTextContent("Tool execution error: ${e.message}")
+                .addTextContent("Stacktrace: " + e.stackTraceToString())
+                .markAsError()
+                .build()
         }
     }
 }
