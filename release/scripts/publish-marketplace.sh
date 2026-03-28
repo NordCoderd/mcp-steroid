@@ -40,10 +40,11 @@ echo "Plugin ZIP: $PLUGIN_ZIP"
 echo "Plugin ID:  $PLUGIN_ID"
 echo "Uploading to JetBrains Marketplace..."
 
-# Upload using curl — token is piped from file, never stored in a variable
+# Upload using curl — token is read from file
+# The xmlId parameter accepts the string plugin ID (com.jonnyzzz.mcp-steroid)
 curl -i \
   --header "Authorization: Bearer $(head -1 "$MARKETPLACE_TOKEN_FILE" | tr -d '[:space:]')" \
-  --form "pluginId=$PLUGIN_ID" \
+  --form "xmlId=$PLUGIN_ID" \
   --form "file=@$PLUGIN_ZIP" \
   --form "channel=default" \
   "https://plugins.jetbrains.com/plugin/uploadPlugin"
