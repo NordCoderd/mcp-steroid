@@ -13,7 +13,6 @@ import com.jonnyzzz.mcpSteroid.mcp.builder
 import com.jonnyzzz.mcpSteroid.review.ReviewManager
 import com.jonnyzzz.mcpSteroid.server.ExecCodeParams
 import com.jonnyzzz.mcpSteroid.server.McpProgressReporter
-import com.jonnyzzz.mcpSteroid.server.SkillReference
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import com.jonnyzzz.mcpSteroid.demo.executionEventBroadcaster
@@ -105,6 +104,16 @@ class ExecutionManager(
                     project.executionStorage.writeCodeExecutionData(executionId, "success.txt", "Execution successful")
                 }
 
+                // Generate suggestions based on execution result
+                val suggestions = project.executionSuggestionService
+                    .generateSuggestions(
+                        isFailed = builder.isFailed,
+                        errorMessages = builder.errorMessages,
+                    )
+                for (suggestion in suggestions) {
+                    builder.logMessage("HINT: $suggestion")
+                }
+
                 // Broadcast execution completed event for Demo Mode
                 executionEventBroadcaster.onCompleted(
                     executionId = executionId,
@@ -131,9 +140,13 @@ class ExecutionManager(
             ModalityState.any().asContextElement()
         )
         private var failed = false
+        private val _errorMessages = mutableListOf<String>()
 
         override val isFailed: Boolean
             get() = failed
+
+        val errorMessages: List<String>
+            get() = _errorMessages
 
         suspend fun build(): ToolCallResult {
             // Wait for all storage writes to complete before returning the result
@@ -177,10 +190,7 @@ class ExecutionManager(
             val text = "ERROR: $message: ${throwable.message}\n${throwable.stackTraceToString()}"
             responseBuilder.addTextContent(text)
             mcpProgress.report(text)
-
-            // Add an error-specific hint with MCP resource hints
-            val hint = SkillReference.getInstance().errorHint(throwable.message ?: message)
-            responseBuilder.addTextContent("HINT: $hint")
+            _errorMessages.add(throwable.message ?: message)
 
             innerScope.launch {
                 project.executionStorage.appendExecutionEvent(executionId, text)
@@ -193,6 +203,7 @@ class ExecutionManager(
             mcpProgress.report(text)
             responseBuilder.markAsError()
             failed = true
+            _errorMessages.add(message)
             innerScope.launch {
                 project.executionStorage.appendExecutionEvent(executionId, text)
                 project.executionStorage.writeCodeErrorEvent(executionId, text)

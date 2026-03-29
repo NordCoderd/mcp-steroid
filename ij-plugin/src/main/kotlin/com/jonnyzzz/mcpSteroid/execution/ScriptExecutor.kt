@@ -9,7 +9,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
 import com.jonnyzzz.mcpSteroid.koltinc.LineMapping
 import com.jonnyzzz.mcpSteroid.server.ExecCodeParams
-import com.jonnyzzz.mcpSteroid.server.SkillReference
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import kotlinx.coroutines.*
 import kotlinx.coroutines.selects.select
@@ -165,9 +164,6 @@ class ScriptExecutor(
         val cleanTrace = lineMapping.cleanStackTrace(throwable.stackTraceToString())
         val text = "ERROR: $message\n$cleanTrace"
         logMessage(text)
-
-        val hint = SkillReference.getInstance().errorHint(throwable.message ?: message)
-        logMessage("HINT: $hint")
     }
 
     private fun reportModalDialog(dialogInfo: ModalDialogInfo, resultBuilder: ExecutionResultBuilder) {

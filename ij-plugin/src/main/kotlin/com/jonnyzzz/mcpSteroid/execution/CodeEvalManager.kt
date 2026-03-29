@@ -14,7 +14,6 @@ import com.jonnyzzz.mcpSteroid.koltinc.builder
 import com.jonnyzzz.mcpSteroid.koltinc.kotlincProcessClient
 import com.jonnyzzz.mcpSteroid.koltinc.scriptClassLoaderFactory
 import com.jonnyzzz.mcpSteroid.koltinc.toArgFile
-import com.jonnyzzz.mcpSteroid.server.SkillReference
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.storage.executionStorage
 import kotlinx.coroutines.sync.Mutex
@@ -120,11 +119,6 @@ class CodeEvalManager(
                 }
 
                 if (kotlincResult.exitCode != 0) {
-                    val hintSource = compilerError.ifBlank { compilerOutput }
-                    if (hintSource.isNotBlank()) {
-                        val hint = SkillReference.getInstance().errorHint(hintSource)
-                        resultBuilder.logMessage("HINT: $hint")
-                    }
                     resultBuilder.reportFailed("kotlinc exited with code: ${kotlincResult.exitCode}\n$compilerError")
                     return null
                 }

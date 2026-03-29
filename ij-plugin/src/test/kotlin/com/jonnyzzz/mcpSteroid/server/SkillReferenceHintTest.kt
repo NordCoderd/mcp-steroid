@@ -1,12 +1,10 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.server
 
-import com.intellij.openapi.components.service
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
+import com.jonnyzzz.mcpSteroid.execution.executionSuggestionService
 
 class SkillReferenceHintTest : BasePlatformTestCase() {
-    private val hints: SkillReference
-        get() = service()
 
     override fun runInDispatchThread(): Boolean = false
 
@@ -15,7 +13,7 @@ class SkillReferenceHintTest : BasePlatformTestCase() {
             input.kt:39:22: error: cannot access 'constructor(p0: String!, p1: Project, p2: ConfigurationFactory): ApplicationConfiguration': it is protected in 'com.intellij.execution.application.ApplicationConfiguration'.
         """.trimIndent()
 
-        val hint = hints.errorHint(compilerError)
+        val hint = project.executionSuggestionService.computeHint(compilerError)
         assertTrue(
             "Hint should recommend modern run configuration creation APIs:\n$hint",
             hint.contains("RunManager.createConfiguration")
@@ -33,7 +31,7 @@ class SkillReferenceHintTest : BasePlatformTestCase() {
             input.kt:71:31: error: unresolved reference 'url'.
         """.trimIndent()
 
-        val hint = hints.errorHint(compilerError)
+        val hint = project.executionSuggestionService.computeHint(compilerError)
         assertTrue(
             "Hint should suggest a VirtualFile-oriented search/read pattern:\n$hint",
             hint.contains("FilenameIndex.getVirtualFilesByName")
@@ -50,7 +48,7 @@ class SkillReferenceHintTest : BasePlatformTestCase() {
             input.kt:27:45: error: unresolved reference 'contentsToByteArray'.
         """.trimIndent()
 
-        val hint = hints.errorHint(compilerError)
+        val hint = project.executionSuggestionService.computeHint(compilerError)
         assertTrue(
             "Hint should point to currently supported file discovery helpers:\n$hint",
             hint.contains("findProjectFiles")
@@ -68,7 +66,7 @@ class SkillReferenceHintTest : BasePlatformTestCase() {
                           ^^^^^^^^^^^^^^^
         """.trimIndent()
 
-        val hint = hints.errorHint(compilerError)
+        val hint = project.executionSuggestionService.computeHint(compilerError)
         assertTrue(
             "Hint should mention both legacy execute wrapper labels:\n$hint",
             hint.contains("return@executeSteroidCode or return@executeSuspend")
