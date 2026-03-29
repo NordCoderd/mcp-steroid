@@ -92,6 +92,42 @@ if (buildFile != null) {
 }
 ```
 
+### Daemon Analysis & Highlights
+
+```kotlin
+import com.intellij.openapi.fileEditor.FileEditorManager
+import kotlin.time.Duration.Companion.seconds
+
+val file = findProjectFile("src/Main.kt") ?: error("File not found")
+
+// Open file in editor (required for daemon analysis)
+withContext(Dispatchers.EDT) {
+    FileEditorManager.getInstance(project).openFile(file, true)
+}
+
+// Wait for daemon analysis to complete (default timeout: 30s)
+val completed = waitForDaemonAnalysis(file, timeout = 30.seconds)
+println("Analysis completed: $completed")
+
+// Get highlights (warnings/errors) when daemon finishes
+// NOTE: may return stale results if IDE window is not focused — use runInspectionsDirectly() instead
+val highlights = getHighlightsWhenReady(file)
+highlights.forEach { info ->
+    println("${info.severity}: ${info.description}")
+}
+```
+
+### File Discovery by Glob Pattern
+
+```kotlin
+// Find project files matching a glob pattern (relative to project root)
+val kotlinFiles = findProjectFiles("**/*.kt")
+println("Found ${kotlinFiles.size} Kotlin files")
+
+val testFiles = findProjectFiles("src/test/**/*Test.kt")
+testFiles.forEach { println(it.path) }
+```
+
 ### Disposable Hierarchy
 
 The context provides a `disposable` property for resource cleanup:

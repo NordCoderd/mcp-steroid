@@ -59,7 +59,7 @@ For complex IntelliJ API work, delegate to a sub-agent:
 - Provide detailed 'reason' parameter
 
 **Resources:**
-- [Script Context API](mcp-steroid://skill/execute-code-script-context) - Full McpScriptContext reference (println, readAction, findFile, progress, etc.)
+- [Script Context API](mcp-steroid://skill/coding-with-intellij-context-api) - Full McpScriptContext reference (println, readAction, findFile, progress, etc.)
 - [Complete Coding Guide](mcp-steroid://skill/coding-with-intellij) - Patterns, examples, best practices
 - [API Power User Guide](mcp-steroid://prompt/skill) - Essential patterns
 - [Debugger Guide](mcp-steroid://prompt/debugger-skill) - Debug workflows
