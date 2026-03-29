@@ -29,6 +29,25 @@ class LineMapping(private val wrappedToOriginal: Map<Int, Int>) {
         }
     }
 
+    /**
+     * Remap line references in JVM stack traces from wrapped-file lines to user-code lines.
+     * Matches patterns like `(input.kt:LINE)` and `input.kt:LINE` that appear in
+     * `Throwable.stackTraceToString()` output.
+     * Lines not in the mapping (wrapper boilerplate) are left as-is.
+     */
+    fun remapStackTrace(stackTrace: String, fileName: String = "input.kt"): String {
+        val pattern = Regex("""${Regex.escape(fileName)}:(\d+)""")
+        return stackTrace.replace(pattern) { match ->
+            val wrappedLine = match.groupValues[1].toInt()
+            val originalLine = wrappedToOriginal[wrappedLine]
+            if (originalLine != null) {
+                "$fileName:$originalLine"
+            } else {
+                match.value
+            }
+        }
+    }
+
     companion object {
         /** A no-op mapping that leaves all line numbers unchanged. */
         val IDENTITY = LineMapping(emptyMap())

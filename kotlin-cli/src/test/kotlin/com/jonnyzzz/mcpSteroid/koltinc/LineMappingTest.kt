@@ -97,4 +97,88 @@ class LineMappingTest {
         val expected = "input.kt:1:5: see also input.kt:3:10:"
         assertEquals(expected, mapping.remapCompilerOutput(input))
     }
+
+    // --- remapStackTrace tests ---
+
+    @Test
+    fun `remapStackTrace remaps line numbers in stack trace format`() {
+        val mapping = LineMapping(mapOf(23 to 1, 24 to 2))
+        val trace = "java.lang.IllegalStateException: boom\n\tat Script.method(input.kt:23)\n\tat Script.run(input.kt:24)"
+        val remapped = mapping.remapStackTrace(trace)
+        assertEquals(
+            "java.lang.IllegalStateException: boom\n\tat Script.method(input.kt:1)\n\tat Script.run(input.kt:2)",
+            remapped
+        )
+    }
+
+    @Test
+    fun `remapStackTrace leaves unmapped lines unchanged`() {
+        val mapping = LineMapping(mapOf(23 to 1))
+        val trace = "\tat Script.method(input.kt:10)"
+        assertEquals(trace, mapping.remapStackTrace(trace))
+    }
+
+    @Test
+    fun `remapStackTrace handles mixed mapped and unmapped frames`() {
+        val mapping = LineMapping(mapOf(23 to 1))
+        val trace = """
+            java.lang.RuntimeException: test
+            	at Script.method(input.kt:23)
+            	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+            	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:108)
+        """.trimIndent()
+        val expected = """
+            java.lang.RuntimeException: test
+            	at Script.method(input.kt:1)
+            	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:33)
+            	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:108)
+        """.trimIndent()
+        assertEquals(expected, mapping.remapStackTrace(trace))
+    }
+
+    @Test
+    fun `remapStackTrace with custom file name`() {
+        val mapping = LineMapping(mapOf(23 to 1))
+        val trace = "\tat Script.method(script.kt:23)"
+        val expected = "\tat Script.method(script.kt:1)"
+        assertEquals(expected, mapping.remapStackTrace(trace, fileName = "script.kt"))
+    }
+
+    @Test
+    fun `remapStackTrace does not match other filenames`() {
+        val mapping = LineMapping(mapOf(23 to 1))
+        val trace = "\tat Script.method(other.kt:23)"
+        // Default fileName is input.kt, so other.kt:23 should NOT be remapped
+        assertEquals(trace, mapping.remapStackTrace(trace))
+    }
+
+    @Test
+    fun `remapStackTrace identity mapping leaves everything unchanged`() {
+        val trace = "\tat Script.method(input.kt:23)"
+        assertEquals(trace, LineMapping.IDENTITY.remapStackTrace(trace))
+    }
+
+    @Test
+    fun `remapStackTrace handles empty input`() {
+        val mapping = LineMapping(mapOf(23 to 1))
+        assertEquals("", mapping.remapStackTrace(""))
+    }
+
+    @Test
+    fun `remapStackTrace handles Caused by chains`() {
+        val mapping = LineMapping(mapOf(23 to 1, 25 to 3))
+        val trace = """
+            java.lang.RuntimeException: wrapper
+            	at Script.run(input.kt:25)
+            Caused by: java.lang.IllegalStateException: boom
+            	at Script.method(input.kt:23)
+        """.trimIndent()
+        val expected = """
+            java.lang.RuntimeException: wrapper
+            	at Script.run(input.kt:3)
+            Caused by: java.lang.IllegalStateException: boom
+            	at Script.method(input.kt:1)
+        """.trimIndent()
+        assertEquals(expected, mapping.remapStackTrace(trace))
+    }
 }

@@ -7,7 +7,9 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Disposer
+import com.jonnyzzz.mcpSteroid.koltinc.LineMapping
 import com.jonnyzzz.mcpSteroid.server.ExecCodeParams
+import com.jonnyzzz.mcpSteroid.server.SkillReference
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import kotlinx.coroutines.*
 import kotlinx.coroutines.selects.select
@@ -54,6 +56,8 @@ class ScriptExecutor(
         val evalResult = project
             .codeEvalManager
             .evalCode(executionId, exec.code, resultBuilder) ?: return
+
+        val lineMapping = evalResult.lineMapping
 
         log.info("Starting execution $executionId")
 
@@ -134,18 +138,36 @@ class ScriptExecutor(
         } catch (e: TimeoutCancellationException) {
             // Timeout - report as error (must be caught before CancellationException since it's a subclass)
             log.warn("Execution $executionId timed out: ${e.message}")
-            resultBuilder.logException("Execution timed out", e)
+            resultBuilder.logRemappedException("Execution timed out", e, lineMapping)
             resultBuilder.reportFailed("Execution timed out after ${exec.timeout} seconds")
         } catch (e: CancellationException) {
             throw e
         } catch (t: Throwable) {
             log.warn("Unexpected error during execution $executionId: ${t.message}", t)
-            resultBuilder.logException("Unexpected error during execution: ${t.message}", t)
-            resultBuilder.reportFailed("Unexpected error during execution: ${t.message}")
+            val remappedMessage = lineMapping.remapStackTrace(t.message ?: "")
+            resultBuilder.logRemappedException("Unexpected error during execution: $remappedMessage", t, lineMapping)
+            resultBuilder.reportFailed("Unexpected error during execution: $remappedMessage")
         } finally {
             modalityMonitor.stop()
             Disposer.dispose(executionDisposable)
         }
+    }
+
+    /**
+     * Logs an exception with stack trace line numbers remapped from wrapped-file coordinates
+     * to user-code coordinates, so agents see meaningful line references.
+     */
+    private fun ExecutionResultBuilder.logRemappedException(
+        message: String,
+        throwable: Throwable,
+        lineMapping: LineMapping,
+    ) {
+        val remappedTrace = lineMapping.remapStackTrace(throwable.stackTraceToString())
+        val text = "ERROR: $message: ${throwable.message}\n$remappedTrace"
+        logMessage(text)
+
+        val hint = SkillReference.getInstance().errorHint(throwable.message ?: message)
+        logMessage("HINT: $hint")
     }
 
     private fun reportModalDialog(dialogInfo: ModalDialogInfo, resultBuilder: ExecutionResultBuilder) {

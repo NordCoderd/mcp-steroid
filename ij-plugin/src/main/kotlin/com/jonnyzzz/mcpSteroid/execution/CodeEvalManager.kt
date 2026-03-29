@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.registry.Registry
 import com.intellij.util.execution.ParametersListUtil
 import com.jonnyzzz.mcpSteroid.koltinc.KotlincCommandLine
+import com.jonnyzzz.mcpSteroid.koltinc.LineMapping
 import com.jonnyzzz.mcpSteroid.koltinc.builder
 import com.jonnyzzz.mcpSteroid.koltinc.kotlincProcessClient
 import com.jonnyzzz.mcpSteroid.koltinc.scriptClassLoaderFactory
@@ -22,7 +23,10 @@ import kotlin.io.path.div
 import kotlin.io.path.writeLines
 import kotlin.io.path.writeText
 
-data class EvalResult(val result: List<suspend McpScriptContext.() -> Unit>)
+data class EvalResult(
+    val result: List<suspend McpScriptContext.() -> Unit>,
+    val lineMapping: LineMapping,
+)
 
 inline val Project.codeEvalManager: CodeEvalManager get() = service()
 
@@ -142,7 +146,7 @@ class CodeEvalManager(
             log.info("Script evaluation complete for $executionId. Captured ${capturedBlocks.size} script block(s)")
 
             project.executionStorage.writeCodeExecutionData(executionId, "compilation-success.txt", "Compiled")
-            return EvalResult(capturedBlocks.toList())
+            return EvalResult(capturedBlocks.toList(), wrappedCode.lineMapping)
         } catch (e: Throwable) {
             val message = "Error executing script $executionId: ${e.message}"
 
