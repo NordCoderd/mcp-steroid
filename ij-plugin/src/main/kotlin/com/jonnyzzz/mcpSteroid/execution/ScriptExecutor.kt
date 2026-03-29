@@ -162,8 +162,8 @@ class ScriptExecutor(
         throwable: Throwable,
         lineMapping: LineMapping,
     ) {
-        val remappedTrace = lineMapping.remapStackTrace(throwable.stackTraceToString())
-        val text = "ERROR: $message: ${throwable.message}\n$remappedTrace"
+        val cleanTrace = lineMapping.cleanStackTrace(throwable.stackTraceToString())
+        val text = "ERROR: $message\n$cleanTrace"
         logMessage(text)
 
         val hint = SkillReference.getInstance().errorHint(throwable.message ?: message)

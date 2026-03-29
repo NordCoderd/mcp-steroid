@@ -48,6 +48,32 @@ class LineMapping(private val wrappedToOriginal: Map<Int, Int>) {
         }
     }
 
+    /**
+     * Produce a clean stack trace for agents: keep only the exception message and
+     * stack frames from the user's script file that map to user code lines.
+     * Wrapper boilerplate frames and framework internals are stripped.
+     */
+    fun cleanStackTrace(stackTrace: String, fileName: String = "input.kt"): String {
+        val fileRef = Regex("""${Regex.escape(fileName)}:(\d+)""")
+        val lines = stackTrace.lines()
+        return buildString {
+            for (line in lines) {
+                val trimmed = line.trimStart()
+                // Always keep the exception message line(s) — not starting with "at "
+                if (!trimmed.startsWith("at ") && !trimmed.startsWith("...")) {
+                    appendLine(line)
+                    continue
+                }
+                // For "at ..." frames, keep only those referencing the user's file with a mapped line
+                val match = fileRef.find(line) ?: continue
+                val wrappedLine = match.groupValues[1].toIntOrNull() ?: continue
+                val originalLine = wrappedToOriginal[wrappedLine] ?: continue
+                // Emit the frame with remapped line number
+                appendLine(line.replace(match.value, "$fileName:$originalLine"))
+            }
+        }.trimEnd()
+    }
+
     companion object {
         /** A no-op mapping that leaves all line numbers unchanged. */
         val IDENTITY = LineMapping(emptyMap())

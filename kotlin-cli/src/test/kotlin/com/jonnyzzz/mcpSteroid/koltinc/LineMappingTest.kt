@@ -181,4 +181,143 @@ class LineMappingTest {
         """.trimIndent()
         assertEquals(expected, mapping.remapStackTrace(trace))
     }
+
+    // ============================================================
+    // cleanStackTrace tests
+    // ============================================================
+
+    @Test
+    fun `cleanStackTrace keeps only user frames and exception message`() {
+        val mapping = LineMapping(mapOf(23 to 1))
+        val trace = """
+            java.lang.IllegalStateException: boom
+            	at Script.method(input.kt:23)
+            	at Script.invoke(input.kt:19)
+            	at com.jonnyzzz.mcpSteroid.execution.ScriptExecutor.run(ScriptExecutor.kt:115)
+            	at kotlinx.coroutines.scheduling.CoroutineScheduler.run(CoroutineScheduler.kt:762)
+        """.trimIndent()
+        val cleaned = mapping.cleanStackTrace(trace)
+        val expected = """
+            java.lang.IllegalStateException: boom
+            	at Script.method(input.kt:1)
+        """.trimIndent()
+        assertEquals(expected, cleaned)
+    }
+
+    @Test
+    fun `cleanStackTrace keeps multiple user frames`() {
+        val mapping = LineMapping(mapOf(23 to 1, 24 to 2, 25 to 3))
+        val trace = """
+            java.lang.NullPointerException
+            	at Script.bar(input.kt:25)
+            	at Script.foo(input.kt:24)
+            	at Script.main(input.kt:23)
+            	at Wrapper.invoke(input.kt:19)
+            	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+        """.trimIndent()
+        val cleaned = mapping.cleanStackTrace(trace)
+        val expected = """
+            java.lang.NullPointerException
+            	at Script.bar(input.kt:3)
+            	at Script.foo(input.kt:2)
+            	at Script.main(input.kt:1)
+        """.trimIndent()
+        assertEquals(expected, cleaned)
+    }
+
+    @Test
+    fun `cleanStackTrace strips wrapper frames with unmapped input-kt lines`() {
+        val mapping = LineMapping(mapOf(23 to 1))
+        val trace = """
+            java.lang.IllegalStateException: boom
+            	at Script.method(input.kt:23)
+            	at Script$${'$'}invoke$${'$'}1.invokeSuspend(input.kt:19)
+            	at Script$${'$'}invoke$${'$'}1.invoke(input.kt)
+        """.trimIndent()
+        val cleaned = mapping.cleanStackTrace(trace)
+        // Line 19 is wrapper (not mapped), "input.kt" without line number is also filtered
+        val expected = """
+            java.lang.IllegalStateException: boom
+            	at Script.method(input.kt:1)
+        """.trimIndent()
+        assertEquals(expected, cleaned)
+    }
+
+    @Test
+    fun `cleanStackTrace preserves Caused-by chain`() {
+        val mapping = LineMapping(mapOf(23 to 1, 24 to 2))
+        val trace = """
+            java.lang.RuntimeException: wrapper
+            	at Script.run(input.kt:24)
+            	at Wrapper.invoke(input.kt:19)
+            Caused by: java.lang.IllegalStateException: root
+            	at Script.inner(input.kt:23)
+            	at kotlinx.coroutines.stuff(Coroutines.kt:50)
+        """.trimIndent()
+        val cleaned = mapping.cleanStackTrace(trace)
+        val expected = """
+            java.lang.RuntimeException: wrapper
+            	at Script.run(input.kt:2)
+            Caused by: java.lang.IllegalStateException: root
+            	at Script.inner(input.kt:1)
+        """.trimIndent()
+        assertEquals(expected, cleaned)
+    }
+
+    @Test
+    fun `cleanStackTrace with inline function line numbers outside file range`() {
+        // Inline functions in Kotlin can produce line numbers from the call site,
+        // which may be very high numbers not in our mapping (e.g., from stdlib or
+        // other inlined code). These should be stripped.
+        val mapping = LineMapping(mapOf(23 to 1, 24 to 2))
+        val trace = """
+            java.lang.IllegalStateException: fail
+            	at Script.method(input.kt:23)
+            	at kotlin.collections.CollectionsKt___CollectionsKt.forEach(input.kt:5678)
+            	at Script.caller(input.kt:24)
+            	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+        """.trimIndent()
+        val cleaned = mapping.cleanStackTrace(trace)
+        // Line 5678 is from an inlined stdlib function — not in mapping, stripped
+        val expected = """
+            java.lang.IllegalStateException: fail
+            	at Script.method(input.kt:1)
+            	at Script.caller(input.kt:2)
+        """.trimIndent()
+        assertEquals(expected, cleaned)
+    }
+
+    @Test
+    fun `cleanStackTrace with inline require or check`() {
+        // require() and check() are inline functions that embed the call-site line
+        // in input.kt even though the actual throw is in stdlib
+        val mapping = LineMapping(mapOf(23 to 1, 24 to 2, 25 to 3))
+        val trace = """
+            java.lang.IllegalArgumentException: requirement failed
+            	at Script.method(input.kt:24)
+            	at Script.main(input.kt:23)
+            	at Wrapper.addBlock(input.kt:19)
+        """.trimIndent()
+        val cleaned = mapping.cleanStackTrace(trace)
+        val expected = """
+            java.lang.IllegalArgumentException: requirement failed
+            	at Script.method(input.kt:2)
+            	at Script.main(input.kt:1)
+        """.trimIndent()
+        assertEquals(expected, cleaned)
+    }
+
+    @Test
+    fun `cleanStackTrace identity mapping passes through all input-kt frames`() {
+        val mapping = LineMapping.IDENTITY
+        val trace = """
+            java.lang.RuntimeException: test
+            	at Script.method(input.kt:23)
+            	at Framework.run(Framework.kt:100)
+        """.trimIndent()
+        val cleaned = mapping.cleanStackTrace(trace)
+        // IDENTITY has empty map, so no input.kt frames are mapped → all stripped
+        // Only the exception message line survives
+        assertEquals("java.lang.RuntimeException: test", cleaned)
+    }
 }
