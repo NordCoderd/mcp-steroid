@@ -4,10 +4,6 @@ package com.jonnyzzz.mcpSteroid.server
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.components.service
 import com.jonnyzzz.mcpSteroid.prompts.generated.debugger.OverviewPromptArticle as DebuggerOverview
-import com.jonnyzzz.mcpSteroid.prompts.generated.ide.OverviewPromptArticle as IdeOverview
-import com.jonnyzzz.mcpSteroid.prompts.generated.lsp.OverviewPromptArticle as LspOverview
-import com.jonnyzzz.mcpSteroid.prompts.generated.prompt.SkillPromptArticle
-import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ExecuteCodeToolDescriptionPromptArticle
 
 /**
  * Application service providing MCP resource references and brief tips for LLM agents.
@@ -34,20 +30,6 @@ class SkillReference {
         get() = mcpServer.skillUrl
 
     /**
-     * Per-call file discovery reminder — injected at the beginning of every
-     * steroid_execute_code response so agents see the right pattern BEFORE
-     * writing the next code snippet. Agents tend to default to Glob before
-     * reading the tool description, so this ensures the guidance is visible
-     * on every call.
-     */
-    val fileDiscoveryReminder: String = buildString {
-        appendLine("FILE DISCOVERY: Use FilenameIndex in steroid_execute_code — NEVER use Glob for file search by name or extension.")
-        appendLine("  val javaFiles = readAction { FilenameIndex.getAllFilesByExt(project, \"java\", GlobalSearchScope.projectScope(project)) }")
-        appendLine("  val byName    = readAction { FilenameIndex.getVirtualFilesByName(\"MyClass.java\", GlobalSearchScope.projectScope(project)) }")
-        append("  Full guide: ${ExecuteCodeToolDescriptionPromptArticle().uri}")
-    }
-
-    /**
      * Brief reminder of critical rules - included in error responses.
      */
     val criticalRules = buildString {
@@ -56,14 +38,6 @@ class SkillReference {
         appendLine("2. waitForSmartMode() runs automatically before your script; call it again only if you trigger indexing")
         appendLine("3. Use readAction {} for PSI/VFS reads")
         append("4. Never use runBlocking - you're already in a coroutine context")
-    }
-
-    private val resourceHint: String = buildString {
-        appendLine("TIP: Browse MCP resources for examples and patterns:")
-        appendLine("   ${SkillPromptArticle().uri} - API patterns")
-        appendLine("   ${DebuggerOverview().uri} - Debugger workflows")
-        appendLine("   ${IdeOverview().uri} - Refactorings & inspections")
-        append("   ${LspOverview().uri} - Code navigation & completion")
     }
 
     /**
@@ -124,18 +98,8 @@ class SkillReference {
             else -> criticalRules
         }
 
-        return buildString {
-            appendLine(hint)
-            appendLine()
-            appendLine(resourceHint)
-        }
+        return hint
     }
-
-    /**
-     * Success message with a documentation link.
-     */
-    val successFooter: String
-        get() = resourceHint
 
     companion object {
         fun getInstance(): SkillReference = service()

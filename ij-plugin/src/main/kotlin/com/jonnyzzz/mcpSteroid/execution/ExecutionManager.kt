@@ -62,7 +62,6 @@ class ExecutionManager(
                 val builder = responseBuilder(this, executionId, mcpProgressReporter)
                 try {
                     builder.logMessage("execution_id: ${executionId.executionId}")
-                    builder.logMessage(SkillReference.getInstance().fileDiscoveryReminder)
 
                     try {
                         // Kill any pending modal dialogs before execution
@@ -105,14 +104,6 @@ class ExecutionManager(
                 if (!builder.isFailed) {
                     project.executionStorage.writeCodeExecutionData(executionId, "success.txt", "Execution successful")
                 }
-
-                builder.logMessage(
-                    "PRO Tip: Call the 'steroid_execute_feedback' tool of this MCP server and list pain points!"
-                )
-
-                // Add MCP resource hints to help agents find documentation
-                val skillRef = SkillReference.getInstance()
-                builder.logMessage(skillRef.successFooter)
 
                 // Broadcast execution completed event for Demo Mode
                 executionEventBroadcaster.onCompleted(
