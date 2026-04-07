@@ -47,12 +47,15 @@ class ContentModuleClasspathTest {
                 import com.intellij.psi.JavaPsiFacade
                 import com.intellij.psi.PsiMethod
 
-                val scope = GlobalSearchScope.projectScope(project)
-                val facade = JavaPsiFacade.getInstance(project)
-                val cls = facade.findClass("java.lang.Deprecated", scope)
-                if (cls != null) {
-                    val methods: Collection<PsiMethod> = AnnotatedElementsSearch.searchPsiMethods(cls, scope).findAll()
-                    println("CONTENT_MODULE_OK: found ${'$'}{methods.size} @Deprecated methods")
+                val count = readAction {
+                    val scope = GlobalSearchScope.projectScope(project)
+                    val facade = JavaPsiFacade.getInstance(project)
+                    val cls = facade.findClass("java.lang.Deprecated", scope)
+                        ?: return@readAction -1
+                    AnnotatedElementsSearch.searchPsiMethods(cls, scope).findAll().size
+                }
+                if (count >= 0) {
+                    println("CONTENT_MODULE_OK: found ${'$'}count @Deprecated methods")
                 } else {
                     println("CONTENT_MODULE_OK: no java.lang.Deprecated on classpath")
                 }
