@@ -171,14 +171,13 @@ release/scripts/run-release.sh --no-dry-run --publish --skip-build --skip-notes 
 Target command when enabled:
 
 ```bash
-cp website/EULA /tmp/LICENSE
-gh release create <tag> <stable-plugin-zip> /tmp/LICENSE \
+gh release create <tag> <stable-plugin-zip> EULA \
   --repo jonnyzzz/mcp-steroid \
   --target "$(git -C website rev-parse HEAD)" \
   --notes-file <notes-file>
 ```
 
-**EULA as LICENSE**: The `gh` CLI uses the source filename as the asset name. The `file#name` rename syntax does NOT work. Copy `website/EULA` to a temp file named `LICENSE` before upload so the asset appears as `LICENSE` on the release page.
+**EULA**: The `gh` CLI uses the source filename as the asset name. The root `EULA` file is uploaded directly — no renaming needed.
 
 **Release target**: The release is created on the public repo (`jonnyzzz/mcp-steroid`), so `--target` must be a commit from that repo (use `git -C website rev-parse HEAD`).
 
