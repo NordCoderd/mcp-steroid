@@ -212,6 +212,8 @@ release/scripts/publish-marketplace.sh <plugin-zip>
 
 Requires `~/.marketplace` file with JetBrains Marketplace permanent token (one line). The script uses the `xmlId` parameter (`com.jonnyzzz.mcp-steroid`) for the upload API. The plugin enters the JetBrains review queue and will be listed once approved.
 
+**Channel**: The script uploads to the `Stable` channel (case-sensitive). Do not use `default` or `stable` — only `Stable` is correct for the stable release track on JetBrains Marketplace.
+
 Plugin page: https://plugins.jetbrains.com/plugin/30019-mcp-steroid
 
 ### Stage 5: Website Updates
