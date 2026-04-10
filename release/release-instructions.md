@@ -31,18 +31,57 @@ Correct order:
 3. `VERSION` is in `X.Y.Z` format.
 4. `~/.marketplace` token file exists (one-line JetBrains permanent token).
 
-### Stage 1: Release Notes
+### Stage 1: Review Changes and Collect Contributors
+
+Before writing release notes, review all changes since the last release and identify
+external contributors who should be acknowledged.
+
+**1a. List commits since the last release tag:**
+```bash
+git log v<prev-version>..HEAD --oneline
+```
+
+**1b. Find external contributors (non-maintainer commits and co-authors):**
+```bash
+# Direct commit authors
+git log v<prev-version>..HEAD --format='%an <%ae>' | sort -u
+
+# Co-authors from commit bodies
+git log v<prev-version>..HEAD --format='%b' | grep -i 'co-authored-by' | sort -u
+
+# PRs merged in this range
+gh pr list --repo jonnyzzz/mcp-steroid --state merged --search "merged:>$(git log -1 --format=%ci v<prev-version> | cut -d' ' -f1)" --json author,title,number
+```
+
+**1c. Update `CONTRIBUTORS.md`** with any new contributors — add their name,
+GitHub handle, and a short description of their contribution(s). Keep the list
+alphabetically sorted within the Contributors section.
+
+**1d. Mention contributors in release notes** — if external contributors
+participated in this release, add an Acknowledgements section at the end of
+the release notes thanking them by name and linking to their PRs/issues.
+
+### Stage 2: Release Notes
 
 Create `release/notes/<version>.md` with user-facing prose (no raw commit hashes).
 Follow the style of previous notes files. Include segues to any relevant blog posts.
 
-Commit it:
-```bash
-git add release/notes/<version>.md
-git commit -m "release: add <version> release notes"
+If external contributors participated in this release, add an **Acknowledgements**
+section at the end:
+```markdown
+### Acknowledgements
+
+Thank you to the following contributors for their work in this release:
+- **Name** ([@handle](https://github.com/handle)) — short description ([#N](https://github.com/jonnyzzz/mcp-steroid/pull/N))
 ```
 
-### Stage 2: Version Bump
+Commit it:
+```bash
+git add release/notes/<version>.md CONTRIBUTORS.md
+git commit -m "release: add <version> release notes and update contributors"
+```
+
+### Stage 3: Version Bump
 
 ```bash
 release/scripts/bump-version.sh
@@ -57,7 +96,7 @@ echo "0.92.0" > VERSION
 git add VERSION && git commit -m "release: bump version to 0.92.0"
 ```
 
-### Stage 3: Website Release Page + Homepage Update
+### Stage 4: Website Release Page + Homepage Update
 
 **3a. Release page** — create `website/content/releases/<version>.md` following the
 pattern of previous releases. Include:
@@ -86,7 +125,7 @@ git commit -m "release: add <version> website release page and update homepage v
 (The `-f` flag is needed because `website/` is in the root `.gitignore`, but existing
 tracked files under `website/` still work normally. New files need `-f` once.)
 
-### Stage 4: Push All Commits
+### Stage 5: Push All Commits
 
 ```bash
 git push origin main
@@ -95,7 +134,7 @@ git push origin main
 All release commits (notes, version bump, website page, hugo.toml) must be pushed
 **before** building the plugin and creating the GitHub release.
 
-### Stage 5: Build Plugin
+### Stage 6: Build Plugin
 
 ```bash
 ./gradlew :ij-plugin:buildPlugin -Pmcp.release.build=true
@@ -106,7 +145,7 @@ Or via IntelliJ MCP (`steroid_execute_code`) with a Gradle run configuration.
 The resulting ZIP is in `ij-plugin/build/distributions/mcp-steroid-<version>-<gitHash>.zip`.
 The `<gitHash>` must match the current HEAD (the version bump commit).
 
-### Stage 6: Create GitHub Release
+### Stage 7: Create GitHub Release
 
 ```bash
 gh release create "v<version>" \
@@ -132,7 +171,7 @@ After creating the release, tag the repo:
 # No manual tag push needed unless the tag was created locally first.
 ```
 
-### Stage 7: Upload to JetBrains Marketplace
+### Stage 8: Upload to JetBrains Marketplace
 
 ```bash
 release/scripts/publish-marketplace.sh "ij-plugin/build/distributions/mcp-steroid-<version>-<gitHash>.zip"
@@ -146,7 +185,7 @@ Plugin page: https://plugins.jetbrains.com/plugin/30019-mcp-steroid
 
 The plugin enters the JetBrains review queue and will be listed once approved.
 
-### Stage 8: Website Deployment
+### Stage 9: Website Deployment
 
 No manual action needed. The GitHub Actions workflow
 (`.github/workflows/github-pages.yml`) triggers automatically on the push from Stage 4
@@ -158,7 +197,7 @@ gh run list --repo jonnyzzz/mcp-steroid --limit 5
 
 Wait for the "Deploy to GitHub Pages" run to succeed.
 
-### Stage 9: Mark Older Releases Obsolete (Optional)
+### Stage 10: Mark Older Releases Obsolete (Optional)
 
 The website template automatically renders an obsolete banner on older release pages
 (handled by `layouts/releases/single.html` — no manual content changes needed).
@@ -167,6 +206,7 @@ The website template automatically renders an obsolete banner on older release p
 
 | File | Purpose |
 |------|---------|
+| `CONTRIBUTORS.md` | Contributor acknowledgements (update each release) |
 | `VERSION` | Current plugin version (`X.Y.Z`) |
 | `EULA` | End User License Agreement (uploaded to GitHub releases) |
 | `release/notes/<version>.md` | Release notes (used as GitHub release body) |
