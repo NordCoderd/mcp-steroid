@@ -427,7 +427,7 @@ The plugin (v2.11.0 in project, v2.14.0 latest) resolves IDEs in two modes:
 - **Maven mode** (`useInstaller = false`): Resolves from Maven repos (`snapshots()`, `nightly()`). Required for snapshot/nightly versions.
 
 Nightly builds (`262-SNAPSHOT`) require:
-1. `nightly()` repo (points to `repo.labs.intellij.net` — internal JetBrains network)
+1. `nightly()` repo (`https://www.jetbrains.com/intellij-repository/nightly` — may require authentication/VPN; source: [Constants.kt#L250](https://github.com/JetBrains/intellij-platform-gradle-plugin/blob/12b993e2a56a66c6fdde72deb0bebb02a1635622/src/main/kotlin/org/jetbrains/intellij/platform/gradle/Constants.kt#L250))
 2. `useInstaller = false` (Maven resolution, not installer download)
 3. Plugin version ≥ 2.14.0 (v2.11.0 doesn't handle nightly snapshots correctly)
 
