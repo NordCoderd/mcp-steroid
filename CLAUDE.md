@@ -392,9 +392,25 @@ Get services: `project.service<MyService>()` or `service<AppService>()`
 - Never catch `ProcessCanceledException` — rethrow it
 - Use `Logger.getInstance(MyClass::class.java)` for logging
 
-## Multi-Version Build Compatibility Tests
+## Multi-Version Compatibility Strategy
 
-Docker-based integration tests that validate the plugin compiles against multiple IntelliJ Platform versions.
+**Strategy: build against 253, run the same binary on 261 and 262.**
+
+The plugin is always compiled against IntelliJ 2025.3 (253). The same binary is then validated
+against newer IDE versions via two independent test suites:
+
+| Test | What it validates | How |
+|------|------------------|-----|
+| `PluginBuildCompatibilityTest` | Plugin **compiles** against newer SDKs | Docker + `./gradlew buildPlugin` with patched versions |
+| `PluginVerificationTest` | Built binary is **API-compatible** with newer IDEs | Docker + Plugin Verifier (`verifyPlugin`) |
+| `PluginRuntimeCompatibilityTest` | Plugin **runs** correctly in newer IDEs | Docker IDE container + MCP tool calls |
+
+The runtime test specifically exercises `list_windows` which triggers mcp-steroid#18
+(ClassCastException on the `kotlin.Pair` vs `c.i.o.u.Pair` type change in 262).
+
+### Build Compatibility Tests
+
+Docker-based tests that validate the plugin compiles against multiple IntelliJ Platform versions.
 Located in `test-integration/.../PluginBuildCompatibilityTest.kt`.
 
 ```bash
@@ -435,6 +451,19 @@ Source: cloned at `~/Work/intellij-platform-gradle-plugin/` — key files:
 - `IntelliJPlatformDependenciesHelper.kt` — dependency resolution, `useInstaller` default
 - `IntelliJPlatformRepositoriesExtension.kt` — `nightly()` repo definition
 - `RequestedIntelliJPlatformsService.kt` — snapshot version pattern matching
+
+### Runtime Compatibility Tests
+
+Validates the 253-built plugin works when loaded into newer IDEs at runtime.
+Located in `test-integration/.../PluginRuntimeCompatibilityTest.kt`.
+
+```bash
+./gradlew :test-integration:test --tests '*PluginRuntimeCompatibilityTest*'
+```
+
+Each test starts a full IntelliJ IDE in Docker with the pre-built plugin installed,
+then calls `list_projects`, `list_windows`, and `execute_code` via MCP HTTP.
+The `list_windows` call exercises the code path affected by mcp-steroid#18.
 
 ## Plugin Deployment
 
