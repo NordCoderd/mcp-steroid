@@ -23,10 +23,7 @@ import java.util.concurrent.TimeUnit
  *
  * Each test mounts the local project into a Docker container, cleans ignored files via
  * `git clean`, copies the clean tree to a build directory with persistent Gradle and
- * IntelliJ Platform caches, and runs `./gradlew :ij-plugin:buildPlugin`.
- *
- * When the target IDE bundles a newer Kotlin than the project default, a [kotlinVersion]
- * patch is applied to the root build.gradle.kts before the build.
+ * IntelliJ Platform caches, applies version patches, and runs `./gradlew :ij-plugin:buildPlugin`.
  *
  * Run:
  *   ./gradlew :test-integration:test --tests '*PluginBuildCompatibilityTest*'
@@ -68,19 +65,19 @@ class PluginBuildCompatibilityTest {
     @Test
     @Timeout(value = 30, unit = TimeUnit.MINUTES)
     fun `build plugin with IntelliJ 2026_1`() =
-        buildPluginWithVersion("2026.1", kotlinVersion = "2.4.0-Beta1")
+        buildPluginWithVersion("2026.1", patches = KOTLIN_2_4_PATCHES)
 
-    // 262-SNAPSHOT requires the nightly repo which is not publicly accessible.
-    // Enable when 2026.2 EAP is published to the snapshots repo.
-    // @Test
-    // @Timeout(value = 30, unit = TimeUnit.MINUTES)
-    // fun `build plugin with IntelliJ 262 nightly`() =
-    //     buildPluginWithVersion("262-SNAPSHOT", kotlinVersion = "2.4.0-Beta1", useNightlyRepo = true)
+    // Reproduces mcp-steroid#18: 262 changed StatusBarEx.getBackgroundProcessModels()
+    // return type from c.i.o.u.Pair to kotlin.Pair. Building against 262 SDK exposes the issue.
+    // Requires nightly repo (internal JetBrains network — repo.labs.intellij.net).
+    @Test
+    @Timeout(value = 30, unit = TimeUnit.MINUTES)
+    fun `build plugin with IntelliJ 262 nightly`() =
+        buildPluginWithVersion("262-SNAPSHOT", patches = SNAPSHOT_262_PATCHES)
 
     private fun buildPluginWithVersion(
         platformVersion: String,
-        kotlinVersion: String? = null,
-        useNightlyRepo: Boolean = false,
+        patches: List<SedPatch> = emptyList(),
     ) = runWithCloseableStack { lifetime ->
         val container = startDockerContainerAndDispose(
             lifetime,
@@ -95,7 +92,7 @@ class PluginBuildCompatibilityTest {
                 ),
         )
 
-        // Copy project into container, clean ignored files, then copy clean tree to build dir with caches
+        // Copy project into container, clean ignored files, copy clean tree to build dir with caches
         container.startProcessInContainer {
             this
                 .args(
@@ -112,33 +109,14 @@ class PluginBuildCompatibilityTest {
                 .timeoutSeconds(120)
         }.assertExitCode(0) { "Failed to prepare build tree: $stderr" }
 
-        // Patch Kotlin version in root build.gradle.kts when the target IDE needs a newer compiler
-        if (kotlinVersion != null) {
+        // Apply sed patches to build files
+        for (patch in patches) {
             container.startProcessInContainer {
                 this
-                    .args(
-                        "sed", "-i",
-                        "s/kotlin(\"jvm\") version \"[^\"]*\"/kotlin(\"jvm\") version \"$kotlinVersion\"/;" +
-                            "s/kotlin(\"plugin.serialization\") version \"[^\"]*\"/kotlin(\"plugin.serialization\") version \"$kotlinVersion\"/",
-                        "$BUILD_GUEST/build.gradle.kts",
-                    )
-                    .description("Patch Kotlin version to $kotlinVersion")
+                    .args("sed", "-i", patch.expression, "$BUILD_GUEST/${patch.file}")
+                    .description(patch.description)
                     .timeoutSeconds(5)
-            }.assertExitCode(0) { "Failed to patch Kotlin version: $stderr" }
-        }
-
-        // Add nightly repository for unreleased IDE versions (262-SNAPSHOT etc.)
-        if (useNightlyRepo) {
-            container.startProcessInContainer {
-                this
-                    .args(
-                        "sed", "-i",
-                        "s/defaultRepositories()/defaultRepositories()\\n        nightly()/",
-                        "$BUILD_GUEST/ij-plugin/build.gradle.kts",
-                    )
-                    .description("Add nightly repo")
-                    .timeoutSeconds(5)
-            }.assertExitCode(0) { "Failed to add nightly repo: $stderr" }
+            }.assertExitCode(0) { "Failed to apply patch '${patch.description}': $stderr" }
         }
 
         // Build the plugin
@@ -168,8 +146,45 @@ class PluginBuildCompatibilityTest {
     }
 }
 
+private data class SedPatch(val file: String, val expression: String, val description: String)
+
 private const val SRC_GUEST = "/mnt/project"
 private const val PREBUILD_GUEST = "/tmp/prebuild"
 private const val BUILD_GUEST = "/build"
 private const val GRADLE_HOME_GUEST = "/cache/gradle-home"
 private const val IJ_PLATFORM_GUEST = "/cache/ij-platform"
+
+/** Patches to upgrade Kotlin to 2.4.0-Beta1 (needed for IntelliJ 2026.1+ which bundles Kotlin metadata 2.4.0) */
+private val KOTLIN_2_4_PATCHES = listOf(
+    SedPatch(
+        file = "build.gradle.kts",
+        expression = """s/kotlin("jvm") version "[^"]*"/kotlin("jvm") version "2.4.0-Beta1"/;""" +
+            """s/kotlin("plugin.serialization") version "[^"]*"/kotlin("plugin.serialization") version "2.4.0-Beta1"/""",
+        description = "Patch Kotlin version to 2.4.0-Beta1",
+    ),
+)
+
+/**
+ * Patches for building against 262-SNAPSHOT (nightly):
+ * - Kotlin 2.4.0-Beta1 (262 bundles Kotlin metadata 2.4.0)
+ * - Plugin version 2.14.0 (2.11.0 doesn't resolve nightly snapshots correctly)
+ * - useInstaller = false (snapshots are Maven artifacts, not installer downloads)
+ * - nightly() repo (262-SNAPSHOT is only in the nightly Maven repository)
+ */
+private val SNAPSHOT_262_PATCHES = KOTLIN_2_4_PATCHES + listOf(
+    SedPatch(
+        file = "build.gradle.kts",
+        expression = """s/id("org.jetbrains.intellij.platform") version "[^"]*"/id("org.jetbrains.intellij.platform") version "2.14.0"/""",
+        description = "Bump IntelliJ Platform Gradle Plugin to 2.14.0",
+    ),
+    SedPatch(
+        file = "ij-plugin/build.gradle.kts",
+        expression = """s/intellijIdeaUltimate(targetIdeVersion)/intellijIdeaUltimate(targetIdeVersion) { useInstaller = false }/""",
+        description = "Disable installer mode for Maven snapshot resolution",
+    ),
+    SedPatch(
+        file = "ij-plugin/build.gradle.kts",
+        expression = """s/defaultRepositories()/defaultRepositories()\n        nightly()/""",
+        description = "Add nightly repo for 262-SNAPSHOT",
+    ),
+)

@@ -392,6 +392,50 @@ Get services: `project.service<MyService>()` or `service<AppService>()`
 - Never catch `ProcessCanceledException` — rethrow it
 - Use `Logger.getInstance(MyClass::class.java)` for logging
 
+## Multi-Version Build Compatibility Tests
+
+Docker-based integration tests that validate the plugin compiles against multiple IntelliJ Platform versions.
+Located in `test-integration/.../PluginBuildCompatibilityTest.kt`.
+
+```bash
+# Run all build compat tests
+./gradlew :test-integration:test --tests '*PluginBuildCompatibilityTest*'
+
+# Run specific version
+./gradlew :test-integration:test --tests '*PluginBuildCompatibilityTest.build plugin with IntelliJ 2025_3*'
+```
+
+### How It Works
+
+Each test mounts the project read-only into a Docker container (`dev-build` image: Debian + JDK 21 + git),
+copies to a build dir, cleans with `git clean -fdx`, applies version patches via `sed`, then runs
+`./gradlew :ij-plugin:buildPlugin`. Persistent caches under `build/build-compat/` (Gradle home,
+`.intellijPlatform`) make re-runs fast.
+
+### Version Patches
+
+| Target IDE | Patches needed |
+|------------|---------------|
+| 2025.3 | None (project default) |
+| 2026.1 | Kotlin → 2.4.0-Beta1 (IDE bundles metadata 2.4.0) |
+| 262-SNAPSHOT | Kotlin → 2.4.0-Beta1 + plugin 2.14.0 + `useInstaller = false` + `nightly()` repo |
+
+### IntelliJ Platform Gradle Plugin — Snapshot Resolution
+
+The plugin (v2.11.0 in project, v2.14.0 latest) resolves IDEs in two modes:
+- **Installer mode** (`useInstaller = true`, default): Downloads `.zip`/`.dmg` from `download.jetbrains.com`. Works for releases only.
+- **Maven mode** (`useInstaller = false`): Resolves from Maven repos (`snapshots()`, `nightly()`). Required for snapshot/nightly versions.
+
+Nightly builds (`262-SNAPSHOT`) require:
+1. `nightly()` repo (points to `repo.labs.intellij.net` — internal JetBrains network)
+2. `useInstaller = false` (Maven resolution, not installer download)
+3. Plugin version ≥ 2.14.0 (v2.11.0 doesn't handle nightly snapshots correctly)
+
+Source: cloned at `~/Work/intellij-platform-gradle-plugin/` — key files:
+- `IntelliJPlatformDependenciesHelper.kt` — dependency resolution, `useInstaller` default
+- `IntelliJPlatformRepositoriesExtension.kt` — `nightly()` repo definition
+- `RequestedIntelliJPlatformsService.kt` — snapshot version pattern matching
+
 ## Plugin Deployment
 
 ```bash
