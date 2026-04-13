@@ -17,14 +17,18 @@ name: Build Plugin
 on:
   push:
     branches: [main]
-  pull_request:
+  # PR commits don't auto-trigger — use `workflow_dispatch` with the PR's head
+  # branch to kick a build explicitly when you want one. This keeps the Actions
+  # quota focused on main (where the published plugin lives) and avoids racing
+  # builds on noisy PR branches.
   workflow_dispatch:
 
 concurrency:
+  # One run per ref. A new push to the same ref (main or a branch we explicitly
+  # dispatched against) cancels the in-flight outdated one — earlier bytes are
+  # never published, so there's no build record to preserve.
   group: build-plugin-${{ github.ref }}
-  # For PRs we cancel outdated in-flight runs to save minutes; pushes to main
-  # carry their own ref group and complete to preserve the build record.
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: true
 
 # Opt JavaScript actions (actions/checkout, actions/upload-artifact) onto Node 24.
 # Node 20 is deprecated on GitHub-hosted runners and will be removed 2026-09-16.
@@ -107,9 +111,6 @@ jobs:
         run: ls -la ij-plugin/build/distributions/
 
       - name: Upload plugin artifact
-        # PRs test + build to validate the change but don't need a long-term
-        # artifact — only push-to-main runs upload.
-        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: mcp-steroid-plugin-${{ steps.version.outputs.version }}

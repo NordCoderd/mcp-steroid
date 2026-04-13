@@ -28,8 +28,10 @@ permissions:
   id-token: write
 
 concurrency:
+  # New commit → cancel the in-flight Pages build. Only the latest bytes ever
+  # get deployed, so earlier runs finishing is wasted effort.
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
