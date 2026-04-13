@@ -41,14 +41,6 @@ repositories {
 
     intellijPlatform {
         defaultRepositories()
-        // `snapshots()` serves published EAP snapshots for already-released majors
-        // (e.g. `253-EAP-SNAPSHOT`, `261-EAP-SNAPSHOT`).
-        snapshots()
-        // `nightly()` serves pre-EAP trunk builds for upcoming majors (currently 262
-        // → `262-SNAPSHOT`, plus the `LATEST-TRUNK-SNAPSHOT` alias). Some artifacts
-        // on this repo require the JetBrains internal network — see
-        // https://www.jetbrains.com/intellij-repository/nightly/.
-        nightly()
     }
 }
 
@@ -188,6 +180,7 @@ intellijPlatform {
         ides {
             create(IntelliJPlatformType.IntellijIdeaUltimate, "2025.3") { useInstaller = true }
             create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.1") { useInstaller = true }
+            //TODO: Setup 262 tests
         }
     }
 }
