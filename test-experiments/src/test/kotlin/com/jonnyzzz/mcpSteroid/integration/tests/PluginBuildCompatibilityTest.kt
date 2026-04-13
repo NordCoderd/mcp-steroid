@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
  * Build compatibility: validates the plugin compiles against multiple IntelliJ Platform versions.
  *
  * Run:
- *   ./gradlew :test-integration:test --tests '*PluginBuildCompatibilityTest*'
+ *   ./gradlew :test-experiments:test --tests '*PluginBuildCompatibilityTest*'
  */
 class PluginBuildCompatibilityTest {
 
@@ -59,7 +59,7 @@ class PluginBuildCompatibilityTest {
  * binary incompatibilities before they reach users.
  *
  * Run:
- *   ./gradlew :test-integration:test --tests '*PluginVerificationTest*'
+ *   ./gradlew :test-experiments:test --tests '*PluginVerificationTest*'
  */
 class PluginVerificationTest {
 
