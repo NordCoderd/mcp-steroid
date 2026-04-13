@@ -39,8 +39,15 @@ env:
 # buildserver.labs.intellij.net (TeamCity) for the same project:
 #
 #   build-number  ←  `build number`     (pure version-string emitter)
-#   test          ←  `ij-plugin test`   (runs :buildPluginTests)
 #   build-plugin  ←  `build plugin`     (packages the .zip via buildPluginOnCI)
+#
+# Plugin tests (`:buildPluginTests` on TC's `ij-plugin test (Linux|Windows|macOS)`
+# configurations) are intentionally NOT mirrored here. They take 15+ minutes on
+# a GitHub-hosted ubuntu-latest runner — long enough that pushes regularly
+# cancel-in-progress before they complete — whereas TC's internal agents run
+# them in 3–5 minutes. The GH Actions pipeline is scoped to "build the
+# publishable plugin zip on every commit to main"; full test coverage stays on
+# buildserver.labs.intellij.net, where the agents are fast enough.
 #
 # Each job gets its own runner, its own `actions/checkout`, and its own
 # `docker/build` image build. That's some duplicated CPU, but it keeps each
@@ -73,55 +80,9 @@ jobs:
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
           echo "Plugin build number: ${new_version}"
 
-  test:
-    name: test
-    needs: build-number
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build Docker build image
-        run: docker build -t mcp-steroid-build:ci docker/build
-
-      - name: Run :test of every plugin module (Docker)
-        # Same `buildPluginTests` aggregator TeamCity runs for its per-OS
-        # `ij-plugin test (Linux|Windows|macOS)` configurations — keeps GH
-        # Actions and buildserver.labs.intellij.net in lockstep on what
-        # "plugin tests" means. Exclusion list lives in the root
-        # build.gradle.kts (`nonPluginTestSubprojects`), so scoping changes
-        # are a one-line edit there with no CI changes.
-        run: |
-          set -euo pipefail
-          mkdir -p "$GITHUB_WORKSPACE/.gradle-home"
-          docker run --rm \
-            -u "$(id -u):$(id -g)" \
-            -e HOME=/tmp \
-            -e GRADLE_USER_HOME=/build/.gradle-home \
-            -v "$GITHUB_WORKSPACE:/build" \
-            -w /build \
-            mcp-steroid-build:ci \
-            ./gradlew buildPluginTests \
-              --no-daemon \
-              --stacktrace
-
-      - name: Upload test reports (on failure)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-reports-${{ needs.build-number.outputs.version }}
-          path: |
-            **/build/reports/tests/
-            **/build/test-results/
-          if-no-files-found: ignore
-          retention-days: 14
-
   build-plugin:
     name: build plugin
-    # Tests gate the package build: a regression fails the pipeline before we
-    # spend time packaging a broken plugin zip.
-    needs: [build-number, test]
+    needs: build-number
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
