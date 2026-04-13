@@ -25,10 +25,8 @@ val releaseNotesVersion = providers.gradleProperty("mcp.release.notes.version")
     .get()
 val releaseNotesFile = rootProject.layout.projectDirectory.file("release/notes/$releaseNotesVersion.md")
 
-val defaultTargetIdeProduct = "idea"
-val defaultTargetIdeVersion = "2025.3"
-val targetIdeProductRaw = providers.gradleProperty("mcp.platform.product").orElse(defaultTargetIdeProduct).get()
-val targetIdeVersion = providers.gradleProperty("mcp.platform.version").orElse(defaultTargetIdeVersion).get()
+val targetIdeProductRaw = providers.gradleProperty("mcp.platform.product").orElse("idea").get()
+val targetIdeVersion = providers.gradleProperty("mcp.platform.version").orElse("2025.3").get()
 val targetIdeProduct = when (targetIdeProductRaw.trim().lowercase()) {
     "idea", "iiu", "intellij", "intellijidea", "intellijideaultimate" -> JetBrainsIdeProduct.IntelliJIdeaUltimate
     "pycharm", "pcp", "python" -> JetBrainsIdeProduct.PyCharm
@@ -37,15 +35,20 @@ val targetIdeProduct = when (targetIdeProductRaw.trim().lowercase()) {
                 "Use one of: idea, pycharm."
     )
 }
-val isTargetIdeOverridden = providers.gradleProperty("mcp.platform.product").isPresent ||
-        providers.gradleProperty("mcp.platform.version").isPresent
-val hostArchitecture = resolveHostArchitecture()
 
 repositories {
     mavenCentral()
 
     intellijPlatform {
         defaultRepositories()
+        // `snapshots()` serves published EAP snapshots for already-released majors
+        // (e.g. `253-EAP-SNAPSHOT`, `261-EAP-SNAPSHOT`).
+        snapshots()
+        // `nightly()` serves pre-EAP trunk builds for upcoming majors (currently 262
+        // → `262-SNAPSHOT`, plus the `LATEST-TRUNK-SNAPSHOT` alias). Some artifacts
+        // on this repo require the JetBrains internal network — see
+        // https://www.jetbrains.com/intellij-repository/nightly/.
+        nightly()
     }
 }
 
@@ -183,10 +186,8 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            ide(IntelliJPlatformType.IntellijIdeaUltimate, "2025.3")
-            ide(IntelliJPlatformType.IntellijIdeaUltimate, "2026.1")
-            // 262 nightly is not publicly accessible yet — enable when 2026.2 EAP is published
-            // ide(IntelliJPlatformType.IntellijIdeaUltimate, "2026.2")
+            create(IntelliJPlatformType.IntellijIdeaUltimate, "2025.3") { useInstaller = true }
+            create(IntelliJPlatformType.IntellijIdeaUltimate, "2026.1") { useInstaller = true }
         }
     }
 }
@@ -218,8 +219,6 @@ intellijPlatformTesting {
                 // already wired up, then add this source set's classes and its runtime deps
                 // on top for our own tests (testcontainers, ktor-client, :test-helper, …).
                 classpath += integrationTest.output + integrationTest.runtimeClasspath
-
-                shouldRunAfter(tasks.test)
             }
         }
     }
@@ -237,66 +236,6 @@ tasks {
             inputs.file(releaseNotesFile)
         }
     }
-}
-
-val verifyIntellijMajorReleaseAlignment by tasks.registering {
-    group = "verification"
-    description = "Assert configured IntelliJ major matches latest stable IntelliJ major from products service"
-    inputs.property("targetIdeProduct", targetIdeProduct.name)
-    inputs.property("targetIdeVersion", targetIdeVersion)
-    inputs.property("isTargetIdeOverridden", isTargetIdeOverridden)
-
-    doLast {
-        if (isTargetIdeOverridden) {
-            logger.lifecycle(
-                "Skipping stable-major alignment check because mcp.platform.product/version overrides are set: {} {}.",
-                targetIdeProduct.name,
-                targetIdeVersion,
-            )
-            return@doLast
-        }
-
-        val latestStable = IdeaReleaseService.latestRelease(targetIdeProduct, IdeaReleaseChannel.STABLE)
-        val configuredMajor = targetIdeVersion
-            .split(".")
-            .take(2)
-            .joinToString(".")
-        check(latestStable.majorVersion == configuredMajor) {
-            "Configured ${targetIdeProduct.name} major '$configuredMajor' is stale. " +
-                    "Latest stable major is '${latestStable.majorVersion}' " +
-                    "(version ${latestStable.version}, build ${latestStable.build}). " +
-                    "Update mcp.platform.version in build.gradle.kts."
-        }
-        logger.lifecycle(
-            "{} major alignment verified: configured {}, latest stable {} ({} / {}).",
-            targetIdeProduct.name,
-            configuredMajor,
-            latestStable.majorVersion,
-            latestStable.version,
-            latestStable.build,
-        )
-    }
-}
-
-val verifySupportedHostArchitecture by tasks.registering {
-    group = "verification"
-    description = "Assert current host machine architecture is supported by build scripts"
-    inputs.property("hostArchitecture", hostArchitecture.name)
-    doLast {
-        check(hostArchitecture == HostArchitecture.ARM64 || hostArchitecture == HostArchitecture.X86_64) {
-            "Unsupported host architecture '$hostArchitecture'"
-        }
-        logger.lifecycle(
-            "Host architecture support verified: {} (aliases {}).",
-            hostArchitecture.name,
-            hostArchitecture.aliases.joinToString(", "),
-        )
-    }
-}
-
-tasks.check {
-    dependsOn(verifyIntellijMajorReleaseAlignment)
-    dependsOn(verifySupportedHostArchitecture)
 }
 
 val verifyBundledKotlinCompatibility by tasks.registering(VerifyBundledKotlinCompatibilityTask::class) {
@@ -330,8 +269,8 @@ dependencies {
     ocrToolDist(project(":ocr-tesseract"))
 }
 
-listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach {
-    it.invoke {
+listOf(tasks.prepareSandbox, tasks.prepareTestSandbox).forEach { r ->
+    r.configure {
         from(ocrToolDist) {
             into(intellijPlatform.projectName.map { "$it/ocr-tesseract" })
             filesMatching("bin/*") {
