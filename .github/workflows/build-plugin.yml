@@ -132,6 +132,13 @@ jobs:
         run: docker build -t mcp-steroid-build:ci docker/build
 
       - name: Build plugin (Docker)
+        # Gradle picks up the full version string from the BUILD_NUMBER env var
+        # (build.gradle.kts falls back to it when -Pmcp.build.version is unset,
+        # requiring a dash to distinguish it from a raw CI counter). Keeps GH
+        # and TeamCity on the same code path — TC gets BUILD_NUMBER from its
+        # buildNumberPattern; here we set it explicitly from the upstream job.
+        env:
+          BUILD_NUMBER: ${{ needs.build-number.outputs.version }}
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.gradle-home"
@@ -139,11 +146,11 @@ jobs:
             -u "$(id -u):$(id -g)" \
             -e HOME=/tmp \
             -e GRADLE_USER_HOME=/build/.gradle-home \
+            -e BUILD_NUMBER \
             -v "$GITHUB_WORKSPACE:/build" \
             -w /build \
             mcp-steroid-build:ci \
             ./gradlew buildPluginOnCI \
-              -Pmcp.build.version='${{ needs.build-number.outputs.version }}' \
               --no-daemon \
               --stacktrace
 
