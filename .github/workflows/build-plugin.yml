@@ -17,11 +17,14 @@ name: Build Plugin
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 concurrency:
   group: build-plugin-${{ github.ref }}
-  cancel-in-progress: false
+  # For PRs we cancel outdated in-flight runs to save minutes; pushes to main
+  # carry their own ref group and complete to preserve the build record.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Opt JavaScript actions (actions/checkout, actions/upload-artifact) onto Node 24.
 # Node 20 is deprecated on GitHub-hosted runners and will be removed 2026-09-16.
@@ -50,10 +53,44 @@ jobs:
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
           echo "Plugin build number: ${new_version}"
 
-      - name: Build plugin (Docker)
+      - name: Run plugin tests (Docker)
+        # Same `buildPluginTests` aggregator TeamCity runs for its per-OS
+        # `ij-plugin test (Linux|Windows|macOS)` configurations — keeps GH
+        # Actions and buildserver.labs.intellij.net in lockstep on what
+        # "plugin tests" means. Exclusion list lives in the root
+        # build.gradle.kts (`nonPluginTestSubprojects`), so scoping changes
+        # are a one-line edit there with no CI changes.
+        #
+        # Run BEFORE buildPluginOnCI so a test regression fails the pipeline
+        # before we spend time packaging a broken plugin zip.
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.gradle-home"
+          docker run --rm \
+            -u "$(id -u):$(id -g)" \
+            -e HOME=/tmp \
+            -e GRADLE_USER_HOME=/build/.gradle-home \
+            -v "$GITHUB_WORKSPACE:/build" \
+            -w /build \
+            mcp-steroid-build:ci \
+            ./gradlew buildPluginTests \
+              --no-daemon \
+              --stacktrace
+
+      - name: Upload test reports (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-${{ steps.version.outputs.version }}
+          path: |
+            **/build/reports/tests/
+            **/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Build plugin (Docker)
+        run: |
+          set -euo pipefail
           docker run --rm \
             -u "$(id -u):$(id -g)" \
             -e HOME=/tmp \
@@ -70,6 +107,9 @@ jobs:
         run: ls -la ij-plugin/build/distributions/
 
       - name: Upload plugin artifact
+        # PRs test + build to validate the change but don't need a long-term
+        # artifact — only push-to-main runs upload.
+        if: github.event_name == 'push'
         uses: actions/upload-artifact@v4
         with:
           name: mcp-steroid-plugin-${{ steps.version.outputs.version }}
