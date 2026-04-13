@@ -121,6 +121,20 @@ dependencies {
     testImplementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 }
 
+// Dedicated source set for Docker-based CLI integration tests (CliClaudeIntegrationTest,
+// CliCodexIntegrationTest, CliGeminiIntegrationTest, etc.). These extend BasePlatformTestCase
+// and need the full IntelliJ Platform test framework classpath, but they spin up Docker
+// containers and require API keys, so they are NOT part of the default `:ij-plugin:test` run.
+// Invoke explicitly via `./gradlew :ij-plugin:integrationTest`.
+val integrationTest: SourceSet by sourceSets.creating {
+    compileClasspath += sourceSets["main"].output + sourceSets["test"].output +
+            sourceSets["test"].compileClasspath
+    runtimeClasspath += output + compileClasspath + sourceSets["test"].runtimeClasspath
+}
+
+configurations["integrationTestImplementation"].extendsFrom(configurations["testImplementation"])
+configurations["integrationTestRuntimeOnly"].extendsFrom(configurations["testRuntimeOnly"])
+
 kotlin {
     jvmToolchain(21)
 }
@@ -173,6 +187,40 @@ intellijPlatform {
             ide(IntelliJPlatformType.IntellijIdeaUltimate, "2026.1")
             // 262 nightly is not publicly accessible yet — enable when 2026.2 EAP is published
             // ide(IntelliJPlatformType.IntellijIdeaUltimate, "2026.2")
+        }
+    }
+}
+
+// Register a dedicated `integrationTest` task via the IntelliJ Platform testing DSL so it
+// gets its own sandbox (prepareSandbox_integrationTest) and the proper IDE JVM argument
+// providers, while compiling from `src/integrationTest/kotlin` instead of `src/test/kotlin`.
+intellijPlatformTesting {
+    testIde {
+        register("integrationTest") {
+            // Populates the suffixed intellijPlatformTestDependencies_integrationTest
+            // configuration with opentest4j + IntelliJ test framework JARs. Without this
+            // the test JVM hits NoClassDefFoundError on org.opentest4j.AssertionFailedError.
+            testFramework(TestFrameworkType.Platform)
+
+            task {
+                group = "verification"
+                description = "Runs Docker-based CLI integration tests (Claude/Codex/Gemini). " +
+                        "Requires Docker and API keys. Not run by default `:ij-plugin:test`."
+                useJUnit()
+
+                // Replace (not append) testClassesDirs: the TestIdeTask default includes
+                // the plugin's instrumented default-test-set classes — keeping them would
+                // run every regular test alongside the Cli*IntegrationTest classes.
+                testClassesDirs = integrationTest.output.classesDirs
+
+                // Additive on classpath: preserve the IntelliJ Platform JARs +
+                // test framework that TestIdeTask.configuration (registration-time lambda)
+                // already wired up, then add this source set's classes and its runtime deps
+                // on top for our own tests (testcontainers, ktor-client, :test-helper, …).
+                classpath += integrationTest.output + integrationTest.runtimeClasspath
+
+                shouldRunAfter(tasks.test)
+            }
         }
     }
 }
