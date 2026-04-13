@@ -23,6 +23,11 @@ concurrency:
   group: build-plugin-${{ github.ref }}
   cancel-in-progress: false
 
+# Opt JavaScript actions (actions/checkout, actions/upload-artifact) onto Node 24.
+# Node 20 is deprecated on GitHub-hosted runners and will be removed 2026-09-16.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     runs-on: ubuntu-latest
