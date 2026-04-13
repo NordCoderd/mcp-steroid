@@ -1,7 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.integration.tests
 
-import com.jonnyzzz.mcpSteroid.integration.infra.IdeTestFolders
 import com.jonnyzzz.mcpSteroid.testHelper.ProjectHomeDirectory
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerDriver
 import com.jonnyzzz.mcpSteroid.testHelper.docker.ContainerVolume
@@ -112,7 +111,7 @@ private object BuildCompatInfra {
         if (::buildImage.isInitialized) return
         buildImage = buildDockerImage(
             logPrefix = "build-compat",
-            dockerfilePath = File(IdeTestFolders.dockerDir, "dev-build/Dockerfile"),
+            dockerfilePath = File(projectHome, "docker/build/Dockerfile"),
             timeoutSeconds = 600,
             quietly = true,
         )

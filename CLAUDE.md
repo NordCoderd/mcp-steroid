@@ -423,7 +423,7 @@ Located in `test-integration/.../PluginBuildCompatibilityTest.kt`.
 
 ### How It Works
 
-Each test mounts the project read-only into a Docker container (`dev-build` image: Debian + JDK 21 + git),
+Each test mounts the project read-only into a Docker container (`docker/build` image: Debian + JDK 21 + git),
 copies to a build dir, cleans with `git clean -fdx`, applies version patches via `sed`, then runs
 `./gradlew :ij-plugin:buildPlugin`. Persistent caches under `build/build-compat/` (Gradle home,
 `.intellijPlatform`) make re-runs fast.
