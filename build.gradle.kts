@@ -38,10 +38,15 @@ val isGhBuild = parseBooleanProperty(
     propertyName = "mcp.gh.build",
     raw = providers.gradleProperty("mcp.gh.build").orElse("false").get()
 )
+val isJbBuild = parseBooleanProperty(
+    propertyName = "mcp.jb.build",
+    raw = providers.gradleProperty("mcp.jb.build").orElse("false").get()
+)
 val snapshotTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
 version = when {
     isReleaseBuild -> "$baseVersion-$gitHash"
     isGhBuild -> "$baseVersion-SNAPSHOT-GH-$gitHash"
+    isJbBuild -> "$baseVersion-SNAPSHOT-JB-$gitHash"
     else -> "$baseVersion-SNAPSHOT-$snapshotTimestamp-$gitHash"
 }
 val releaseNotesVersion = providers.gradleProperty("mcp.release.notes.version").orElse(baseVersion).get()
