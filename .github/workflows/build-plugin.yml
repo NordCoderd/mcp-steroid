@@ -35,19 +35,35 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
+# The workflow is split into independent jobs that mirror what we have on
+# buildserver.labs.intellij.net (TeamCity) for the same project:
+#
+#   build-number  ←  `build number`     (pure version-string emitter)
+#   test          ←  `ij-plugin test`   (runs :buildPluginTests)
+#   build-plugin  ←  `build plugin`     (packages the .zip via buildPluginOnCI)
+#
+# Each job gets its own runner, its own `actions/checkout`, and its own
+# `docker/build` image build. That's some duplicated CPU, but it keeps each
+# job independently re-runnable and makes room for additional jobs (plugin
+# verifier, website, release compat matrix, …) to hang off `needs:
+# build-number` in parallel without turning the file into a single giant
+# linear recipe.
 jobs:
-  build:
+  build-number:
+    name: build number
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 2
+    outputs:
+      # Downstream jobs read the computed version via ${{ needs.build-number.outputs.version }}.
+      version: ${{ steps.version.outputs.version }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Build Docker build image
-        run: docker build -t mcp-steroid-build:ci docker/build
-
       - name: Compute plugin build number
         id: version
+        # Mirrors the `build number` TC config: <VERSION>.<run-counter>-gh-<short-sha>.
+        # build.gradle.kts asserts this exact format (`mcp.build.version` regex).
         run: |
           set -euo pipefail
           base="$(tr -d '[:space:]' < VERSION)"
@@ -57,16 +73,25 @@ jobs:
           echo "version=${new_version}" >> "$GITHUB_OUTPUT"
           echo "Plugin build number: ${new_version}"
 
-      - name: Run plugin tests (Docker)
+  test:
+    name: test
+    needs: build-number
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker build image
+        run: docker build -t mcp-steroid-build:ci docker/build
+
+      - name: Run :test of every plugin module (Docker)
         # Same `buildPluginTests` aggregator TeamCity runs for its per-OS
         # `ij-plugin test (Linux|Windows|macOS)` configurations — keeps GH
         # Actions and buildserver.labs.intellij.net in lockstep on what
         # "plugin tests" means. Exclusion list lives in the root
         # build.gradle.kts (`nonPluginTestSubprojects`), so scoping changes
         # are a one-line edit there with no CI changes.
-        #
-        # Run BEFORE buildPluginOnCI so a test regression fails the pipeline
-        # before we spend time packaging a broken plugin zip.
         run: |
           set -euo pipefail
           mkdir -p "$GITHUB_WORKSPACE/.gradle-home"
@@ -85,16 +110,31 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: test-reports-${{ steps.version.outputs.version }}
+          name: test-reports-${{ needs.build-number.outputs.version }}
           path: |
             **/build/reports/tests/
             **/build/test-results/
           if-no-files-found: ignore
           retention-days: 14
 
+  build-plugin:
+    name: build plugin
+    # Tests gate the package build: a regression fails the pipeline before we
+    # spend time packaging a broken plugin zip.
+    needs: [build-number, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker build image
+        run: docker build -t mcp-steroid-build:ci docker/build
+
       - name: Build plugin (Docker)
         run: |
           set -euo pipefail
+          mkdir -p "$GITHUB_WORKSPACE/.gradle-home"
           docker run --rm \
             -u "$(id -u):$(id -g)" \
             -e HOME=/tmp \
@@ -103,7 +143,7 @@ jobs:
             -w /build \
             mcp-steroid-build:ci \
             ./gradlew buildPluginOnCI \
-              -Pmcp.build.version='${{ steps.version.outputs.version }}' \
+              -Pmcp.build.version='${{ needs.build-number.outputs.version }}' \
               --no-daemon \
               --stacktrace
 
@@ -113,6 +153,6 @@ jobs:
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mcp-steroid-plugin-${{ steps.version.outputs.version }}
+          name: mcp-steroid-plugin-${{ needs.build-number.outputs.version }}
           path: ij-plugin/build/distributions/*.zip
           if-no-files-found: error
