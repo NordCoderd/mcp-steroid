@@ -65,24 +65,33 @@ suspend fun collectListWindowsResponse(): ListWindowsResponse {
                 val window = SwingUtilities.getWindowAncestor(component)
                 val bounds = window?.bounds
 
-                // Collect progress tasks from the status bar using new ProgressModel API
+                // Collect progress tasks from the status bar.
+                // Wrapped in try/catch because IntelliJ 262+ changed the return type of
+                // StatusBarEx.backgroundProcessModels from List<c.i.o.u.Pair> to
+                // List<kotlin.Pair>, causing ClassCastException when the plugin is built
+                // against 253. See mcp-steroid#18.
                 val statusBar = frame.statusBar as? StatusBarEx
                 statusBar?.let { bar ->
-                    val tasks = bar.backgroundProcessModels
-                    tasks.forEach { pair ->
-                        val taskInfo = pair.first
-                        val progressModel = pair.second
-                        allProgressTasks.add(
-                            ProgressTaskInfo(
-                                title = taskInfo.title,
-                                text = progressModel.getText() ?: "",
-                                text2 = progressModel.getDetails() ?: "",
-                                fraction = if (progressModel.isIndeterminate()) null else progressModel.getFraction(),
-                                isIndeterminate = progressModel.isIndeterminate(),
-                                isCancellable = progressModel.isCancellable(),
-                                projectName = project?.name
+                    try {
+                        val tasks = bar.backgroundProcessModels
+                        tasks.forEach { pair ->
+                            val taskInfo = pair.first
+                            val progressModel = pair.second
+                            allProgressTasks.add(
+                                ProgressTaskInfo(
+                                    title = taskInfo.title,
+                                    text = progressModel.getText() ?: "",
+                                    text2 = progressModel.getDetails() ?: "",
+                                    fraction = if (progressModel.isIndeterminate()) null else progressModel.getFraction(),
+                                    isIndeterminate = progressModel.isIndeterminate(),
+                                    isCancellable = progressModel.isCancellable(),
+                                    projectName = project?.name
+                                )
                             )
-                        )
+                        }
+                    } catch (_: ClassCastException) {
+                        // mcp-steroid#18: kotlin.Pair vs com.intellij.openapi.util.Pair
+                        // on IntelliJ 262+. Progress tasks are non-essential — skip them.
                     }
                 }
 
