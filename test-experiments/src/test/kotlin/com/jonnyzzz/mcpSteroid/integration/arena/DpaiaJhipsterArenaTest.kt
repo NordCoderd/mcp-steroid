@@ -98,12 +98,14 @@ class DpaiaJhipsterArenaTest {
             // ── Prewarm: compile Maven project (NOT counted in agent timer) ─────
             // This compiles Java sources and runs frontend-maven-plugin (npm install + webapp build).
             // After this, the agent can run tests immediately without waiting for compilation.
-            // Resolve JAVA_HOME symlink inside the container (mvnw validates it)
+            // Find the real JDK 21 path inside the container.
+            // The java-21-default symlink may not resolve correctly with mvnw, and the apt
+            // package name includes arch suffix (temurin-21-jdk-arm64/amd64).
             val javaHome = session.scope.startProcessInContainer {
-                this.args("readlink", "-f", "/usr/lib/jvm/java-21-default")
+                this.args("ls", "-d", "/usr/lib/jvm/temurin-21-*")
                     .timeoutSeconds(5)
-                    .description("Resolve JAVA_HOME symlink")
-            }.awaitForProcessFinish().stdout.trim()
+                    .description("Find JDK 21 path")
+            }.awaitForProcessFinish().stdout.trim().lines().first()
             println("[ARENA] Resolved JAVA_HOME=$javaHome")
 
             println("[ARENA] Prewarming: ./mvnw compile -DskipTests ...")

@@ -115,7 +115,6 @@ suspend fun collectListWindowsResponse(): ListWindowsResponse {
                             )
                         )
                     }
-
                 }
 
                 WindowInfo(
