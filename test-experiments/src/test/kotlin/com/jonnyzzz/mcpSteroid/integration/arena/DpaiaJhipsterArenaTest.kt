@@ -98,13 +98,21 @@ class DpaiaJhipsterArenaTest {
             // ── Prewarm: compile Maven project (NOT counted in agent timer) ─────
             // This compiles Java sources and runs frontend-maven-plugin (npm install + webapp build).
             // After this, the agent can run tests immediately without waiting for compilation.
+            // Resolve JAVA_HOME symlink inside the container (mvnw validates it)
+            val javaHome = session.scope.startProcessInContainer {
+                this.args("readlink", "-f", "/usr/lib/jvm/java-21-default")
+                    .timeoutSeconds(5)
+                    .description("Resolve JAVA_HOME symlink")
+            }.awaitForProcessFinish().stdout.trim()
+            println("[ARENA] Resolved JAVA_HOME=$javaHome")
+
             println("[ARENA] Prewarming: ./mvnw compile -DskipTests ...")
             val prewarmStart = System.currentTimeMillis()
             session.scope.startProcessInContainer {
                 this
                     .args("./mvnw", "compile", "-DskipTests", "-Dspotless.check.skip=true", "-B", "-q")
                     .workingDirInContainer(ideProjectDir)
-                    .addEnv("JAVA_HOME", "/usr/lib/jvm/java-21-default")
+                    .addEnv("JAVA_HOME", javaHome)
                     .timeoutSeconds(600)
                     .description("Maven compile prewarm for ${testCase.instanceId}")
             }.assertExitCode(0) { "Maven compile prewarm failed for ${testCase.instanceId}" }
