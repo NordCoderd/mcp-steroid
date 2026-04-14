@@ -44,11 +44,20 @@ kotlin {
 
 tasks.test {
     useJUnitPlatform()
-    // OCR tests need the tessdata files to be downloaded
-    dependsOn(downloadTessdata)
+    // Run against the installed distribution — matches production deployment and
+    // ensures native libraries (Tesseract/Leptonica) are in the correct directory
+    // structure for JNA/JavaCPP to load them on all platforms.
+    dependsOn(tasks.installDist)
     doFirst {
-        // Set tessdata path so the CLI can find training data
-        systemProperty("tessdata.prefix", tessdataDownloadDir.get().asFile.absolutePath)
+        val installDir = tasks.installDist.get().destinationDir
+        val isWindows = System.getProperty("os.name").lowercase().contains("windows")
+        val launcher = if (isWindows) {
+            installDir.resolve("bin/ocr-tesseract.bat")
+        } else {
+            installDir.resolve("bin/ocr-tesseract")
+        }
+        systemProperty("ocr.test.launcher", launcher.absolutePath)
+        systemProperty("ocr.test.install.dir", installDir.absolutePath)
     }
 }
 
