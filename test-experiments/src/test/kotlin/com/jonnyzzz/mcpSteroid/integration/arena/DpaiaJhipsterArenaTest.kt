@@ -102,11 +102,9 @@ class DpaiaJhipsterArenaTest {
             val prewarmStart = System.currentTimeMillis()
             session.scope.startProcessInContainer {
                 this
-                    .args(
-                        "bash", "-c",
-                        "cd $ideProjectDir && JAVA_HOME=/usr/lib/jvm/java-21-default " +
-                                "./mvnw compile -DskipTests -Dspotless.check.skip=true -B -q"
-                    )
+                    .args("./mvnw", "compile", "-DskipTests", "-Dspotless.check.skip=true", "-B", "-q")
+                    .workingDirInContainer(ideProjectDir)
+                    .addEnv("JAVA_HOME", "/usr/lib/jvm/java-21-default")
                     .timeoutSeconds(600)
                     .description("Maven compile prewarm for ${testCase.instanceId}")
             }.assertExitCode(0) { "Maven compile prewarm failed for ${testCase.instanceId}" }
