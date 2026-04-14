@@ -354,6 +354,8 @@ if (toInstall.isEmpty()) {
 import com.intellij.openapi.projectRoots.JavaSdk
 import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
+import com.intellij.openapi.application.EDT
+import kotlinx.coroutines.withContext
 
 // Discover Temurin JDK dirs in /usr/lib/jvm/
 val jvmDir = java.io.File("/usr/lib/jvm")
