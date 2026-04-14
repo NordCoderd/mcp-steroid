@@ -382,7 +382,10 @@ for (dir in temurinDirs) {
         continue
     }
 
-    val sdk = SdkConfigurationUtil.createAndAddSDK(dir.absolutePath, javaSdkType)
+    // createAndAddSDK requires EDT for VFS refresh + write action
+    val sdk = withContext(Dispatchers.EDT) {
+        SdkConfigurationUtil.createAndAddSDK(dir.absolutePath, javaSdkType)
+    }
     if (sdk != null) {
         // Rename to simple version number
         val mod = sdk.sdkModificator
