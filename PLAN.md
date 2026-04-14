@@ -134,7 +134,7 @@ letter — 0 steroid_execute_code calls, using only native Read/Grep/Edit/Bash.
 |------|--------------|------------|------|-------|------|-------|
 | 0 (baseline) | 0 | 117s | $0.53 | 47/47 | YES | Old prompt: "skip steroid" |
 | 1 | 3 | 118s | $0.41 | 47/47 | YES | VCS check + 2 compile checks; agent used MCP! |
-| 2 | ? | ? | ? | ? | ? | |
+| 2 | 3 (0 err) | 122s | $0.42 | 47/47 | YES | Consistent: VCS+compile; no API errors |
 | 3 | ? | ? | ? | ? | ? | |
 | 4 | ? | ? | ? | ? | ? | |
 | 5 | ? | ? | ? | ? | ? | |
