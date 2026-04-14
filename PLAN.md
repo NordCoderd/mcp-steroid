@@ -133,7 +133,7 @@ letter — 0 steroid_execute_code calls, using only native Read/Grep/Edit/Bash.
 | Iter | steroid calls | Agent time | Cost | Tests | Fix? | Notes |
 |------|--------------|------------|------|-------|------|-------|
 | 0 (baseline) | 0 | 117s | $0.53 | 47/47 | YES | Old prompt: "skip steroid" |
-| 1 | ? | ? | ? | ? | ? | New prompt: mandatory first+compile calls |
+| 1 | 3 | 118s | $0.41 | 47/47 | YES | VCS check + 2 compile checks; agent used MCP! |
 | 2 | ? | ? | ? | ? | ? | |
 | 3 | ? | ? | ? | ? | ? | |
 | 4 | ? | ? | ? | ? | ? | |
