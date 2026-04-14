@@ -95,7 +95,9 @@ append_result() {
 # Return the most-recently-created run dir for a given scenario+mode
 find_latest_run_dir() {
   local instance_id="$1" mode="$2"
-  ls -dt "$TEST_OUTPUT_DIR"/run-*-arena-${instance_id}-claude-${mode} 2>/dev/null | head -1
+  # Dirs created by DpaiaScenarioBaseTest are named: run-<timestamp>-<instanceId>-<mode>
+  # (no "arena-" prefix, no "-claude-" segment — just instanceId + mode label)
+  ls -dt "$TEST_OUTPUT_DIR"/run-*-${instance_id}-${mode} 2>/dev/null | head -1 || true
 }
 
 # Parse a field from the JSON summary file
