@@ -109,7 +109,9 @@ json_field() {
 # Count steroid_execute_code calls in a decoded agent log
 count_exec_code_calls() {
   local decoded_log="$1"
-  grep -c ">> steroid_execute_code" "$decoded_log" 2>/dev/null || echo "0"
+  # grep -c exits with code 1 when there are 0 matches (but still prints "0").
+  # Using "|| true" avoids the double-0 that "|| echo 0" would produce.
+  grep -c ">> steroid_execute_code" "$decoded_log" 2>/dev/null || true
 }
 
 # Run a Claude sub-agent for analysis or improvement
