@@ -7,9 +7,16 @@ import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJContainer
 import com.jonnyzzz.mcpSteroid.integration.infra.IntelliJProject
 import com.jonnyzzz.mcpSteroid.integration.infra.McpConnectionMode
 import com.jonnyzzz.mcpSteroid.integration.infra.create
-import com.jonnyzzz.mcpSteroid.testHelper.AiAgentSession
 import com.jonnyzzz.mcpSteroid.testHelper.CloseableStackHost
+import com.jonnyzzz.mcpSteroid.testHelper.docker.startProcessInContainer
+import com.jonnyzzz.mcpSteroid.testHelper.process.assertExitCode
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 import org.junit.jupiter.api.AfterAll
 import org.junit.jupiter.api.Test
@@ -19,16 +26,14 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
 /**
- * Dedicated arena test for a single DPAIA scenario.
+ * Dedicated arena test for a single DPAIA scenario — **Claude Code only**.
  *
- * Each test method launches a **fresh Docker container** with IntelliJ IDEA, so agents
- * never see state left by a previous run. The matrix is:
+ * Each test method launches a **fresh Docker container** with IntelliJ IDEA.
+ * Before the agent timer starts, the test runs a full prewarm:
+ * 1. Maven import + JDK setup (via [waitForProjectReady])
+ * 2. `./mvnw compile -DskipTests` (compiles Java + installs npm packages via frontend-maven-plugin)
  *
- * - `[claude+mcp]` / `[claude+none]`
- * - `[codex+mcp]`  / `[codex+none]`
- * - `[gemini+mcp]` / `[gemini+none]`
- *
- * After all methods finish, [printComparisonTable] prints a side-by-side summary.
+ * Only after the project is fully built does the agent timer start.
  *
  * **Usage:**
  * ```
@@ -36,72 +41,43 @@ import java.util.concurrent.TimeUnit
  *   -Darena.test.instanceId=dpaia__jhipster__sample__app-3
  * ```
  *
- * To run a single agent/mode combination:
+ * **Run a single mode:**
  * ```
  * --tests '*DpaiaJhipsterArenaTest.claude with mcp'
  * ```
  */
 class DpaiaJhipsterArenaTest {
 
-    // ── Claude ───────────────────────────────────────────────────────────────
-
     @Test
     @Timeout(value = 60, unit = TimeUnit.MINUTES)
     fun `claude with mcp`() {
-        runArenaTest(agentName = "claude", withMcp = true)
+        runClaude(withMcp = true)
     }
 
     @Test
     @Timeout(value = 60, unit = TimeUnit.MINUTES)
     fun `claude without mcp`() {
-        runArenaTest(agentName = "claude", withMcp = false)
-    }
-
-    // ── Codex ────────────────────────────────────────────────────────────────
-
-    @Test
-    @Timeout(value = 60, unit = TimeUnit.MINUTES)
-    fun `codex with mcp`() {
-        runArenaTest(agentName = "codex", withMcp = true)
-    }
-
-    @Test
-    @Timeout(value = 60, unit = TimeUnit.MINUTES)
-    fun `codex without mcp`() {
-        runArenaTest(agentName = "codex", withMcp = false)
-    }
-
-    // ── Gemini ───────────────────────────────────────────────────────────────
-
-    @Test
-    @Timeout(value = 60, unit = TimeUnit.MINUTES)
-    fun `gemini with mcp`() {
-        runArenaTest(agentName = "gemini", withMcp = true)
-    }
-
-    @Test
-    @Timeout(value = 60, unit = TimeUnit.MINUTES)
-    fun `gemini without mcp`() {
-        runArenaTest(agentName = "gemini", withMcp = false)
+        runClaude(withMcp = false)
     }
 
     // ── Test execution ───────────────────────────────────────────────────────
 
-    private fun runArenaTest(agentName: String, withMcp: Boolean) {
+    private fun runClaude(withMcp: Boolean) {
         val testCase = resolvedTestCase
         val modeLabel = if (withMcp) "mcp" else "none"
         val caseConfig = DpaiaCuratedCases.CASE_CONFIGS[testCase.instanceId]
             ?: DpaiaCuratedCases.CaseConfig()
 
-        // Each test method gets its own fresh container.
         val lifetime = CloseableStackHost()
         try {
             val aiMode = if (withMcp) AiMode.AI_MCP else AiMode.NONE
             val mcpMode = if (withMcp) null else McpConnectionMode.None
 
+            println("[ARENA] Creating container for [claude+$modeLabel] ${testCase.instanceId} ...")
+
             val session = IntelliJContainer.create(
                 lifetime,
-                consoleTitle = "arena-${testCase.instanceId}-$agentName-$modeLabel",
+                consoleTitle = "jhipster-claude-$modeLabel",
                 project = IntelliJProject.ProjectFromGitCommitAndPatch(
                     cloneUrl = testCase.cloneUrl,
                     repoOwnerAndName = testCase.repo.removeSuffix(".git"),
@@ -117,14 +93,28 @@ class DpaiaJhipsterArenaTest {
                 timeoutMillis = caseConfig.projectReadyTimeoutMs,
             )
 
-            val agent: AiAgentSession = when (agentName) {
-                "claude" -> session.aiAgents.claude
-                "codex" -> session.aiAgents.codex
-                "gemini" -> session.aiAgents.gemini
-                else -> error("Unknown agent: $agentName")
-            }
-
             val ideProjectDir = session.intellijDriver.getGuestProjectDir()
+
+            // ── Prewarm: compile Maven project (NOT counted in agent timer) ─────
+            // This compiles Java sources and runs frontend-maven-plugin (npm install + webapp build).
+            // After this, the agent can run tests immediately without waiting for compilation.
+            println("[ARENA] Prewarming: ./mvnw compile -DskipTests ...")
+            val prewarmStart = System.currentTimeMillis()
+            session.scope.startProcessInContainer {
+                this
+                    .args(
+                        "bash", "-c",
+                        "cd $ideProjectDir && JAVA_HOME=/usr/lib/jvm/java-21-default " +
+                                "./mvnw compile -DskipTests -Dspotless.check.skip=true -B -q"
+                    )
+                    .timeoutSeconds(600)
+                    .description("Maven compile prewarm for ${testCase.instanceId}")
+            }.assertExitCode(0) { "Maven compile prewarm failed for ${testCase.instanceId}" }
+            val prewarmMs = System.currentTimeMillis() - prewarmStart
+            println("[ARENA] Prewarm complete in ${prewarmMs / 1000}s")
+
+            // ── Agent run (TIMED) ────────────────────────────────────────────────
+            val agent = session.aiAgents.claude
             val runner = ArenaTestRunner(
                 container = session.scope,
                 projectGuestDir = ideProjectDir,
@@ -138,48 +128,65 @@ class DpaiaJhipsterArenaTest {
                 predeployedProjectDir = ideProjectDir,
             )
 
-            // Record result for the comparison table (printed in @AfterAll).
-            results.add(
-                RunRecord(
-                    instanceId = testCase.instanceId,
-                    agentName = agentName,
-                    withMcp = withMcp,
-                    exitCode = result.agentResult.exitCode,
-                    claimedFix = result.evaluation.agentClaimedFix,
-                    usedMcpSteroid = result.evaluation.usedMcpSteroid,
-                    summary = result.evaluation.agentSummary,
-                    agentDurationMs = result.agentDurationMs,
-                )
+            // ── Extract metrics from Claude NDJSON ───────────────────────────────
+            val rawOutput = result.agentResult.stdout
+            val tokens = extractTokenUsage(rawOutput)
+            val testMetrics = extractTestMetrics(rawOutput)
+
+            val record = RunRecord(
+                instanceId = testCase.instanceId,
+                withMcp = withMcp,
+                agentDurationMs = result.agentDurationMs,
+                prewarmMs = prewarmMs,
+                exitCode = result.agentResult.exitCode,
+                claimedFix = result.evaluation.agentClaimedFix,
+                usedMcpSteroid = result.evaluation.usedMcpSteroid,
+                summary = result.evaluation.agentSummary,
+                tokenUsage = tokens,
+                testMetrics = testMetrics,
             )
+            results.add(record)
 
-            // Write run summary JSON for the improvement pipeline.
-            writeRunSummary(testCase, agentName, modeLabel, result, session.runDirInContainer)
+            // Write JSON summary
+            writeRunSummary(testCase, modeLabel, result, record, session.runDirInContainer)
 
-            // Lenient assertion: agent either exited cleanly or claimed a fix.
-            // Agent CLIs (especially Gemini) may exit with non-zero codes even on success.
+            // Print summary
+            println("[ARENA] ════════════════════════════════════════")
+            println("[ARENA] claude+$modeLabel — ${testCase.instanceId}")
+            println("[ARENA]   Claimed fix:    ${record.claimedFix}")
+            println("[ARENA]   Used MCP:       ${record.usedMcpSteroid}")
+            println("[ARENA]   Exit code:      ${record.exitCode}")
+            println("[ARENA]   Agent time:     ${record.agentDurationMs / 1000}s")
+            println("[ARENA]   Prewarm time:   ${record.prewarmMs / 1000}s")
+            if (tokens != null) {
+                println("[ARENA]   Tokens in/out:  ${tokens.inputTokens}/${tokens.outputTokens}")
+                println("[ARENA]   Cache read:     ${tokens.cacheReadTokens}")
+                println("[ARENA]   Cost:           $${tokens.costUsd ?: "?"}")
+                println("[ARENA]   Turns:          ${tokens.numTurns ?: "?"}")
+            }
+            if (testMetrics != null) {
+                println("[ARENA]   Tests:          ${testMetrics.testsRun} run, ${testMetrics.testsFail} fail, BUILD ${if (testMetrics.buildSuccess == true) "SUCCESS" else "FAILURE"}")
+            }
+            println("[ARENA]   Summary:        ${record.summary ?: "(none)"}")
+            println("[ARENA] ════════════════════════════════════════")
+
+            // Lenient assertion
             check(result.evaluation.agentExitedSuccessfully || result.evaluation.agentClaimedFix) {
-                "Agent [$agentName+$modeLabel] neither exited successfully (exit=${result.agentResult.exitCode}) " +
+                "Claude [claude+$modeLabel] neither exited successfully (exit=${result.agentResult.exitCode}) " +
                         "nor claimed a fix for ${testCase.instanceId}."
             }
 
-            // When MCP is enabled, verify the agent actually used steroid_execute_code.
             if (withMcp) {
                 check(result.evaluation.usedMcpSteroid) {
-                    "Agent [$agentName+mcp] did not use steroid_execute_code for ${testCase.instanceId}."
+                    "Claude [claude+mcp] did not use steroid_execute_code for ${testCase.instanceId}."
                 }
             }
-
-            println("[ARENA] [$agentName+$modeLabel] ${testCase.instanceId} — " +
-                    "fix=${result.evaluation.agentClaimedFix}, " +
-                    "mcp=${result.evaluation.usedMcpSteroid}, " +
-                    "exit=${result.agentResult.exitCode}, " +
-                    "duration=${result.agentDurationMs / 1000}s")
         } finally {
             lifetime.closeAllStacks()
         }
     }
 
-    // ── Companion: shared state ──────────────────────────────────────────────
+    // ── Companion ────────────────────────────────────────────────────────────
 
     companion object {
         private const val DATASET_URL =
@@ -199,7 +206,6 @@ class DpaiaJhipsterArenaTest {
             DpaiaDatasetLoader.findById(dataset, id)
         }
 
-        /** Accumulated results across all test methods in this JVM. */
         val results = CopyOnWriteArrayList<RunRecord>()
 
         @JvmStatic
@@ -211,60 +217,144 @@ class DpaiaJhipsterArenaTest {
             }
 
             println()
-            println("╔════════════════════════════════════════════════════════════════════════════════╗")
-            println("║                        ARENA COMPARISON TABLE                                 ║")
-            println("╠════════════════════════════════════════════════════════════════════════════════╣")
-            println("║ Agent+Mode       │ Fix? │ MCP? │ Exit │ Duration │ Summary                    ║")
-            println("╠════════════════════════════════════════════════════════════════════════════════╣")
-            for (r in results.sortedWith(compareBy({ it.agentName }, { !it.withMcp }))) {
-                val mode = if (r.withMcp) "mcp " else "none"
-                val label = "${r.agentName}+$mode".padEnd(16)
-                val fix = if (r.claimedFix) " YES" else "  NO"
-                val mcp = if (r.usedMcpSteroid) " YES" else "  NO"
-                val exit = (r.exitCode?.toString() ?: "?").padStart(4)
-                val dur = "${r.agentDurationMs / 1000}s".padStart(8)
-                val summary = (r.summary ?: "").take(26).padEnd(26)
-                println("║ $label │ $fix │ $mcp │ $exit │ $dur │ $summary ║")
+            println("╔═══════════════════════════════════════════════════════════════════════════════════════╗")
+            println("║                   JHIPSTER ARENA — CLAUDE COMPARISON                                 ║")
+            println("╠═══════════════════════════════════════════════════════════════════════════════════════╣")
+
+            for (r in results.sortedBy { !it.withMcp }) {
+                val mode = if (r.withMcp) "claude+mcp " else "claude+none"
+                println("║ $mode                                                                              ║")
+                println("║   Fix: ${if (r.claimedFix) "YES" else "NO "}  Exit: ${(r.exitCode?.toString() ?: "?").padStart(3)}  " +
+                        "Agent: ${(r.agentDurationMs / 1000).toString().padStart(4)}s  " +
+                        "Prewarm: ${(r.prewarmMs / 1000).toString().padStart(4)}s                              ║")
+                val t = r.tokenUsage
+                if (t != null) {
+                    println("║   Tokens: ${t.inputTokens}in/${t.outputTokens}out  " +
+                            "Cache: ${t.cacheReadTokens}  " +
+                            "Cost: $${String.format("%.2f", t.costUsd ?: 0.0)}  " +
+                            "Turns: ${t.numTurns ?: "?"}".padEnd(56) + "║")
+                }
+                val m = r.testMetrics
+                if (m != null) {
+                    println("║   Tests: ${m.testsRun} run, ${m.testsPass} pass, ${m.testsFail} fail  " +
+                            "BUILD ${if (m.buildSuccess == true) "SUCCESS" else "FAILURE"}".padEnd(49) + "║")
+                }
+                println("║   ${(r.summary ?: "(no summary)").take(72).padEnd(72)}      ║")
             }
-            println("╚════════════════════════════════════════════════════════════════════════════════╝")
+
+            println("╚═══════════════════════════════════════════════════════════════════════════════════════╝")
             println()
+        }
+
+        // ── Metrics extraction ───────────────────────────────────────────────
+
+        private val TEST_RESULT_REGEX = Regex("""Tests run: (\d+), Failures: (\d+), Errors: (\d+), Skipped: (\d+)""")
+        private val BUILD_STATUS_REGEX = Regex("""BUILD (SUCCESS|FAILURE)""")
+
+        fun extractTestMetrics(rawOutput: String): TestMetrics? {
+            val matches = TEST_RESULT_REGEX.findAll(rawOutput).toList()
+            if (matches.isEmpty()) return null
+            val last = matches.last()
+            val testsRun = last.groupValues[1].toInt()
+            val testsFail = last.groupValues[2].toInt()
+            val testsError = last.groupValues[3].toInt()
+            val testsPass = testsRun - testsFail - testsError
+            val buildSuccess = BUILD_STATUS_REGEX.findAll(rawOutput).toList()
+                .lastOrNull()?.groupValues?.get(1)?.let { it == "SUCCESS" }
+            return TestMetrics(testsRun, testsPass, testsFail, testsError, buildSuccess)
+        }
+
+        fun extractTokenUsage(rawOutput: String): TokenUsage? {
+            for (line in rawOutput.lines().asReversed()) {
+                val trimmed = line.trim()
+                if (trimmed.isEmpty()) continue
+                val json = try {
+                    Json.parseToJsonElement(trimmed).jsonObject
+                } catch (_: Exception) {
+                    continue
+                }
+                if (json["type"]?.jsonPrimitive?.content != "result") continue
+                val usage = json["usage"]?.jsonObject ?: return null
+                return TokenUsage(
+                    inputTokens = usage["input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L,
+                    outputTokens = usage["output_tokens"]?.jsonPrimitive?.longOrNull ?: 0L,
+                    cacheReadTokens = usage["cache_read_input_tokens"]?.jsonPrimitive?.longOrNull ?: 0L,
+                    costUsd = (json["total_cost_usd"] ?: json["cost_usd"])?.jsonPrimitive?.doubleOrNull,
+                    numTurns = json["num_turns"]?.jsonPrimitive?.intOrNull,
+                )
+            }
+            return null
         }
 
         private fun writeRunSummary(
             testCase: DpaiaTestCase,
-            agentName: String,
             modeLabel: String,
             result: ArenaTestResult,
+            record: RunRecord,
             runDir: File,
         ) {
             val summary = buildJsonObject {
                 put("instance_id", testCase.instanceId)
-                put("agent", agentName)
+                put("agent", "claude")
                 put("mode", modeLabel)
                 put("run_dir", runDir.absolutePath)
                 put("exit_code", result.agentResult.exitCode ?: -1)
-                put("agent_claimed_fix", result.evaluation.agentClaimedFix)
-                put("used_mcp_steroid", result.evaluation.usedMcpSteroid)
-                put("agent_duration_ms", result.agentDurationMs)
-                put("agent_summary", result.evaluation.agentSummary ?: "")
+                put("agent_claimed_fix", record.claimedFix)
+                put("used_mcp_steroid", record.usedMcpSteroid)
+                put("agent_duration_ms", record.agentDurationMs)
+                put("prewarm_ms", record.prewarmMs)
+                record.tokenUsage?.let { t ->
+                    put("input_tokens", t.inputTokens)
+                    put("output_tokens", t.outputTokens)
+                    put("cache_read_tokens", t.cacheReadTokens)
+                    t.costUsd?.let { put("cost_usd", it) }
+                    t.numTurns?.let { put("num_turns", it) }
+                }
+                record.testMetrics?.let { m ->
+                    put("tests_run", m.testsRun)
+                    put("tests_pass", m.testsPass)
+                    put("tests_fail", m.testsFail)
+                    m.buildSuccess?.let { put("build_success", it) }
+                }
+                put("agent_summary", record.summary ?: "")
                 put("timestamp", java.time.Instant.now().toString())
             }
             val summaryFile = IdeTestFolders.testOutputDir
-                .resolve("dpaia-arena-run-${testCase.instanceId}-$agentName-$modeLabel.json")
+                .resolve("dpaia-jhipster-claude-$modeLabel.json")
             summaryFile.parentFile.mkdirs()
             summaryFile.writeText(summary.toString())
             println("[ARENA] Run summary written to: ${summaryFile.absolutePath}")
         }
     }
 
+    // ── Data classes ─────────────────────────────────────────────────────────
+
+    data class TokenUsage(
+        val inputTokens: Long,
+        val outputTokens: Long,
+        val cacheReadTokens: Long = 0L,
+        val costUsd: Double? = null,
+        val numTurns: Int? = null,
+    )
+
+    data class TestMetrics(
+        val testsRun: Int,
+        val testsPass: Int,
+        val testsFail: Int,
+        val testsError: Int,
+        val buildSuccess: Boolean?,
+    )
+
     data class RunRecord(
         val instanceId: String,
-        val agentName: String,
         val withMcp: Boolean,
+        val agentDurationMs: Long,
+        val prewarmMs: Long,
         val exitCode: Int?,
         val claimedFix: Boolean,
         val usedMcpSteroid: Boolean,
         val summary: String?,
-        val agentDurationMs: Long,
+        val tokenUsage: TokenUsage?,
+        val testMetrics: TestMetrics?,
     )
 }
