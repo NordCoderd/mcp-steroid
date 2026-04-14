@@ -19,25 +19,29 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
 
 /**
- * Integration test that runs a single dpaia.dev arena test case.
+ * Dedicated arena test for a single DPAIA scenario.
  *
- * Each test method starts a **fresh Docker container** with IntelliJ IDEA so agents
- * never see state left by a previous run. The test matrix is:
+ * Each test method launches a **fresh Docker container** with IntelliJ IDEA, so agents
+ * never see state left by a previous run. The matrix is:
  *
  * - `[claude+mcp]` / `[claude+none]`
  * - `[codex+mcp]`  / `[codex+none]`
  * - `[gemini+mcp]` / `[gemini+none]`
  *
- * The dataset is downloaded from:
- * https://github.com/dpaia/ee-dataset/blob/main/datasets/java-spring-ee-dataset.json
+ * After all methods finish, [printComparisonTable] prints a side-by-side summary.
  *
- * To run a specific test case, set the system property:
- *   -Darena.test.instanceId=dpaia__empty__maven__springboot3-3
+ * **Usage:**
+ * ```
+ * ./gradlew :test-experiments:test --tests '*DpaiaJhipsterArenaTest*' \
+ *   -Darena.test.instanceId=dpaia__jhipster__sample__app-3
+ * ```
  *
- * To run a single agent+mode:
- *   --tests '*DpaiaArenaTest.claude with mcp'
+ * To run a single agent/mode combination:
+ * ```
+ * --tests '*DpaiaJhipsterArenaTest.claude with mcp'
+ * ```
  */
-class DpaiaArenaTest {
+class DpaiaJhipsterArenaTest {
 
     // ── Claude ───────────────────────────────────────────────────────────────
 
@@ -89,6 +93,7 @@ class DpaiaArenaTest {
         val caseConfig = DpaiaCuratedCases.CASE_CONFIGS[testCase.instanceId]
             ?: DpaiaCuratedCases.CaseConfig()
 
+        // Each test method gets its own fresh container.
         val lifetime = CloseableStackHost()
         try {
             val aiMode = if (withMcp) AiMode.AI_MCP else AiMode.NONE
@@ -133,6 +138,7 @@ class DpaiaArenaTest {
                 predeployedProjectDir = ideProjectDir,
             )
 
+            // Record result for the comparison table (printed in @AfterAll).
             results.add(
                 RunRecord(
                     instanceId = testCase.instanceId,
@@ -146,14 +152,17 @@ class DpaiaArenaTest {
                 )
             )
 
+            // Write run summary JSON for the improvement pipeline.
             writeRunSummary(testCase, agentName, modeLabel, result, session.runDirInContainer)
 
             // Lenient assertion: agent either exited cleanly or claimed a fix.
+            // Agent CLIs (especially Gemini) may exit with non-zero codes even on success.
             check(result.evaluation.agentExitedSuccessfully || result.evaluation.agentClaimedFix) {
                 "Agent [$agentName+$modeLabel] neither exited successfully (exit=${result.agentResult.exitCode}) " +
                         "nor claimed a fix for ${testCase.instanceId}."
             }
 
+            // When MCP is enabled, verify the agent actually used steroid_execute_code.
             if (withMcp) {
                 check(result.evaluation.usedMcpSteroid) {
                     "Agent [$agentName+mcp] did not use steroid_execute_code for ${testCase.instanceId}."
@@ -170,13 +179,13 @@ class DpaiaArenaTest {
         }
     }
 
-    // ── Companion ────────────────────────────────────────────────────────────
+    // ── Companion: shared state ──────────────────────────────────────────────
 
     companion object {
         private const val DATASET_URL =
             "https://raw.githubusercontent.com/dpaia/ee-dataset/main/datasets/java-spring-ee-dataset.json"
 
-        private const val DEFAULT_INSTANCE_ID = "dpaia__empty__maven__springboot3-3"
+        private const val DEFAULT_INSTANCE_ID = "dpaia__jhipster__sample__app-3"
 
         private val dataset by lazy {
             println("[ARENA] Downloading dataset from $DATASET_URL ...")
@@ -190,6 +199,7 @@ class DpaiaArenaTest {
             DpaiaDatasetLoader.findById(dataset, id)
         }
 
+        /** Accumulated results across all test methods in this JVM. */
         val results = CopyOnWriteArrayList<RunRecord>()
 
         @JvmStatic
