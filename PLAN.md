@@ -136,8 +136,8 @@ letter — 0 steroid_execute_code calls, using only native Read/Grep/Edit/Bash.
 | 1 | 3 | 118s | $0.41 | 47/47 | YES | VCS check + 2 compile checks; agent used MCP! |
 | 2 | 3 (0 err) | 122s | $0.42 | 47/47 | YES | Consistent: VCS+compile; no API errors |
 | 3 | 3 (0 err) | 105s | $0.37 | 47/47 | YES | Fastest yet; stable pattern |
-| 4 | ? | ? | ? | ? | ? | |
-| 5 | ? | ? | ? | ? | ? | |
+| 4 | 5 (3 err) | 151s | $0.46 | 47/47 | YES | Modal "Resolving SDKs" aborted builds; agent retried |
+| 5 | ? | ? | ? | ? | ? | Fix: jdk.table.xml paths (temurin-N-jdk-arch) |
 
 ### Experiment: harder scenarios
 - [ ] `dpaia__feature__service-125` — 44KB patch, cross-layer JPQL (HIGH MCP benefit)
