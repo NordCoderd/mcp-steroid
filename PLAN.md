@@ -72,7 +72,21 @@ Fix: install chromium in ide-base Dockerfile so puppeteer finds it.
 - Phase 4: DONE
 - Phase 5: PARTIAL (DpaiaComparisonTest done, DpaiaClaudeComparisonTest deferred)
 
+## First Experiment Result (2026-04-14)
+
+**Scenario:** dpaia__jhipster__sample__app-3 (ROLE_ADMIN → ROLE_ADMINISTRATOR)
+**Agent:** Claude Sonnet 4.6 + MCP Steroid
+
+| Metric         | Value |
+|----------------|-------|
+| Fix claimed    | YES   |
+| Tests          | 47/47 pass, BUILD SUCCESS |
+| Agent time     | 117s  |
+| Prewarm        | 81s   |
+| Cost           | $0.53 |
+| Turns          | 33    |
+
 ## Remaining Work
-- [ ] Build and verify compilation of all changed files
+- [ ] Run `claude without mcp` for A/B comparison on same scenario
 - [ ] DpaiaClaudeComparisonTest refactoring (complex due to token metrics extraction)
-- [ ] Proper reflection fix for #18 (use IntelliJ to find the Pair<> method)
+- [ ] Extract token usage from NDJSON (currently parsed but not printed in table)
