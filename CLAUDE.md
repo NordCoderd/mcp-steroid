@@ -654,6 +654,19 @@ Credentials stored as `credentialsJSON:*` on the TC server, referenced via `Toke
 **Missing:** `GEMINI_API_KEY` — no `credentialsJSON` ref exists yet. `CliGeminiIntegrationTest` will fail
 with `GEMINI_API_KEY required` until one is added to the TC server and declared in `Tokens.kt`.
 
+### Queue management — move builds to top
+
+The TC queue has thousands of builds. After triggering a build, move it to the top:
+```bash
+curl -sS -X POST -H "Authorization: Bearer $TOK" "$TC/ajax.html" -d "moveToTop=$BUILD_ID"
+```
+Or use the "Move to top" button in the TC UI.
+
+### Windows CI compatibility
+
+- `BufferedWriter.newLine()` writes `\r\n` on Windows — use `write("\n")` for protocol output (NDJSON, MCP)
+- `File.readText()` preserves `\r\n` — normalize with `.replace("\r\n", "\n")` when comparing against generated text
+
 ### Adding / changing a TC build configuration
 
 1. Edit the `.kt` file in `~/Work/mcp-steroid-teamcity/.teamcity/builds/`
