@@ -100,6 +100,45 @@ Scenarios with highest Bash usage (indicating least IntelliJ leverage):
 
 **Common pattern**: High Bash correlates with Docker-dependent multi-module builds where `./mvnw test` is the only reliable test runner. IntelliJ's test runner (`ProjectTaskManager`) could replace many of these Bash calls for compilation checks.
 
-## Improvement Applied (This Session)
+## Prompt Improvements (Session 2)
 
-The arena prompt was updated to encourage `ProjectTaskManager.buildAllModules()` over `./mvnw test-compile` for compilation feedback, with an explicit note that IntelliJ incremental build is ~3× faster. Results from subsequent runs will show whether this reduces the Bash:exec_code ratio.
+Three improvements applied to `ArenaTestRunner.kt` based on run analysis:
+
+### 1. Build Environment Discovery in First Call
+
+Added Maven path, Gradlew path, and JDK list to the first exec_code recipe:
+
+```kotlin
+val mavenBin = "/opt/idea/plugins/maven/lib/maven3/bin/mvn"
+println("Maven: ${if (File(mavenBin).exists()) mavenBin else "NOT FOUND"}")
+val jvmDir = File("/usr/lib/jvm")
+println("JDKs: ${jvmDir.listFiles()?.filter { it.name.startsWith("temurin") }?.map { it.name }?.joinToString(", ")}")
+println("Current JAVA_HOME: ${System.getProperty("java.home")}")
+```
+
+**Impact**: Eliminates 4-8 Bash discovery calls (`find /opt -name mvn`, `ls /usr/lib/jvm/`, etc.) per run. First observed output:
+```
+Maven: /opt/idea/plugins/maven/lib/maven3/bin/mvn
+JDKs: temurin-8-jdk-arm64, temurin-21-jdk-arm64, temurin-17-jdk-arm64, temurin-11-jdk-arm64, temurin-25-jdk-arm64
+```
+
+### 2. MODAL DIALOG DETECTED Clarification
+
+Added explicit note that `=== MODAL DIALOG DETECTED ===` in buildAllModules output is the dialog-killer log, NOT a compile error. Only `Build errors: true` means a compile failure.
+
+### 3. Multi-Module Sequential Scoping
+
+Added rule for microservices projects: implement module-by-module (read+write MODULE_1 → move to MODULE_2), not read-all-services-first. This prevents the 40-read exploration loop seen in microshop-18.
+
+## Pass 1 of 3 — Early Results (2026-04-15)
+
+First two scenarios with the improved prompt show consistent improvement:
+
+| Scenario | Original Duration | Pass 1 Duration | Δ | exec_code (orig→new) | Bash (orig→new) | Reads (orig→new) |
+|----------|------------------|-----------------|---|---------------------|-----------------|------------------|
+| empty__maven__springboot3-3 | 154s | 146s | -5% | 4→2 | 6→5 | 5→3 |
+| feature__service-125 | 638s | 444s | **-30%** | 4→2 | 17→15 | 22→18 |
+
+**Key observation for feature__service-125**: The agent used the printed Maven/JDK paths immediately for all Bash commands, never running discovery commands. Duration improved from 638s to 444s — the 30% saving comes from fewer exploration+discovery calls.
+
+Pass 1 is in progress; full 17-scenario comparison will be updated as results arrive.
