@@ -148,8 +148,9 @@ Results as they arrive — pass 1 in progress with improved prompt (build env di
 | spring__boot__microshop-18 | 762s³ | 900s (FAIL) | timeout | 3→1 | 11→0 | 42→43 | 16→14 |
 | spring__boot__microshop-2 | 167s | 161s | -4% | 2→3 | 11→10 | 11→11 | 3→3 |
 | spring__petclinic-27 | 629s | 480s | **-24%** | 3→2 | 2→6 | 12→12 | 5→5 |
+| spring__petclinic__rest-3 | 545s | 385s | **-29%** | 2→2 | 4→3 | 19→10 | 5→4 |
 
-12/17 complete (11 pass, 1 fail). ³ Original took 3 runs to pass. Key observations:
+13/17 complete (12 pass, 1 fail). ³ Original took 3 runs to pass. Key observations:
 - **feature-125 (-30%)**: Most dramatic. Agent used printed Maven/JDK paths, never ran discovery commands.
 - **feature-25 (-13%)**: Docker failure recognized quickly. Gap: JDK selection waste.
 - **jhipster-3 (-8%)**: exec_code 5→2 (clean). Agent recognized rename-only task fast.
@@ -163,10 +164,11 @@ Results as they arrive — pass 1 in progress with improved prompt (build env di
 
 - **microshop-2 (-4%)**: Minimal change, already efficient. Wrong JAVA_HOME on first Gradle attempt (analysis).
 - **petclinic-27 (-24%)**: Big win — 480s vs 629s. exec_code 3→2. Bash went up 2→6 (more test runs needed for 94/94 pass).
+- **petclinic-rest-3 (-29%)**: Another big win — 385s vs 545s. Reads halved (19→10), Bash 4→3. 217/217 tests.
 
-**Aggregate (11 passing/17)**: exec_code per scenario avg 3.4→2.5 (-26%), Bash avg 11.2→8.5 (-24%).
+**Aggregate (12 passing/17)**: exec_code per scenario avg 3.3→2.4 (-27%), Bash avg 10.8→8.2 (-24%).
 
-Pass 1 in progress (12/17 done, scenario 13 petclinic-rest-3 next); table updated as results arrive.
+Pass 1 in progress (13/17 done, scenario 14 piggymetrics-6 running); table updated as results arrive.
 
 ## Prompt Improvements — Session 3 Candidates (post-3-pass)
 
