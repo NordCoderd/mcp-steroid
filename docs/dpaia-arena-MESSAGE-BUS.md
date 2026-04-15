@@ -308,3 +308,8 @@ ANALYSIS: dpaia__spring__petclinic__rest-14 — fix=yes exec_code=2 efficiency=h
 2026-04-15T09:34:03Z SCENARIO[6/17]: dpaia__spring__petclinic-36 start
 2026-04-15T09:34:03Z RUN[1]: dpaia__spring__petclinic-36 claude+mcp
 2026-04-15T09:42:48Z RESULT[1]: dpaia__spring__petclinic-36 fix=True exit=0 duration=238s exec_code=2
+ANALYSIS: dpaia__spring__petclinic-36 — fix=yes exec_code=2 efficiency=medium gap=none — missed data.sql on first pass (not in VCS diff); 6 wasted Edit calls (file not read); premature full-suite run before all files updated
+2026-04-15T09:44:58Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-113434-dpaia__spring__petclinic-36-mcp
+2026-04-15T09:44:58Z PASS: dpaia__spring__petclinic-36 on run 1
+2026-04-15T09:44:58Z SCENARIO[7/17]: dpaia__jhipster__sample__app-3 start
+2026-04-15T09:44:58Z RUN[1]: dpaia__jhipster__sample__app-3 claude+mcp
