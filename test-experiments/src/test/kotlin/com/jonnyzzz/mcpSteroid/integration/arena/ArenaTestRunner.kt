@@ -239,8 +239,8 @@ class ArenaTestRunner(
             appendLine("  //   val vf = findProjectFile(path) ?: run { println(\"NOT FOUND: \$path\"); continue }")
             appendLine("  //   val c = VfsUtil.loadText(vf); if (c.isEmpty()) { println(\"EMPTY: \$path\"); continue }")
             appendLine("  ```")
-            appendLine("  **USE THE PRINTED Maven/Gradlew/JDK paths for ALL subsequent Bash build commands** — never run `find /opt -name mvn` or `ls /usr/lib/jvm/` after this. The first call tells you everything you need.
-  **JDK SELECTION**: Read pom.xml `<java.version>` (or `<maven.compiler.source>`) to find the required Java version N. Then from the printed JDK list, pick the LOWEST temurin version >= N. Example: project needs Java 24, JDKs available are 8,11,17,21,25 → use `JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*`. NEVER try lower JDKs first.")
+            appendLine("  **USE THE PRINTED Maven/Gradlew/JDK paths for ALL subsequent Bash build commands** — never run `find /opt -name mvn` or `ls /usr/lib/jvm/` after this. The first call tells you everything you need.")
+            appendLine("  **JDK SELECTION**: Read pom.xml java.version (or maven.compiler.source) to find the required Java version N. Then from the printed JDK list, pick the LOWEST temurin version >= N. Example: project needs Java 24, JDKs available are 8,11,17,21,25 — use JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*. NEVER try lower JDKs first.")
             appendLine("  If `dockerOk=false`: still **run the FAIL_TO_PASS tests first via Bash** (many use H2, no Docker needed).")
             appendLine("  Only treat Docker as a blocker if the test explicitly fails with a `DockerException` / `Could not find a valid Docker environment` error.")
         } else {
