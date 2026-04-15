@@ -319,3 +319,9 @@ ANALYSIS: dpaia__spring__petclinic-36 — fix=yes exec_code=2 efficiency=medium 
 2026-04-15T09:57:06Z PASS: dpaia__jhipster__sample__app-3 on run 1
 2026-04-15T09:57:06Z SCENARIO[8/17]: dpaia__train__ticket-1 start
 2026-04-15T09:57:06Z RUN[1]: dpaia__train__ticket-1 claude+mcp
+2026-04-15T10:03:02Z RESULT[1]: dpaia__train__ticket-1 fix=True exit=0 duration=246s exec_code=2
+ANALYSIS: dpaia__train__ticket-1 — fix=yes exec_code=2 efficiency=medium gap=add Maven multi-module hint (install -N root POM + install ts-common) and -Djacoco.skip=true to avoid ~10 wasted Bash calls on dependency resolution and JVM crashes
+2026-04-15T10:05:06Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-115729-dpaia__train__ticket-1-mcp
+2026-04-15T10:05:06Z PASS: dpaia__train__ticket-1 on run 1
+2026-04-15T10:05:06Z SCENARIO[9/17]: dpaia__train__ticket-31 start
+2026-04-15T10:05:06Z RUN[1]: dpaia__train__ticket-31 claude+mcp
