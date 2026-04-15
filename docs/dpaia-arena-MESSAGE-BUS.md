@@ -224,3 +224,9 @@ ANALYSIS: dpaia__train__ticket-1 — fix=yes exec_code=2 efficiency=medium gap=a
 2026-04-15T06:23:58Z PASS: dpaia__train__ticket-1 on run 1
 2026-04-15T06:23:58Z SCENARIO[9/17]: dpaia__train__ticket-31 start
 2026-04-15T06:23:58Z RUN[1]: dpaia__train__ticket-31 claude+mcp
+2026-04-15T06:31:06Z RESULT[1]: dpaia__train__ticket-31 fix=True exit=0 duration=317s exec_code=4
+ANALYSIS: dpaia__train__ticket-31 — fix=yes exec_code=5 efficiency=medium gap=add Maven multi-module hint (install -N root POM + ts-common) and -Djacoco.skip=true to avoid ~7 wasted Bash calls on dependency resolution
+2026-04-15T06:33:15Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-082434-dpaia__train__ticket-31-mcp
+2026-04-15T06:33:15Z PASS: dpaia__train__ticket-31 on run 1
+2026-04-15T06:33:15Z SCENARIO[10/17]: dpaia__spring__boot__microshop-18 start
+2026-04-15T06:33:15Z RUN[1]: dpaia__spring__boot__microshop-18 claude+mcp
