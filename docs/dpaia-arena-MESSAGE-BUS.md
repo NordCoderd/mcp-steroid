@@ -365,3 +365,9 @@ ANALYSIS: dpaia__piggymetrics-6 — fix=yes exec_code=2 efficiency=high gap=none
 2026-04-15T11:07:57Z PASS: dpaia__spring__petclinic__microservices-5 on run 1
 2026-04-15T11:07:57Z SCENARIO[16/17]: dpaia__spring__petclinic__rest-37 start
 2026-04-15T11:07:57Z RUN[1]: dpaia__spring__petclinic__rest-37 claude+mcp
+2026-04-15T11:11:57Z RESULT[1]: dpaia__spring__petclinic__rest-37 fix=True exit=0 duration=126s exec_code=2
+ANALYSIS: dpaia__spring__petclinic__rest-37 — fix=yes exec_code=2 efficiency=high gap=none
+2026-04-15T11:13:07Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-130824-dpaia__spring__petclinic__rest-37-mcp
+2026-04-15T11:13:07Z PASS: dpaia__spring__petclinic__rest-37 on run 1
+2026-04-15T11:13:07Z SCENARIO[17/17]: dpaia__spring__petclinic-71 start
+2026-04-15T11:13:07Z RUN[1]: dpaia__spring__petclinic-71 claude+mcp
