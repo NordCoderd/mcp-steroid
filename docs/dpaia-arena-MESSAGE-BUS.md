@@ -441,3 +441,9 @@ ANALYSIS: dpaia__spring__petclinic-27 — fix=yes exec_code=2 efficiency=high ga
 2026-04-15T13:44:19Z PASS: dpaia__spring__petclinic-27 on run 1
 2026-04-15T13:44:19Z SCENARIO[13/17]: dpaia__spring__petclinic__rest-3 start
 2026-04-15T13:44:19Z RUN[1]: dpaia__spring__petclinic__rest-3 claude+mcp
+2026-04-15T13:53:03Z RESULT[1]: dpaia__spring__petclinic__rest-3 fix=True exit=0 duration=419s exec_code=2
+ANALYSIS: dpaia__spring__petclinic__rest-3 — fix=yes exec_code=3 efficiency=high gap=none — exec_code compile timed out, Maven fallback correct; read budget slightly exceeded (23 reads) but justified for complex 3-class feature
+2026-04-15T13:55:51Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-154442-dpaia__spring__petclinic__rest-3-mcp
+2026-04-15T13:55:51Z PASS: dpaia__spring__petclinic__rest-3 on run 1
+2026-04-15T13:55:51Z SCENARIO[14/17]: dpaia__piggymetrics-6 start
+2026-04-15T13:55:51Z RUN[1]: dpaia__piggymetrics-6 claude+mcp
