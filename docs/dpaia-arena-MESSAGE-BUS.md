@@ -386,3 +386,4 @@ ANALYSIS: dpaia__feature__service-125 — fix=yes exec_code=3 efficiency=medium 
 2026-04-15T12:04:26Z PASS: dpaia__feature__service-125 on run 1
 2026-04-15T12:04:26Z SCENARIO[3/17]: dpaia__empty__maven__springboot3-1 start
 2026-04-15T12:04:26Z RUN[1]: dpaia__empty__maven__springboot3-1 claude+mcp
+2026-04-15T12:09:13Z RESULT[1]: dpaia__empty__maven__springboot3-1 fix=True exit=0 duration=185s exec_code=1
