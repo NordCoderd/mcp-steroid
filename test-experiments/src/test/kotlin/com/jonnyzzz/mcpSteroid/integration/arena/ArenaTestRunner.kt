@@ -92,6 +92,8 @@ class ArenaTestRunner(
 
         appendLine("You are working on a Java Spring project located at: `$projectDir`")
         appendLine()
+        appendLine("**OUTPUT REQUIREMENT** (read now, apply at the end): When the fix is complete and the full test suite passes, your LAST message MUST contain `ARENA_FIX_APPLIED: yes` on its own line — the harness only detects this exact string, not Maven/Gradle `BUILD SUCCESS` output. Full template in **Success Markers** at the end of this prompt.")
+        appendLine()
         appendLine("## Task Context")
         appendLine()
         appendLine(testCase.problemStatement)
