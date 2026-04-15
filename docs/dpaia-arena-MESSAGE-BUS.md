@@ -399,3 +399,9 @@ ANALYSIS: dpaia__spring__petclinic__rest-14 — fix=yes exec_code=2 efficiency=h
 2026-04-15T12:29:09Z PASS: dpaia__spring__petclinic__rest-14 on run 1
 2026-04-15T12:29:09Z SCENARIO[6/17]: dpaia__spring__petclinic-36 start
 2026-04-15T12:29:09Z RUN[1]: dpaia__spring__petclinic-36 claude+mcp
+2026-04-15T12:38:39Z RESULT[1]: dpaia__spring__petclinic-36 fix=True exit=0 duration=251s exec_code=2
+ANALYSIS: dpaia__spring__petclinic-36 — fix=yes exec_code=2 efficiency=high gap=none — messages.properties double-pass (16 redundant calls) but otherwise clean linear workflow; 251s for 33 edits across 19 files
+2026-04-15T12:40:33Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-142939-dpaia__spring__petclinic-36-mcp
+2026-04-15T12:40:33Z PASS: dpaia__spring__petclinic-36 on run 1
+2026-04-15T12:40:33Z SCENARIO[7/17]: dpaia__jhipster__sample__app-3 start
+2026-04-15T12:40:33Z RUN[1]: dpaia__jhipster__sample__app-3 claude+mcp
