@@ -29,3 +29,7 @@ Each scenario is run up to 3 times. Analysis and prompt improvements happen betw
 | spring__petclinic-71 | 1 | False | 0 | 1586s | 0 | (agent wrote 26 files, 64/64 tests pass, BUILD SUCCESS — did not claim fix; improvement sub-agent running) |
 | spring__petclinic-71 | 2 | False | 0 | 1638s | 0 | (64/64 tests pass again — agent wrote markdown summary instead of ARENA_FIX_APPLIED; run 3 prompt now has marker at top) |
 | spring__petclinic-71 | 3 | True | 0 | 2307s | 0 | Implemented Spring Petclinic domain model from scratch (BaseEntity, NamedEntity, Person, Owner, Pet, Visit, PetType, Vet, Specialty, repositories, controllers); 64/64 tests pass (2 MySQL skipped), BUILD SUCCESS, ARENA_FIX_APPLIED: yes. |
+
+<!-- === PASS 1 of 3 (2026-04-15T05:14:36Z) === -->
+
+| empty__maven__springboot3-3 | 1 | True | 0 | 146s | 1 | Created `Product` entity with JPA/validation annotations, `ProductRepository` interface extending CrudRepository with custom @Query methods (findByPriceRange, searchByKeyword), added spring-boot-starter-data-jpa/validation and H2 dependencies to pom.xml, configured H2 in application.properties — all 22 tests pass (ProductTest: 10/10, ProductRepositoryTest: 11/11, SampleSpringBootApplicationTests: 1/1) using JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64. |

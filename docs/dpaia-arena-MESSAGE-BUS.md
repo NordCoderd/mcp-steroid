@@ -170,3 +170,7 @@ IMPROVE: dpaia__spring__petclinic-71 — changed: added OUTPUT REQUIREMENT remin
 2026-04-15T03:08:25Z ANALYSIS[3]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-042344-dpaia__spring__petclinic-71-mcp
 2026-04-15T03:08:25Z PASS: dpaia__spring__petclinic-71 on run 3
 2026-04-15T03:08:25Z DONE: 16 passed 0 failed out of 17
+2026-04-15T05:14:36Z START: dpaia-arena-runner.sh START_INDEX=0 MAX_RUNS=1
+2026-04-15T05:14:36Z SCENARIO[1/17]: dpaia__empty__maven__springboot3-3 start
+2026-04-15T05:14:36Z RUN[1]: dpaia__empty__maven__springboot3-3 claude+mcp
+2026-04-15T05:18:35Z RESULT[1]: dpaia__empty__maven__springboot3-3 fix=True exit=0 duration=146s exec_code=1
