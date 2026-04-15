@@ -417,3 +417,4 @@ ANALYSIS: dpaia__train__ticket-1 — fix=yes exec_code=3 efficiency=medium gap=a
 2026-04-15T12:59:10Z PASS: dpaia__train__ticket-1 on run 1
 2026-04-15T12:59:10Z SCENARIO[9/17]: dpaia__train__ticket-31 start
 2026-04-15T12:59:10Z RUN[1]: dpaia__train__ticket-31 claude+mcp
+2026-04-15T13:04:27Z RESULT[1]: dpaia__train__ticket-31 fix=True exit=0 duration=207s exec_code=2
