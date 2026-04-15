@@ -325,3 +325,5 @@ ANALYSIS: dpaia__train__ticket-1 — fix=yes exec_code=2 efficiency=medium gap=a
 2026-04-15T10:05:06Z PASS: dpaia__train__ticket-1 on run 1
 2026-04-15T10:05:06Z SCENARIO[9/17]: dpaia__train__ticket-31 start
 2026-04-15T10:05:06Z RUN[1]: dpaia__train__ticket-31 claude+mcp
+2026-04-15T10:12:21Z RESULT[1]: dpaia__train__ticket-31 fix=True exit=0 duration=320s exec_code=2
+ANALYSIS: dpaia__train__ticket-31 — fix=yes exec_code=2 efficiency=medium gap=same as ticket-1: add Maven multi-module hint (install -N + ts-common) and -DforkCount=0 to avoid ~11 wasted Bash calls on deps+fork crashes
