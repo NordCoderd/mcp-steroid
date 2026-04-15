@@ -174,3 +174,18 @@ IMPROVE: dpaia__spring__petclinic-71 — changed: added OUTPUT REQUIREMENT remin
 2026-04-15T05:14:36Z SCENARIO[1/17]: dpaia__empty__maven__springboot3-3 start
 2026-04-15T05:14:36Z RUN[1]: dpaia__empty__maven__springboot3-3 claude+mcp
 2026-04-15T05:18:35Z RESULT[1]: dpaia__empty__maven__springboot3-3 fix=True exit=0 duration=146s exec_code=1
+ANALYSIS: dpaia__empty__maven__springboot3-3 — fix=yes exec_code=2 efficiency=high gap=none — agent deviated from instructions only on compilation (used Maven ./mvnw test instead of buildAllModules); recovered cleanly from Java 24 JDK mismatch
+2026-04-15T05:21:25Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-071506-dpaia__empty__maven__springboot3-3-mcp
+2026-04-15T05:21:25Z PASS: dpaia__empty__maven__springboot3-3 on run 1
+2026-04-15T05:21:25Z SCENARIO[2/17]: dpaia__feature__service-125 start
+2026-04-15T05:21:51Z RUN[1]: dpaia__feature__service-125 claude+mcp
+2026-04-15T05:31:35Z RESULT[1]: dpaia__feature__service-125 fix=True exit=0 duration=444s exec_code=2
+ANALYSIS: dpaia__feature__service-125 — fix=yes exec_code=2 efficiency=medium gap=Docker-failure hint not strong enough: agent retried Docker env-var debugging 8 times after HTTP 400 was already confirmed; hint must explicitly ban socket/DOCKER_HOST probes once HTTP 400 is seen
+2026-04-15T05:21:25Z SCENARIO[2/17]: dpaia__feature__service-125 start
+2026-04-15T05:21:25Z RUN[1]: dpaia__feature__service-125 claude+mcp
+2026-04-15T05:31:37Z RESULT[1]: dpaia__feature__service-125 fix=True exit=0 duration=444s exec_code=2
+2026-04-15T05:33:28Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-072151-dpaia__feature__service-125-mcp
+2026-04-15T05:33:28Z PASS: dpaia__feature__service-125 on run 1
+2026-04-15T05:33:28Z SCENARIO[3/17]: dpaia__empty__maven__springboot3-1 start
+2026-04-15T05:33:28Z RUN[1]: dpaia__empty__maven__springboot3-1 claude+mcp
+2026-04-15T05:38:49Z RESULT[1]: dpaia__empty__maven__springboot3-1 fix=True exit=0 duration=235s exec_code=2
