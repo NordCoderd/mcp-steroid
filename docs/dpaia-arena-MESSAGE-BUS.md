@@ -393,3 +393,9 @@ ANALYSIS: dpaia__feature__service-25 — fix=yes exec_code=3 efficiency=high gap
 2026-04-15T12:23:09Z PASS: dpaia__feature__service-25 on run 1
 2026-04-15T12:23:09Z SCENARIO[5/17]: dpaia__spring__petclinic__rest-14 start
 2026-04-15T12:23:09Z RUN[1]: dpaia__spring__petclinic__rest-14 claude+mcp
+2026-04-15T12:27:16Z RESULT[1]: dpaia__spring__petclinic__rest-14 fix=True exit=0 duration=131s exec_code=1
+ANALYSIS: dpaia__spring__petclinic__rest-14 — fix=yes exec_code=2 efficiency=high gap=none — agent tried Edit before Read on 7 files (recovered correctly); no separate buildAllModules but Maven test covers compilation
+2026-04-15T12:29:09Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-142338-dpaia__spring__petclinic__rest-14-mcp
+2026-04-15T12:29:09Z PASS: dpaia__spring__petclinic__rest-14 on run 1
+2026-04-15T12:29:09Z SCENARIO[6/17]: dpaia__spring__petclinic-36 start
+2026-04-15T12:29:09Z RUN[1]: dpaia__spring__petclinic-36 claude+mcp
