@@ -453,3 +453,7 @@ ANALYSIS: dpaia__piggymetrics-6 — fix=yes exec_code=2 efficiency=medium gap=no
 2026-04-15T14:02:14Z PASS: dpaia__piggymetrics-6 on run 1
 2026-04-15T14:02:14Z SCENARIO[15/17]: dpaia__spring__petclinic__microservices-5 start
 2026-04-15T14:02:14Z RUN[1]: dpaia__spring__petclinic__microservices-5 claude+mcp
+2026-04-15T14:09:37Z RESULT[1]: dpaia__spring__petclinic__microservices-5 fix=True exit=0 duration=206s exec_code=0
+2026-04-15T14:09:37Z PASS: dpaia__spring__petclinic__microservices-5 on run 1
+2026-04-15T14:09:38Z SCENARIO[16/17]: dpaia__spring__petclinic__rest-37 start
+2026-04-15T14:09:38Z RUN[1]: dpaia__spring__petclinic__rest-37 claude+mcp
