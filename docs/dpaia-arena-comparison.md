@@ -150,8 +150,10 @@ Results as they arrive — pass 1 in progress with improved prompt (build env di
 | spring__petclinic-27 | 629s | 480s | **-24%** | 3→2 | 2→6 | 12→12 | 5→5 |
 | spring__petclinic__rest-3 | 545s | 385s | **-29%** | 2→2 | 4→3 | 19→10 | 5→4 |
 | piggymetrics-6 | 240s³ | 304s | +27%⁴ | 2→1 | 20→17 | 7→8 | 1→1 |
+| spring__petclinic__microservices-5 | 373s | 468s | +25% | 4→2 | 4→5 | 14→9 | 1→2 |
+| spring__petclinic__rest-37 | 88s | 125s | +42% | 3→2 | 2→2 | 2→3 | ~1→0 |
 
-14/17 complete (13 pass, 1 fail). ³ Original took 3 runs. ⁴ First-run pass (orig failed runs 1-2). Key observations:
+16/17 complete (15 pass, 1 fail). ³ Original took 3 runs. ⁴ First-run pass (orig failed runs 1-2). Key observations:
 - **feature-125 (-30%)**: Most dramatic. Agent used printed Maven/JDK paths, never ran discovery commands.
 - **feature-25 (-13%)**: Docker failure recognized quickly. Gap: JDK selection waste.
 - **jhipster-3 (-8%)**: exec_code 5→2 (clean). Agent recognized rename-only task fast.
@@ -167,10 +169,23 @@ Results as they arrive — pass 1 in progress with improved prompt (build env di
 - **petclinic-27 (-24%)**: Big win — 480s vs 629s. exec_code 3→2. Bash went up 2→6 (more test runs needed for 94/94 pass).
 - **petclinic-rest-3 (-29%)**: Another big win — 385s vs 545s. Reads halved (19→10), Bash 4→3. 217/217 tests.
 - **piggymetrics-6 (first-run pass!)**: Original needed 3 runs (Docker pull stall, API 400). Now passes first try in 304s. Docker handling improved.
+- **microservices-5 (+25%)**: Slower (468s vs 373s). Reads dropped (14→9), exec_code 4→2, but Bash 4→5.
+- **rest-37 (+42%)**: Slowest delta. Simple scenario (88s baseline), variance dominates.
 
-**Aggregate (13 passing/17)**: exec_code per scenario avg 3.2→2.3 (-28%), Bash avg 11.3→8.6 (-24%).
+**Aggregate (15 passing/17)**: exec_code per scenario avg 3.3→2.2 (-33%), Bash avg 10.7→8.2 (-23%).
 
-Pass 1 in progress (14/17 done, scenario 15 petclinic-microservices-5 next); table updated as results arrive.
+Pass 1: 16/17 done, scenario 17 (petclinic-71, baseline 2307s) running — last one.
+
+### MCP Steroid Server-Side Timing (from run-*/intellij/mcp-steroid/ logs)
+
+| Phase | Time | Notes |
+|-------|------|-------|
+| Kotlin script compilation | ~2.5-3.0s | Per exec_code call, MCP Steroid compiles .kts |
+| ProjectTaskManager.buildAllModules() | ~1-3.3s | JPS incremental build (Maven projects, non-delegated) |
+| VCS check + env discovery | ~2-5ms execution | After 2.5s compilation overhead |
+| Problem list inspection | ~2ms execution | After 2.5s compilation overhead |
+
+**Key insight**: Each exec_code call has a fixed ~3s Kotlin compilation cost. The actual IDE API execution is near-instant. This means batching multiple operations into a single exec_code call saves ~3s per avoided call.
 
 ## Prompt Improvements — Session 3 Candidates (post-3-pass)
 
