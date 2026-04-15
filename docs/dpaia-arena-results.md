@@ -68,3 +68,7 @@ Each scenario is run up to 3 times. Analysis and prompt improvements happen betw
 | spring__petclinic__microservices-5 | 1 | True | 0 | 468s | 0 | Added circuit breaker+timeout+fallback to CustomersServiceClient (using ReactiveResilience4JCircuitBreakerFactory, named "customersServiceCircuitBreaker", returning {id,"Unknown","Owner",...} on failure) and timeout to VisitsServiceClient; added wiremock-standalone:3.3.1 and reactor-test dependencies; all 13 tests in the api-gateway module pass including the 9 new tests in CustomersServiceClientIntegrationTest and ResiliencyTest. |
 | spring__petclinic__rest-37 | 1 | True | 0 | 126s | 2 | Added paginated GET /api/pets/pages endpoint to PetRestController with manual pagination via PageImpl. Full test suite: 184 tests, 0 failures, BUILD SUCCESS. |
 | spring__petclinic-71 | 1 | True | 0 | 1574s | 2 |  |
+
+<!-- === PASS 3 of 3 (2026-04-15T11:46:52Z) === -->
+
+| empty__maven__springboot3-3 | 1 | True | 0 | 105s | 1 | Created Product JPA entity with validation annotations (@NotBlank, @Size, @NotNull, @DecimalMin) and ProductRepository extending CrudRepository with custom query methods (findByPriceRange, searchByKeyword). Added spring-boot-starter-data-jpa, spring-boot-starter-validation, and H2 dependencies to pom.xml. Configured H2 in-memory database. Full test suite: 22 tests, 0 failures — BUILD SUCCESS. |
