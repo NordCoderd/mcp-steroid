@@ -313,3 +313,4 @@ ANALYSIS: dpaia__spring__petclinic-36 — fix=yes exec_code=2 efficiency=medium 
 2026-04-15T09:44:58Z PASS: dpaia__spring__petclinic-36 on run 1
 2026-04-15T09:44:58Z SCENARIO[7/17]: dpaia__jhipster__sample__app-3 start
 2026-04-15T09:44:58Z RUN[1]: dpaia__jhipster__sample__app-3 claude+mcp
+2026-04-15T09:50:56Z RESULT[1]: dpaia__jhipster__sample__app-3 fix=True exit=0 duration=136s exec_code=3
