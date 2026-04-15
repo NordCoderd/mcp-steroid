@@ -111,3 +111,9 @@ RESEARCH: hypothesis=Add pattern for multi-module Maven: "For multi-module proje
 
 The single biggest lever is NOT the skill resources — it's the **arena prompt in ArenaTestRunner.kt** which explicitly tells agents to use Bash for Maven. Skill resource changes compete against this user-message-level instruction. For maximum impact, BOTH the arena prompt AND the tool description need to align on "use IDE Maven runner, not Bash." However, the arena prompt is outside the allowed modification scope (prompts/src/main/prompts/).
 
+### Implementation Pass 2
+
+IMPLEMENT: applied hypothesis=inline-maven-test-pattern file=prompts/src/main/prompts/skill/execute-code-tool-description.md change=Inlined full 30-line MavenRunConfigurationType+SMTRunnerEventsListener kotlin[IU] code block directly in tool description. Agents see copy-paste pattern on every exec_code call. Commit d24d909e (applied by prior session).
+
+IMPLEMENT: applied hypothesis=inline-compile-check-pattern file=prompts/src/main/prompts/skill/execute-code-tool-description.md change=Inlined 5-line ProjectTaskManager.buildAllModules() kotlin code block with result checking. Agents see copy-paste compile check on every exec_code call. Contract test passes. Commit 22d7cf04.
+
