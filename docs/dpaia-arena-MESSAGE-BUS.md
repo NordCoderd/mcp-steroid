@@ -349,3 +349,4 @@ ANALYSIS: dpaia__spring__petclinic-27 — fix=yes exec_code=2 efficiency=high ga
 2026-04-15T10:50:25Z PASS: dpaia__spring__petclinic-27 on run 1
 2026-04-15T10:50:25Z SCENARIO[13/17]: dpaia__spring__petclinic__rest-3 start
 2026-04-15T10:50:25Z RUN[1]: dpaia__spring__petclinic__rest-3 claude+mcp
+2026-04-15T10:58:58Z RESULT[1]: dpaia__spring__petclinic__rest-3 fix=True exit=0 duration=396s exec_code=2
