@@ -332,3 +332,14 @@ ANALYSIS: dpaia__train__ticket-31 — fix=yes exec_code=2 efficiency=medium gap=
 2026-04-15T10:14:19Z SCENARIO[10/17]: dpaia__spring__boot__microshop-18 start
 2026-04-15T10:14:19Z RUN[1]: dpaia__spring__boot__microshop-18 claude+mcp
 2026-04-15T10:31:44Z RESULT[1]: dpaia__spring__boot__microshop-18 fix=False exit=-1 duration=900s exec_code=2
+ANALYSIS: dpaia__spring__boot__microshop-18 — fix=no exec_code=2 efficiency=low gap=Docker-in-Docker unavailable in arena (Testcontainers tests can't run); agent timed out at 900s after successful compilation+composite tests but never emitted ARENA_FIX_APPLIED
+2026-04-15T10:33:50Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-121445-dpaia__spring__boot__microshop-18-mcp
+2026-04-15T10:33:50Z FAIL: dpaia__spring__boot__microshop-18 failed all 1 runs
+2026-04-15T10:33:50Z SCENARIO[11/17]: dpaia__spring__boot__microshop-2 start
+2026-04-15T10:33:50Z RUN[1]: dpaia__spring__boot__microshop-2 claude+mcp
+2026-04-15T10:38:27Z RESULT[1]: dpaia__spring__boot__microshop-2 fix=True exit=0 duration=158s exec_code=2
+ANALYSIS: dpaia__spring__boot__microshop-2 — fix=yes exec_code=2 efficiency=high gap=none
+2026-04-15T10:39:36Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-123417-dpaia__spring__boot__microshop-2-mcp
+2026-04-15T10:39:36Z PASS: dpaia__spring__boot__microshop-2 on run 1
+2026-04-15T10:39:36Z SCENARIO[12/17]: dpaia__spring__petclinic-27 start
+2026-04-15T10:39:36Z RUN[1]: dpaia__spring__petclinic-27 claude+mcp
