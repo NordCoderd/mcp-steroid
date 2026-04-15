@@ -189,3 +189,38 @@ ANALYSIS: dpaia__feature__service-125 — fix=yes exec_code=2 efficiency=medium 
 2026-04-15T05:33:28Z SCENARIO[3/17]: dpaia__empty__maven__springboot3-1 start
 2026-04-15T05:33:28Z RUN[1]: dpaia__empty__maven__springboot3-1 claude+mcp
 2026-04-15T05:38:49Z RESULT[1]: dpaia__empty__maven__springboot3-1 fix=True exit=0 duration=235s exec_code=2
+ANALYSIS: dpaia__empty__maven__springboot3-1 — fix=yes exec_code=2 efficiency=high gap=none — IDE SDK modal caused false build-error report; agent correctly fell back to Maven compile check
+2026-04-15T05:40:42Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-073351-dpaia__empty__maven__springboot3-1-mcp
+2026-04-15T05:40:42Z PASS: dpaia__empty__maven__springboot3-1 on run 1
+2026-04-15T05:40:42Z SCENARIO[4/17]: dpaia__feature__service-25 start
+2026-04-15T05:40:42Z RUN[1]: dpaia__feature__service-25 claude+mcp
+2026-04-15T05:49:04Z RESULT[1]: dpaia__feature__service-25 fix=True exit=0 duration=331s exec_code=3
+ANALYSIS: dpaia__feature__service-25 — fix=yes exec_code=3 efficiency=medium gap=Maven JDK selection: exec_code already listed JDK 25 available; agent wasted 2 Bash calls trying JDK 17/21 first
+2026-04-15T05:51:08Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-074107-dpaia__feature__service-25-mcp
+2026-04-15T05:51:08Z PASS: dpaia__feature__service-25 on run 1
+2026-04-15T05:51:08Z SCENARIO[5/17]: dpaia__spring__petclinic__rest-14 start
+2026-04-15T05:51:08Z RUN[1]: dpaia__spring__petclinic__rest-14 claude+mcp
+2026-04-15T05:54:56Z RESULT[1]: dpaia__spring__petclinic__rest-14 fix=True exit=0 duration=127s exec_code=2
+ANALYSIS: dpaia__spring__petclinic__rest-14 — fix=yes exec_code=2 efficiency=high gap=none — agent tried Edit before Read (recovered correctly); 4 Glob misses for YAML → Bash find (negligible)
+2026-04-15T05:56:48Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-075131-dpaia__spring__petclinic__rest-14-mcp
+2026-04-15T05:56:49Z PASS: dpaia__spring__petclinic__rest-14 on run 1
+2026-04-15T05:56:49Z SCENARIO[6/17]: dpaia__spring__petclinic-36 start
+2026-04-15T05:56:49Z RUN[1]: dpaia__spring__petclinic-36 claude+mcp
+2026-04-15T06:05:51Z RESULT[1]: dpaia__spring__petclinic-36 fix=True exit=0 duration=264s exec_code=2
+ANALYSIS: dpaia__spring__petclinic-36 — fix=yes exec_code=2 efficiency=high gap=none — agent missed data.sql on first pass but recovered via test failure; 19 files touched in 265s
+2026-04-15T06:08:01Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-075711-dpaia__spring__petclinic-36-mcp
+2026-04-15T06:08:01Z PASS: dpaia__spring__petclinic-36 on run 1
+2026-04-15T06:08:01Z SCENARIO[7/17]: dpaia__jhipster__sample__app-3 start
+2026-04-15T06:08:01Z RUN[1]: dpaia__jhipster__sample__app-3 claude+mcp
+2026-04-15T06:13:57Z RESULT[1]: dpaia__jhipster__sample__app-3 fix=True exit=0 duration=135s exec_code=2
+ANALYSIS: dpaia__jhipster__sample__app-3 — fix=yes exec_code=2 efficiency=high gap=none — IDE modal caused false build-error on exec_code compile check; agent correctly fell back to Maven; 136s total, clean progression
+2026-04-15T06:15:03Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-080825-dpaia__jhipster__sample__app-3-mcp
+2026-04-15T06:15:03Z PASS: dpaia__jhipster__sample__app-3 on run 1
+2026-04-15T06:15:03Z SCENARIO[8/17]: dpaia__train__ticket-1 start
+2026-04-15T06:15:03Z RUN[1]: dpaia__train__ticket-1 claude+mcp
+2026-04-15T06:21:55Z RESULT[1]: dpaia__train__ticket-1 fix=True exit=0 duration=294s exec_code=2
+ANALYSIS: dpaia__train__ticket-1 — fix=yes exec_code=2 efficiency=medium gap=add Maven multi-module build hint (install -N root POM + install common module) and -Djacoco.skip=true to avoid ~10 wasted env-discovery Bash calls
+2026-04-15T06:23:58Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-081540-dpaia__train__ticket-1-mcp
+2026-04-15T06:23:58Z PASS: dpaia__train__ticket-1 on run 1
+2026-04-15T06:23:58Z SCENARIO[9/17]: dpaia__train__ticket-31 start
+2026-04-15T06:23:58Z RUN[1]: dpaia__train__ticket-31 claude+mcp

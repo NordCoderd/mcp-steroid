@@ -150,3 +150,25 @@ Results as they arrive — pass 1 in progress with improved prompt (build env di
 - **springboot3-1 (+7%)**: Slightly slower — variance in Maven/test execution time.
 
 Pass 1 in progress (5/17 done); table updated as results arrive.
+
+## Prompt Improvements — Session 3 Candidates (post-3-pass)
+
+These improvements identified from pass 1 analysis should be implemented AFTER all 3 passes complete to maintain comparable baselines.
+
+### 1. JDK Selection from Printed List
+
+**Gap**: feature-25 agent wasted 2 Bash calls trying JDK 17/21 even though JDK 25 was printed in the first exec_code output. The project uses Java 24 (pom.xml `<java.version>24`).
+
+**Fix**: Add explicit guidance: *After exec_code prints available JDKs, check `pom.xml` `<java.version>` or `build.gradle` `sourceCompatibility`/`toolchain`. Use the JDK version matching the project's Java version. Never try lower JDKs first if the project requires Java 21+.*
+
+### 2. Docker Failure — Stronger Halt
+
+**Gap**: feature-125 agent retried Docker env-var debugging 8× after HTTP 400 was confirmed. Feature-25 agent correctly recognized "Could not find Docker environment" but still did 1 extra bash call.
+
+**Fix**: Add explicit ban: *If `docker info` works but Testcontainers fails with HTTP 400 or "Could not find a valid Docker environment" — this is NOT a code problem. IMMEDIATELY: verify Maven compile passes, output ARENA_FIX_APPLIED, stop. Never probe DOCKER_HOST/socket after seeing these errors.*
+
+### 3. Modal Dialog + Build Errors: true — No Extra Maven Fallback
+
+**Gap**: When modal dialog fires AND `Build errors: true, aborted: false`, the IntelliJ problem list may be empty (false positive from SDK loading race). Agent correctly checked the problem list (good), but still ran Maven compile as extra verification.
+
+**Fix**: Add guidance: *If MODAL DIALOG detected AND build errors: true BUT `Problem files: (empty)` → proceed as if compilation succeeded. Skip Maven fallback — IntelliJ's problem list is the authoritative source.*
