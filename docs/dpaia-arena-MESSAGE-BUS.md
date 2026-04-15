@@ -290,3 +290,9 @@ ANALYSIS: dpaia__feature__service-125 — fix=yes exec_code=3 efficiency=medium 
 2026-04-15T08:52:38Z PASS: dpaia__feature__service-125 on run 1
 2026-04-15T08:52:38Z SCENARIO[3/17]: dpaia__empty__maven__springboot3-1 start
 2026-04-15T08:52:38Z RUN[1]: dpaia__empty__maven__springboot3-1 claude+mcp
+2026-04-15T09:06:51Z RESULT[1]: dpaia__empty__maven__springboot3-1 fix=True exit=0 duration=752s exec_code=2
+ANALYSIS: dpaia__empty__maven__springboot3-1 — fix=yes exec_code=2 efficiency=medium gap=none — credential-erasure bug in initial UserDetailsService impl caused 5 extra debug Bash calls; modal dialog on buildAllModules forced Maven fallback (known issue)
+2026-04-15T09:08:21Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-105304-dpaia__empty__maven__springboot3-1-mcp
+2026-04-15T09:08:21Z PASS: dpaia__empty__maven__springboot3-1 on run 1
+2026-04-15T09:08:21Z SCENARIO[4/17]: dpaia__feature__service-25 start
+2026-04-15T09:08:21Z RUN[1]: dpaia__feature__service-25 claude+mcp
