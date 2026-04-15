@@ -141,15 +141,22 @@ Results as they arrive — pass 1 in progress with improved prompt (build env di
 | empty__maven__springboot3-1 | 219s | 235s | +7% | 2→2 | 6→4 | 3→2 | 7→5 |
 | feature__service-25 | 380s | 331s | **-13%** | 3→3 | 10→10 | 14→16 | 1→1 |
 | spring__petclinic__rest-14 | 130s | 127s | -2% | 3→2 | 2→3 | 8→8 | ~1→0 |
+| spring__petclinic-36 | 200s | 264s | +32% | 3→2 | 6→4 | 21→22 | ~1→0 |
+| jhipster__sample__app-3 | 146s | 135s | **-8%** | 5→2 | 3→3 | 9→6 | ~1→0 |
+| train__ticket-1 | 240s | 294s | +23% | 2→2 | 31→21 | 7→7 | 1→1 |
 
-5/17 complete. Key observations:
-- **feature-125 (-30%)**: Most dramatic. Agent used printed Maven/JDK paths, never ran discovery commands. 8 writes vs 16 prior (more focused).
-- **feature-25 (-13%)**: Good improvement. Docker failure recognized quickly (330s vs 380s). Gap: JDK selection — agent wasted 2 Bash calls trying JDK 17/21 before JDK 25.
-- **petclinic-rest-14 (-2%)**: exec_code 3→2. Clean parallel edits (7 controllers + openapi.yml in 2 batches). 181/181 pass.
-- **springboot3-3 (-5%)**: exec_code 4→2 (eliminated redundant build-check call).
-- **springboot3-1 (+7%)**: Slightly slower — variance in Maven/test execution time.
+8/17 complete. Key observations:
+- **feature-125 (-30%)**: Most dramatic. Agent used printed Maven/JDK paths, never ran discovery commands.
+- **feature-25 (-13%)**: Docker failure recognized quickly. Gap: JDK selection waste.
+- **jhipster-3 (-8%)**: exec_code 5→2 (clean). Agent recognized rename-only task fast.
+- **train-ticket-1 (+23%)**: Slower but Bash dropped 31→21 (-32%). Multi-module JDK issue caused extra Maven calls.
+- **petclinic-36 (+32%)**: Agent missed data.sql on first pass, extra test iteration. Variance.
+- **springboot3-3 (-5%)**, **petclinic-rest-14 (-2%)**: Minimal improvement, already efficient.
+- **springboot3-1 (+7%)**: Maven execution variance.
 
-Pass 1 in progress (5/17 done); table updated as results arrive.
+**Aggregate (8/17)**: exec_code per scenario avg 4.0→2.1 (-47%), Bash avg 10.8→8.4 (-22%).
+
+Pass 1 in progress (8/17 done, scenario 9 running); table updated as results arrive.
 
 ## Prompt Improvements — Session 3 Candidates (post-3-pass)
 
