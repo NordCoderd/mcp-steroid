@@ -231,3 +231,14 @@ ANALYSIS: dpaia__train__ticket-31 — fix=yes exec_code=5 efficiency=medium gap=
 2026-04-15T06:33:15Z SCENARIO[10/17]: dpaia__spring__boot__microshop-18 start
 2026-04-15T06:33:15Z RUN[1]: dpaia__spring__boot__microshop-18 claude+mcp
 2026-04-15T06:50:29Z RESULT[1]: dpaia__spring__boot__microshop-18 fix=False exit=-1 duration=900s exec_code=1
+ANALYSIS: dpaia__spring__boot__microshop-18 — fix=no exec_code=1 efficiency=low gap=HARD STOP read budget violated again (43 reads before first edit); budget wording too weak for complex multi-module tasks — needs file-count cap tied to VCS diff scope
+2026-04-15T06:53:04Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-083338-dpaia__spring__boot__microshop-18-mcp
+2026-04-15T06:53:04Z FAIL: dpaia__spring__boot__microshop-18 failed all 1 runs
+2026-04-15T06:53:04Z SCENARIO[11/17]: dpaia__spring__boot__microshop-2 start
+2026-04-15T06:53:04Z RUN[1]: dpaia__spring__boot__microshop-2 claude+mcp
+2026-04-15T06:57:38Z RESULT[1]: dpaia__spring__boot__microshop-2 fix=True exit=0 duration=161s exec_code=2
+ANALYSIS: dpaia__spring__boot__microshop-2 — fix=yes exec_code=2 efficiency=medium gap=none — per-module tests redundant before full suite; wrong JAVA_HOME on first Gradle attempt
+2026-04-15T06:59:12Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-085332-dpaia__spring__boot__microshop-2-mcp
+2026-04-15T06:59:12Z PASS: dpaia__spring__boot__microshop-2 on run 1
+2026-04-15T06:59:12Z SCENARIO[12/17]: dpaia__spring__petclinic-27 start
+2026-04-15T06:59:12Z RUN[1]: dpaia__spring__petclinic-27 claude+mcp
