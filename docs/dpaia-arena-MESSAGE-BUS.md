@@ -296,3 +296,8 @@ ANALYSIS: dpaia__empty__maven__springboot3-1 — fix=yes exec_code=2 efficiency=
 2026-04-15T09:08:21Z PASS: dpaia__empty__maven__springboot3-1 on run 1
 2026-04-15T09:08:21Z SCENARIO[4/17]: dpaia__feature__service-25 start
 2026-04-15T09:08:21Z RUN[1]: dpaia__feature__service-25 claude+mcp
+ANALYSIS: dpaia__feature__service-25 — fix=no exec_code=2 efficiency=low gap=Docker-success hint not followed: agent spent 45+ Bash calls debugging Testcontainers Docker connectivity instead of declaring success after compilation passed
+2026-04-15T09:28:52Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-110846-dpaia__feature__service-25-mcp
+2026-04-15T09:28:52Z FAIL: dpaia__feature__service-25 failed all 1 runs
+2026-04-15T09:28:52Z SCENARIO[5/17]: dpaia__spring__petclinic__rest-14 start
+2026-04-15T09:28:52Z RUN[1]: dpaia__spring__petclinic__rest-14 claude+mcp
