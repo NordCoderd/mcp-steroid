@@ -254,3 +254,9 @@ ANALYSIS: dpaia__spring__petclinic__rest-3 — fix=yes exec_code=2 efficiency=hi
 2026-04-15T07:23:54Z PASS: dpaia__spring__petclinic__rest-3 on run 1
 2026-04-15T07:23:54Z SCENARIO[14/17]: dpaia__piggymetrics-6 start
 2026-04-15T07:23:54Z RUN[1]: dpaia__piggymetrics-6 claude+mcp
+2026-04-15T07:30:29Z RESULT[1]: dpaia__piggymetrics-6 fix=True exit=0 duration=304s exec_code=1
+ANALYSIS: dpaia__piggymetrics-6 — fix=yes exec_code=1 efficiency=medium gap=none — agent followed Docker hint correctly; code changes compile; infrastructure blocks actual test pass
+2026-04-15T07:31:49Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-092419-dpaia__piggymetrics-6-mcp
+2026-04-15T07:31:49Z PASS: dpaia__piggymetrics-6 on run 1
+2026-04-15T07:31:49Z SCENARIO[15/17]: dpaia__spring__petclinic__microservices-5 start
+2026-04-15T07:31:49Z RUN[1]: dpaia__spring__petclinic__microservices-5 claude+mcp
