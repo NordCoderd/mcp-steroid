@@ -435,3 +435,9 @@ ANALYSIS: dpaia__spring__boot__microshop-2 — fix=yes exec_code=2 efficiency=hi
 2026-04-15T13:33:23Z PASS: dpaia__spring__boot__microshop-2 on run 1
 2026-04-15T13:33:23Z SCENARIO[12/17]: dpaia__spring__petclinic-27 start
 2026-04-15T13:33:23Z RUN[1]: dpaia__spring__petclinic-27 claude+mcp
+2026-04-15T13:42:35Z RESULT[1]: dpaia__spring__petclinic-27 fix=True exit=0 duration=282s exec_code=2
+ANALYSIS: dpaia__spring__petclinic-27 — fix=yes exec_code=2 efficiency=high gap=none — clean 283s run; read budget slightly exceeded (12 before first write) but justified for 5-file feature; exec_code compile timed out, fell back to Maven correctly
+2026-04-15T13:44:19Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-153348-dpaia__spring__petclinic-27-mcp
+2026-04-15T13:44:19Z PASS: dpaia__spring__petclinic-27 on run 1
+2026-04-15T13:44:19Z SCENARIO[13/17]: dpaia__spring__petclinic__rest-3 start
+2026-04-15T13:44:19Z RUN[1]: dpaia__spring__petclinic__rest-3 claude+mcp
