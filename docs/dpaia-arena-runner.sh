@@ -106,12 +106,14 @@ json_field() {
   python3 -c "import json,sys; d=json.load(open('$file')); print(d.get('$field',''))" 2>/dev/null || echo ""
 }
 
-# Count steroid_execute_code calls in a decoded agent log
+# Count steroid_execute_code calls in a decoded agent log.
+# Decoded logs use the MCP-qualified format ">> mcp__mcp-steroid__steroid_execute_code (reason)"
+# Match "steroid_execute_code (" to count actual tool invocations only (not ToolSearch lookups).
 count_exec_code_calls() {
   local decoded_log="$1"
   # grep -c exits with code 1 when there are 0 matches (but still prints "0").
   # Using "|| true" avoids the double-0 that "|| echo 0" would produce.
-  grep -c ">> steroid_execute_code" "$decoded_log" 2>/dev/null || true
+  grep -c "steroid_execute_code (" "$decoded_log" 2>/dev/null || true
 }
 
 # Run a Claude sub-agent for analysis or improvement

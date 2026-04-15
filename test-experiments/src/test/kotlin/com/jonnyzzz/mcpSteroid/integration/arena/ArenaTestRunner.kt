@@ -139,6 +139,7 @@ class ArenaTestRunner(
         appendLine("- Test-class command template: `$runClassCommand`")
         if (testCase.buildSystem == "maven") {
             appendLine("- **NEVER use `$buildWrapper install -am`** (also-make). The `-am` flag builds ALL upstream dependencies (potentially 48+ modules) and causes OOM in the container. Install only what you need: `$buildWrapper install -pl <module> -DskipTests`.")
+            appendLine("- **Maven wrapper not found / `./mvnw` permission error**: If `./mvnw` is missing or not executable from the project root, use the bundled Maven directly: `JAVA_HOME=/usr/lib/jvm/temurin-17-<arch> /opt/idea/plugins/maven/lib/maven3/bin/mvn -f $projectDir/pom.xml ...`. Do NOT spend more than 2 Bash calls searching for the wrapper — fall back to the bundled mvn immediately.")
             appendLine("- **Maven + Lombok/Spring Boot 2.x failures**: If Maven fails with Lombok annotation errors (`bad class file`, `class file has wrong version`, or `com.sun.tools.javac.code.Symbol` errors), the default JAVA_HOME (Java 21) may be incompatible. Run `ls /usr/lib/jvm/` to find available JDKs, then try: `JAVA_HOME=/usr/lib/jvm/temurin-17-<arch> $buildWrapper ...`. Do NOT use `steroid_execute_code` or IntelliJ compiler to fix Maven compilation failures — bash + correct JAVA_HOME is always faster.")
             appendLine("- **Maven missing module dependency** (e.g. `Could not resolve .../ts-common...`): install only that module: `JAVA_HOME=... $buildWrapper install -pl <missing-module> -DskipTests -Dspotless.check.skip=true`. Do NOT use IntelliJ APIs to resolve Maven module dependencies.")
         }
@@ -160,8 +161,9 @@ class ArenaTestRunner(
 
         if (withMcp) {
             appendLine("- IntelliJ MCP is available; the project is already open and indexed.")
-            appendLine("- Use `steroid_execute_code` for **IDE-specific operations only**: VCS diff (`ChangeListManager`), PSI queries, type hierarchy, cross-file reference search (`ReferencesSearch`), and compile error inspection (`runInspectionsDirectly`, `ProjectTaskManager.buildAllModules`).")
-            appendLine("- **Run Maven/Gradle tests with the Bash tool** — do NOT use `steroid_execute_code` to run `./mvnw` or `./gradlew`. The `ProcessBuilder` pattern inside steroid is banned (classpath conflicts + token overflow). Just run: `./mvnw test -Dtest=MyTest` from Bash.")
+            appendLine("- Use `steroid_execute_code` for: VCS diff (`ChangeListManager`), PSI queries, type hierarchy, cross-file reference search (`ReferencesSearch`), **IntelliJ builds** (`ProjectTaskManager.buildAllModules`), and **running tests via IntelliJ** (`ProjectTaskManager.getInstance(project).run(...)`).")
+            appendLine("- **Prefer IntelliJ builds over Maven/Gradle for compilation checks** — use `ProjectTaskManager.buildAllModules()` instead of `./mvnw test-compile` or `./gradlew compileJava`. IntelliJ incremental build is ~3× faster than a cold Maven compile and shows errors directly. Reserve `./mvnw test` (Bash) only for running the full test suite to confirm final pass/fail.")
+            appendLine("- **Do NOT use `steroid_execute_code` to run `./mvnw` or `./gradlew` via ProcessBuilder** — the ProcessBuilder pattern inside steroid is banned (classpath conflicts + token overflow). Use Bash for Maven/Gradle CLI invocations.")
             appendLine("- Keep one stable `task_id` for this task.")
             appendLine("- **Project name in IntelliJ is always `project-home`** — use this exact name in every `steroid_execute_code` call. Never use the GitHub repo name (e.g. \"petclinic\", \"spring-petclinic\") as the project name.")
             appendLine("- **The IDE is already configured** — do NOT attempt JDK/SDK setup, do NOT install plugins. Start immediately with your first real task call.")
@@ -193,11 +195,12 @@ class ArenaTestRunner(
             appendLine("- **Native file read budget — HARD STOP**: After the first `steroid_execute_code` VCS check, you may make AT MOST **10 Read/Glob/Grep calls** before your first Edit or Write. Read ONLY the files directly named in the VCS diff — NOT build files, entity classes, application configs, or files from modules not mentioned in the diff. Do NOT audit the entire project before writing code.")
             appendLine("  - **If you have already made 10 Read/Glob/Grep calls without yet making an Edit or Write: STOP IMMEDIATELY. Make your first code change now.** The test patch shows exactly what each test expects — further reading adds no value and will cause a timeout. Scope constraint: read only VCS-diff files + their direct imports. No build files, no entity classes, no application.yml, no pom.xml from unrelated modules.")
             appendLine("- **MANDATORY first steroid call**: Your FIRST action must be a `steroid_execute_code` call that checks VCS changes and project readiness. This is required even for simple tasks — it confirms the IDE sees the project and shows exactly what the test patch changed.")
-            appendLine("- **MANDATORY compilation check after edits**: After all file edits (before running Maven/Gradle tests), run ONE `steroid_execute_code` call to trigger IntelliJ compilation. This catches errors in ~2s vs waiting for a full Maven compile cycle (~25s). Use this exact code:")
+            appendLine("- **MANDATORY compilation check after edits**: After all file edits (before running Maven/Gradle tests), run ONE `steroid_execute_code` call to trigger IntelliJ compilation. **Do NOT use `./mvnw test-compile` or `./gradlew compileJava` for this check** — IntelliJ incremental build catches errors in ~2-5s vs a cold Maven compile (~25-60s). Use this exact code:")
             appendLine("  ```kotlin")
             appendLine("  val result = com.intellij.task.ProjectTaskManager.getInstance(project).buildAllModules().blockingGet(60_000)")
             appendLine("  println(\"Build errors: ${'$'}{result?.hasErrors()}, aborted: ${'$'}{result?.isAborted}\")")
             appendLine("  ```")
+            appendLine("  **If `buildAllModules()` returns `isAborted=true`** (IntelliJ blocked by an SDK resolution modal): fall back to `./mvnw test-compile -Dspotless.check.skip=true` via Bash for that compilation check only. Do NOT retry `buildAllModules` in a loop.")
             appendLine("- For simple multi-file edits (renames, annotation changes), use `Grep` + `Read` + `Edit` for the edits themselves, but still use steroid for the mandatory first call and compilation check.")
             appendLine("- **First call recipe** — combine readiness + Docker + VCS changes in ONE `steroid_execute_code` call (saves ~60s vs 3 separate calls):")
             appendLine("  ```kotlin")
