@@ -592,6 +592,21 @@ println(if (configured == null) "[JDK-SETUP] WARNING: Configuration timed out af
                 } catch (e: Exception) {
                     println("[IMPORT] Gradle source download setting failed: ${'$'}{e.message}")
                 }
+                // Trigger Gradle refresh so source download setting takes effect
+                try {
+                    println("[IMPORT] Triggering Gradle refresh...")
+                    val gradleProjectPath = project.basePath!!
+                    com.intellij.openapi.externalSystem.util.ExternalSystemUtil.refreshProject(
+                        gradleProjectPath,
+                        com.intellij.openapi.externalSystem.importing.ImportSpecBuilder(
+                            project,
+                            org.jetbrains.plugins.gradle.util.GradleConstants.SYSTEM_ID
+                        ).build()
+                    )
+                    kotlinx.coroutines.delay(2_000L)
+                } catch (e: Exception) {
+                    println("[IMPORT] Gradle refresh failed: ${'$'}{e.message}")
+                }
             """.trimIndent()
             BuildSystem.NONE -> """
                 println("[IMPORT] No build system — skipping import trigger")
