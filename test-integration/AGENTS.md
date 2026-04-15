@@ -4,6 +4,38 @@
 suite. Experimental / long-running tests live in the sibling `:test-experiments` module, which
 depends on this one for the infrastructure.
 
+## Researching IntelliJ APIs — Use MCP Steroid
+
+**The IntelliJ project is open in the IDE (`~/Work/intellij`).** Use `steroid_execute_code`
+with `project_name="intellij"` to research APIs directly via PSI — this is faster and more
+accurate than file-based search.
+
+**Pattern: Find a class and inspect its methods**
+```
+// steroid_execute_code on project "intellij"
+import com.intellij.psi.search.FilenameIndex
+import com.intellij.psi.search.GlobalSearchScope
+val scope = GlobalSearchScope.allScope(project)
+val files = readAction { FilenameIndex.getVirtualFilesByName("MavenRunConfigurationType.java", scope) }
+files.forEach { f ->
+    val lines = String(f.contentsToByteArray(), f.charset).lines()
+    lines.forEachIndexed { idx, line ->
+        if (line.contains("fun runConfiguration") || line.contains("@Deprecated") || line.contains("@ApiStatus")) {
+            println("L${idx+1}: ${line.trim()}")
+            for (i in 1..5) { lines.getOrNull(idx+i)?.let { println("  L${idx+1+i}: ${it.trim()}") } }
+        }
+    }
+}
+```
+
+**Why this is better than file search:**
+- O(1) indexed lookup via `FilenameIndex` — no `find` or `grep` needed
+- Can use PSI to resolve types, find usages, check deprecation annotations
+- Works on ALL open projects (intellij, mcp-steroid, jb-cli)
+- Finds internal/non-exported classes that grep might miss
+
+**Both you and sub-agents MUST use MCP Steroid** for IntelliJ API research — not file search tools.
+
 ## Architecture
 
 ```
