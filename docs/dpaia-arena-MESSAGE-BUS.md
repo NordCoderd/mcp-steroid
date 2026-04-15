@@ -284,3 +284,5 @@ ANALYSIS: dpaia__empty__maven__springboot3-3 — fix=yes exec_code=3 efficiency=
 2026-04-15T08:37:50Z PASS: dpaia__empty__maven__springboot3-3 on run 1
 2026-04-15T08:37:50Z SCENARIO[2/17]: dpaia__feature__service-125 start
 2026-04-15T08:37:50Z RUN[1]: dpaia__feature__service-125 claude+mcp
+2026-04-15T08:50:25Z RESULT[1]: dpaia__feature__service-125 fix=True exit=0 duration=570s exec_code=3
+ANALYSIS: dpaia__feature__service-125 — fix=yes exec_code=3 efficiency=medium gap=did not run all FAIL_TO_PASS test classes (only 1 of 4); Docker HTTP 400 still triggered 3 wasted probe calls
