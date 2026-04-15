@@ -116,6 +116,8 @@ abstract class DpaiaScenarioBaseTest {
             val rawOutput = result.agentResult.stdout
             val tokens = extractTokenUsage(rawOutput)
             val testMetrics = extractTestMetrics(rawOutput)
+            val decodedLogMetrics = findDecodedLogFile(session.runDirInContainer)
+                ?.let { extractDecodedLogMetrics(it.readText()) }
 
             val record = RunRecord(
                 instanceId = testCase.instanceId,
@@ -128,6 +130,7 @@ abstract class DpaiaScenarioBaseTest {
                 summary = result.evaluation.agentSummary,
                 tokenUsage = tokens,
                 testMetrics = testMetrics,
+                decodedLogMetrics = decodedLogMetrics,
             )
             results.add(record)
 
@@ -150,6 +153,10 @@ abstract class DpaiaScenarioBaseTest {
             }
             if (testMetrics != null) {
                 println("[ARENA]   Tests:          ${testMetrics.testsRun} run, ${testMetrics.testsFail} fail, BUILD ${if (testMetrics.buildSuccess == true) "SUCCESS" else "FAILURE"}")
+            }
+            if (decodedLogMetrics != null) {
+                println("[ARENA]   exec_code:      ${decodedLogMetrics.execCodeCalls}")
+                println("[ARENA]   Read/Write/Bash: ${decodedLogMetrics.readCalls}/${decodedLogMetrics.writeCalls}/${decodedLogMetrics.bashCalls}")
             }
             println("[ARENA]   Summary:        ${record.summary ?: "(none)"}")
             println("[ARENA] ════════════════════════════════════════")
@@ -241,6 +248,12 @@ abstract class DpaiaScenarioBaseTest {
                 put("tests_fail", m.testsFail)
                 m.buildSuccess?.let { put("build_success", it) }
             }
+            record.decodedLogMetrics?.let { d ->
+                put("exec_code_calls", d.execCodeCalls)
+                put("read_calls", d.readCalls)
+                put("write_calls", d.writeCalls)
+                put("bash_calls", d.bashCalls)
+            }
             put("agent_summary", record.summary ?: "")
             put("timestamp", java.time.Instant.now().toString())
         }
@@ -268,6 +281,7 @@ abstract class DpaiaScenarioBaseTest {
         val summary: String?,
         val tokenUsage: TokenUsage?,
         val testMetrics: TestMetrics?,
+        val decodedLogMetrics: DecodedLogMetrics? = null,
     )
 
     companion object {
