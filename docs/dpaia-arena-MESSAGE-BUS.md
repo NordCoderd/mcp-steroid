@@ -423,3 +423,9 @@ ANALYSIS: dpaia__train__ticket-31 — fix=yes exec_code=3 efficiency=medium gap=
 2026-04-15T13:07:15Z PASS: dpaia__train__ticket-31 on run 1
 2026-04-15T13:07:15Z SCENARIO[10/17]: dpaia__spring__boot__microshop-18 start
 2026-04-15T13:07:15Z RUN[1]: dpaia__spring__boot__microshop-18 claude+mcp
+2026-04-15T13:24:23Z RESULT[1]: dpaia__spring__boot__microshop-18 fix=False exit=-1 duration=900s exec_code=1
+ANALYSIS: dpaia__spring__boot__microshop-18 — fix=no exec_code=1 efficiency=low gap=HARD STOP read budget violated again (35+ reads before first edit); add "after writes, IMMEDIATELY compile — no more reads" rule
+2026-04-15T13:26:43Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-150741-dpaia__spring__boot__microshop-18-mcp
+2026-04-15T13:26:43Z FAIL: dpaia__spring__boot__microshop-18 failed all 1 runs
+2026-04-15T13:26:43Z SCENARIO[11/17]: dpaia__spring__boot__microshop-2 start
+2026-04-15T13:26:43Z RUN[1]: dpaia__spring__boot__microshop-2 claude+mcp
