@@ -152,8 +152,9 @@ Results as they arrive — pass 1 in progress with improved prompt (build env di
 | piggymetrics-6 | 240s³ | 304s | +27%⁴ | 2→1 | 20→17 | 7→8 | 1→1 |
 | spring__petclinic__microservices-5 | 373s | 468s | +25% | 4→2 | 4→5 | 14→9 | 1→2 |
 | spring__petclinic__rest-37 | 88s | 125s | +42% | 3→2 | 2→2 | 2→3 | ~1→0 |
+| spring__petclinic-71 | 2307s³ | 2268s | **-2%⁴** | 3→7 | 28→20 | 42→38 | 27→23 |
 
-16/17 complete (15 pass, 1 fail). ³ Original took 3 runs. ⁴ First-run pass (orig failed runs 1-2). Key observations:
+**PASS 1 COMPLETE: 17/17 done (16 pass, 1 fail).** ³ Original took 3 runs. ⁴ First-run pass (orig needed 3). Key observations:
 - **feature-125 (-30%)**: Most dramatic. Agent used printed Maven/JDK paths, never ran discovery commands.
 - **feature-25 (-13%)**: Docker failure recognized quickly. Gap: JDK selection waste.
 - **jhipster-3 (-8%)**: exec_code 5→2 (clean). Agent recognized rename-only task fast.
@@ -171,8 +172,15 @@ Results as they arrive — pass 1 in progress with improved prompt (build env di
 - **piggymetrics-6 (first-run pass!)**: Original needed 3 runs (Docker pull stall, API 400). Now passes first try in 304s. Docker handling improved.
 - **microservices-5 (+25%)**: Slower (468s vs 373s). Reads dropped (14→9), exec_code 4→2, but Bash 4→5.
 - **rest-37 (+42%)**: Slowest delta. Simple scenario (88s baseline), variance dominates.
+- **petclinic-71 (-2%, first-run pass!)**: The monster scenario — entire Spring Petclinic from scratch. 2268s vs 2307s (3rd run). Original needed 3 runs; now passes first try. ec 3→7 (more compile checks for 23 files), Bash 28→20 (-29%).
 
-**Aggregate (15 passing/17)**: exec_code per scenario avg 3.3→2.2 (-33%), Bash avg 10.7→8.2 (-23%).
+**PASS 1 FINAL AGGREGATE (16 passing / 17 total)**:
+- exec_code per scenario avg: 3.3 → 2.6 (-21%)
+- Bash per scenario avg: 11.5 → 8.8 (-23%)
+- First-run pass rate: 14/17 (orig) → 16/17 (+2 scenarios now pass first try: piggymetrics-6, petclinic-71)
+- Only failure: microshop-18 (exploration loop, needs MAX_RUNS>1)
+
+Pass 2 started at 08:31 UTC (scenario 1 springboot3-3 running).
 
 Pass 1: 16/17 done, scenario 17 (petclinic-71, baseline 2307s) running — last one.
 
