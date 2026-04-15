@@ -314,3 +314,8 @@ ANALYSIS: dpaia__spring__petclinic-36 — fix=yes exec_code=2 efficiency=medium 
 2026-04-15T09:44:58Z SCENARIO[7/17]: dpaia__jhipster__sample__app-3 start
 2026-04-15T09:44:58Z RUN[1]: dpaia__jhipster__sample__app-3 claude+mcp
 2026-04-15T09:50:56Z RESULT[1]: dpaia__jhipster__sample__app-3 fix=True exit=0 duration=136s exec_code=3
+2026-04-15T09:57:06Z WARN: analysis sub-agent non-zero exit
+2026-04-15T09:57:06Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-114523-dpaia__jhipster__sample__app-3-mcp
+2026-04-15T09:57:06Z PASS: dpaia__jhipster__sample__app-3 on run 1
+2026-04-15T09:57:06Z SCENARIO[8/17]: dpaia__train__ticket-1 start
+2026-04-15T09:57:06Z RUN[1]: dpaia__train__ticket-1 claude+mcp
