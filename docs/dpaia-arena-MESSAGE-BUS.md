@@ -405,3 +405,9 @@ ANALYSIS: dpaia__spring__petclinic-36 — fix=yes exec_code=2 efficiency=high ga
 2026-04-15T12:40:33Z PASS: dpaia__spring__petclinic-36 on run 1
 2026-04-15T12:40:33Z SCENARIO[7/17]: dpaia__jhipster__sample__app-3 start
 2026-04-15T12:40:33Z RUN[1]: dpaia__jhipster__sample__app-3 claude+mcp
+2026-04-15T12:46:47Z RESULT[1]: dpaia__jhipster__sample__app-3 fix=True exit=0 duration=138s exec_code=2
+ANALYSIS: dpaia__jhipster__sample__app-3 — fix=yes exec_code=2 efficiency=high gap=none — clean linear workflow: 9 files renamed in parallel batches, 139s, 47/47 tests pass
+2026-04-15T12:48:21Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-144102-dpaia__jhipster__sample__app-3-mcp
+2026-04-15T12:48:21Z PASS: dpaia__jhipster__sample__app-3 on run 1
+2026-04-15T12:48:21Z SCENARIO[8/17]: dpaia__train__ticket-1 start
+2026-04-15T12:48:21Z RUN[1]: dpaia__train__ticket-1 claude+mcp
