@@ -242,3 +242,4 @@ ANALYSIS: dpaia__spring__boot__microshop-2 — fix=yes exec_code=2 efficiency=me
 2026-04-15T06:59:12Z PASS: dpaia__spring__boot__microshop-2 on run 1
 2026-04-15T06:59:12Z SCENARIO[12/17]: dpaia__spring__petclinic-27 start
 2026-04-15T06:59:12Z RUN[1]: dpaia__spring__petclinic-27 claude+mcp
+2026-04-15T07:11:54Z RESULT[1]: dpaia__spring__petclinic-27 fix=True exit=0 duration=480s exec_code=2
