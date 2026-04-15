@@ -87,8 +87,6 @@ class DockerCodexSession(
             add("exec")
             add("--model")
             add(model)
-            add("--reasoning-effort")
-            add("high")
             add("--dangerously-bypass-approvals-and-sandbox")
             add("--skip-git-repo-check")
             add("--json")
