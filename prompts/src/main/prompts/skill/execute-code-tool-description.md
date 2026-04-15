@@ -22,7 +22,44 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - Inspections: Run code analysis, get warnings/errors
 - Actions: Trigger any IDE action programmatically
 - **Compile check**: `ProjectTaskManager.getInstance(project).build(*modules).await()` — 2-5s incremental, replaces `./mvnw test-compile` (25-60s)
-- **Run Maven tests via IDE** — `MavenRunConfigurationType.runConfiguration()` + `SMTRunnerEventsListener` gives structured pass/fail in ~4s, saves ~31s vs Bash `./mvnw test` (Maven cold start). Read [mcp-steroid://skill/coding-with-intellij-spring] for the copy-paste pattern (section "Maven projects — MavenRunConfigurationType"). **Do NOT use Bash `./mvnw test` as primary approach — it is a LAST-RESORT fallback only.**
+- **Run Maven tests via IDE** — saves ~31s vs Bash `./mvnw test`. **Copy-paste this pattern — do NOT use `./mvnw test`:**
+
+```kotlin[IU]
+import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
+import org.jetbrains.idea.maven.execution.MavenRunnerParameters
+import com.intellij.execution.testframework.sm.runner.SMTRunnerEventsListener
+import com.intellij.execution.testframework.sm.runner.SMTestProxy
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
+import kotlin.time.Duration.Companion.minutes
+
+val result = CompletableDeferred<Boolean>()
+project.messageBus.connect().subscribe(SMTRunnerEventsListener.TEST_STATUS, object : SMTRunnerEventsListener {
+    override fun onTestingFinished(testsRoot: SMTestProxy.SMRootTestProxy) { result.complete(testsRoot.isPassed) }
+    override fun onTestingStarted(testsRoot: SMTestProxy.SMRootTestProxy) {}
+    override fun onTestsCountInSuite(count: Int) {}
+    override fun onTestStarted(test: SMTestProxy) {}
+    override fun onTestFinished(test: SMTestProxy) {}
+    override fun onTestFailed(test: SMTestProxy) {}
+    override fun onTestIgnored(test: SMTestProxy) {}
+    override fun onSuiteFinished(suite: SMTestProxy) {}
+    override fun onSuiteStarted(suite: SMTestProxy) {}
+    override fun onCustomProgressTestsCategory(categoryName: String?, count: Int) {}
+    override fun onCustomProgressTestStarted() {}
+    override fun onCustomProgressTestFailed() {}
+    override fun onCustomProgressTestFinished() {}
+    override fun onSuiteTreeNodeAdded(testProxy: SMTestProxy) {}
+    override fun onSuiteTreeStarted(suite: SMTestProxy) {}
+})
+MavenRunConfigurationType.runConfiguration(project,
+    MavenRunnerParameters(true, project.basePath!!, "pom.xml",
+        listOf("test", "-Dtest=MyTestClass", "-Dspotless.check.skip=true"), emptyList()),
+    null, null) {}
+val passed = withTimeout(5.minutes) { result.await() }
+println("Maven test: passed=$passed")
+```
+
+  Replace `MyTestClass` with target class. Always pass `dialog_killer: true`. See [mcp-steroid://skill/coding-with-intellij-spring] for Gradle patterns and edge cases.
 - **Run Gradle tests via IDE** — `GradleRunConfiguration` + `setRunAsTest(true)` + `SMTRunnerEventsListener`. Read [mcp-steroid://skill/coding-with-intellij-spring] (section "Gradle projects").
 
 **⚠️ MANDATORY — before your first `./mvnw` or `./gradlew` Bash command**: STOP. Read `mcp-steroid://skill/coding-with-intellij-spring` for IDE test runner patterns. Each Bash Maven/Gradle call wastes ~31s on cold JVM startup that the IDE runner avoids. Only fall back to Bash after the IDE pattern has timed out (>2 min).
