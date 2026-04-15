@@ -411,3 +411,9 @@ ANALYSIS: dpaia__jhipster__sample__app-3 — fix=yes exec_code=2 efficiency=high
 2026-04-15T12:48:21Z PASS: dpaia__jhipster__sample__app-3 on run 1
 2026-04-15T12:48:21Z SCENARIO[8/17]: dpaia__train__ticket-1 start
 2026-04-15T12:48:21Z RUN[1]: dpaia__train__ticket-1 claude+mcp
+2026-04-15T12:56:44Z RESULT[1]: dpaia__train__ticket-1 fix=True exit=0 duration=380s exec_code=3
+ANALYSIS: dpaia__train__ticket-1 — fix=yes exec_code=3 efficiency=medium gap=add Maven multi-module hint (install -N root POM + ts-common) and -Djacoco.skip=true -DargLine="-Xmx512m" to avoid ~10 wasted Bash calls; exec_code compile script used unavailable WolfTheProblemSolver API
+2026-04-15T12:59:10Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-144849-dpaia__train__ticket-1-mcp
+2026-04-15T12:59:10Z PASS: dpaia__train__ticket-1 on run 1
+2026-04-15T12:59:10Z SCENARIO[9/17]: dpaia__train__ticket-31 start
+2026-04-15T12:59:10Z RUN[1]: dpaia__train__ticket-31 claude+mcp
