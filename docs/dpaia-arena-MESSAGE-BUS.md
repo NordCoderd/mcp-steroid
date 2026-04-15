@@ -301,3 +301,9 @@ ANALYSIS: dpaia__feature__service-25 — fix=no exec_code=2 efficiency=low gap=D
 2026-04-15T09:28:52Z FAIL: dpaia__feature__service-25 failed all 1 runs
 2026-04-15T09:28:52Z SCENARIO[5/17]: dpaia__spring__petclinic__rest-14 start
 2026-04-15T09:28:52Z RUN[1]: dpaia__spring__petclinic__rest-14 claude+mcp
+2026-04-15T09:32:43Z RESULT[1]: dpaia__spring__petclinic__rest-14 fix=True exit=0 duration=111s exec_code=2
+ANALYSIS: dpaia__spring__petclinic__rest-14 — fix=yes exec_code=2 efficiency=high gap=none — agent tried Edit before Read on 6 files (recovered correctly); all compliance checks pass
+2026-04-15T09:34:03Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-112926-dpaia__spring__petclinic__rest-14-mcp
+2026-04-15T09:34:03Z PASS: dpaia__spring__petclinic__rest-14 on run 1
+2026-04-15T09:34:03Z SCENARIO[6/17]: dpaia__spring__petclinic-36 start
+2026-04-15T09:34:03Z RUN[1]: dpaia__spring__petclinic-36 claude+mcp
