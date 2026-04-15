@@ -331,3 +331,4 @@ ANALYSIS: dpaia__train__ticket-31 — fix=yes exec_code=2 efficiency=medium gap=
 2026-04-15T10:14:19Z PASS: dpaia__train__ticket-31 on run 1
 2026-04-15T10:14:19Z SCENARIO[10/17]: dpaia__spring__boot__microshop-18 start
 2026-04-15T10:14:19Z RUN[1]: dpaia__spring__boot__microshop-18 claude+mcp
+2026-04-15T10:31:44Z RESULT[1]: dpaia__spring__boot__microshop-18 fix=False exit=-1 duration=900s exec_code=2
