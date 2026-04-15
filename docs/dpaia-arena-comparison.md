@@ -138,7 +138,11 @@ First two scenarios with the improved prompt show consistent improvement:
 |----------|------------------|-----------------|---|---------------------|-----------------|------------------|
 | empty__maven__springboot3-3 | 154s | 146s | -5% | 4→2 | 6→5 | 5→3 |
 | feature__service-125 | 638s | 444s | **-30%** | 4→2 | 17→15 | 22→18 |
+| empty__maven__springboot3-1 | 219s | 235s | +7% | 2→2 | 6→4 | 3→2 |
 
-**Key observation for feature__service-125**: The agent used the printed Maven/JDK paths immediately for all Bash commands, never running discovery commands. Duration improved from 638s to 444s — the 30% saving comes from fewer exploration+discovery calls.
+**Key observations**:
+- **feature-125 (-30%)**: Most dramatic improvement. Agent used printed Maven/JDK paths immediately, never ran `find /opt -name mvn` or `ls /usr/lib/jvm/`. Also wrote 8 files vs 16 in previous run (more focused implementation).
+- **springboot3-3 (-5%)**: Minor improvement, exec_code reduced from 4→2, bash from 6→5.
+- **springboot3-1 (+7%)**: Slightly slower despite 2 fewer bash calls (4 vs 6). Variance in test execution time.
 
-Pass 1 is in progress; full 17-scenario comparison will be updated as results arrive.
+Pass 1 is in progress (3/17 done); full 17-scenario comparison updated as results arrive.
