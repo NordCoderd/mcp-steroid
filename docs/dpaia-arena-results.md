@@ -52,3 +52,4 @@ Each scenario is run up to 3 times. Analysis and prompt improvements happen betw
 
 <!-- === PASS 2 of 3 (2026-04-15T08:31:07Z) === -->
 
+| empty__maven__springboot3-3 | 1 | True | 0 | 197s | 3 | Created `Product` entity (`eval.sample.model`) with JPA annotations, Bean Validation constraints, and custom toString/equals/hashCode; created `ProductRepository` (`eval.sample.repository`) extending `CrudRepository` with derived query methods and two custom JPQL queries (`findByPriceRange`, `searchByKeyword`); added `spring-boot-starter-data-jpa`, `spring-boot-starter-validation`, and H2 runtime dependency to `pom.xml`; configured H2 in-memory datasource in `application.properties`; changed `java.version` to 21. Full suite: 22 tests, 0 failures, BUILD SUCCESS. |

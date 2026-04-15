@@ -278,3 +278,9 @@ ANALYSIS: dpaia__spring__petclinic-71 — fix=yes exec_code=7 efficiency=medium 
 2026-04-15T08:31:07Z START: dpaia-arena-runner.sh START_INDEX=0 MAX_RUNS=1
 2026-04-15T08:31:07Z SCENARIO[1/17]: dpaia__empty__maven__springboot3-3 start
 2026-04-15T08:31:07Z RUN[1]: dpaia__empty__maven__springboot3-3 claude+mcp
+2026-04-15T08:36:03Z RESULT[1]: dpaia__empty__maven__springboot3-3 fix=True exit=0 duration=197s exec_code=3
+ANALYSIS: dpaia__empty__maven__springboot3-3 — fix=yes exec_code=3 efficiency=high gap=none — modal dialog on buildAllModules caused false compile error; agent correctly fell back to Maven; 2 redundant per-class test runs before full suite
+2026-04-15T08:37:50Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-103137-dpaia__empty__maven__springboot3-3-mcp
+2026-04-15T08:37:50Z PASS: dpaia__empty__maven__springboot3-3 on run 1
+2026-04-15T08:37:50Z SCENARIO[2/17]: dpaia__feature__service-125 start
+2026-04-15T08:37:50Z RUN[1]: dpaia__feature__service-125 claude+mcp
