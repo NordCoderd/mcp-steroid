@@ -388,3 +388,8 @@ ANALYSIS: dpaia__feature__service-125 — fix=yes exec_code=3 efficiency=medium 
 2026-04-15T12:04:26Z RUN[1]: dpaia__empty__maven__springboot3-1 claude+mcp
 2026-04-15T12:09:13Z RESULT[1]: dpaia__empty__maven__springboot3-1 fix=True exit=0 duration=185s exec_code=1
 2026-04-15T12:20:14Z RESULT[1]: dpaia__feature__service-25 fix=True exit=0 duration=321s exec_code=2
+ANALYSIS: dpaia__feature__service-25 — fix=yes exec_code=3 efficiency=high gap=JDK selection: agent wasted 2 Bash calls trying JDK 21 before JDK 25; add hint to pick highest JDK when project release target exceeds 21
+2026-04-15T12:23:09Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-141203-dpaia__feature__service-25-mcp
+2026-04-15T12:23:09Z PASS: dpaia__feature__service-25 on run 1
+2026-04-15T12:23:09Z SCENARIO[5/17]: dpaia__spring__petclinic__rest-14 start
+2026-04-15T12:23:09Z RUN[1]: dpaia__spring__petclinic__rest-14 claude+mcp
