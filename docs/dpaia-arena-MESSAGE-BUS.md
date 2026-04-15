@@ -447,3 +447,9 @@ ANALYSIS: dpaia__spring__petclinic__rest-3 — fix=yes exec_code=3 efficiency=hi
 2026-04-15T13:55:51Z PASS: dpaia__spring__petclinic__rest-3 on run 1
 2026-04-15T13:55:51Z SCENARIO[14/17]: dpaia__piggymetrics-6 start
 2026-04-15T13:55:51Z RUN[1]: dpaia__piggymetrics-6 claude+mcp
+2026-04-15T14:00:21Z RESULT[1]: dpaia__piggymetrics-6 fix=True exit=0 duration=157s exec_code=1
+ANALYSIS: dpaia__piggymetrics-6 — fix=yes exec_code=2 efficiency=medium gap=none — agent followed Docker hint correctly; 2 wasted Bash calls on Maven dependency resolution (parent POM not installed first); clean 158s run with parallel edits across 6 files
+2026-04-15T14:02:14Z ANALYSIS[1]: done run_dir=/Users/jonnyzzz/Work/mcp-steroid/test-experiments/build/test-logs/test/run-20260415-155615-dpaia__piggymetrics-6-mcp
+2026-04-15T14:02:14Z PASS: dpaia__piggymetrics-6 on run 1
+2026-04-15T14:02:14Z SCENARIO[15/17]: dpaia__spring__petclinic__microservices-5 start
+2026-04-15T14:02:14Z RUN[1]: dpaia__spring__petclinic__microservices-5 claude+mcp
