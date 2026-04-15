@@ -21,7 +21,15 @@ This is a **stateful** API - everything you do changes the IDE state. The Intell
 - Code navigation: Find usages, go to definition, symbol search
 - Inspections: Run code analysis, get warnings/errors
 - Actions: Trigger any IDE action programmatically
-- **Compile check**: `ProjectTaskManager.getInstance(project).build(*modules).await()` — 2-5s incremental, replaces `./mvnw test-compile` (25-60s)
+- **Compile check** — 2-5s incremental, replaces `./mvnw test-compile` (25-60s). **Use after every file edit — do NOT use `./mvnw compile`:**
+
+```kotlin
+import com.intellij.task.ProjectTaskManager
+import org.jetbrains.concurrency.await
+
+val result = ProjectTaskManager.getInstance(project).buildAllModules().await()
+println("Compile errors: ${result.hasErrors()}, aborted: ${result.isAborted()}")
+```
 - **Run Maven tests via IDE** — saves ~31s vs Bash `./mvnw test`. **Copy-paste this pattern — do NOT use `./mvnw test`:**
 
 ```kotlin[IU]
