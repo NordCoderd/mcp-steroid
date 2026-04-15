@@ -257,7 +257,7 @@ class ArenaTestRunner(
             appendLine("- PASS_TO_PASS tests must stay passing.")
         }
         appendLine("- `ARENA_FIX_APPLIED: yes` requires actual test output showing BUILD SUCCESS — not just compile checks.")
-        appendLine("- Output these markers on separate lines:")
+        appendLine("- **MANDATORY final output** — after the full test suite passes, your response MUST end with these exact markers on their own lines. Do NOT substitute Maven/Gradle's `BUILD SUCCESS` console output for these markers — the harness only detects the explicit `ARENA_FIX_APPLIED:` line:")
         appendLine("ARENA_FIX_APPLIED: yes")
         appendLine("ARENA_SUMMARY: <one line summary of what changed and what test output confirmed success>")
     }
