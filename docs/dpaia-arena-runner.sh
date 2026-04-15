@@ -15,8 +15,9 @@
 # Environment:
 #   RUN_AGENT   — path to run-agent.sh (default: ~/Work/jonnyzzz-ai-coder/run-agent.sh)
 #   MAX_RUNS    — maximum attempts per scenario (default: 3)
-#   SKIP_IMPROVE — set to 1 to skip improvement sub-agent on failure
-#   DRY_RUN     — set to 1 to print commands without executing gradle/sub-agents
+#   SKIP_IMPROVE  — set to 1 to skip improvement sub-agent on failure
+#   SKIP_ANALYZE  — set to 1 to skip analysis sub-agent after each run (saves ~10 min/scenario)
+#   DRY_RUN       — set to 1 to print commands without executing gradle/sub-agents
 #
 # Output:
 #   docs/dpaia-arena-results.md   — running results table (appended per run)
@@ -31,6 +32,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 RUN_AGENT="${RUN_AGENT:-$HOME/Work/jonnyzzz-ai-coder/run-agent.sh}"
 MAX_RUNS="${MAX_RUNS:-3}"
 SKIP_IMPROVE="${SKIP_IMPROVE:-0}"
+SKIP_ANALYZE="${SKIP_ANALYZE:-0}"
 DRY_RUN="${DRY_RUN:-0}"
 START_INDEX="${1:-0}"
 
@@ -261,7 +263,7 @@ for (( idx=START_INDEX; idx<TOTAL; idx++ )); do
     bus "RESULT[$run]: $INSTANCE_ID fix=$CLAIMED_FIX exit=$EXIT_CODE duration=${AGENT_DURATION_S}s exec_code=$EXEC_CODE_CALLS"
 
     # ── Analysis sub-agent ───────────────────────────────────────────────────
-    if [ -n "$RUN_DIR" ]; then
+    if [ -n "$RUN_DIR" ] && [ "${SKIP_ANALYZE:-0}" != "1" ]; then
       ANALYSIS_PROMPT_TMP="$RUN_DIR/analysis-prompt.md"
       ANALYSIS_OUTPUT="$RUN_DIR/analysis.md"
       build_analysis_prompt "$INSTANCE_ID" "$RUN_DIR" "$RESULT_JSON" "$ANALYSIS_PROMPT_TMP"

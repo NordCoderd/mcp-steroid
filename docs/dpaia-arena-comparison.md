@@ -130,19 +130,23 @@ Added explicit note that `=== MODAL DIALOG DETECTED ===` in buildAllModules outp
 
 Added rule for microservices projects: implement module-by-module (read+write MODULE_1 → move to MODULE_2), not read-all-services-first. This prevents the 40-read exploration loop seen in microshop-18.
 
-## Pass 1 of 3 — Early Results (2026-04-15)
+## Pass 1 of 3 — Results (2026-04-15)
 
-First two scenarios with the improved prompt show consistent improvement:
+Results as they arrive — pass 1 in progress with improved prompt (build env discovery + multi-module scoping):
 
-| Scenario | Original Duration | Pass 1 Duration | Δ | exec_code (orig→new) | Bash (orig→new) | Reads (orig→new) |
-|----------|------------------|-----------------|---|---------------------|-----------------|------------------|
-| empty__maven__springboot3-3 | 154s | 146s | -5% | 4→2 | 6→5 | 5→3 |
-| feature__service-125 | 638s | 444s | **-30%** | 4→2 | 17→15 | 22→18 |
-| empty__maven__springboot3-1 | 219s | 235s | +7% | 2→2 | 6→4 | 3→2 |
+| Scenario | Orig Duration | P1 Duration | Δ | ec orig→new | Bash orig→new | Reads orig→new | Writes orig→new |
+|----------|--------------|------------|---|-------------|---------------|----------------|-----------------|
+| empty__maven__springboot3-3 | 154s | 146s | -5% | 4→2 | 6→5 | 5→3 | 2→2 |
+| feature__service-125 | 638s | 444s | **-30%** | 4→2 | 17→15 | 22→18 | 8→8 |
+| empty__maven__springboot3-1 | 219s | 235s | +7% | 2→2 | 6→4 | 3→2 | 7→5 |
+| feature__service-25 | 380s | 331s | **-13%** | 3→3 | 10→10 | 14→16 | 1→1 |
+| spring__petclinic__rest-14 | 130s | 127s | -2% | 3→2 | 2→3 | 8→8 | ~1→0 |
 
-**Key observations**:
-- **feature-125 (-30%)**: Most dramatic improvement. Agent used printed Maven/JDK paths immediately, never ran `find /opt -name mvn` or `ls /usr/lib/jvm/`. Also wrote 8 files vs 16 in previous run (more focused implementation).
-- **springboot3-3 (-5%)**: Minor improvement, exec_code reduced from 4→2, bash from 6→5.
-- **springboot3-1 (+7%)**: Slightly slower despite 2 fewer bash calls (4 vs 6). Variance in test execution time.
+5/17 complete. Key observations:
+- **feature-125 (-30%)**: Most dramatic. Agent used printed Maven/JDK paths, never ran discovery commands. 8 writes vs 16 prior (more focused).
+- **feature-25 (-13%)**: Good improvement. Docker failure recognized quickly (330s vs 380s). Gap: JDK selection — agent wasted 2 Bash calls trying JDK 17/21 before JDK 25.
+- **petclinic-rest-14 (-2%)**: exec_code 3→2. Clean parallel edits (7 controllers + openapi.yml in 2 batches). 181/181 pass.
+- **springboot3-3 (-5%)**: exec_code 4→2 (eliminated redundant build-check call).
+- **springboot3-1 (+7%)**: Slightly slower — variance in Maven/test execution time.
 
-Pass 1 is in progress (3/17 done); full 17-scenario comparison updated as results arrive.
+Pass 1 in progress (5/17 done); table updated as results arrive.
