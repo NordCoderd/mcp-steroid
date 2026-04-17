@@ -2,8 +2,8 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
+import com.intellij.codeInsight.daemon.LineMarkerInfo
 import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerEx
-import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInsight.daemon.impl.ShowIntentionsPass
 import com.intellij.ide.DataManager
@@ -14,6 +14,7 @@ import com.intellij.openapi.application.EDT
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.editor.ScrollType
+import com.intellij.openapi.editor.impl.DocumentMarkupModel
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.DumbService
@@ -354,7 +355,16 @@ class ActionDiscoveryToolHandler : McpRegistrar {
         dataContext: DataContext,
         maxActions: Int,
     ): List<GutterIconInfo> {
-        val lineMarkers = readAction { DaemonCodeAnalyzerImpl.getLineMarkers(document, project) }
+        // Use public MarkupModel API instead of @Internal DaemonCodeAnalyzerImpl.getLineMarkers()
+        val lineMarkers = readAction {
+            val markupModel = DocumentMarkupModel.forDocument(document, project, true)
+            markupModel.allHighlighters
+                .filter { it.isValid }
+                .mapNotNull { highlighter ->
+                    (highlighter.gutterIconRenderer as? LineMarkerInfo.LineMarkerGutterIconRenderer<*>)
+                        ?.lineMarkerInfo
+                }
+        }
         return lineMarkers.mapNotNull { marker ->
             val renderer = marker.createGutterRenderer() ?: return@mapNotNull null
             val clickAction = renderer.clickAction?.let { toActionInfo(it, null) }
