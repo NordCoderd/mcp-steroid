@@ -235,10 +235,12 @@ class ActionDiscoveryToolHandler : McpRegistrar {
             fileType = psiFile.fileType.name,
             actionGroups = actionGroupInfo,
             intentions = IntentionsPayload(
-                intentions = intentionsInfo.intentionsToShow.map(::toIntentionActionInfo),
-                errorFixes = intentionsInfo.errorFixesToShow.map(::toIntentionActionInfo),
-                inspectionFixes = intentionsInfo.inspectionFixesToShow.map(::toIntentionActionInfo),
-                notificationActions = intentionsInfo.notificationActionsToShow.map(::toIntentionActionInfo),
+                // Severity is inferred from list membership instead of calling @Internal
+                // IntentionActionDescriptor.isError()/isInformation() methods
+                intentions = intentionsInfo.intentionsToShow.map { toIntentionActionInfo(it, isError = false, isInformation = true) },
+                errorFixes = intentionsInfo.errorFixesToShow.map { toIntentionActionInfo(it, isError = true, isInformation = false) },
+                inspectionFixes = intentionsInfo.inspectionFixesToShow.map { toIntentionActionInfo(it, isError = false, isInformation = false) },
+                notificationActions = intentionsInfo.notificationActionsToShow.map { toIntentionActionInfo(it, isError = false, isInformation = false) },
                 gutterActions = intentionsInfo.guttersToShow.map { toActionInfo(it, null) }
             ),
             gutterIcons = gutterIcons,
@@ -385,15 +387,19 @@ class ActionDiscoveryToolHandler : McpRegistrar {
         }
     }
 
-    private fun toIntentionActionInfo(descriptor: HighlightInfo.IntentionActionDescriptor): IntentionActionInfo {
+    private fun toIntentionActionInfo(
+        descriptor: HighlightInfo.IntentionActionDescriptor,
+        isError: Boolean,
+        isInformation: Boolean,
+    ): IntentionActionInfo {
         val action = descriptor.action
         return IntentionActionInfo(
             text = action.text,
             familyName = action.familyName,
             displayName = descriptor.displayName,
             className = action.javaClass.name,
-            isError = descriptor.isError,
-            isInformation = descriptor.isInformation
+            isError = isError,
+            isInformation = isInformation,
         )
     }
 
