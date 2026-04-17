@@ -41,3 +41,11 @@
 
 17 scenarios × 3 agents (claude, codex, gemini) × 2 modes (mcp, none).
 See `docs/arena-3pass-results.md` for full comparison table.
+
+## Update (2026-04-17): ModalityStateMonitor Fix Validated
+
+The `JobProvider` skip in `ModalityStateMonitor` works correctly:
+- Log confirms: "Skipping JobProvider modal entity (coroutine progress, not UI dialog)"
+- Maven execution starts successfully (no longer killed by dialog_killer)
+- New failure: exec_code timeout (5 min) — Maven test execution takes >5 min in Docker
+- The Maven test project needs a simpler test (current Calculator tests may be slow due to Maven cold start + Spring context)
