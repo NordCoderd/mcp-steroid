@@ -11,20 +11,19 @@ Execute Kotlin code directly in IntelliJ IDEA's runtime with full access to the 
 
 **Learning Curve**: Writing working code for IntelliJ APIs may require several attempts. This is normal! The API is vast and powerful. Keep trying - each attempt teaches you more about the available APIs. Use `printException()` to see stack traces when errors occur.
 
-**Comparison to LSP**: This MCP server provides functionality similar to LSP (Language Server Protocol) tools, but uses IntelliJ's native APIs instead. IntelliJ APIs are often more powerful and feature-rich than standard LSP, offering:
-- Deeper code understanding via PSI (Program Structure Interface)
-- Access to IDE-specific features (inspections, refactorings, intentions)
-- Full project model with module dependencies
-- Platform-specific indices for fast code search
+**Drop-in replacement for LSP**: This MCP server replaces LSP (Language Server Protocol) tools with IntelliJ's native APIs — same operations, deeper understanding:
+- PSI (Program Structure Interface) instead of LSP document symbols — full semantic analysis
+- IntelliJ inspections, refactorings, intentions instead of LSP code actions
+- Full project model with module dependencies instead of workspace folders
+- Platform-specific indices for O(1) code search instead of filesystem scans
 
 ## Quickstart Flow
 
 ```
 1. steroid_list_projects → get list of open projects
 2. Pick a project_name from the list
-3. steroid_capabilities → list installed plugins and languages (optional)
-4. steroid_execute_code → run Kotlin code with that project
-5. steroid_execute_feedback → report success/failure for tracking
+3. steroid_execute_code → run Kotlin code with that project
+4. steroid_execute_feedback → report success/failure for tracking
 ```
 
 **Example session:**
@@ -59,12 +58,6 @@ List all open projects. Returns IDE metadata and project names for use with `ste
 ### `steroid_list_windows`
 List open IDE windows and their associated projects. Some windows may not be tied to a project and a project can have multiple windows.
 Use this in multi-window setups to pick the correct `project_name` and `window_id` for screenshot/input tools.
-
-### `steroid_capabilities`
-List IDE capabilities such as installed plugins and registered languages.
-
-**Parameters:**
-- `include_disabled_plugins` (optional): Include disabled plugins in the response (default: false)
 
 ### `steroid_action_discovery`
 Discover available editor actions, quick-fixes, and gutter actions for a file and caret context.

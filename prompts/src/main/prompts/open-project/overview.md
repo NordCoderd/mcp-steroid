@@ -164,7 +164,7 @@ return immediately with a message indicating the project is already open.
 - Check `steroid_list_windows()` for `projectInitialized` status
 - Wait for `indexingInProgress` to become false
 - The project may need additional configuration
-- Check if all required plugins are installed via `steroid_capabilities()`
+- Check if all required plugins are installed via `steroid_execute_code`
 - Some projects require specific SDKs to be configured
 
 ### Modal dialog is blocking
