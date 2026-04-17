@@ -106,12 +106,12 @@ class MavenTestExecutionTest {
                     null, null, params, project, "Maven test (MCP)", false)
                 runManager.addConfiguration(configSettings)
                 runManager.selectedConfiguration = configSettings
-                println("MAVEN_CONFIG_CREATED: ${configSettings.name}")
+                println("MAVEN_CONFIG_CREATED: ${'$'}{configSettings.name}")
 
                 // Check if Maven project is properly imported
                 val mavenManager = org.jetbrains.idea.maven.project.MavenProjectsManager.getInstance(project)
                 val mavenProjects = mavenManager.projects
-                println("MAVEN_PROJECTS: ${mavenProjects.size} (${mavenProjects.map { it.mavenId.artifactId }})")
+                println("MAVEN_PROJECTS: ${'$'}{mavenProjects.size} (${'$'}{mavenProjects.map { it.mavenId.artifactId }})")
 
                 withContext(kotlinx.coroutines.Dispatchers.EDT) {
                     com.intellij.execution.ProgramRunnerUtil.executeConfiguration(
@@ -120,13 +120,13 @@ class MavenTestExecutionTest {
                 println("MAVEN_LAUNCH_DISPATCHED")
 
                 // Poll RunContentManager for the Maven process
-                kotlinx.coroutines.delay(3000)
+                kotlinx.coroutines.delay(5000)
                 val runContent = com.intellij.execution.ui.RunContentManager.getInstance(project)
                 val descriptors = runContent.allDescriptors
-                println("RUN_DESCRIPTORS: ${descriptors.size}")
+                println("RUN_DESCRIPTORS: ${'$'}{descriptors.size}")
                 descriptors.forEach { d ->
                     val handler = d.processHandler
-                    println("  descriptor: ${d.displayName}, terminated=${handler?.isProcessTerminated}, started=${handler?.isStartNotified}")
+                    println("  descriptor: ${'$'}{d.displayName}, terminated=${'$'}{handler?.isProcessTerminated}, started=${'$'}{handler?.isStartNotified}")
                 }
 
                 // Wait for test execution to complete
