@@ -96,19 +96,20 @@ class MavenTestExecutionTest {
                     }
                 )
 
-                // Launch via Maven IDE runner
-                MavenRunConfigurationType.runConfiguration(
-                    project,
-                    MavenRunnerParameters(
-                        /* isPomExecution= */ true,
-                        /* workingDirPath= */ project.basePath!!,
-                        /* pomFileName= */ "pom.xml",
-                        /* goals= */ listOf("test"),
-                        /* profiles= */ emptyList()
-                    ),
-                    /* settings (MavenGeneralSettings) = */ null,
-                    /* runnerSettings (MavenRunnerSettings) = */ null,
-                ) { /* ProgramRunner.Callback — completion handled by SMTRunnerEventsListener above */ }
+                // Create Maven run configuration and launch via ProgramRunnerUtil (async)
+                // Do NOT use MavenRunConfigurationType.runConfiguration() — it blocks
+                // the coroutine via invokeAndWait, preventing withTimeout from firing.
+                val runManager = com.intellij.execution.RunManager.getInstance(project)
+                val params = MavenRunnerParameters(true, project.basePath!!, "pom.xml",
+                    listOf("test"), emptyList())
+                val configSettings = MavenRunConfigurationType.createRunnerAndConfigurationSettings(
+                    null, null, params, project, "Maven test (MCP)", false)
+                runManager.addConfiguration(configSettings)
+                runManager.selectedConfiguration = configSettings
+                withContext(kotlinx.coroutines.Dispatchers.EDT) {
+                    com.intellij.execution.ProgramRunnerUtil.executeConfiguration(
+                        configSettings, com.intellij.execution.executors.DefaultRunExecutor.getRunExecutorInstance())
+                }
 
                 // Wait for test execution to complete
                 withTimeout(8.minutes) {
