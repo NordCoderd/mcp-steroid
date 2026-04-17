@@ -134,8 +134,7 @@ Open a project in the IDE. This tool initiates the project opening process and r
 - `project_path` (required): Absolute path to the project directory to open
 - `task_id` (required): Task identifier for logging
 - `reason` (required): Why you are opening the project
-- `trust_project` (optional): If true, trust the project path before opening (skips trust dialog). Default: false
-- `force_new_frame` (optional): If true, always open in a new window. Default: false
+- `trust_project` (optional): If true, trust the project path before opening (skips trust dialog). Default: true
 
 **Workflow:**
 1. Call `steroid_open_project` with the project path
@@ -149,8 +148,8 @@ Open a project in the IDE. This tool initiates the project opening process and r
 This server exposes built-in resources through the MCP resource APIs. These are the fastest way to load full examples and guides without guessing or copy/pasting from the web.
 
 **How to access resources:**
-1. Call `list_mcp_resources` to discover available resources.
-2. Call `read_mcp_resource` with the resource URI to load the content.
+1. Call `steroid_fetch_resource` with a `mcp-steroid://` URI to load the content.
+2. Or use `list_mcp_resources` to browse all available resources.
 
 **Key resources provided by this server:**
 - `mcp-steroid://prompt/skill` - This guide as a resource.

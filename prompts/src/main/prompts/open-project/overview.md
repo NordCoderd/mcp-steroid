@@ -16,8 +16,7 @@ Opens a project in the IDE. This tool initiates the project opening process and 
 - `project_path` (required): Absolute path to the project directory
 - `task_id` (required): Task identifier for logging
 - `reason` (required): Why you are opening the project
-- `trust_project` (optional): If true, trust the project before opening (default: false)
-- `force_new_frame` (optional): If true, always open in a new window (default: false)
+- `trust_project` (optional): If true, trust the project before opening (default: true)
 
 ## Important: Project Opening is Asynchronous
 
