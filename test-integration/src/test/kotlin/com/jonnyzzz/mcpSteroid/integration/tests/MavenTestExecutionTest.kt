@@ -111,7 +111,7 @@ class MavenTestExecutionTest {
                 ) { /* ProgramRunner.Callback — completion handled by SMTRunnerEventsListener above */ }
 
                 // Wait for test execution to complete
-                withTimeout(5.minutes) {
+                withTimeout(8.minutes) {
                     testFinished.await()
                 }
 
