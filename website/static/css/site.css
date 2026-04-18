@@ -144,10 +144,19 @@ a:hover {
     width: 24px;
     height: 24px;
 }
-/* Mobile nav */
+/* Middle nav — hide Docs/Releases to prevent double-line wrapping */
+@media (max-width: 1024px) {
+    .nav-link.nav-collapsible {
+        display: none;
+    }
+}
+/* Mobile nav — hamburger menu */
 @media (max-width: 768px) {
     .nav-toggle {
         display: block;
+    }
+    .nav-link.nav-collapsible {
+        display: flex;
     }
     .nav-links {
         position: absolute;
