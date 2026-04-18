@@ -106,12 +106,14 @@ git add VERSION && git commit -m "release: bump version to 0.92.0"
 
 ### Stage 4: Website Release Page + Homepage Update
 
-**3a. Release page** — create `website/content/releases/<version>.md` following the
-pattern of previous releases. Include:
-- Version, date
-- Download links + SHA-256 of the plugin ZIP
-- Highlights (can reuse the release notes content)
-- Standard feedback/support/EULA sections
+**4a. Release page** — create `website/content/releases/<version>.md` following the
+pattern of `0.93.0.md`. Page structure (in this order):
+1. Success banner + release date
+2. **Highlights** (first — this is what users came to see)
+3. Download (custom repo, marketplace, manual ZIP link)
+4. Connecting to agents + supported agents
+5. Reporting issues + Discord
+6. Feedback + support
 
 EULA link must point to the GitHub release asset:
 `https://github.com/jonnyzzz/mcp-steroid/releases/download/v<version>/EULA`
