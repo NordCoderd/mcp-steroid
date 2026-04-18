@@ -1323,6 +1323,7 @@ h1 {
     min-height: 44px;
     align-items: center;
     justify-content: center;
+    margin-left: auto;
 }
 .nav-heart-mobile .nav-heart {
     width: 22px;
