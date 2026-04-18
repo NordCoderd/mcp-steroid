@@ -69,6 +69,26 @@ alphabetically sorted within the Contributors section.
 contributor names with GitHub handles. No need to describe what they did — just thank
 them by name.
 
+**1e. Review and collect fixed issues:**
+
+```bash
+# List all issues (open and closed)
+gh issue list --repo jonnyzzz/mcp-steroid --state all --limit 50 --json number,title,state,closedAt
+
+# Find the v<prev-version> tag date
+git log -1 --format=%ci v<prev-version>
+```
+
+For each closed issue with `closedAt` after the previous release tag date:
+1. Verify the fix is actually in this release (check commits/PRs)
+2. Add to the website release page under a **Fixed Issues** section:
+   `- [#N](https://github.com/jonnyzzz/mcp-steroid/issues/N) — short description`
+3. Comment on the issue: "Fixed in v<version>" — but only if no developer has
+   already mentioned the fix version explicitly
+
+For open issues: check if they were actually fixed but not closed. Close them
+with a comment if the fix is confirmed in the release range.
+
 ### Stage 2: Release Notes
 
 Create `release/notes/<version>.md` with user-facing prose (no raw commit hashes).
@@ -111,9 +131,10 @@ pattern of `0.93.0.md`. Page structure (in this order):
 2. **Highlights** (first — this is what users came to see)
 3. Download (custom repo, marketplace, manual ZIP link)
 4. Connecting to agents + supported agents
-5. **Contributors** (list names with GitHub handles — no descriptions needed)
-6. Reporting issues + Discord
-7. Feedback + support
+5. **Fixed Issues** (list of `#N — description` with links to GitHub issues)
+6. **Contributors** (list names with GitHub handles — no descriptions needed)
+7. Reporting issues + Discord
+8. Feedback + support
 
 EULA link must point to the GitHub release asset:
 `https://github.com/jonnyzzz/mcp-steroid/releases/download/v<version>/EULA`
