@@ -17,10 +17,18 @@ the release will point to a newer commit than the plugin ZIP — avoid this.
 
 Correct order:
 1. Commit all release material (notes, website page, `hugo.toml`, `VERSION`)
-2. Push to `origin/main`
+2. Push to `origin/main` and sync to `jb/main`
 3. Build the plugin
-4. Create the GitHub release (target = HEAD = plugin hash)
-5. Upload to JetBrains Marketplace
+4. Create tags on both remotes
+5. Create the GitHub release (attaches to existing tag)
+6. Upload to JetBrains Marketplace
+7. **Explicitly trigger the website build** and verify it's live
+
+**Critical:** Steps 1-2 must complete before step 3. The website content (release page,
+`hugo.toml`) must be on `origin/main` before the GitHub release is created, so the
+Pages workflow can find the content when it runs. The push in step 2 will trigger a
+Pages build that fails (release doesn't exist yet) — this is expected. The explicit
+trigger in step 7 is what actually deploys the website.
 
 ## Release Stages
 
@@ -215,39 +223,41 @@ Plugin page: https://plugins.jetbrains.com/plugin/30019-mcp-steroid
 
 The plugin enters the JetBrains review queue and will be listed once approved.
 
-### Stage 9: Website Deployment and Verification
+### Stage 9: Trigger Website Build and Verify
 
-The GitHub Actions workflow (`.github/workflows/github-pages.yml`) triggers on:
-- **push** to `main` touching `website/**` or `VERSION` (from Stage 4)
-- **release published** (from Stage 7b) — this is the primary trigger for releases
+The website build (`make build`) queries the GitHub release for the plugin ZIP download
+URL to generate `updatePlugins.xml`. The website content (release page, `hugo.toml`)
+was committed and pushed in Stages 4-5, **before** the release was created. The
+push-triggered GitHub Actions run from Stage 5 will fail because the release didn't
+exist yet — this is expected and harmless.
 
-**Ordering:** The push-triggered build (Stage 4) may fail because the GitHub release
-doesn't exist yet at that point. This is expected. The `release: published` trigger
-fires after Stage 7b and rebuilds the website with the correct ZIP download URL.
+Now that the GitHub release exists (Stage 7b), explicitly trigger the website build:
+
+```bash
+gh workflow run "Deploy to GitHub Pages" --repo jonnyzzz/mcp-steroid --ref main
+```
+
+The `release: published` event from Stage 7b may also trigger a run automatically.
+Either way, the explicit trigger ensures the build happens.
 
 **Monitor the deployment:**
 
 ```bash
-# List recent Pages workflow runs
+# Wait a few seconds for the run to appear, then watch it
 gh run list --repo jonnyzzz/mcp-steroid --workflow "Deploy to GitHub Pages" --limit 3
-
-# Watch the active run
 gh run watch <RUN_ID> --repo jonnyzzz/mcp-steroid
-```
-
-If the `release: published` trigger also fails (rare), re-trigger manually:
-```bash
-gh workflow run "Deploy to GitHub Pages" --repo jonnyzzz/mcp-steroid --ref main
 ```
 
 **Verify the website is live** (with cache-busting to avoid Cloudflare stale responses):
 
 ```bash
 # version.json should show the new version
-curl -sH "Cache-Control: no-cache" "https://mcp-steroid.jonnyzzz.com/version.json?_=$(date +%s)"
+curl -sH "Cache-Control: no-cache" \
+  "https://mcp-steroid.jonnyzzz.com/version.json?_=$(date +%s)"
 
 # updatePlugins.xml should reference the new ZIP
-curl -sH "Cache-Control: no-cache" "https://mcp-steroid.jonnyzzz.com/updatePlugins.xml?_=$(date +%s)" | head -5
+curl -sH "Cache-Control: no-cache" \
+  "https://mcp-steroid.jonnyzzz.com/updatePlugins.xml?_=$(date +%s)" | head -5
 
 # Release page should return HTTP 200
 curl -sI "https://mcp-steroid.jonnyzzz.com/releases/<version>/?_=$(date +%s)" | head -3
@@ -258,6 +268,10 @@ curl -sI "https://mcp-steroid.jonnyzzz.com/releases/<version>/?_=$(date +%s)" | 
 query string, it will expire within Cloudflare's TTL (typically 2-4 hours for HTML,
 shorter for JSON). Do not purge Cloudflare manually — wait or use cache-busting URLs
 for verification.
+
+**If verification fails:** Check the workflow run logs for errors. The most common
+failure is the release ZIP not being found — ensure the GitHub release (Stage 7b)
+completed successfully before the website build ran.
 
 ### Stage 10: Mark Older Releases Obsolete (Optional)
 
