@@ -20,6 +20,11 @@ on:
     paths:
       - 'website/**'
       - 'VERSION'
+  # Rebuild after a GitHub release is published — the website build queries
+  # the release to generate updatePlugins.xml with the correct ZIP download URL.
+  # Without this, the push-triggered build fails because the release doesn't exist yet.
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
