@@ -215,17 +215,44 @@ Plugin page: https://plugins.jetbrains.com/plugin/30019-mcp-steroid
 
 The plugin enters the JetBrains review queue and will be listed once approved.
 
-### Stage 9: Website Deployment
+### Stage 9: Website Deployment and Verification
 
-No manual action needed. The GitHub Actions workflow
-(`.github/workflows/github-pages.yml`) triggers automatically on the push from Stage 4
-and builds/deploys the website. Verify with:
+**IMPORTANT ordering issue:** The website build (`make build`) queries the GitHub release
+to find the plugin ZIP URL. If the GitHub release does not exist yet when the Pages
+workflow triggers, the build fails with `Could not find release ZIP for version X.Y.Z`.
+
+This happens because the website page commit (Stage 4) triggers the workflow, but the
+GitHub release (Stage 7) hasn't been created yet. The solution:
+
+1. If the Pages workflow fails, wait until Stage 7 (GitHub release) completes.
+2. Re-trigger the workflow manually:
+   ```bash
+   gh workflow run "Deploy to GitHub Pages" --repo jonnyzzz/mcp-steroid --ref main
+   ```
+3. Monitor the run:
+   ```bash
+   gh run list --repo jonnyzzz/mcp-steroid --workflow "Deploy to GitHub Pages" --limit 3
+   gh run watch <RUN_ID> --repo jonnyzzz/mcp-steroid
+   ```
+
+**Verify the website is live** (with cache-busting to avoid Cloudflare stale responses):
 
 ```bash
-gh run list --repo jonnyzzz/mcp-steroid --limit 5
+# version.json should show the new version
+curl -sH "Cache-Control: no-cache" "https://mcp-steroid.jonnyzzz.com/version.json?_=$(date +%s)"
+
+# updatePlugins.xml should reference the new ZIP
+curl -sH "Cache-Control: no-cache" "https://mcp-steroid.jonnyzzz.com/updatePlugins.xml?_=$(date +%s)" | head -5
+
+# Release page should return HTTP 200
+curl -sI "https://mcp-steroid.jonnyzzz.com/releases/<version>/?_=$(date +%s)" | head -3
 ```
 
-Wait for the "Deploy to GitHub Pages" run to succeed.
+**Cloudflare caching:** The website is behind Cloudflare. Query-string cache-busting
+(`?_=<timestamp>`) bypasses the edge cache. If you see stale content without the
+query string, it will expire within Cloudflare's TTL (typically 2-4 hours for HTML,
+shorter for JSON). Do not purge Cloudflare manually — wait or use cache-busting URLs
+for verification.
 
 ### Stage 10: Mark Older Releases Obsolete (Optional)
 
