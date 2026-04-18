@@ -65,22 +65,21 @@ gh pr list --repo jonnyzzz/mcp-steroid --state merged --search "merged:>$(git lo
 GitHub handle, and a short description of their contribution(s). Keep the list
 alphabetically sorted within the Contributors section.
 
-**1d. Mention contributors in release notes** — if external contributors
-participated in this release, add an Acknowledgements section at the end of
-the release notes thanking them by name and linking to their PRs/issues.
+**1d. Mention contributors in both release notes and website release page** — list
+contributor names with GitHub handles. No need to describe what they did — just thank
+them by name.
 
 ### Stage 2: Release Notes
 
 Create `release/notes/<version>.md` with user-facing prose (no raw commit hashes).
 Follow the style of previous notes files. Include segues to any relevant blog posts.
 
-If external contributors participated in this release, add an **Acknowledgements**
-section at the end:
+If external contributors participated in this release, add a **Contributors** section:
 ```markdown
-### Acknowledgements
+### Contributors
 
-Thank you to the following contributors for their work in this release:
-- **Name** ([@handle](https://github.com/handle)) — short description ([#N](https://github.com/jonnyzzz/mcp-steroid/pull/N))
+Thank you to the contributors in this release:
+- **Name** ([@handle](https://github.com/handle))
 ```
 
 Commit it:
@@ -112,8 +111,9 @@ pattern of `0.93.0.md`. Page structure (in this order):
 2. **Highlights** (first — this is what users came to see)
 3. Download (custom repo, marketplace, manual ZIP link)
 4. Connecting to agents + supported agents
-5. Reporting issues + Discord
-6. Feedback + support
+5. **Contributors** (list names with GitHub handles — no descriptions needed)
+6. Reporting issues + Discord
+7. Feedback + support
 
 EULA link must point to the GitHub release asset:
 `https://github.com/jonnyzzz/mcp-steroid/releases/download/v<version>/EULA`
