@@ -217,23 +217,28 @@ The plugin enters the JetBrains review queue and will be listed once approved.
 
 ### Stage 9: Website Deployment and Verification
 
-**IMPORTANT ordering issue:** The website build (`make build`) queries the GitHub release
-to find the plugin ZIP URL. If the GitHub release does not exist yet when the Pages
-workflow triggers, the build fails with `Could not find release ZIP for version X.Y.Z`.
+The GitHub Actions workflow (`.github/workflows/github-pages.yml`) triggers on:
+- **push** to `main` touching `website/**` or `VERSION` (from Stage 4)
+- **release published** (from Stage 7b) — this is the primary trigger for releases
 
-This happens because the website page commit (Stage 4) triggers the workflow, but the
-GitHub release (Stage 7) hasn't been created yet. The solution:
+**Ordering:** The push-triggered build (Stage 4) may fail because the GitHub release
+doesn't exist yet at that point. This is expected. The `release: published` trigger
+fires after Stage 7b and rebuilds the website with the correct ZIP download URL.
 
-1. If the Pages workflow fails, wait until Stage 7 (GitHub release) completes.
-2. Re-trigger the workflow manually:
-   ```bash
-   gh workflow run "Deploy to GitHub Pages" --repo jonnyzzz/mcp-steroid --ref main
-   ```
-3. Monitor the run:
-   ```bash
-   gh run list --repo jonnyzzz/mcp-steroid --workflow "Deploy to GitHub Pages" --limit 3
-   gh run watch <RUN_ID> --repo jonnyzzz/mcp-steroid
-   ```
+**Monitor the deployment:**
+
+```bash
+# List recent Pages workflow runs
+gh run list --repo jonnyzzz/mcp-steroid --workflow "Deploy to GitHub Pages" --limit 3
+
+# Watch the active run
+gh run watch <RUN_ID> --repo jonnyzzz/mcp-steroid
+```
+
+If the `release: published` trigger also fails (rare), re-trigger manually:
+```bash
+gh workflow run "Deploy to GitHub Pages" --repo jonnyzzz/mcp-steroid --ref main
+```
 
 **Verify the website is live** (with cache-busting to avoid Cloudflare stale responses):
 
