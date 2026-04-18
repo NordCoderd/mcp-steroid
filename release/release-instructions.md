@@ -125,7 +125,7 @@ git commit -m "release: add <version> website release page and update homepage v
 (The `-f` flag is needed because `website/` is in the root `.gitignore`, but existing
 tracked files under `website/` still work normally. New files need `-f` once.)
 
-### Stage 5: Push All Commits
+### Stage 5: Push to Origin and Sync to JB Remote
 
 ```bash
 git push origin main
@@ -133,6 +133,19 @@ git push origin main
 
 All release commits (notes, version bump, website page, hugo.toml) must be pushed
 **before** building the plugin and creating the GitHub release.
+
+Then sync to the `jb` remote (TeamCity pulls from `jb/main`):
+```bash
+git fetch jb
+git checkout -b jb-merge jb/main
+git merge main --no-ff -m "Merge remote-tracking branch 'origin/main' into jb-merge"
+git push jb jb-merge:main
+git checkout main
+git branch -D jb-merge
+```
+
+If there are conflicts (e.g. `github-pages.yml` deleted on jb), resolve them
+appropriately — jb doesn't use GitHub Pages, so accept jb's deletion.
 
 ### Stage 6: Build Plugin
 
@@ -145,31 +158,48 @@ Or via IntelliJ MCP (`steroid_execute_code`) with a Gradle run configuration.
 The resulting ZIP is in `ij-plugin/build/distributions/mcp-steroid-<version>-<gitHash>.zip`.
 The `<gitHash>` must match the current HEAD (the version bump commit).
 
-### Stage 7: Create GitHub Release
+### Stage 7: Create Tags and GitHub Release
+
+**7a. Create tags on both remotes:**
+
+The release tag on `jb` must point to the **jb merge commit** (not the origin commit),
+because TeamCity builds from `jb/main`. The tag on `origin` points to the build commit.
+
+```bash
+# Tag on origin (the build commit)
+git tag "v<version>" "<gitHash>" -m "Release <version>"
+git push origin "v<version>"
+
+# Tag on jb (the merge commit that contains the build commit)
+# Find the jb merge commit — it's the latest commit on jb/main after the sync in Stage 5
+JB_MERGE=$(git ls-remote jb refs/heads/main | cut -f1)
+git tag "v<version>" "$JB_MERGE" -f -m "Release <version>"
+git push jb "v<version>"
+```
+
+**Note**: If `git push origin "v<version>"` says "already exists", the tag was created
+correctly. If `gh release create` fails with "target_commitish is invalid", it means
+the tag already exists on the remote — drop `--target` from the `gh` command.
+
+**7b. Create the GitHub release:**
 
 ```bash
 gh release create "v<version>" \
   "ij-plugin/build/distributions/mcp-steroid-<version>-<gitHash>.zip" \
   EULA \
   --repo jonnyzzz/mcp-steroid \
-  --target "$(git rev-parse HEAD)" \
   --notes-file "release/notes/<version>.md" \
   --title "v<version>"
 ```
 
+**Do NOT use `--target`** when the tag already exists on the remote — `gh` will reject
+it with HTTP 422. The release attaches to the existing tag automatically.
+
 **EULA**: The root `EULA` file is uploaded directly. The `gh` CLI uses the source
 filename as the asset name — it appears as `EULA` on the release page.
 
-**Target**: `git rev-parse HEAD` — must be the same commit whose hash appears in the ZIP name.
-
 **Immutable**: Once created, releases cannot have assets added. If a fix is needed,
-delete and recreate the release. Tags locked by a release cannot be reused.
-
-After creating the release, tag the repo:
-```bash
-# gh release create creates the tag automatically on the remote.
-# No manual tag push needed unless the tag was created locally first.
-```
+delete and recreate the release.
 
 ### Stage 8: Upload to JetBrains Marketplace
 
