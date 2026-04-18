@@ -1316,6 +1316,23 @@ h1 {
     height: 16px;
     color: #e25555;
 }
+.nav-heart-mobile {
+    display: none;
+    padding: 0.5rem;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+}
+.nav-heart-mobile .nav-heart {
+    width: 22px;
+    height: 22px;
+}
+@media (max-width: 768px) {
+    .nav-heart-mobile {
+        display: flex;
+    }
+}
 .nav-support {
     color: var(--color-tertiary);
 }
