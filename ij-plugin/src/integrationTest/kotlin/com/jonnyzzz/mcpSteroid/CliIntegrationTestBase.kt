@@ -356,6 +356,72 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
         return raw.substring(idx + separator.length).trimEnd()
     }
 
+    /**
+     * Runs the apply-patch recipe evaluator prompt. This is an autoresearch probe,
+     * not a pass/fail behaviour test: the agent is asked to exercise the current
+     * `mcp-steroid://ide/apply-patch` recipe end-to-end and produce a candid
+     * review under ~700 words. The review is framed between
+     * `APPLY_PATCH_REVIEW_START` / `APPLY_PATCH_REVIEW_END` markers so the loop
+     * harness can extract it.
+     *
+     * The assertion surface is deliberately minimal — we only require that the
+     * agent (a) produced the bracketed review, (b) cited the recipe, and (c) ran
+     * at least one `steroid_execute_code` call. The qualitative content is the
+     * real artifact, captured from the test run's stdout.
+     */
+    open fun testApplyPatchRecipeEvaluation(): Unit = timeoutRunBlocking(1800.seconds) {
+        val session = newAiSession()
+        val evaluatorPrompt = requireNotNull(javaClass.getResource("/apply-patch/evaluator-prompt.md")) {
+            "Missing test resource /apply-patch/evaluator-prompt.md"
+        }.readText()
+
+        val preamble = """
+            You are participating in an autoresearch evaluation of MCP Steroid's
+            `mcp-steroid://ide/apply-patch` recipe. The MCP server is already registered
+            under the name "intellij" — use it for every tool call. Do not call
+            list_mcp_resources.
+
+            When you invoke steroid_execute_code, pass project_name=${project.name}.
+            First, call steroid_list_projects once so you have the project name and layout.
+
+            Below is the evaluator task description. Execute it faithfully and produce the
+            review between the APPLY_PATCH_REVIEW_START / APPLY_PATCH_REVIEW_END markers
+            exactly as specified.
+
+            ----- BEGIN EVALUATOR TASK -----
+            $evaluatorPrompt
+            ----- END EVALUATOR TASK -----
+            """.trimIndent()
+
+        val result = session.runPrompt(preamble, timeoutSeconds = 1500)
+            .assertExitCode(0) { "apply-patch evaluator prompt run" }
+
+        val combinedOutput = result.stdout + "\n" + result.stderr
+
+        println("=== AGENT OUTPUT (testApplyPatchRecipeEvaluation) ===")
+        println(combinedOutput)
+        println("=== END ===")
+
+        assertTrue(
+            "review must be framed by APPLY_PATCH_REVIEW_START / APPLY_PATCH_REVIEW_END markers\n$combinedOutput",
+            combinedOutput.contains("APPLY_PATCH_REVIEW_START") &&
+                combinedOutput.contains("APPLY_PATCH_REVIEW_END"),
+        )
+
+        val review = combinedOutput
+            .substringAfter("APPLY_PATCH_REVIEW_START")
+            .substringBefore("APPLY_PATCH_REVIEW_END")
+
+        assertTrue(
+            "review must reference the apply-patch recipe path\n$review",
+            review.contains("apply-patch") || review.contains("mcp-steroid://ide/apply-patch"),
+        )
+        assertTrue(
+            "review must be non-trivial (>= 300 chars of content)\n$review",
+            review.trim().length >= 300,
+        )
+    }
+
     open fun testExecSessionReset(): Unit = timeoutRunBlocking(360.seconds) {
         val session = newAiSession()
 
