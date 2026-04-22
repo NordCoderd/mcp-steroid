@@ -36,5 +36,16 @@ println("Compile errors: ${result.hasErrors()}, aborted: ${result.isAborted()}")
 
 **File discovery INSIDE steroid_execute_code**: use `FilenameIndex` (O(1) indexed), not filesystem scan.
 **File reading by known path**: use native `Read` tool (zero overhead), not steroid_execute_code.
+**In-place file editing (ANY size, 1–1000+ lines)**: use steroid_execute_code — do NOT use the native `Edit` tool. The native `Edit` writes to disk bypassing IntelliJ, leaving VFS + PSI stale; every following semantic query sees the old content until you force a refresh. The IDE-side recipe below is ~5 lines of real code, same payload shape as `Edit(old, new)`, reads+writes inside one call, and the VFS auto-refreshes so PSI stays consistent:
+
+```kotlin
+val vf = findProjectFile("src/main/java/com/example/MyClass.java")!!
+val content = String(vf.contentsToByteArray(), vf.charset)  // read
+val updated = content.replace("OLD_STRING", "NEW_STRING")
+check(updated != content) { "no match for OLD_STRING — verify with Grep first" }
+writeAction { VfsUtil.saveText(vf, updated) }               // write + VFS refresh
+```
+
+For exactly-one-occurrence replace: `.replace(OLD, NEW).also { check(… == 1 occurrence) }`. For regex: `Regex(pattern).replace(content, replacement)`. Do NOT pre-Read the file via the native tool before using this recipe — the `vf.contentsToByteArray()` read already covers that.
 
 💡 Call `steroid_execute_feedback` after execution to rate success.
