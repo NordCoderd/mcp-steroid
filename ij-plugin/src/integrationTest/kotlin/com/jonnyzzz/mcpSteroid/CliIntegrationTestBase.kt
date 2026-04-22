@@ -315,9 +315,13 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             combinedOutput.contains("EVAL_REPORT_START") && combinedOutput.contains("EVAL_REPORT_END"),
         )
 
+        // Use substringAfterLast / substringBeforeLast: the preamble we handed the
+        // agent contains an example of the marker format, so the first pair of
+        // markers in the output is usually the preamble echo, not the actual
+        // report. The agent's real report is the LAST marker pair.
         val reportBody = combinedOutput
-            .substringAfter("EVAL_REPORT_START")
-            .substringBefore("EVAL_REPORT_END")
+            .substringAfterLast("EVAL_REPORT_START")
+            .substringBeforeLast("EVAL_REPORT_END")
 
         for (sectionNumber in 1..9) {
             assertTrue(
@@ -408,9 +412,11 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
                 combinedOutput.contains("APPLY_PATCH_REVIEW_END"),
         )
 
+        // Use substringAfterLast / substringBeforeLast — the preamble contains an
+        // example marker pair that agents echo back in their thinking phase.
         val review = combinedOutput
-            .substringAfter("APPLY_PATCH_REVIEW_START")
-            .substringBefore("APPLY_PATCH_REVIEW_END")
+            .substringAfterLast("APPLY_PATCH_REVIEW_START")
+            .substringBeforeLast("APPLY_PATCH_REVIEW_END")
 
         assertTrue(
             "review must reference the apply-patch recipe path\n$review",
