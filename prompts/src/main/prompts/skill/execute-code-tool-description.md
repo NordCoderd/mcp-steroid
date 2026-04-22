@@ -5,6 +5,8 @@ MCP tool description for the steroid_execute_code tool.
 ###_NO_AUTO_TOC_###
 Execute Kotlin code directly in IntelliJ's runtime with full API access — builds, tests, refactoring, inspections, debugging, navigation.
 
+**Default to `steroid_execute_code` for every code-touching step: read, grep, edit, test, compile, refactor.** One call stays inside the IDE, keeps VFS + PSI consistent, and reliably replaces 3-5 chained native-tool calls. Native tools (`Read` / `Edit` / `Grep` / `Glob` / `Bash`) are fallbacks for outside-the-IDE work: git, shell, Docker CLI, remote HTTP. When in doubt, try the IDE recipe first — it also self-documents for the next call.
+
 **Before your first call, read the guide for your task** with `steroid_fetch_resource`:
 - Building/testing → `mcp-steroid://prompt/test-skill`
 - Debugging → `mcp-steroid://prompt/debugger-skill`
@@ -37,7 +39,27 @@ val result = ProjectTaskManager.getInstance(project).buildAllModules().await()
 println("Compile errors: ${result.hasErrors()}, aborted: ${result.isAborted()}")
 ```
 
-**Do NOT use Bash `./mvnw test` or `./gradlew test`** — read `mcp-steroid://prompt/test-skill` for IDE test runner patterns that save ~31s per invocation.
+**Run tests via the IDE runner, not Bash.** `./mvnw test` / `./gradlew test` cold-start ~31 s per invocation. The IDE runner keeps the JVM warm and returns structured pass/fail:
+
+```kotlin
+// Maven — single test class or method via the IDE's Maven runner:
+import com.intellij.openapi.externalSystem.service.execution.ExternalSystemRunConfiguration
+import com.intellij.openapi.externalSystem.model.execution.ExternalSystemTaskExecutionSettings
+import org.jetbrains.idea.maven.execution.MavenRunConfigurationType
+import com.intellij.execution.ProgramRunnerUtil
+import com.intellij.execution.executors.DefaultRunExecutor
+import com.intellij.execution.RunManager
+
+val cfg = MavenRunConfigurationType.getInstance().configurationFactories.single()
+    .createTemplateConfiguration(project) as org.jetbrains.idea.maven.execution.MavenRunConfiguration
+cfg.name = "Run PetRestControllerTests"
+cfg.runnerParameters.workingDirPath = project.basePath!!
+cfg.runnerParameters.goals = listOf("test", "-Dtest=PetRestControllerTests", "-Dspotless.check.skip=true")
+val settings = RunManager.getInstance(project).createConfiguration(cfg, cfg.factory!!)
+ProgramRunnerUtil.executeConfiguration(settings, DefaultRunExecutor.getRunExecutorInstance())
+```
+
+For deeper patterns (SMTRunner listeners that block until tests finish + emit structured JSON results) fetch `mcp-steroid://skill/coding-with-intellij-spring`. Bash `./mvnw test` is only OK as a last-resort when the IDE runner has genuinely failed for the scenario.
 
 **After a compile error**: fix and retry. Common fixes:
 - `suspension functions can only be called within coroutine body` → mark helper as `suspend fun`
