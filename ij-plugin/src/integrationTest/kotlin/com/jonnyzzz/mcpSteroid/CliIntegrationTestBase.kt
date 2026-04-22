@@ -326,9 +326,12 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             )
         }
 
-        val verdictCount = Regex("""\*\*Verdict:\*\*""").findAll(reportBody).count()
+        // Agents inconsistently format the verdict tag as either `**Verdict:**` (colon
+        // inside bold) or `**Verdict**:` (colon outside). Accept both — the prompt only
+        // cares that each section has a recognizable verdict line.
+        val verdictCount = Regex("""\*\*Verdict\*\*:|\*\*Verdict:\*\*""").findAll(reportBody).count()
         assertTrue(
-            "report must contain at least 9 '**Verdict:**' lines, found $verdictCount\n$reportBody",
+            "report must contain at least 9 verdict lines, found $verdictCount\n$reportBody",
             verdictCount >= 9,
         )
     }
