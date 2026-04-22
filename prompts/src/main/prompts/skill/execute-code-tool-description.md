@@ -5,7 +5,22 @@ MCP tool description for the steroid_execute_code tool.
 ###_NO_AUTO_TOC_###
 Execute Kotlin code directly in IntelliJ's runtime with full API access — builds, tests, refactoring, inspections, debugging, navigation.
 
-**Default to `steroid_execute_code` for every code-touching step: read, grep, edit, test, compile, refactor.** One call stays inside the IDE, keeps VFS + PSI consistent, and reliably replaces 3-5 chained native-tool calls. Native tools (`Read` / `Edit` / `Grep` / `Glob` / `Bash`) are fallbacks for outside-the-IDE work: git, shell, Docker CLI, remote HTTP. When in doubt, try the IDE recipe first — it also self-documents for the next call.
+## Decision tree — pick the IDE path before reaching for a native tool
+
+| Task shape | One-line IDE call |
+|---|---|
+| **Two or more literal-text edits, same or different files** | `applyPatch { hunk(pathA, oldA, newA); hunk(pathB, oldB, newB); … }` — atomic undo, pre-flight validation, PSI commit. Use whenever an `Edit`/`Edit`/`Edit` chain is tempting. |
+| **One literal-text edit, single file** | `val vf = findProjectFile(p)!!; writeAction { VfsUtil.saveText(vf, String(vf.contentsToByteArray(), vf.charset).replace(OLD, NEW)) }` |
+| **Find files by extension** | `FilenameIndex.getAllFilesByExt(project, "java", projectScope())` — not `Bash find … -name "*.java"` |
+| **Find files by exact name** | `FilenameIndex.getVirtualFilesByName("UserService.java", projectScope())` |
+| **Find all references to a symbol** | `ReferencesSearch.search(psiElement, projectScope())` — type-aware; Grep over source text is a fallback |
+| **Read file content (any size)** | `String(findProjectFile(p)!!.contentsToByteArray(), charset)` — stays inside the IDE; the next semantic query sees what you read |
+| **Grep content inside project files** | `FilenameIndex.getAllFilesByExt(project, ext, scope).flatMap { vf -> Regex(pat).findAll(String(vf.contentsToByteArray(), vf.charset)) … }` in ONE call |
+| **Run Maven / Gradle tests** | IDE runner — see the Maven / Gradle recipes below; Bash `./mvnw test` is last resort |
+| **Compile check after an edit** | `ProjectTaskManager.getInstance(project).buildAllModules().await()` |
+| **Git / Docker CLI / shell** | native `Bash` — genuinely outside the IDE |
+
+If your next instinct is a native `Read` / `Edit` / `Grep` / `Glob` / `Bash` call, check this table first. The IDE path keeps VFS + PSI consistent, reuses the warm JVM, and one call reliably replaces 3-5 chained native-tool calls.
 
 **Before your first call, read the guide for your task** with `steroid_fetch_resource`:
 - Building/testing → `mcp-steroid://prompt/test-skill`
