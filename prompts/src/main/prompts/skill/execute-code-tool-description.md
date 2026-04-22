@@ -61,4 +61,20 @@ For exactly-one-occurrence replace: `.replace(OLD, NEW).also { check(… == 1 oc
 
 **Payload accounting for this recipe.** The `steroid_execute_code` tool input carries only the Kotlin **script source** (typically ~200–400 chars for an in-place edit — 5 lines of code + a path + OLD/NEW strings). The file bytes that `vf.contentsToByteArray()` reads and the `updated` content that `saveText(vf, updated)` writes live inside the IDE JVM and never cross the MCP boundary — do NOT double-count them against the payload budget. For a 1-line change in a 160-line file, the `Edit` tool ships old_string + new_string (~60 bytes) and the recipe ships ~300 bytes of script — roughly 5× on the script itself, but you save the otherwise-required pre-Read (~3600 bytes for that 160-line file) and keep the IDE's VFS consistent. Net payload is **smaller**, not larger.
 
+**Batch multiple edits into one call.** A single `steroid_execute_code` amortizes tool-call overhead across N substitutions — this is where MCP Steroid pulls decisively ahead of `Edit`/`Edit`/`Edit` chains. Five changes in one file through the native `Edit` tool = 5 round-trips × (pre-Read + Edit) ≈ 10 tool calls. The pattern below is still one call:
+
+```kotlin
+val vf = findProjectFile("src/main/java/com/example/MyClass.java")!!
+val content = String(vf.contentsToByteArray(), vf.charset)
+val updated = content
+    .replace("old_import_1", "new_import_1")
+    .replace("legacyMethodName(", "newMethodName(")
+    .replace("DEPRECATED_CONST", "CURRENT_CONST")
+    .let { Regex("""logger\.warn\(""").replace(it, "logger.info(") }
+check(updated != content) { "no substitutions matched — verify patterns" }
+writeAction { VfsUtil.saveText(vf, updated) }
+```
+
+Multi-file variant: iterate over a `listOf(findProjectFile(…))` and perform all edits in the same `writeAction { }` — N files become 1 tool call instead of 2N.
+
 💡 Call `steroid_execute_feedback` after execution to rate success.
