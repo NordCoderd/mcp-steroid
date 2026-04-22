@@ -18,17 +18,22 @@ Metric legend:
 | 03'  | f0ff0af1 | 5   | 3   | —      | 28      | 22:32 | compact VfsUtil.saveText in coding-with-intellij.md Quick Ref    |
 | —    | b37d173d | —   | —   | —      | —       | —     | fix: rename recipe readAction + writeIntentReadAction            |
 | 04   | 17de0af9 | 5   | 3   | 4x     | 31      | 16:30 | correct auto-imports doc in execute-code-overview.md             |
-| 05   | beeccdc4 | 4   | 2   | 1.5-2.5x | 21    | 13:41 | compact in-place edit recipe in tool description                 |
-| 06   | (next)   | —   | —   | —      | —       | —     | preventive threading-rules card in tool description              |
+| 05   | beeccdc4 | 4   | 2   | 1.5-2.5x | 21    | 13:41* | compact in-place edit recipe in tool description                 |
+| 06   | 41b66090 | 4   | 2   | —      | 24      | 19:36 | preventive threading-rules card in tool description              |
+| 07   | (next)   | —   | —   | —      | —       | —     | cement "always IntelliJ for edits" in mcp-steroid-info.md        |
 
-Notes on iter-05:
-- BUILD FAILED in teardown ("Context has been disposed"); the agent's report
-  reached sys-out cleanly — infrastructure race, not an assertion failure.
-  Treating iter-05 as signal-valid for planning iter-06.
-- §1 (b) shrank to 2 items (only "small edits" + "free-text search" — the latter
-  is outside MCP Steroid's intentional scope).
-- §4 token-efficiency: small-edit gap narrowed from 4x to 1.5-2.5x.
+*iter-05 build failed in post-test teardown race; report reached sys-out cleanly.
 
-Still-open (b): small edits and free-text search. apply-patch recipe (task #4)
-targets the small-edit one; free-text search is outside MCP Steroid's scope by
-design (cf. §8 "Tasks outside MCP Steroid's scope (built-in only)").
+Key trend signals:
+- **§5 limitations converging to fixture-only issues**: iter-06 "Limitations
+  observed" lists only (a) index scope, (b) fixture write timeouts, (c) VFS
+  refresh — no more "API learning curve" / threading complaints.
+- **§4 small-edit ratio compressed**: 4x → 1.5-2.5x via compact VfsUtil.saveText
+  recipe in tool description.
+- **§7 unique capabilities surfacing new items autonomously**: iter-06 agent
+  discovered `runInspectionsDirectly()` and listed it as unique capability #5.
+- **Still-open §1 (b)**: (i) small edits framed as "Built-in Edit cheaper on
+  tokens" — iter-07 targets this by policy statement in session-entry prompt;
+  (ii) free-text search — outside MCP Steroid's scope by design.
+- Validation: :prompts:test + :ij-plugin:test green through iter-06 (with one
+  mid-loop fix at b37d173d for the iter-02 rename-recipe threading regression).
