@@ -11,15 +11,17 @@ Metric legend:
 | iter | commit   | (a) | (b) | verdict | wall  | edit made this round                                             |
 |------|----------|-----|-----|---------|-------|------------------------------------------------------------------|
 | 00   | 534c008c | 6   | 3   | 32      | 20:31 | — baseline                                                       |
-| 01   | ac8a0182 | 5   | ~2  | 24      | 12:58 | route 1–3 line edits + single-file-private-rename to built-ins  |
+| 01   | ac8a0182 | 5   | ~2  | 24      | 12:58 | route 1–3 line edits + single-file-private-rename to built-ins (superseded at 03') |
 | 02   | ed24e475 | 5   | 2   | 21      | 12:39 | replace lsp/rename.md regex recipe with semantic RenameProcessor |
-| 03   | **reverted** | — | — | — | — | mcp-steroid-info.md scope split — policy reversal: keep "Use IntelliJ aggressively" messaging, do not steer agents toward built-in Edit. See iter-03' below. |
-| 03'  | (next)   | —   | —   | —       | —     | Remove iter-01 Edit-routing rows; promote VfsUtil.saveText compact recipe as primary in-place-edit path |
+| 03   | **reverted** 209097e0 | — | — | — | — | mcp-steroid-info.md scope split — policy reversal |
+| 03'  | f0ff0af1 | 5   | 3   | 28      | 22:32 | remove iter-01 Edit-routing rows; promote VfsUtil.saveText compact recipe |
+| —    | b37d173d | — | — | — | — | fix: lsp/rename — readAction analysis; writeIntentReadAction; test heading |
+| 04   | (next)   | —   | —   | —       | —     | correct "NO AUTO-IMPORTS" claim; split into auto-imported vs explicit lists |
 
 Notes:
-- iter-03 ba1dbaf3 attempted to reclassify small edits as "out of scope" for MCP Steroid
-  via mcp-steroid-info.md. Reverted on policy: MCP Steroid should stay the default for all
-  edits because the IDE VFS is authoritative; the right long-term fix is a multi-site
-  apply-patch recipe (parked task #4), not steering the agent off toward built-in Edit.
-- KtBlocks green through iter-02: lsp/rename RenameProcessor recipe compiles on all IDE targets.
-- Test assertion loosened once at iter-01 start (accept `**Verdict (3.1):**` etc.).
+- iter-03 (ba1dbaf3) reverted; policy: MCP Steroid stays the default for all edits.
+  Long-term fix tracked as parked task #4 (apply-patch recipe).
+- iter-02 rename recipe had two runtime bugs caught by :ij-plugin:test regression run
+  (readAction scope + writeAction vs writeIntentReadAction). Fixed at b37d173d.
+- KtBlocks green; LspExamplesExecutionTest.testRenameExampleExecutes green after fix.
+- Test verdict-regex loosened once at iter-01 start; no further assertion edits.

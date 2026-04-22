@@ -94,15 +94,40 @@ println("Plugin installed: $installed")
 
 ---
 
-## ⚠️ NO AUTO-IMPORTS — Every IntelliJ Class Must Be Imported Explicitly
+## ⚠️ Imports: What's Auto-Added vs What You Still Write
 
-A missing import produces `unresolved reference` (sometimes misleadingly as a type-inference error) and wastes a full retry turn. Common imports not auto-added by the preprocessor:
+The preprocessor (`CodeWrapperForCompilation`) already adds these imports to every script, so **do not repeat them** in your code — they cost tokens without adding anything:
+
 ```kotlin[IU]
-import com.intellij.psi.search.FilenameIndex        // getVirtualFilesByName, getAllFilesByExt
-import com.intellij.psi.search.GlobalSearchScope    // projectScope(), allScope()
-import com.intellij.openapi.roots.ProjectRootManager // contentSourceRoots
-import com.intellij.openapi.vfs.VfsUtil              // saveText(), createDirectoryIfMissing()
-import com.intellij.psi.search.PsiShortNamesCache   // allClassNames
-import com.intellij.psi.search.searches.AnnotatedElementsSearch
-import com.intellij.psi.search.searches.ReferencesSearch
+// Auto-imported — DO NOT repeat in your script:
+import com.intellij.openapi.project.*                 // Project, ProjectManager
+import com.intellij.openapi.application.*             // ApplicationManager, ModalityState, runReadAction, …
+import com.intellij.openapi.application.readAction    // suspend read action
+import com.intellij.openapi.application.writeAction   // suspend write action
+import com.intellij.openapi.vfs.*                     // VirtualFile, VfsUtil, VfsUtilCore, LocalFileSystem
+import com.intellij.openapi.editor.*                  // Editor, Document, EditorFactory
+import com.intellij.openapi.fileEditor.*              // FileEditorManager, FileDocumentManager
+import com.intellij.openapi.command.*                 // CommandProcessor, WriteCommandAction
+import com.intellij.psi.*                             // PsiFile, PsiElement, PsiManager, PsiDocumentManager, …
+import kotlinx.coroutines.*
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.minutes
 ```
+
+**You still need to add these explicitly** — they sit outside the auto-import glob and a missing one throws `unresolved reference`, wasting a retry turn:
+
+```kotlin[IU]
+import com.intellij.psi.search.FilenameIndex         // getVirtualFilesByName, getAllFilesByExt
+import com.intellij.psi.search.GlobalSearchScope     // projectScope(), allScope()
+import com.intellij.psi.search.PsiShortNamesCache    // allClassNames
+import com.intellij.psi.search.searches.ReferencesSearch
+import com.intellij.psi.search.searches.AnnotatedElementsSearch
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.openapi.roots.ProjectRootManager  // contentSourceRoots
+import com.intellij.refactoring.rename.RenameProcessor
+import com.intellij.refactoring.safeDelete.SafeDeleteProcessor
+import com.intellij.refactoring.move.moveClassesOrPackages.MoveClassesOrPackagesProcessor
+// … plus whichever specific refactoring/search API your script uses
+```
+
+Rule of thumb: `com.intellij.openapi.*` sub-packages in the auto-import list above are free; everything under `com.intellij.psi.search.*`, `com.intellij.refactoring.*`, and non-standard `openapi` roots (`roots.`, `wm.`, `module.`, `externalSystem.`) needs an explicit import.
