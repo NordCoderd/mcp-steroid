@@ -63,11 +63,63 @@ import sys
 _CLAUDE_EXEC_CODE_NAME = "mcp__mcp-steroid__steroid_execute_code"
 _CLAUDE_FETCH_RESOURCE_NAME = "mcp__mcp-steroid__steroid_fetch_resource"
 
+# Negative metric: new DSL methods added to McpScriptContext are a cognitive
+# tax for agents (API surface to learn, documentation, test burden, drift
+# risk). Count them by scanning McpScriptContext.kt for member declarations
+# whose name is not in the set of primitive APIs that were present at
+# baseline — anything beyond that baseline increases `dsl_methods_added`.
+#
+# Scoring: penalise 1 point per net-new method beyond the baseline set.
+_DSL_BASELINE_METHODS = frozenset(
+    {
+        # Identity / inputs
+        "project", "params", "disposable", "isDisposed",
+        # Output
+        "println", "printJson", "printException", "progress", "takeIdeScreenshot",
+        # Waiting / analysis
+        "waitForSmartMode", "isEditorHighlightingCompleted",
+        "waitForEditorHighlighting", "getHighlightsWhenReady",
+        "runInspectionsDirectly",
+        # Modality
+        "doNotCancelOnModalityStateChange",
+        # Core action wrappers (generic — not DSL methods)
+        "readAction", "writeAction", "smartReadAction",
+        # Scopes / file lookup (generic convenience)
+        "projectScope", "allScope",
+        "findFile", "findPsiFile", "findProjectFile", "findProjectFiles",
+        "findProjectPsiFile",
+    }
+)
+
 
 def _count_lines(text):
     if not text:
         return 0
     return text.count("\n") + 1
+
+
+def count_dsl_methods_added(mcp_script_context_path):
+    """Count methods declared in McpScriptContext.kt that are not in the
+    baseline primitive set. Treated as a negative metric — each addition is
+    cognitive tax on agents.
+
+    Returns (added_count, added_names_sorted).
+    """
+    if not os.path.exists(mcp_script_context_path):
+        return 0, []
+    text = open(mcp_script_context_path, "r", encoding="utf-8").read()
+    # match `fun <name>`, `suspend fun <name>`, `val <name>:` — member decls.
+    # Excludes nested lambdas / types because those patterns don't apply to
+    # the interface's top-level member block we care about.
+    pattern = re.compile(
+        r"^\s*(?:suspend\s+)?(?:fun\s+(?:<[^>]+>\s+)?(?P<fn>\w+)\s*\(|val\s+(?P<val>\w+)\s*:)",
+        re.MULTILINE,
+    )
+    names = set()
+    for m in pattern.finditer(text):
+        names.add(m.group("fn") or m.group("val"))
+    added = sorted(n for n in names if n not in _DSL_BASELINE_METHODS)
+    return len(added), added
 
 
 def _find_agent_file(run_dir):
@@ -268,9 +320,43 @@ def _csv_row(a):
 
 def main(argv):
     p = argparse.ArgumentParser()
-    p.add_argument("run_dirs", nargs="+")
+    p.add_argument("run_dirs", nargs="*")
     p.add_argument("--csv", action="store_true")
+    p.add_argument(
+        "--dsl-methods",
+        action="store_true",
+        help="Report the DSL-methods-added penalty for the current tree "
+        "(scans ij-plugin/src/main/kotlin/com/jonnyzzz/mcpSteroid/execution/"
+        "McpScriptContext.kt) and exit.",
+    )
+    # __file__ = .../docs/autoresearch/dpaia/metrics.py  →  four dirname hops to repo root.
+    _repo_root = os.path.dirname(
+        os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
+    )
+    p.add_argument(
+        "--context-path",
+        default=os.path.join(
+            _repo_root,
+            "ij-plugin/src/main/kotlin/com/jonnyzzz/mcpSteroid/execution/McpScriptContext.kt",
+        ),
+    )
     args = p.parse_args(argv[1:])
+
+    if args.dsl_methods:
+        count, names = count_dsl_methods_added(args.context_path)
+        print(json.dumps({
+            "mcp_script_context": args.context_path,
+            "dsl_methods_added_vs_baseline": count,
+            "added_names": names,
+            "scoring": "negative — each added method is cognitive tax on agents",
+        }, indent=2))
+        return
+
+    if not args.run_dirs:
+        sys.stderr.write("no run dirs given; see --help\n")
+        sys.exit(2)
 
     if args.csv:
         print(_csv_header())

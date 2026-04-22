@@ -15,6 +15,7 @@ the user asked for:
 | **complexity** | steroid_execute_code call count + Kotlin-line stats (total, avg, p50, max) |
 | **ease of use** | fetch_resource call count (indicates searching for help), native `Edit` call count (indicates bypassing the IDE), exec_code retry count (heuristic: same opening 80 chars), native `Bash` call count |
 | **errors** | count of `is_error=true` tool_result blocks, plus whether `applyPatch`/`hunk(` appeared in any script (DSL adoption signal) |
+| **DSL surface area (negative)** | `dsl_methods_added_vs_baseline` — count of suspend methods / member vals on `McpScriptContext` beyond the primitive baseline. Adding a new DSL method (e.g. `applyPatch`) is a **cost**: agents learn more surface, we carry more tests, the prompt footprint grows. Iteration must NOT add methods unless prompt-only fixes have been exhausted. Run `python3 metrics.py --dsl-methods` at iteration-close to report current count. |
 
 Run:
 
