@@ -18,9 +18,22 @@ val result = applyPatch {
 println(result)
 ```
 
+**When the same old → new applies to N files** (common — `@ComponentScan` added to every `*Application.java`, same logger refactor in every service), loop over paths so the old/new pair ships ONCE instead of N times:
+
+```kotlin
+val old = "@SpringBootApplication\npublic class"
+val new = "@SpringBootApplication\n@ComponentScan(\"shop\")\npublic class"
+applyPatch {
+    listOf("/abs/A.java", "/abs/B.java", "/abs/C.java", "/abs/D.java")
+        .forEach { hunk(it, old, new) }
+}
+```
+
+Per `mcp-steroid://ide/apply-patch`: ~40% token cut for shared-pattern edits vs naive `hunk; hunk; hunk; hunk`. Pre-flight catches non-unique anchors with `ApplyPatchException`, so you can safely keep `old` to the shortest unique signature (30–60 chars usually — no need for the full 300-char safety block).
+
 One undoable command. Pre-flight validates every `oldString` exists exactly once. PSI committed in the same call. Native `Edit` chains bypass the VFS, leave PSI stale, and cost you one tool call per site.
 
-**Heuristic**: before the 2nd `Edit` in the same task, stop and ask: "Am I applying the same or similar change to 2+ files?" If yes, `applyPatch { hunk(...); hunk(...); … }` in one call.
+**Heuristic**: before the 2nd `Edit` in the same task, stop and ask: "Am I applying the same or similar change to 2+ files?" If yes, `applyPatch { … }` in one call. If the old/new is shared, `forEach`.
 
 ## Decision tree — pick the IDE path before reaching for a native tool
 

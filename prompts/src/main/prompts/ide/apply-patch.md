@@ -17,6 +17,38 @@ println(result)
 
 `applyPatch` and its builder (`hunk(filePath, oldString, newString)`) are members of the `McpScriptContext` that hosts every `steroid_execute_code` call — no import, no boilerplate.
 
+## Shipping the same edit across N files — use the `forEach` idiom
+
+When the same `old_string → new_string` applies to many files (e.g. adding
+the same annotation to each microservice's `*Application.java`), **do not
+repeat the old/new pair N times**. The `applyPatch { }` lambda is plain
+Kotlin — loop over paths:
+
+```kotlin
+val oldPat = "@SpringBootApplication\npublic class"
+val newPat = "@SpringBootApplication\n@ComponentScan(\"shop\")\npublic class"
+applyPatch {
+    listOf(
+        "/abs/product-service/.../ProductServiceApplication.java",
+        "/abs/product-composite/.../ProductCompositeServiceApplication.java",
+        "/abs/recommendation-service/.../RecommendationServiceApplication.java",
+        "/abs/review-service/.../ReviewServiceApplication.java",
+    ).forEach { hunk(it, oldPat, newPat) }
+}
+```
+
+Token cost: old/new strings ship once + N paths. For 4 files with identical
+~370-char Edit payloads in the native chain (1 480 chars total), this
+idiom ships ~892 chars (≈ 40% smaller).
+
+## Shortest unique anchor — don't over-quote `old_string`
+
+Agents often carry 300+ chars of `old_string` for safety. Pre-flight
+already rejects non-unique matches with an `ApplyPatchException` naming
+both offsets — so you can safely minimize. A 30–60 char unique signature
+(e.g. `"@SpringBootApplication\npublic class MyServiceApplication"`) is
+usually enough and cuts payload 50–70%.
+
 ## Semantics
 
 - **Pre-flight validation** (read action): every `oldString` must occur **exactly once** in its file. A missing or non-unique hunk throws `ApplyPatchException` with hunk index, path, and both offsets — and **no edit lands**. All-or-nothing.
