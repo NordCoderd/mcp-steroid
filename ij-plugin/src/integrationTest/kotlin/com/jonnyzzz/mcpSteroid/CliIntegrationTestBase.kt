@@ -326,10 +326,16 @@ abstract class CliIntegrationTestBase : BasePlatformTestCase() {
             )
         }
 
-        // Agents inconsistently format the verdict tag as either `**Verdict:**` (colon
-        // inside bold) or `**Verdict**:` (colon outside). Accept both — the prompt only
-        // cares that each section has a recognizable verdict line.
-        val verdictCount = Regex("""\*\*Verdict\*\*:|\*\*Verdict:\*\*""").findAll(reportBody).count()
+        // Agents format the verdict tag several equivalent ways across runs:
+        //   **Verdict:** ...
+        //   **Verdict**: ...
+        //   **Verdict (3.1):** ...   ← sub-verdicts within section 3
+        //   **Verdict (3.14–3.16):** ...
+        // Accept any `**Verdict…**` or `**Verdict…:` pattern so the assertion measures
+        // "did the agent produce 9 recognizable verdict lines" rather than punctuating
+        // exactly the way my prompt preamble showed.
+        val verdictCount = Regex("""\*\*Verdict\b[^*\n]{0,50}(?:\*\*:?|:\*\*)""")
+            .findAll(reportBody).count()
         assertTrue(
             "report must contain at least 9 verdict lines, found $verdictCount\n$reportBody",
             verdictCount >= 9,
