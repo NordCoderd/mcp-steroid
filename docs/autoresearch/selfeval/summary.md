@@ -14,7 +14,7 @@ Metric legend:
 | 01   | ac8a0182 | 5   | ~2  | 24      | 12:58 | route 1–3 line edits + single-file-private-rename to built-ins  |
 | 02   | ed24e475 | 5   | 2   | 21      | 12:39 | replace lsp/rename.md regex recipe with semantic RenameProcessor |
 | 03   | **reverted** | — | — | — | — | mcp-steroid-info.md scope split — policy reversal: keep "Use IntelliJ aggressively" messaging, do not steer agents toward built-in Edit. See iter-03' below. |
-| 03'  | (next)   | —   | —   | —       | —     | TBD — alternative target from iter-02 report                    |
+| 03'  | (next)   | —   | —   | —       | —     | Remove iter-01 Edit-routing rows; promote VfsUtil.saveText compact recipe as primary in-place-edit path |
 
 Notes:
 - iter-03 ba1dbaf3 attempted to reclassify small edits as "out of scope" for MCP Steroid

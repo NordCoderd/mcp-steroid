@@ -26,6 +26,7 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 | Find files by extension | `FilenameIndex.getAllFilesByExt(project, "java", scope)` | O(1) indexed vs O(n) filesystem scan |
 | Find file by exact name | `FilenameIndex.getVirtualFilesByName("UserService.java", scope)` | O(1) indexed lookup |
 | Find all usages of symbol | `ReferencesSearch.search(element, scope)` | Understands code semantics |
+| **In-place edit of any size** (1–1000+ lines) | `val vf = findProjectFile(…)!!; val updated = String(vf.contentsToByteArray(), vf.charset).replace(OLD, NEW); check(updated != …); writeAction { VfsUtil.saveText(vf, updated) }` | **✅ PRIMARY** — ~5 lines of real code, same payload shape as `Edit(old,new)`. Stays inside the IDE JVM so VFS/PSI auto-refresh; the native `Edit` tool bypasses IntelliJ and leaves PSI stale. Use `replace(…, count = 1)` for single-occurrence replace; use `Regex.replace` for patterned substitutions. |
 | Manual text replacement | Refactoring APIs | Maintains code correctness |
 | Run Maven tests | `MavenRunConfigurationType.runConfiguration()` + `SMTRunnerEventsListener` | **✅ PRIMARY** — structured pass/fail; Bash `./mvnw test` is LAST-RESORT only |
 | Run Gradle tests | `GradleRunConfiguration` + `setRunAsTest(true)` + `SMTRunnerEventsListener` | **✅ PRIMARY** — structured pass/fail; Bash `./gradlew test` is LAST-RESORT only |
@@ -36,8 +37,6 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 | Operation | Native Tool | Why NOT steroid_execute_code? |
 |-----------|-------------|-------------------|
 | **Create new files** | **Write tool** | steroid_execute_code file creation is **+47% slower** (A/B measured) |
-| **Small in-place edit (1–3 lines)** | **Edit tool** | Edit ships ~100 bytes (old_string + new_string). A PSI/document-based steroid_execute_code script for the same change is ~500+ bytes of boilerplate (findFile, getDocument, writeAction, replaceString) — **~4× more payload with no semantic benefit** for a localized text change. Use PSI only when the edit needs type-aware reasoning (e.g., a rename that must update references across files). |
-| **Single-file private rename** | **Grep + Edit(replace_all=true)** | For a symbol used only inside one file, `Grep` confirms the scope in 1 call and `Edit(replace_all=true)` rewrites it atomically within that file — ~2 calls, ~100 bytes. PSI rename refactoring adds ~400 bytes of script overhead without improving correctness at this scope. Switch to the PSI rename path (`RefactoringFactory.createRename`) only when the symbol has cross-file references. |
 | **Create directories** | **Bash `mkdir -p`** | `VfsUtil.createDirectoryIfMissing` adds ~8s JVM overhead; `mkdir -p` is instant |
 | Read a file | Read tool | Zero JVM overhead; steroid_execute_code adds ~12s per call |
 | List files | Glob tool | Zero overhead; steroid_execute_code not needed |
