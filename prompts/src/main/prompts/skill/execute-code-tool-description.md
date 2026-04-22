@@ -12,9 +12,20 @@ Execute Kotlin code directly in IntelliJ's runtime with full API access — buil
 
 **Quick Start:**
 - Code is a suspend function body (never use runBlocking)
-- `readAction { }` for reads, `writeAction { }` for modifications
 - `waitForSmartMode()` runs automatically
 - Available: `project`, `println()`, `printJson()`, `progress()`
+
+**Threading rules — apply preventively, not after an error:**
+
+| You are about to… | Wrap the call in… |
+|---|---|
+| Read any PSI element / walk a PSI tree / navigate references | `readAction { }` |
+| Write to a VFS file (`VfsUtil.saveText`, `vf.setBinaryContent`) | `writeAction { }` |
+| Invoke a refactoring processor's `.run()` (Rename / Move / SafeDelete / Inline / ChangeSignature / Extract*) | `writeIntentReadAction { }` — NOT `writeAction`; the processor manages its own actions internally, and `writeAction` deadlocks |
+| Commit pending document edits to PSI | `writeAction { PsiDocumentManager.getInstance(project).commitAllDocuments() }` (usually as the line *after* the refactor) |
+| Use a `CommandProcessor.executeCommand { … }` block (undo-grouping) | put the command inside the appropriate read/write action — `executeCommand` itself is *not* an action |
+
+A correctly-wrapped call produces the right result on the first try. An incorrectly-wrapped call throws `Read access is allowed from inside read-action only` or hangs indefinitely — both waste a retry turn.
 
 **Compile check** (use after every edit — do NOT use `./mvnw compile`):
 
