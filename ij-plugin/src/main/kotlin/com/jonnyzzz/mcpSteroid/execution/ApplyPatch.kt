@@ -2,6 +2,8 @@
 package com.jonnyzzz.mcpSteroid.execution
 
 import com.intellij.openapi.application.EDT
+import com.intellij.openapi.application.ModalityState
+import com.intellij.openapi.application.asContextElement
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
@@ -163,14 +165,21 @@ internal suspend fun executeApplyPatch(
 
     val commandName = "MCP Steroid: apply-patch (${resolved.size} hunk${if (resolved.size == 1) "" else "s"})"
 
-    // The write phase runs on the EDT via coroutine-aware dispatch — `Dispatchers.EDT`
-    // cooperates with structured concurrency so the outer scope's cancellation propagates,
-    // unlike the legacy `ApplicationManager.getApplication().invokeAndWait { … }` path.
-    // Once on EDT, `WriteCommandAction.runWriteCommandAction` handles the triple
-    // requirement (write lock, CommandProcessor undo group, document write notification)
-    // in one call. Document.replaceString calls inside the lambda share the same
-    // undoable command named `commandName`.
-    withContext(Dispatchers.EDT) {
+    // The write phase runs on the EDT with write-lock + CommandProcessor undo group.
+    //
+    // Modality matters: `ModalityState.any()` (used by MCP Steroid's UI-only helpers —
+    // DialogKiller, VisionService, ListWindowsToolHandler) is explicitly NOT safe here.
+    // JavaDoc at platform/core-api/src/com/intellij/openapi/application/ModalityState.java:
+    //   "Please don't use it unless absolutely needed. The code under this modality can
+    //    only perform purely UI operations, it shouldn't access any PSI, VFS or project
+    //    model."
+    // apply-patch mutates the Document model (PSI is backed by it), so we use
+    // `ModalityState.nonModal()` instead — the dispatch waits until any modal dialog
+    // dismisses before running, which is correct behaviour for model edits.
+    //
+    // `withContext(Dispatchers.EDT + …)` internally handles the already-on-EDT case —
+    // Kotlin coroutines detect we're on the right thread and run inline.
+    withContext(Dispatchers.EDT + ModalityState.nonModal().asContextElement()) {
         WriteCommandAction.runWriteCommandAction(project, commandName, null, Runnable {
             for ((_, hunksInFile) in groupedDescending) {
                 for (h in hunksInFile) {
