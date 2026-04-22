@@ -13,7 +13,6 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
 
@@ -98,18 +97,19 @@ class VfsRefreshService(
     suspend fun awaitRefresh() {
         val base = projectBaseVf() ?: return
         val done = CompletableDeferred<Unit>()
-        withContext(Dispatchers.IO) {
-            try {
-                RefreshQueue.getInstance().refresh(
-                    /* async = */ true,
-                    /* recursive = */ true,
-                    /* finishRunnable = */ Runnable { done.complete(Unit) },
-                    /* files = */ base,
-                )
-            } catch (e: Exception) {
-                log.debug("awaitRefresh schedule failed (non-fatal)", e)
-                done.complete(Unit)
-            }
+        try {
+            // RefreshQueue.refresh with async=true returns immediately — no IO dispatch
+            // needed. The actual refresh happens on RefreshQueueImpl's own thread; the
+            // finishRunnable fires on EDT when done, which completes our deferred.
+            RefreshQueue.getInstance().refresh(
+                /* async = */ true,
+                /* recursive = */ true,
+                /* finishRunnable = */ Runnable { done.complete(Unit) },
+                /* files = */ base,
+            )
+        } catch (e: Exception) {
+            log.debug("awaitRefresh schedule failed (non-fatal)", e)
+            done.complete(Unit)
         }
         val result = withTimeoutOrNull(30.seconds) { done.await() }
         if (result == null) {

@@ -59,7 +59,18 @@ writeAction { VfsUtil.saveText(vf, updated) }               // write + VFS refre
 
 For exactly-one-occurrence replace: `.replace(OLD, NEW).also { check(… == 1 occurrence) }`. For regex: `Regex(pattern).replace(content, replacement)`. Do NOT pre-Read the file via the native tool before using this recipe — the `vf.contentsToByteArray()` read already covers that.
 
-**Two or more edits in one or more files**: read `mcp-steroid://ide/apply-patch` — the **Apply Patch** recipe applies N literal-text substitutions under a single `WriteCommandAction`, so they land atomically (all or nothing), Undo rolls them back as one unit, and PSI is committed in the same call. That is the right choice over a chain of `Edit`/`Edit`/`Edit` calls.
+**Two or more edits in one or more files**: use the `applyPatch { hunk(...) }` DSL that's a member of every `steroid_execute_code` script context — N literal-text substitutions, one undoable command, all-or-nothing pre-flight. Zero imports, ~5 lines of Kotlin for a 3-hunk patch:
+
+```kotlin
+val result = applyPatch {
+    hunk("/abs/path/A.java", "oldA", "newA")
+    hunk("/abs/path/A.java", "oldA2", "newA2")
+    hunk("/abs/path/B.java", "oldB", "newB")
+}
+println(result)   // per-hunk path:line:col audit
+```
+
+Read `mcp-steroid://ide/apply-patch` for full semantics (pre-flight validation, descending-offset ordering per file, `ApplyPatchException` on missing/non-unique `oldString`).
 
 **VFS refresh before and after every call.** MCP Steroid schedules two refreshes for you:
 - **Before** kotlinc compiles your script, the plugin **awaits** a `VfsUtil.markDirtyAndRefresh` on the project root so the compiler sees every on-disk change made by a peer process or the previous call. Blocking, capped at 30 s.
