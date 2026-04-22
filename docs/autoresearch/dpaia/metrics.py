@@ -169,12 +169,29 @@ def analyse(run_dir):
         "exec_code_lines_max": max(exec_code_line_counts) if exec_code_line_counts else 0,
     }
 
+    # Secondary goal: MAXIMIZE MCP Steroid tool calls (the whole point of the
+    # plugin). We surface the ratio as a headline metric so iteration drift is
+    # visible at a glance. MCP Steroid tool calls are anything whose name starts
+    # with `mcp__mcp-steroid__steroid_`. "native" tools are everything else
+    # (Read / Edit / Write / Glob / Grep / Bash / etc.) that the agent could
+    # have routed through the IDE instead.
+    mcp_calls = sum(
+        n for name, n in tool_calls_by_name.items()
+        if name.startswith("mcp__mcp-steroid__")
+    )
+    total_calls = sum(tool_calls_by_name.values())
+    native_calls = total_calls - mcp_calls
+    mcp_share = (mcp_calls / total_calls) if total_calls else 0.0
+
     return {
         "run_dir": run_dir,
         "agent": agent_name,
         "tokens": tokens,
         "calls": {
-            "total": sum(tool_calls_by_name.values()),
+            "total": total_calls,
+            "mcp_steroid": mcp_calls,
+            "native": native_calls,
+            "mcp_share": round(mcp_share, 3),  # headline: 0..1 — bigger is better
             "by_name": tool_calls_by_name,
             "errors_by_name": errors_by_name,
         },
@@ -198,6 +215,10 @@ def _csv_header():
         [
             "run_dir",
             "agent",
+            # Headline: MCP Steroid tool-call share. Primary optimization target.
+            "mcp_share",
+            "mcp_steroid_calls",
+            "native_calls",
             "tokens_input",
             "tokens_output",
             "tokens_cache_read",
@@ -223,6 +244,9 @@ def _csv_row(a):
         for v in [
             a["run_dir"],
             a["agent"],
+            a["calls"]["mcp_share"],
+            a["calls"]["mcp_steroid"],
+            a["calls"]["native"],
             a["tokens"]["input"],
             a["tokens"]["output"],
             a["tokens"]["cache_read"],
