@@ -20,20 +20,18 @@ Metric legend:
 | 04   | 17de0af9 | 5   | 3   | 4x     | 31      | 16:30 | correct auto-imports doc in execute-code-overview.md             |
 | 05   | beeccdc4 | 4   | 2   | 1.5-2.5x | 21    | 13:41* | compact in-place edit recipe in tool description                 |
 | 06   | 41b66090 | 4   | 2   | —      | 24      | 19:36 | preventive threading-rules card in tool description              |
-| 07   | (next)   | —   | —   | —      | —       | —     | cement "always IntelliJ for edits" in mcp-steroid-info.md        |
+| 07   | d53c6ca0 | **8** | 3 | ~5x  | 24      | 12:04 | cement always-IDE-for-edits policy in mcp-steroid-info           |
+| 08   | (next)   | —   | —   | —      | —       | —     | payload-accounting clarification for recipe reads/writes         |
 
 *iter-05 build failed in post-test teardown race; report reached sys-out cleanly.
 
 Key trend signals:
-- **§5 limitations converging to fixture-only issues**: iter-06 "Limitations
-  observed" lists only (a) index scope, (b) fixture write timeouts, (c) VFS
-  refresh — no more "API learning curve" / threading complaints.
-- **§4 small-edit ratio compressed**: 4x → 1.5-2.5x via compact VfsUtil.saveText
-  recipe in tool description.
-- **§7 unique capabilities surfacing new items autonomously**: iter-06 agent
-  discovered `runInspectionsDirectly()` and listed it as unique capability #5.
-- **Still-open §1 (b)**: (i) small edits framed as "Built-in Edit cheaper on
-  tokens" — iter-07 targets this by policy statement in session-entry prompt;
-  (ii) free-text search — outside MCP Steroid's scope by design.
-- Validation: :prompts:test + :ij-plugin:test green through iter-06 (with one
-  mid-loop fix at b37d173d for the iter-02 rename-recipe threading regression).
+- **§1 (a) items expanded iter-07**: 4 → 8, agent enumerated inspections,
+  quick-fixes, signature help, run configs, debugger as distinct §1 items
+  (previously confined to §7 unique capabilities).
+- **Stuck small-edit verdict**: iter-07 agent double-counted `saveText(vf, updated)`
+  file-content as MCP tool payload (it's IDE-side, never crosses boundary).
+  iter-08 targets this misreading directly.
+- **§5 limitations stable at fixture-only**: no API-learning-curve complaints
+  since iter-06.
+- **Validation**: :prompts:test + :ij-plugin:test green through iter-07.
