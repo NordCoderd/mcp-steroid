@@ -19,32 +19,32 @@ This guide teaches you how to write effective Kotlin code that executes inside I
 
 ## Quick Reference
 
-**The IDE knows the code better than any file search tool. Use it only where it adds value.**
+**The IDE knows the code better than any file search tool. `steroid_execute_code` is the default edit/navigate path — native tools only where the IDE genuinely does not apply.**
 
-| Operation | Use IntelliJ API (steroid_execute_code) | Why? |
-|-----------|------------------------------|------|
-| Find files by extension | `FilenameIndex.getAllFilesByExt(project, "java", scope)` | O(1) indexed vs O(n) filesystem scan |
-| Find file by exact name | `FilenameIndex.getVirtualFilesByName("UserService.java", scope)` | O(1) indexed lookup |
-| Find all usages of symbol | `ReferencesSearch.search(element, scope)` | Understands code semantics |
-| **In-place edit of any size** (1–1000+ lines) | `val vf = findProjectFile(…)!!; val updated = String(vf.contentsToByteArray(), vf.charset).replace(OLD, NEW); check(updated != …); writeAction { VfsUtil.saveText(vf, updated) }` | **✅ PRIMARY** — ~5 lines of real code, same payload shape as `Edit(old,new)`. Stays inside the IDE JVM so VFS/PSI auto-refresh; the native `Edit` tool bypasses IntelliJ and leaves PSI stale. Use `replace(…, count = 1)` for single-occurrence replace; use `Regex.replace` for patterned substitutions. |
-| Manual text replacement | Refactoring APIs | Maintains code correctness |
-| Run Maven tests | `MavenRunConfigurationType.runConfiguration()` + `SMTRunnerEventsListener` | **✅ PRIMARY** — structured pass/fail; Bash `./mvnw test` is LAST-RESORT only |
-| Run Gradle tests | `GradleRunConfiguration` + `setRunAsTest(true)` + `SMTRunnerEventsListener` | **✅ PRIMARY** — structured pass/fail; Bash `./gradlew test` is LAST-RESORT only |
-| Maven dependency sync | `MavenProjectsManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles()` | **✅ Use this** — no CLI equivalent |
+| Operation | IDE path (inside `steroid_execute_code`) | Why |
+|-----------|------------------------------------------|------|
+| Find files by extension | `FilenameIndex.getAllFilesByExt(project, "java", projectScope())` | O(1) indexed, index is canonical |
+| Find file by exact name | `FilenameIndex.getVirtualFilesByName("UserService.java", projectScope())` | O(1) indexed lookup |
+| Find all usages of symbol | `ReferencesSearch.search(element, projectScope())` | Type-aware, no false positives from strings/comments |
+| Read a file | `String(findProjectFile("…")!!.contentsToByteArray(), charset)` | Stays inside the IDE; no separate Read-before-Edit contract to satisfy |
+| List files | `FilenameIndex.getAllFilesByExt(project, "java", projectScope())` or PSI directory traversal | Same index backing |
+| **Grep text content** | `FilenameIndex.getAllFilesByExt(project, ext, scope).flatMap { vf -> /* indexOf / Regex.findAll on vf.text */ }` | Works over the VFS so subsequent semantic queries see the same state you searched |
+| **Multi-site literal edit** (any number of files) | `applyPatch { hunk(path, old, new); … }` | One undoable command, atomic pre-flight, PSI commit in-place — see `mcp-steroid://ide/apply-patch` |
+| **In-place single-file edit** | `val vf = findProjectFile(…)!!; val updated = String(vf.contentsToByteArray(), vf.charset).replace(OLD, NEW); check(updated != …); writeAction { VfsUtil.saveText(vf, updated) }` | Same IDE-side read+write+VFS-refresh in one call; payload shape identical to `Edit(old,new)` |
+| Create new files | `writeAction { VfsUtil.createDirectoryIfMissing(root, parentRel)!!.createChildData(this, name).also { VfsUtil.saveText(it, content) } }` | VFS creates the index entry immediately so PSI can parse the file without a refresh round-trip |
+| Run Maven tests | `MavenRunConfigurationType.runConfiguration()` + `SMTRunnerEventsListener` | Structured pass/fail; Bash `./mvnw test` cold-starts ~31 s per run |
+| Run Gradle tests | `GradleRunConfiguration` + `setRunAsTest(true)` + `SMTRunnerEventsListener` | Structured pass/fail; same cold-start cost applies |
+| Maven dependency sync | `MavenProjectsManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles()` | No CLI equivalent |
 
-**Operations that do NOT need steroid_execute_code — use native agent tools instead:**
+**Native tools only where MCP Steroid genuinely does not apply** — keep this list tight, and prefer the IDE whenever the operation touches the project model:
 
-| Operation | Native Tool | Why NOT steroid_execute_code? |
-|-----------|-------------|-------------------|
-| **Create new files** | **Write tool** | steroid_execute_code file creation is **+47% slower** (A/B measured) |
-| **Create directories** | **Bash `mkdir -p`** | `VfsUtil.createDirectoryIfMissing` adds ~8s JVM overhead; `mkdir -p` is instant |
-| Read a file | Read tool | Zero JVM overhead; steroid_execute_code adds ~12s per call |
-| List files | Glob tool | Zero overhead; steroid_execute_code not needed |
-| `grep`/search text | Grep tool | Zero overhead |
-| **Run Maven/Gradle tests** | **See Quick Reference above — use IDE runners inside steroid_execute_code** | Bash `./mvnw test` / `./gradlew test` is LAST-RESORT only |
-| Docker availability | Bash tool | Just a socket check — no IntelliJ value |
-| Docker inspect/exec | Bash tool | No IntelliJ API equivalent; use Bash directly |
-| Simple file existence | Bash `test -f` | No IntelliJ value for POSIX checks |
+| Operation | Native Tool | Why |
+|-----------|-------------|-------|
+| Docker inspect / exec | Bash tool | Docker CLI is outside the IDE's scope; spawning `docker` inside the IDE JVM via `GeneralCommandLine` is banned |
+| Shell commands / git / package managers | Bash tool | The IDE does not own these processes |
+| Docker availability probe | `java.io.File("/var/run/docker.sock").exists()` **inside** `steroid_execute_code` | Pure JVM, no process spawn — keeps you inside the IDE call |
+
+Everything else — reads, edits, greps, renames, refactors, test runs, compile checks, inspections — goes through `steroid_execute_code`. The IDE's VFS + PSI stay authoritative and the next semantic query sees the state you just wrote.
 
 ## ❌ BANNED Anti-Patterns: ProcessBuilder for Builds
 

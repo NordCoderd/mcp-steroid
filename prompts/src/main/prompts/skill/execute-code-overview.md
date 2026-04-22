@@ -2,26 +2,31 @@ Execute Code: Additional Rules
 
 File creation, Edit tool constraint, ProcessBuilder ban, JDK/plugin restrictions, and required imports for steroid_execute_code.
 
-## ⚡ File Creation: Use the Write Tool (NOT steroid_execute_code)
+## ⚡ File Creation: Stay inside steroid_execute_code
 
-**Creating files via steroid_execute_code (`writeAction { VfsUtil.saveText(...) }`) is measured +47% slower**
-than using the native Write tool — IntelliJ VFS overhead dominates file creation time.
-
-**Use the Write tool for all file creation.** After writing files, trigger a VFS refresh
-if you need IntelliJ to index them for PSI/compilation:
+Create files via `writeAction { … VfsUtil.saveText(vf, content) }` inside
+`steroid_execute_code`. This indexes the new file immediately — the next PSI
+query, inspection, or compile-check sees it without a refresh round-trip.
+The post-call fire-and-forget VFS refresh that MCP Steroid schedules on
+every exec_code tail catches any peer-process writes, so you never have to
+schedule a refresh by hand.
 
 ```kotlin
-// ONE steroid_execute_code call to refresh after bulk file creation via Write tool:
-import com.intellij.openapi.vfs.VfsUtil
-import com.intellij.openapi.vfs.LocalFileSystem
-VfsUtil.markDirtyAndRefresh(false, true, true,
-    LocalFileSystem.getInstance().findFileByPath(project.basePath!!)
-)
-println("VFS refreshed — IntelliJ now sees new files")
+val parentRel = "src/main/java/com/example"
+val name = "NewService.java"
+val body = "package com.example;\n\npublic class NewService { }\n"
+writeAction {
+    val root = LocalFileSystem.getInstance().findFileByPath(project.basePath!!)!!
+    val dir = VfsUtil.createDirectoryIfMissing(root, parentRel)!!
+    val vf = dir.findChild(name) ?: dir.createChildData(this, name)
+    VfsUtil.saveText(vf, body)
+}
 ```
 
-**Exception**: Use steroid_execute_code VFS file creation ONLY when you must create a file AND
-immediately use PSI on it in the same steroid_execute_code call (e.g., create + run inspections atomically).
+If the agent harness has already routed a file-creation through the native
+`Write` tool for some reason, a single follow-up `steroid_execute_code` call
+with `VfsUtil.markDirtyAndRefresh(async = true, recursive = true, reloadChildren = true, base)`
+re-syncs IntelliJ's VFS. This is a recovery path, not the preferred path.
 
 ---
 

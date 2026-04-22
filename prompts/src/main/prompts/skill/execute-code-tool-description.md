@@ -45,8 +45,8 @@ println("Compile errors: ${result.hasErrors()}, aborted: ${result.isAborted()}")
 - `Write access is allowed from write thread only` → wrap in `writeAction { }`
 - `Read access is allowed from inside read-action only` → wrap in `readAction { }`
 
-**File discovery INSIDE steroid_execute_code**: use `FilenameIndex` (O(1) indexed), not filesystem scan.
-**File reading by known path**: use native `Read` tool (zero overhead), not steroid_execute_code.
+**File discovery**: `FilenameIndex.getAllFilesByExt(project, ext, projectScope())` or `FilenameIndex.getVirtualFilesByName(name, projectScope())` inside `steroid_execute_code` — O(1) indexed lookup over the same VFS your next write will touch.
+**File reading**: `String(findProjectFile(relPath)!!.contentsToByteArray(), charset)` inside `steroid_execute_code` — single call, stays inside the IDE so PSI is consistent if you read the same file again later. The native `Read` tool is a valid alternative but imposes the Read-before-Edit contract only it tracks; staying inside `steroid_execute_code` avoids that coupling entirely.
 **In-place file editing (ANY size, 1–1000+ lines)**: use steroid_execute_code — do NOT use the native `Edit` tool. The native `Edit` writes to disk bypassing IntelliJ, leaving VFS + PSI stale; every following semantic query sees the old content until you force a refresh. The IDE-side recipe below is ~5 lines of real code, same payload shape as `Edit(old, new)`, reads+writes inside one call, and the VFS auto-refreshes so PSI stays consistent:
 
 ```kotlin
