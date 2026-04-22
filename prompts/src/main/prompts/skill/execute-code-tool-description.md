@@ -5,6 +5,23 @@ MCP tool description for the steroid_execute_code tool.
 ###_NO_AUTO_TOC_###
 Execute Kotlin code directly in IntelliJ's runtime with full API access — builds, tests, refactoring, inspections, debugging, navigation.
 
+## 🛑 STOP before the 2nd native `Edit` — use `applyPatch`
+
+If you are about to make similar edits across **two or more files** (same pattern, different paths), **do not chain `Edit` calls**. Switch to a single `steroid_execute_code` call with the `applyPatch` DSL:
+
+```kotlin
+val result = applyPatch {
+    hunk("/abs/path/A.java",  "oldA", "newA")
+    hunk("/abs/path/B.java",  "oldB", "newB")
+    hunk("/abs/path/C.java",  "oldC", "newC")
+}
+println(result)
+```
+
+One undoable command. Pre-flight validates every `oldString` exists exactly once. PSI committed in the same call. Native `Edit` chains bypass the VFS, leave PSI stale, and cost you one tool call per site.
+
+**Heuristic**: before the 2nd `Edit` in the same task, stop and ask: "Am I applying the same or similar change to 2+ files?" If yes, `applyPatch { hunk(...); hunk(...); … }` in one call.
+
 ## Decision tree — pick the IDE path before reaching for a native tool
 
 | Task shape | One-line IDE call |
