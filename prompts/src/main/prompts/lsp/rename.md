@@ -29,9 +29,12 @@ data class RenamePlan(
     val oldName: String,
     val usages: Array<UsageInfo>,
     val processor: RenameProcessor,
+    val analysis: String,
 )
 
-val plan = readAction {
+// Returns either an error message (String) when the position does not resolve to a
+// renameable declaration, or a fully-populated RenamePlan with the rendered analysis.
+val plan: Any = readAction {
     val virtualFile = findFile(filePath)
         ?: return@readAction "File not found: $filePath"
 
@@ -62,9 +65,26 @@ val plan = readAction {
         /* isSearchInComments = */ false,
         /* isSearchTextOccurrences = */ false)
 
-    // Pre-compute usages for the dry-run preview.
+    // Pre-compute usages for the dry-run preview. Also build the rendered analysis
+    // text here so every PSI/document property access stays inside the read action.
     val usages = processor.findUsages()
-    RenamePlan(named, oldName, usages, processor)
+    val analysis = buildString {
+        appendLine("Rename (semantic, PSI-backed): $oldName -> $newName")
+        appendLine("Declaration: ${named.javaClass.simpleName}")
+        appendLine("Usages across project: ${usages.size}")
+        appendLine()
+        usages.take(20).forEach { u ->
+            val uVf = u.virtualFile?.path ?: "<unknown>"
+            val uDoc = u.file?.let { PsiDocumentManager.getInstance(project).getDocument(it) }
+            val uOff = u.navigationOffset
+            val uLine = if (uDoc != null && uOff >= 0) uDoc.getLineNumber(uOff) + 1 else -1
+            appendLine("  - $uVf:$uLine")
+        }
+        if (usages.size > 20) {
+            appendLine("  ... and ${usages.size - 20} more")
+        }
+    }
+    RenamePlan(named, oldName, usages, processor, analysis)
 }
 
 if (plan is String) {
@@ -73,25 +93,9 @@ if (plan is String) {
 }
 
 val renamePlan = plan as RenamePlan
-val analysis = buildString {
-    appendLine("Rename (semantic, PSI-backed): ${renamePlan.oldName} -> $newName")
-    appendLine("Declaration: ${renamePlan.element.javaClass.simpleName}")
-    appendLine("Usages across project: ${renamePlan.usages.size}")
-    appendLine()
-    renamePlan.usages.take(20).forEach { u ->
-        val uVf = u.virtualFile?.path ?: "<unknown>"
-        val uDoc = u.file?.let { PsiDocumentManager.getInstance(project).getDocument(it) }
-        val uOff = u.navigationOffset
-        val uLine = if (uDoc != null && uOff >= 0) uDoc.getLineNumber(uOff) + 1 else -1
-        appendLine("  - $uVf:$uLine")
-    }
-    if (renamePlan.usages.size > 20) {
-        appendLine("  ... and ${renamePlan.usages.size - 20} more")
-    }
-}
 
 if (dryRun) {
-    println(analysis)
+    println(renamePlan.analysis)
     println()
     println("(Dry run - no changes made. Set dryRun=false to perform the rename.)")
     return
@@ -99,12 +103,13 @@ if (dryRun) {
 
 // Apply the rename atomically. RenameProcessor wraps the whole update in a single
 // CommandProcessor command, so it is undoable as one unit. Either every reference
-// updates or none do.
-writeAction {
-    renamePlan.processor.run()
-}
+// updates or none do. Use writeIntentReadAction (not writeAction): refactoring
+// processors perform their own read/write action management internally, matching
+// the pattern used by safe-delete / move-class / change-signature recipes.
+writeIntentReadAction { renamePlan.processor.run() }
+writeAction { PsiDocumentManager.getInstance(project).commitAllDocuments() }
 
-println(analysis)
+println(renamePlan.analysis)
 println()
 println("Rename applied: ${renamePlan.oldName} -> $newName (${renamePlan.usages.size} usages updated atomically)")
 ```
