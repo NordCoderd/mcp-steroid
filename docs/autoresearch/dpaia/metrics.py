@@ -62,6 +62,7 @@ import sys
 
 _CLAUDE_EXEC_CODE_NAME = "mcp__mcp-steroid__steroid_execute_code"
 _CLAUDE_FETCH_RESOURCE_NAME = "mcp__mcp-steroid__steroid_fetch_resource"
+_CLAUDE_APPLY_PATCH_NAME = "mcp__mcp-steroid__steroid_apply_patch"
 
 # Negative metric: new DSL methods added to McpScriptContext are a cognitive
 # tax for agents (API surface to learn, documentation, test burden, drift
@@ -326,6 +327,12 @@ def analyse(run_dir):
                         if "applyPatch" in code or "hunk(" in code:
                             apply_patch_called = True
                             apply_patch_hunks += code.count("hunk(")
+                    elif name == _CLAUDE_APPLY_PATCH_NAME:
+                        # Dedicated MCP tool: hunks ship as a JSON array in the tool input.
+                        # Counts as apply-patch adoption whether or not the DSL string appears.
+                        apply_patch_called = True
+                        hunks_json = (block.get("input") or {}).get("hunks") or []
+                        apply_patch_hunks += len(hunks_json) if isinstance(hunks_json, list) else 0
                     elif name == _CLAUDE_FETCH_RESOURCE_NAME:
                         fetch_resource_calls += 1
                     elif name == "Edit":

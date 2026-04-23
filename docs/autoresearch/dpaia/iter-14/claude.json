@@ -45,7 +45,7 @@
   },
   "errors": 2,
   "apply_patch": {
-    "called": false,
-    "hunks_estimate": 0
+    "called": true,
+    "hunks_estimate": 2
   }
 }
