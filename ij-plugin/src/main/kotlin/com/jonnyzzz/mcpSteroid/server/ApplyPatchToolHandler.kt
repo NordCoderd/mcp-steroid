@@ -17,6 +17,7 @@ import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallContext
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallResult
+import com.jonnyzzz.mcpSteroid.prompts.generated.skill.ApplyPatchToolDescriptionPromptArticle
 import com.jonnyzzz.mcpSteroid.updates.analyticsBeacon
 import kotlinx.serialization.json.*
 
@@ -48,6 +49,8 @@ import kotlinx.serialization.json.*
  */
 class ApplyPatchToolHandler : McpRegistrar {
     private val log = Logger.getInstance(ApplyPatchToolHandler::class.java)
+
+    private val toolDescription get() = ApplyPatchToolDescriptionPromptArticle().readPayload(ResourceRegistrar.buildPromptsContext())
 
     override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
@@ -200,36 +203,4 @@ class ApplyPatchToolHandler : McpRegistrar {
         isError = true,
     )
 
-    private val toolDescription: String get() = """
-        Atomic multi-site literal-text patch. Apply N `old_string → new_string`
-        substitutions across one or more files in a single undoable command.
-
-        Use this INSTEAD of chaining 2+ native `Edit` calls. Pre-flight
-        validates every `old_string` is present exactly once per file; if any
-        hunk fails validation, NO edits land (all-or-nothing). Multi-hunk
-        edits in the same file apply in descending-offset order automatically
-        so earlier edits don't shift later ones.
-
-        Why this tool vs `steroid_execute_code` with `applyPatch { }`: this
-        bypasses kotlinc compilation, so large patches (8+ hunks, 3k+ char
-        payloads) complete in tens of ms instead of tens of seconds — matters
-        for Claude Code CLI's 60s per-tool MCP timeout.
-
-        Input shape:
-        {
-          "project_name": "project-home",
-          "task_id": "my-task",
-          "reason": "add @ComponentScan to each service Application",
-          "hunks": [
-            {"path": "/abs/path/A.java", "old_string": "old", "new_string": "new"},
-            {"path": "/abs/path/B.java", "old_string": "other", "new_string": "replacement"}
-          ]
-        }
-
-        Return: human-readable audit — `N hunks across M file(s) applied
-        atomically` + per-hunk `path:line:col (oldLen→newLen chars)`.
-
-        Same underlying engine as `steroid_execute_code`'s `applyPatch { hunk(…) }`
-        DSL — identical semantics, no boilerplate, no compile overhead.
-    """.trimIndent()
 }
