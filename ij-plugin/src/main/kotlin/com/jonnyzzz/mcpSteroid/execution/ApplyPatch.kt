@@ -167,18 +167,17 @@ internal suspend fun executeApplyPatch(
 
     // The write phase runs on the EDT with write-lock + CommandProcessor undo group.
     //
-    // Modality matters: `ModalityState.any()` (used by MCP Steroid's UI-only helpers —
-    // DialogKiller, VisionService, ListWindowsToolHandler) is explicitly NOT safe here.
-    // JavaDoc at platform/core-api/src/com/intellij/openapi/application/ModalityState.java:
-    //   "Please don't use it unless absolutely needed. The code under this modality can
-    //    only perform purely UI operations, it shouldn't access any PSI, VFS or project
-    //    model."
-    // apply-patch mutates the Document model (PSI is backed by it), so we use
-    // `ModalityState.nonModal()` instead — the dispatch waits until any modal dialog
-    // dismisses before running, which is correct behaviour for model edits.
+    // Modality: `ModalityState.any()` is explicitly NOT safe here (per JavaDoc at
+    // platform/core-api/src/com/intellij/openapi/application/ModalityState.java —
+    // `.any()` is for purely UI helpers and must not touch PSI/VFS/model). We use
+    // `nonModal()` so dispatch waits until any modal dialog dismisses.
     //
-    // `withContext(Dispatchers.EDT + …)` internally handles the already-on-EDT case —
-    // Kotlin coroutines detect we're on the right thread and run inline.
+    // `withContext(Dispatchers.EDT + …)` detects the already-on-EDT case and runs
+    // inline. Tests that want to drive this path must NOT block EDT in the caller
+    // — see `ApplyPatchTest`, which overrides `runInDispatchThread() = false` so
+    // `timeoutRunBlocking` runs on the JUnit worker thread and leaves EDT free
+    // to dispatch the write phase (an EDT-parked-in-runBlocking caller would
+    // deadlock here).
     withContext(Dispatchers.EDT + ModalityState.nonModal().asContextElement()) {
         WriteCommandAction.runWriteCommandAction(project, commandName, null, Runnable {
             for ((_, hunksInFile) in groupedDescending) {

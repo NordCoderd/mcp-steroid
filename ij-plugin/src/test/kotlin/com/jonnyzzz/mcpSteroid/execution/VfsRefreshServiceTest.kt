@@ -20,6 +20,11 @@ import kotlin.time.Duration.Companion.seconds
  */
 class VfsRefreshServiceTest : BasePlatformTestCase() {
 
+    // Run tests off the EDT so `timeoutRunBlocking` doesn't park the dispatch
+    // thread while the service-under-test needs `withContext(Dispatchers.EDT)`
+    // or similar platform-coroutine dispatches — classic deadlock otherwise.
+    override fun runInDispatchThread(): Boolean = false
+
     fun testScheduleAsyncRefreshReturnsImmediately(): Unit = timeoutRunBlocking(30.seconds) {
         val service = project.vfsRefreshService
         val elapsedMs = measureTimeMillis {

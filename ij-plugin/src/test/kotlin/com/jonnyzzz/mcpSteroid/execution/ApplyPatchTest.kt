@@ -1,6 +1,8 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.execution
 
+import com.intellij.openapi.application.edtWriteAction
+import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -14,7 +16,6 @@ import java.nio.file.Path
 import kotlin.io.path.createDirectories
 import kotlin.io.path.createTempDirectory
 import kotlin.io.path.div
-import kotlin.io.path.readText as pathReadText
 import kotlin.io.path.writeText
 import kotlin.time.Duration.Companion.seconds
 
@@ -26,8 +27,22 @@ import kotlin.time.Duration.Companion.seconds
  * DSL's behaviour ever drifts — atomicity, descending-offset ordering,
  * pre-flight validation — a failure here catches it before the recipe
  * sends agents off in the wrong direction.
+ *
+ * **Threading note.** By default `UsefulTestCase.runBare` wraps each test in
+ * `EdtTestUtil.runInEdtAndWait`, which makes `timeoutRunBlocking` park the EDT
+ * inside `runBlocking`. The apply-patch engine dispatches its write phase with
+ * `withContext(Dispatchers.EDT)`, which would then be unable to run because
+ * EDT is parked — a classic deadlock. We opt out by overriding
+ * [runInDispatchThread] to `false`, so each test runs on the JUnit worker
+ * thread; `timeoutRunBlocking` on that thread leaves EDT free to pump the
+ * `Dispatchers.EDT` queue for the write action.
  */
 class ApplyPatchTest : BasePlatformTestCase() {
+
+    // See the class KDoc above — the apply-patch engine requires a live EDT
+    // dispatcher during its `withContext(Dispatchers.EDT)` phase; running the
+    // test itself on EDT would deadlock `timeoutRunBlocking` against that.
+    override fun runInDispatchThread(): Boolean = false
 
     // Production apply-patch resolves files via `McpScriptContext.findFile`,
     // which goes through `LocalFileSystem`. The test uses a real on-disk temp
@@ -73,7 +88,21 @@ class ApplyPatchTest : BasePlatformTestCase() {
         return path
     }
 
-    private fun Path.readTextFile(): String = pathReadText()
+    /**
+     * Read the file content *through the IDE* rather than directly from disk.
+     *
+     * `executeApplyPatch` mutates the in-memory [com.intellij.openapi.editor.Document]
+     * and commits PSI, but leaves the on-disk copy stale until the platform's next
+     * VFS refresh / document save cycle. Production callers see consistent content
+     * because the post-exec async VFS refresh covers that; tests must read via VFS
+     * (or explicitly save the document) to observe the patched content.
+     */
+    private suspend fun Path.readViaIde(): String {
+        val vf = LocalFileSystem.getInstance().findFileByNioFile(this)
+            ?: error("VFS cannot resolve $this")
+        edtWriteAction { FileDocumentManager.getInstance().saveAllDocuments() }
+        return String(vf.contentsToByteArray(), vf.charset)
+    }
 
     fun testSingleHunkSingleFile(): Unit = timeoutRunBlocking(30.seconds) {
         val ctx = createContext()
@@ -83,7 +112,7 @@ class ApplyPatchTest : BasePlatformTestCase() {
             hunk(vf.toString(), "int x = 1", "int x = 42")
         }
 
-        assertEquals("class A { int x = 42; }\n", vf.readTextFile())
+        assertEquals("class A { int x = 42; }\n", vf.readViaIde())
         assertEquals(1, result.hunkCount)
         assertEquals(1, result.fileCount)
         val h = result.applied.single()
@@ -114,7 +143,7 @@ class ApplyPatchTest : BasePlatformTestCase() {
             hunk(vf.toString(), "int z = 3", "int z = 300")
         }
 
-        val updated = vf.readTextFile()
+        val updated = vf.readViaIde()
         assertTrue("x replaced: $updated", updated.contains("int x = 100"))
         assertTrue("y replaced: $updated", updated.contains("int y = 200"))
         assertTrue("z replaced: $updated", updated.contains("int z = 300"))
@@ -135,8 +164,8 @@ class ApplyPatchTest : BasePlatformTestCase() {
             hunk(b.toString(), "count = 2", "count = 200")
         }
 
-        assertEquals("int count = 100;\n", a.readTextFile())
-        assertEquals("int count = 200;\n", b.readTextFile())
+        assertEquals("int count = 100;\n", a.readViaIde())
+        assertEquals("int count = 200;\n", b.readViaIde())
         assertEquals(2, result.hunkCount)
         assertEquals(2, result.fileCount)
     }
@@ -160,8 +189,8 @@ class ApplyPatchTest : BasePlatformTestCase() {
         assertTrue("Error names the missing hunk index", err!!.message!!.contains("Hunk #1"))
         assertTrue("Error names the path", err.message!!.contains("Fail_B.java"))
         // Crucial: neither file was modified, because pre-flight ran before any edit.
-        assertEquals("content_A\n", a.readTextFile())
-        assertEquals("content_B\n", b.readTextFile())
+        assertEquals("content_A\n", a.readViaIde())
+        assertEquals("content_B\n", b.readViaIde())
     }
 
     fun testNonUniqueOldStringFailsCleanly(): Unit = timeoutRunBlocking(30.seconds) {
@@ -180,7 +209,7 @@ class ApplyPatchTest : BasePlatformTestCase() {
         assertNotNull("Expected ApplyPatchException on non-unique old_string", err)
         assertTrue("Error explains non-unique", err!!.message!!.contains("occurs more than once"))
         assertTrue("Error suggests context expansion", err.message!!.contains("expand old_string"))
-        assertEquals("token\nother\ntoken\n", vf.readTextFile())
+        assertEquals("token\nother\ntoken\n", vf.readViaIde())
     }
 
     fun testZeroHunksThrows(): Unit = timeoutRunBlocking(30.seconds) {
