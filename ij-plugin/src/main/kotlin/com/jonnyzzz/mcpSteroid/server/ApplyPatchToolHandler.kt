@@ -5,12 +5,14 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.ProjectManager.getInstance
 import com.intellij.openapi.vfs.LocalFileSystem
+import com.intellij.platform.backend.observation.Observation
 import com.jonnyzzz.mcpSteroid.execution.ApplyPatchException
 import com.jonnyzzz.mcpSteroid.execution.ApplyPatchHunk
 import com.jonnyzzz.mcpSteroid.execution.dialogKiller
 import com.jonnyzzz.mcpSteroid.execution.executeApplyPatch
 import com.jonnyzzz.mcpSteroid.execution.vfsRefreshService
 import com.jonnyzzz.mcpSteroid.storage.ExecutionId
+import kotlinx.coroutines.withTimeoutOrNull
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallContext
@@ -146,6 +148,17 @@ class ApplyPatchToolHandler : McpRegistrar {
             logMessage = { log.info(it) },
             forceEnabled = null,
         )
+
+        // Wait for IDE background configuration (project save, indexing, etc.) to
+        // settle before the write action. Without this, in a freshly-opened IDE
+        // the project-save activity that follows DialogKiller can hold the
+        // write-intent read lock for 10+ s, causing `WriteCommandAction` to time
+        // out before Claude's 60 s MCP tool cap. 5 s is a pragmatic upper bound:
+        // if configuration isn't done by then, proceed anyway — the write action
+        // retries on its own.
+        withTimeoutOrNull(5_000L) {
+            Observation.awaitConfiguration(project)
+        }
 
         val result = try {
             executeApplyPatch(project, hunks) { path ->
