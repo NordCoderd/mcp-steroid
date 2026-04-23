@@ -23,6 +23,8 @@ Never include AI as co-author or mention AI in commit messages.
 - **BANNED: detecting failures and skipping tests.** Tests exist to show problems. Never add `try { } catch { skip() }`, `TestAbortedException` on error detection, `Assumptions.assumeTrue(isAvailable)`, or any pattern that turns a real failure into a skip. The only acceptable test skip is at the **Gradle task level** (`enabled = !condition`) when an entire test suite is structurally incompatible with the platform (e.g., native-only tests disabled on an OS that cannot run them). Individual test-level runtime skips that hide failures are forbidden.
 - **Prefer Kotlin Coroutines native APIs over Java threading primitives**: use `CompletableDeferred<T>` + `withTimeout(duration) { deferred.await() }` instead of `CountDownLatch`. Use `Channel<T>` for streaming. Use `suspendCancellableCoroutine` for one-shot callbacks. `CountDownLatch` / `Semaphore` / `Object.wait()` are banned in new coroutine code — they block threads and are not cancellation-aware.
 - **NEVER run `test-integration` or `test-experiments` tests in parallel** — each test starts a full Docker IntelliJ container. Running two or more concurrently exhausts RAM/CPU (IDE windows never appear, containers OOM). Always run one `./gradlew :test-integration:test --tests '...'` (or `:test-experiments:test --tests '...'`) at a time. Wait for it to finish completely before starting the next. This applies to all Docker-based tests: DPAIA arena, debugger demo, playground, CLI agent tests.
+- **BANNED: `./gradlew test` at the root.** It fans out to every module — `:prompts:test` alone runs ~80 `KtBlocksCompilationTest` classes × 8 IDEs (external kotlinc processes) and can take hours after any cache-invalidating change. Always scope to the module(s) you touched: `./gradlew :ij-plugin:test`, `./gradlew :kotlin-cli:test`, `./gradlew :prompts:test --tests '<specific-class>'`. See the per-module guidance under "Test Task Isolation Rules".
+- **Diagnose a stuck/slow test with JDK tooling BEFORE killing it.** `jps -l | grep GradleWorkerMain` → `jcmd <pid> Thread.print > /tmp/dump.txt` while the JVM is alive; then `grep '<YourTest>Test' /tmp/dump.txt -A 5` to find the blocked method. Killing first throws away the evidence and forces a guess-and-retry loop. See "Live JVM Thread/Coroutine Dumps". Once you have the stuck test's name, **iterate on just that test** (`./gradlew :ij-plugin:test --tests 'com.example.StuckTest'` with `--rerun-tasks`) — don't re-run the whole module.
 
 ## Workflow
 
@@ -145,6 +147,16 @@ private fun testExecParams(code: String, timeout: Int = 30) = ExecCodeParams(
 ```
 
 ### Test Task Isolation Rules
+
+**Prefer per-project `:module:test` over root `./gradlew test`.** Running the entire root suite blindly is almost always useless for stabilization work — it churns through ~100+ tests (many unrelated to the change at hand), can take 45+ minutes end-to-end, and buries a single real failure under noise from every other module. Only reach for root `test` when doing a pre-release green-sweep. For every other case:
+
+- After touching `ij-plugin` production code: `./gradlew :ij-plugin:test` (or with `--tests '<pattern>'` for a subset).
+- After touching `prompts/src/main/prompts/**`: `./gradlew :prompts:test --tests '<relevant KtBlocksCompilationTest>'`.
+- After touching `kotlin-cli` (e.g., `CodeWrapperForCompilation`): `./gradlew :kotlin-cli:test`.
+- After touching `buildSrc` codegen: `./gradlew :prompt-generator:test :prompts:generatePrompts` (the regeneration is the real validation).
+- When a test fails under root `test`, re-run just that module first — much faster, same signal.
+
+This repository's per-module split (`:ij-plugin`, `:prompts`, `:kotlin-cli`, `:prompts-api`, `:test-helper`, `:test-integration`, `:test-experiments`) is intentional and each module stands alone.
 
 - **`./gradlew :ij-plugin:test`** — runs only unit/in-process tests. Docker CLI tests are excluded by default.
   - Docker CLI tests (require Docker + API keys): run explicitly with `--tests '*CliClaudeIntegrationTest*'` etc.
