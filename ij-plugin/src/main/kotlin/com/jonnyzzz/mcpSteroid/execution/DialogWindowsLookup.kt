@@ -44,7 +44,7 @@ class DialogWindowsLookup {
     private suspend fun canPumpEdtNonModal(): Boolean {
         if (ApplicationManager.getApplication().isHeadlessEnvironment) return true
         return try {
-            withContext(Dispatchers.IO + CoroutineName("DialogWindowsLookup#check")) {
+            withContext(CoroutineName("DialogWindowsLookup#check")) {
                 withTimeout(100) {
                     async(Dispatchers.EDT) { true }.await()
                 }
