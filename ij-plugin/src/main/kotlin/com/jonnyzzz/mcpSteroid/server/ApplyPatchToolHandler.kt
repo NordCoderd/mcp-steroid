@@ -2,12 +2,15 @@
 package com.jonnyzzz.mcpSteroid.server
 
 import com.intellij.openapi.application.readAction
+import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.project.ProjectManager.getInstance
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.jonnyzzz.mcpSteroid.execution.ApplyPatchException
 import com.jonnyzzz.mcpSteroid.execution.ApplyPatchHunk
+import com.jonnyzzz.mcpSteroid.execution.dialogKiller
 import com.jonnyzzz.mcpSteroid.execution.executeApplyPatch
 import com.jonnyzzz.mcpSteroid.execution.vfsRefreshService
+import com.jonnyzzz.mcpSteroid.storage.ExecutionId
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
 import com.jonnyzzz.mcpSteroid.mcp.ToolCallContext
@@ -42,6 +45,7 @@ import kotlinx.serialization.json.*
  * the same action, VFS async-refreshed on completion.
  */
 class ApplyPatchToolHandler : McpRegistrar {
+    private val log = Logger.getInstance(ApplyPatchToolHandler::class.java)
 
     override fun register(server: McpServerCore) {
         server.toolRegistry.registerTool(
@@ -129,6 +133,19 @@ class ApplyPatchToolHandler : McpRegistrar {
         if (project == null) {
             return errorResult("Project not found: \"$projectName\". Available projects: $availableNames")
         }
+
+        // Kill any modal dialog that may be blocking EDT dispatch. Without this,
+        // the withContext(EDT + ModalityState.nonModal()) inside executeApplyPatch
+        // will wait until the modal dismisses — which can exceed Claude Code's
+        // hardcoded ~60s MCP tool timeout even though the patch itself is sub-ms.
+        // This mirrors what ExecutionManager does before each execute_code call.
+        val executionId = ExecutionId("apply-patch-${System.currentTimeMillis()}")
+        dialogKiller().killProjectDialogs(
+            project = project,
+            executionId = executionId,
+            logMessage = { log.info(it) },
+            forceEnabled = null,
+        )
 
         val result = try {
             executeApplyPatch(project, hunks) { path ->
