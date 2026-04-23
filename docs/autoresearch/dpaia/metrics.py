@@ -136,10 +136,153 @@ def _find_agent_file(run_dir):
     return os.path.join(run_dir, fname), name
 
 
+def _is_codex_format(ev):
+    """Codex NDJSON uses item.started / item.completed wrappers instead of
+    Anthropic's assistant.message.content[] blocks."""
+    return ev.get("type", "").startswith("item.") or ev.get("type") in (
+        "thread.started",
+        "turn.started",
+        "turn.completed",
+    )
+
+
+def _analyse_codex(ndjson_path, agent_name, run_dir):
+    """Parse OpenAI Codex CLI's NDJSON schema. Edit-equivalent is `file_change`
+    (a single event bundling N paths). Command_execution is the Bash-equivalent.
+    MCP calls arrive as `mcp_tool_call` items with server=mcp-steroid."""
+    tokens = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0, "total": 0}
+    mcp_calls_by_tool = {}
+    command_calls = 0
+    file_change_events = 0
+    file_change_total_paths = 0
+    exec_code_line_counts = []
+    exec_code_raw_codes = []
+    fetch_resource_calls = 0
+    apply_patch_called = False
+    apply_patch_hunks = 0
+    errors = 0
+
+    with open(ndjson_path, "r", encoding="utf-8") as fh:
+        for line in fh:
+            try:
+                ev = json.loads(line)
+            except Exception:
+                continue
+            usage = ev.get("usage") or {}
+            # Codex reports usage with cached_input_tokens — map to Claude-ish schema
+            if usage:
+                tokens["input"] += int(usage.get("input_tokens") or 0)
+                tokens["output"] += int(usage.get("output_tokens") or 0)
+                tokens["cache_read"] += int(usage.get("cached_input_tokens") or 0)
+            if ev.get("type") == "item.completed":
+                it = ev.get("item") or {}
+                itype = it.get("type")
+                if itype == "mcp_tool_call":
+                    tool = it.get("tool", "?")
+                    mcp_calls_by_tool[tool] = mcp_calls_by_tool.get(tool, 0) + 1
+                    args = it.get("arguments") or {}
+                    if tool == "steroid_execute_code":
+                        code = args.get("code") or ""
+                        exec_code_line_counts.append(_count_lines(code))
+                        exec_code_raw_codes.append(code)
+                        if "applyPatch" in code or "hunk(" in code:
+                            apply_patch_called = True
+                            apply_patch_hunks += code.count("hunk(")
+                    elif tool == "steroid_fetch_resource":
+                        fetch_resource_calls += 1
+                    if it.get("error"):
+                        errors += 1
+                elif itype == "command_execution":
+                    command_calls += 1
+                    if it.get("exit_code") not in (0, None):
+                        errors += 1
+                elif itype == "file_change":
+                    file_change_events += 1
+                    file_change_total_paths += len(it.get("changes") or [])
+
+    tokens["total"] = tokens["input"] + tokens["output"] + tokens["cache_read"]
+
+    # Retries heuristic (same as Claude side):
+    retries = 0
+    for i in range(1, len(exec_code_raw_codes)):
+        a = exec_code_raw_codes[i - 1][:80].strip()
+        b = exec_code_raw_codes[i][:80].strip()
+        if a and a == b:
+            retries += 1
+
+    total_mcp = sum(mcp_calls_by_tool.values())
+    # Codex native-ops on a calls-basis (file_change = 1 event, command = 1 event).
+    native_calls = command_calls + file_change_events
+    total_calls = total_mcp + native_calls
+    mcp_share = (total_mcp / total_calls) if total_calls else 0.0
+
+    # Secondary "edit-basis" share: file_change batches counted as N edits.
+    native_edits = command_calls + file_change_total_paths
+    mcp_share_edit_basis = (
+        (total_mcp / (total_mcp + native_edits)) if (total_mcp + native_edits) else 0.0
+    )
+
+    by_name = dict(mcp_calls_by_tool)
+    by_name["command_execution"] = command_calls
+    by_name["file_change"] = file_change_events
+    by_name["file_change_paths_total"] = file_change_total_paths
+
+    complexity = {
+        "exec_code_calls": len(exec_code_line_counts),
+        "exec_code_lines_total": sum(exec_code_line_counts),
+        "exec_code_lines_avg": (
+            statistics.fmean(exec_code_line_counts) if exec_code_line_counts else 0.0
+        ),
+        "exec_code_lines_p50": (
+            statistics.median(exec_code_line_counts) if exec_code_line_counts else 0
+        ),
+        "exec_code_lines_max": max(exec_code_line_counts) if exec_code_line_counts else 0,
+    }
+    return {
+        "run_dir": run_dir,
+        "agent": agent_name,
+        "tokens": tokens,
+        "calls": {
+            "total": total_calls,
+            "mcp_steroid": total_mcp,
+            "native": native_calls,
+            "mcp_share": round(mcp_share, 3),
+            "mcp_share_edit_basis": round(mcp_share_edit_basis, 3),
+            "by_name": by_name,
+            "errors_by_name": {},
+        },
+        "complexity": complexity,
+        "ease_of_use": {
+            "fetch_resource_calls": fetch_resource_calls,
+            "native_edit_calls": file_change_total_paths,
+            "exec_code_retries": retries,
+            "native_bash_calls": command_calls,
+        },
+        "errors": errors,
+        "apply_patch": {
+            "called": apply_patch_called,
+            "hunks_estimate": apply_patch_hunks,
+        },
+    }
+
+
 def analyse(run_dir):
     ndjson_path, agent_name = _find_agent_file(run_dir)
     if ndjson_path is None:
         return None
+
+    # Sniff first non-empty event to decide which format parser to use.
+    with open(ndjson_path, "r", encoding="utf-8") as fh:
+        first_ev = None
+        for line in fh:
+            try:
+                first_ev = json.loads(line)
+                if first_ev:
+                    break
+            except Exception:
+                continue
+    if first_ev is not None and _is_codex_format(first_ev):
+        return _analyse_codex(ndjson_path, agent_name, run_dir)
 
     tokens = {
         "input": 0,
@@ -302,7 +445,7 @@ def _csv_row(a):
             a["tokens"]["input"],
             a["tokens"]["output"],
             a["tokens"]["cache_read"],
-            a["tokens"]["cache_creation"],
+            a["tokens"].get("cache_creation", 0),
             a["tokens"]["total"],
             a["calls"]["total"],
             a["complexity"]["exec_code_calls"],
