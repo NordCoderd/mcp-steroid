@@ -386,14 +386,33 @@ $roots
     </jdk>"""
 
         // Note: apt package temurin-N-jdk creates /usr/lib/jvm/temurin-N-jdk-<arch>.
-        // Names use just the version number ("8", "11", "17", "21", "25") so that
+        // Primary names are just the version number ("8", "11", "17", "21", "25") so
         // mcpSetupJdkAndWaitForImport can easily match by name.
+        //
+        // We additionally register distribution-qualified aliases (e.g. `corretto-21`,
+        // `temurin-21`) pointing at the same path. Reason: projects checked into VCS
+        // frequently write `project-jdk-name="corretto-21"` into `.idea/misc.xml`
+        // (that's the name IntelliJ assigns after a user imports a Corretto install
+        // from their local machine). If no JDK with that exact name exists in
+        // `ProjectJdkTable` when the project opens, `UnknownSdkStartupChecker` fires
+        // `UnknownSdkTracker.updateUnknownSdks()`, which offers a modal consent dialog
+        // to download Amazon Corretto — blocks headless Docker tests indefinitely.
+        // Pre-registering the alias names avoids the entire code path.
         val entries = buildString {
             appendLine(jdk8Entry("8", "/usr/lib/jvm/temurin-8-jdk-$temurinArch"))
             appendLine(jdk9PlusEntry("11", "/usr/lib/jvm/temurin-11-jdk-$temurinArch", "java version \"11\""))
             appendLine(jdk9PlusEntry("17", "/usr/lib/jvm/temurin-17-jdk-$temurinArch", "java version \"17\""))
             appendLine(jdk9PlusEntry("21", "/usr/lib/jvm/temurin-21-jdk-$temurinArch", "java version \"21\""))
             appendLine(jdk9PlusEntry("25", "/usr/lib/jvm/temurin-25-jdk-$temurinArch", "java version \"25\""))
+            // Distribution-qualified aliases for projects that pin a specific vendor name.
+            for (version in listOf(11, 17, 21, 25)) {
+                val path = "/usr/lib/jvm/temurin-$version-jdk-$temurinArch"
+                val ver = "java version \"$version\""
+                appendLine(jdk9PlusEntry("corretto-$version", path, ver))
+                appendLine(jdk9PlusEntry("temurin-$version", path, ver))
+            }
+            appendLine(jdk8Entry("corretto-8", "/usr/lib/jvm/temurin-8-jdk-$temurinArch"))
+            appendLine(jdk8Entry("temurin-8", "/usr/lib/jvm/temurin-8-jdk-$temurinArch"))
         }
 
         val xml = """<?xml version="1.0" encoding="UTF-8"?>
