@@ -44,6 +44,62 @@ files.forEach { f ->
 
 **Both you and sub-agents MUST use MCP Steroid** for IntelliJ API research — not file search tools.
 
+## Debugging a stuck/hung Docker test — collect thread dumps FIRST
+
+When a `test-integration` or `test-experiments` test hangs (IDE window never appears,
+project never finishes importing, `waitForIdeWindow` times out, assertions stall), **do NOT
+kill the Gradle task first**. The JVM inside the container is still alive and holds all the
+evidence you need in a thread dump. `--rm` only runs on container stop, so you have time to
+poke at it.
+
+### Recipe
+
+```bash
+# 1. Find the running IDE container (most recent, image built from the test's Dockerfile)
+docker ps --format '{{.ID}}\t{{.Image}}\t{{.Names}}\t{{.CreatedAt}}'
+
+# 2. Find the IDE JVM PID inside that container (it's always com.intellij.idea.Main)
+docker exec <CONTAINER_ID> jps -l
+# → e.g.   766 com.intellij.idea.Main
+
+# 3. Take a full thread dump (includes coroutine dump via the plugin's DebugProbes)
+docker exec <CONTAINER_ID> jcmd <PID> Thread.print > /tmp/ide-thread-dump.txt
+
+# 4. Inspect — the EDT (AWT-EventQueue-0) is the primary suspect for modal-dialog hangs
+grep -n "AWT-EventQueue-0" /tmp/ide-thread-dump.txt   # find line number
+sed -n '<LINE>,$p' /tmp/ide-thread-dump.txt | head -80  # read its stack
+```
+
+### What the stack tells you
+
+| Symptom on EDT | Likely cause |
+|---|---|
+| `DialogWrapperPeerImpl.show` → `MessageDialogBuilder$YesNo.ask` → `UnknownSdkFixActionDownloadBase.collectConsent` | A named SDK (e.g. `corretto-21`) is pinned in `.idea/misc.xml` or `.idea/gradle.xml` and the container doesn't have a `ProjectJdkTable` entry with that exact name. IntelliJ fires `SdkLookup` at project open, which proposes a download, which blocks the EDT on a YesNo modal. |
+| `DialogWrapperPeerImpl.show` → `MessageDialogBuilder$YesNo.ask` → `ClassicUiToIslandsMigration` or similar | A "Meet the Islands Theme" / onboarding modal. Fix via `early-access-registry.txt` + `options/other.xml` startup stubs (see `writeEarlyAccessRegistry` / `writeStartupProperties` in `intelliJ.kt`). |
+| Deep inside `VfsData` init under `fleet.kernel.Transactor` with `urlopen`/`socket` frames | `AIPromoWindowAdvisor` is blocking startup on a `frameworks.jetbrains.com` HTTP fetch. Fix via `-Dllm.show.ai.promotion.window.on.start=false` + the AI-promo startup stubs. |
+
+### Finding the *caller* that triggered the modal
+
+The EDT frame only shows the dialog itself. The real caller is usually another thread
+blocked on `invokeAndWait`:
+
+```bash
+grep -n "UnknownSdk\|SdkLookup\|SdkType\|Workspace\|ApplicationImpl pooled thread" /tmp/ide-thread-dump.txt
+```
+
+Look for the pooled thread whose stack ends in `SwingUtilities.invokeAndWait` + the relevant
+IntelliJ method. That thread's Kotlin frames (if any) identify which entry point kicked off
+the modal (e.g. `SdkLookupContextEx.runSdkResolutionUnderProgress` → Gradle plugin called
+`SdkLookup.newLookupBuilder().executeLookup()` because of `gradleJvm="corretto-25"` in
+`.idea/gradle.xml`).
+
+### Only kill the container after you have the dump
+
+`docker stop <CONTAINER_ID>` after saving the dump, then Ctrl-C the Gradle task. Copy the
+dump out of `/tmp` into the failing test's `run-*/intellij/` folder if you plan to iterate
+on the fix — keeping the dump alongside the run-dir artifacts (video, screenshots, logs)
+makes later comparisons trivial.
+
 ## RLM Analysis of Arena Runs (run-*/intellij/mcp-steroid/)
 
 Each arena run creates server-side exec_code logs at `run-*/intellij/mcp-steroid/eid_*`. Structure:

@@ -30,6 +30,13 @@ data class McpWindowInfo(
     val projectInitialized: Boolean?,
 )
 
+/** One entry in IntelliJ's global [ProjectJdkTable]. `homePath` may be null if the JDK is a stub. */
+data class JdkInfo(
+    val name: String,
+    val homePath: String?,
+    val versionString: String?,
+)
+
 class McpSteroidDriver(
     private val driver: ContainerDriver,
     private val ijDriver: IntelliJDriver,
@@ -343,93 +350,138 @@ if (toInstall.isEmpty()) {
      * @param projectPath Guest project directory (used to resolve the project name from [mcpListProjects]).
      */
     /**
-     * Register all Temurin JDKs found in `/usr/lib/jvm/` into IntelliJ's [ProjectJdkTable]
-     * using the IntelliJ API (`SdkConfigurationUtil.createAndAddSDK`).
+     * Return every entry currently in IntelliJ's global [ProjectJdkTable] that has
+     * `SdkType == JavaSdk`.
      *
-     * This replaces the pre-written `jdk.table.xml` approach which was fragile:
-     * IntelliJ sometimes ignored the XML entries. Using the API ensures the IDE
-     * properly indexes each JDK's classpath, sources, and annotations.
+     * The server-side script emits one `[JDK-LIST] name=… home=… version=…` line per
+     * entry and a final `[JDK-LIST] count=N`. Parsing is line-anchored (not regex-heavy)
+     * because JDK names never contain spaces in our fixtures.
+     */
+    fun mcpListJdks(projectName: String = resolveProjectName()): List<JdkInfo> {
+        val code = $$"""
+            import com.intellij.openapi.projectRoots.JavaSdk
+            import com.intellij.openapi.projectRoots.ProjectJdkTable
+
+            val sdks = ProjectJdkTable.getInstance().getSdksOfType(JavaSdk.getInstance())
+            for (sdk in sdks.sortedBy { it.name }) {
+                val home = sdk.homePath ?: ""
+                val ver = sdk.versionString ?: ""
+                println("[JDK-LIST]\tname=${sdk.name}\thome=$home\tversion=$ver")
+            }
+            println("[JDK-LIST]\tcount=${sdks.size}")
+        """.trimIndent()
+
+        val result = mcpExecuteCode(
+            code = code,
+            projectName = projectName,
+            reason = "List registered JDKs",
+            timeout = 30,
+        ).assertExitCode(0) { "mcpListJdks failed: $stdout" }
+
+        return result.stdout.lineSequence()
+            .mapNotNull { line ->
+                val fields = line.substringAfter("[JDK-LIST]\t", missingDelimiterValue = "").split("\t")
+                if (fields.isEmpty() || !fields[0].startsWith("name=")) return@mapNotNull null
+                val map = fields.associate { it.substringBefore("=") to it.substringAfter("=", "") }
+                JdkInfo(
+                    name = map["name"].orEmpty(),
+                    homePath = map["home"]?.takeIf { it.isNotEmpty() },
+                    versionString = map["version"]?.takeIf { it.isNotEmpty() },
+                )
+            }
+            .toList()
+    }
+
+    /**
+     * Register one JDK under the requested [name] pointing at [homePath].
      *
-     * SDK names use the major version number ("8", "11", "17", "21", "25").
+     * Uses the shortest IntelliJ-native registration path that still lets us pick the
+     * exact `ProjectJdkTable` entry name:
+     *   1. `JavaSdk.createJdk(name, homePath, isJre=false)` — builds the [Sdk] and runs
+     *      `JavaSdkImpl.setupSdkPaths` for classpath/jrt wiring. No UI involvement.
+     *   2. `ProjectJdkTable.addJdk(sdk)` inside [writeAction] — the one write IntelliJ
+     *      requires for a global SDK-table mutation.
      *
-     * @param projectPath Guest project directory (for project name resolution).
+     * `SdkConfigurationUtil.createAndAddSDK(path, sdkType)` is a one-liner alternative
+     * but auto-generates a unique name (e.g. `21-ea-1758`). We need exact names like
+     * `corretto-21` so `.idea/misc.xml` with `project-jdk-name="corretto-21"` resolves
+     * without firing `SdkLookup`'s downloader modal.
+     *
+     * Idempotent — if [name] already exists in the table, this is a no-op.
+     */
+    fun mcpAddJdk(projectName: String = resolveProjectName(), name: String, homePath: String) {
+        val code = $$"""
+            import com.intellij.openapi.application.writeAction
+            import com.intellij.openapi.projectRoots.JavaSdk
+            import com.intellij.openapi.projectRoots.ProjectJdkTable
+
+            val javaSdkType = JavaSdk.getInstance()
+            val table = ProjectJdkTable.getInstance()
+            if (table.findJdk("$$name") != null) {
+                println("[JDK-ADD]\talready-registered\tname=$$name")
+            } else {
+                val homeFile = java.io.File("$$homePath")
+                require(java.io.File(homeFile, "bin/java").isFile) { "Not a JDK home: $$homePath" }
+                val sdk = javaSdkType.createJdk("$$name", "$$homePath", false)
+                writeAction { table.addJdk(sdk) }
+                println("[JDK-ADD]\tregistered\tname=${sdk.name}\thome=${sdk.homePath}\tversion=${sdk.versionString}")
+            }
+        """.trimIndent()
+
+        mcpExecuteCode(
+            code = code,
+            projectName = projectName,
+            reason = "Register JDK name=$name home=$homePath",
+            timeout = 60,
+        ).assertExitCode(0) { "mcpAddJdk(name=$name, home=$homePath) failed: $stdout" }
+    }
+
+    /**
+     * Discover every Temurin JDK under `/usr/lib/jvm/` in the container and register it
+     * under three aliases each: bare version (`"21"`), `"corretto-21"`, `"temurin-21"`.
+     *
+     * Why three aliases: projects checked into VCS often pin `project-jdk-name="corretto-21"`
+     * or `gradleJvm="corretto-25"` in their `.idea` XML files. If no `ProjectJdkTable`
+     * entry with that exact name exists when the project opens, IntelliJ's `SdkLookup`
+     * proposes a download and blocks the EDT on a YesNo consent modal. Pre-registering
+     * the vendor aliases (all pointing at the same Temurin install) short-circuits it.
+     *
+     * Discovery lives here (Gradle-side shell) rather than inside the script so that the
+     * script has nothing to scan — each `mcpAddJdk` call targets a known path.
      */
     fun mcpRegisterJdks(projectPath: String) {
         val projectName = resolveProjectName(projectPath) ?: return
+        val existingNames = mcpListJdks(projectName).map { it.name }.toSet()
+        println("[JDK-REGISTER] Existing JDKs in ProjectJdkTable: $existingNames")
 
-        // Call IntelliJ API via steroid_execute_code. `JavaSdk.createJdk` +
-        // `ProjectJdkTable.addJdk` is the canonical registration path — no XML,
-        // no modal dialogs. For every discovered Temurin JDK we register:
-        //   1. Bare-version name ("8", "11", "17", "21", "25")
-        //   2. Vendor-qualified aliases ("corretto-N", "temurin-N")
-        // Aliases share the same `homePath` — different `Sdk` instances with
-        // different names. Projects checked into VCS with
-        // `project-jdk-name="corretto-21"` will find a matching entry.
-        val code = """
-import com.intellij.openapi.projectRoots.JavaSdk
-import com.intellij.openapi.projectRoots.ProjectJdkTable
+        val discovered = driver.startProcessInContainer {
+            this
+                .args("bash", "-c", "ls -1d /usr/lib/jvm/temurin-*-jdk-* 2>/dev/null || true")
+                .timeoutSeconds(10)
+                .quietly()
+                .description("list Temurin JDKs in /usr/lib/jvm")
+        }.awaitForProcessFinish()
 
-val jvmDir = java.io.File("/usr/lib/jvm")
-val temurinDirs = jvmDir.listFiles { f -> f.isDirectory && f.name.startsWith("temurin-") && f.name.contains("-jdk-") }
-    ?.sortedBy { it.name }
-    ?: emptyList()
+        val temurinDirs = discovered.stdout.lines()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .sorted()
+        println("[JDK-REGISTER] Discovered Temurin dirs: $temurinDirs")
 
-println("[JDK-REGISTER] Found ${"\$"}{temurinDirs.size} Temurin JDK dirs: ${"\$"}{temurinDirs.map { it.name }}")
-
-val javaSdkType = JavaSdk.getInstance()
-val existingNames = ProjectJdkTable.getInstance().getSdksOfType(javaSdkType).map { it.name }.toSet()
-println("[JDK-REGISTER] Already registered: ${"\$"}existingNames")
-
-fun aliasesFor(version: String): List<String> = listOf(
-    version,               // bare "21"
-    "corretto-${"\$"}version",     // "corretto-21" — matches misc.xml from Corretto imports
-    "temurin-${"\$"}version",      // "temurin-21"  — matches misc.xml from Temurin imports
-)
-
-var registered = 0
-for (dir in temurinDirs) {
-    val javaFile = java.io.File(dir, "bin/java")
-    if (!javaFile.exists()) {
-        println("[JDK-REGISTER] Skipping ${"\$"}{dir.name} — no bin/java")
-        continue
-    }
-    // Extract version number: "temurin-21-jdk-arm64" -> "21"
-    val version = dir.name.removePrefix("temurin-").substringBefore("-jdk")
-    for (sdkName in aliasesFor(version)) {
-        if (sdkName in existingNames) {
-            println("[JDK-REGISTER] Already registered: ${"\$"}sdkName")
-            continue
-        }
-        try {
-            // createJdk(name, homePath, false=don't detect) sets up the classpath
-            // via JavaSdkImpl.setupSdkPaths; no UI involvement.
-            val sdk = javaSdkType.createJdk(sdkName, dir.absolutePath, false)
-            com.intellij.openapi.application.writeAction {
-                ProjectJdkTable.getInstance().addJdk(sdk)
+        for (dir in temurinDirs) {
+            // "/usr/lib/jvm/temurin-21-jdk-arm64" -> "21"
+            val version = dir.substringAfter("temurin-").substringBefore("-jdk")
+            for (alias in listOf(version, "corretto-$version", "temurin-$version")) {
+                if (alias in existingNames) {
+                    println("[JDK-REGISTER] Skip $alias — already in table")
+                    continue
+                }
+                try {
+                    mcpAddJdk(projectName, alias, dir)
+                } catch (e: Exception) {
+                    println("[JDK-REGISTER] Failed to add $alias at $dir: ${e.message}")
+                }
             }
-            println("[JDK-REGISTER] Registered: ${"\$"}sdkName at ${"\$"}{dir.absolutePath}")
-            registered++
-        } catch (e: Exception) {
-            println("[JDK-REGISTER] FAILED to register ${"\$"}sdkName at ${"\$"}{dir.absolutePath}: ${"\$"}{e.message}")
-        }
-    }
-}
-
-val finalSdks = ProjectJdkTable.getInstance().getSdksOfType(javaSdkType)
-println("[JDK-REGISTER] Final SDK count: ${"\$"}{finalSdks.size} — ${"\$"}{finalSdks.map { "${"\$"}{it.name}@${"\$"}{it.homePath}" }}")
-println("[JDK-REGISTER] Newly registered: ${"\$"}registered")
-"done"
-""".trimIndent()
-
-        try {
-            mcpExecuteCode(
-                code = code,
-                projectName = projectName,
-                reason = "Register Temurin JDKs into ProjectJdkTable via IntelliJ API",
-                timeout = 120,
-            )
-        } catch (e: Exception) {
-            println("[JDK-REGISTER] Warning: JDK registration failed: ${e.message}")
         }
     }
 

@@ -657,6 +657,24 @@ fun IntelliJContainer.Companion.create(
     console.writeInfo("Waiting for MCP Steroid server...")
     mcpSteroidDriver.waitForMcpReady()
 
+    // Register JDKs as early as possible — racing against IntelliJ's async `SdkLookup`
+    // which fires when project-open's `UnknownSdkStartupChecker` + Gradle auto-import
+    // activities run. If `SdkLookup.findJdk(sdkName)` runs before our JDK registration
+    // hits `ProjectJdkTable`, it proposes a download and blocks the EDT on a
+    // `MessageDialogBuilder$YesNo.ask` consent modal — making the test un-runnable.
+    // Polling for the project to appear in `mcpListProjects` first so `mcpExecuteCode`
+    // can target it; most of the time this succeeds within ~1s of MCP readiness.
+    console.writeInfo("Registering JDKs early (racing project-open SdkLookup)...")
+    try {
+        waitFor(30_000L, "project appears in MCP list") {
+            mcpSteroidDriver.mcpListProjects().any { it.path == ijDriver.getGuestProjectDir() }
+        }
+        mcpSteroidDriver.mcpRegisterJdks(ijDriver.getGuestProjectDir())
+        console.writeSuccess("Early JDK registration complete")
+    } catch (e: Throwable) {
+        console.writeInfo("Early JDK registration failed: ${e.message} (will retry in waitForProjectReady)")
+    }
+
     val resolvedMcpConnectionMode: McpConnectionMode = mcpConnectionMode ?: when (aiMode) {
         AiMode.NONE -> McpConnectionMode.None
         AiMode.AI_MCP -> McpConnectionMode.Http
