@@ -161,29 +161,39 @@ false)` / `ProjectJdkTable.addJdk` inside `writeAction { }`, or
 `jrt://` wiring for us, and every failure lands as a normal exception
 in the script output instead of a silent WARN.
 
-Pattern:
+Use the atomic driver APIs — don't hand-roll new `mcpExecuteCode`
+scripts that touch `ProjectJdkTable`:
 
 ```kotlin
-session.mcpSteroid.mcpExecuteCode(
-    code = """
-        import com.intellij.openapi.projectRoots.JavaSdk
-        import com.intellij.openapi.projectRoots.ProjectJdkTable
+// Query what's registered
+val jdks: List<JdkInfo> = session.mcpSteroid.mcpListJdks()
 
-        val sdk = JavaSdk.getInstance().createJdk("21", "/usr/lib/jvm/temurin-21-jdk-arm64", false)
-        com.intellij.openapi.application.writeAction {
-            ProjectJdkTable.getInstance().addJdk(sdk)
-        }
-        "done"
-    """.trimIndent(),
-    taskId = "register-jdks",
-    reason = "Register Temurin JDK 21 via IntelliJ API",
+// Add one — idempotent, skips if `findJdk(name) != null`
+session.mcpSteroid.mcpAddJdk(
+    name = "corretto-21",
+    homePath = "/usr/lib/jvm/temurin-21-jdk-arm64",
 )
+
+// Bulk: discover every Temurin dir in /usr/lib/jvm and register it under
+// three aliases each — bare, corretto-N, temurin-N — so projects checked
+// into VCS with `project-jdk-name="corretto-21"` resolve locally instead
+// of triggering SdkLookup's download-consent modal.
+session.mcpSteroid.mcpRegisterJdks(guestProjectDir)
 ```
 
-See `McpSteroidDriver.mcpRegisterJdks` for the production version — it
-registers every discovered Temurin dir under three names (`"21"`,
-`"corretto-21"`, `"temurin-21"`) so projects checked into VCS with
-vendor-pinned `project-jdk-name="corretto-21"` find a matching entry.
+Under the hood both `mcpListJdks` and `mcpAddJdk` issue a single
+`steroid_execute_code` call — the embedded Kotlin uses the shortest
+named-JDK path available: `JavaSdk.createJdk(name, home, isJre=false)`
+plus `writeAction { ProjectJdkTable.addJdk(sdk) }`. This is two lines
+because `createAndAddSDK(path, sdkType)` auto-generates a unique name
+(e.g. `21-ea-1758`), which breaks the whole point of matching
+`project-jdk-name="corretto-21"`.
+
+`mcpRegisterJdks` is also called automatically by
+`IntelliJ_factoryKt.create` right after `waitForMcpReady`, racing the
+project-open `SdkLookup` so `findJdk(sdkName)` sees our aliases before
+the download-consent modal path can fire. Tests only need to call it
+again if they want to verify the state.
 
 ### Still-acceptable XML touches
 
@@ -197,14 +207,42 @@ render time.
 
 ### Modal dialogs must never block the harness
 
-As belt-and-suspenders against the Corretto-consent modal, the IDE
-`.vmoptions` sets `-Dunknown.sdk=false` and
-`-Dunknown.sdk.auto=false`. These are the two registry keys
-`UnknownSdkTracker` checks at `UnknownSdkTracker.java:57,76` — when
-either is false the tracker short-circuits before creating any
-`UnknownSdkFixActionDownloadBase`, so `collectConsent` is never
-called. `waitForIdeWindow` fails fast on any modal detected during
-startup — see `IntelliJContainer.kt`.
+As belt-and-suspenders against the modals that fire during project
+open, import, and compile, the IDE `.vmoptions` disables **three**
+registry keys — one for each entry point the IntelliJ SDK-resolution
+code can take into a modal dialog:
+
+| VM flag | Gated code path | What the modal would be |
+|---|---|---|
+| `-Dunknown.sdk=false` | `UnknownSdkTracker.isEnabled()` at `UnknownSdkTracker.java:57` | no tracker activity; no download fixes ever created |
+| `-Dunknown.sdk.auto=false` | `UnknownSdkTracker.createCollector()` at `UnknownSdkTracker.java:76` | tracker exists but never runs; `onLookupCompleted` skipped, no `UnknownSdkFixActionDownloadBase` → no `collectConsent` |
+| `-Dunknown.sdk.modal.jps=false` | `CompilerDriverUnknownSdkTracker.fixSdkSettings` at `CompilerDriverUnknownSdkTracker.kt:41` | `Task.WithResult` modal 'Resolving SDKs…' fires during `ProjectTaskManager.build()` |
+
+With all three on, every async `SdkLookup` caller is silenced before
+it can request user consent. `mcpRegisterJdks` (from
+`IntelliJ_factoryKt.create` immediately after `waitForMcpReady`)
+still seeds `ProjectJdkTable` with the three alias forms — bare
+version, `corretto-N`, `temurin-N` — so modules that reference a
+named JDK in `.idea/*.xml` still resolve without a lookup round-trip.
+
+`waitForIdeWindow` fails fast on any modal detected during startup —
+see `IntelliJContainer.kt`. When that trips, the saved PNG under
+`run-*/screenshot/` shows which dialog is up and the thread-dump
+recipe higher in this file identifies the caller.
+
+### Non-Java IDEs skip JDK setup
+
+`mcpRegisterJdks` / `mcpAddJdk` / `mcpSetProjectSdk` all import
+`com.intellij.openapi.projectRoots.JavaSdk`, which is only on the
+script classpath in IDEs that bundle the `com.intellij.java` plugin
+(IntelliJ IDEA). PyCharm, GoLand, WebStorm, and Rider all fail to
+compile `mcpListJdks`'s script with `unresolved reference 'JavaSdk'`.
+
+To handle this cleanly, `IdeProduct` carries a `hasJavaSdk: Boolean`
+flag. Both the factory's early-JDK hook and
+`IntelliJContainer.waitForProjectReady` gate the JDK steps on it, so
+a non-Java IDE logs `Skipping JDK setup — <IDE> has no Java plugin`
+and moves on. If you add a new IDE product, set the flag truthfully.
 
 ## Architecture
 

@@ -382,6 +382,10 @@ rm -rf ij-plugin/build/idea-sandbox/
 | `KtBlocksCompilationTest` fails | Non-compilable code in ` ```kotlin ``` ` fence | Change fence to ` ```text ``` ` in `.md` |
 | `MarkdownArticleContractTest` fails | Title >80 chars, desc >200 chars, or bare code outside fences | Fix the article header/body |
 | `NoHardcodedMcpSteroidUriUsageTest` fails | Hardcoded `mcp-steroid://...` URI in production Kotlin | Replace with generated article class: `XxxPromptArticle().uri` (see `FetchResourceToolHandler.kt` for examples) |
+| `:test-integration` hangs with `Blocking modal dialog detected` | Stale local `test-project/.idea/` pins `project-jdk-name`/`gradleJvm` to a name not in `ProjectJdkTable` → `SdkLookup` fires download-consent modal | Either sanitize the pins out of your local `.idea/` (it's gitignored, so only you hit this) or add the name to `mcpRegisterJdks` aliases; see "SDK-lookup modal paths" in MEMORY.md |
+| `:test-integration` hangs with `MODAL DIALOG DETECTED — Resolving SDKs…` during `ProjectTaskManager.build()` | Third `unknown.sdk*` registry key missing: `-Dunknown.sdk.modal.jps=false` (gates `CompilerDriverUnknownSdkTracker.fixSdkSettings`) | Add the flag to `intelliJ.kt` `generateVmOptions()` alongside `unknown.sdk` / `unknown.sdk.auto` |
+| `unresolved reference 'JavaSdk'` when running a PyCharm/GoLand/WebStorm/Rider test | Factory's early-JDK hook fires for IDEs without `com.intellij.java` on script classpath | Check `IdeProduct.hasJavaSdk` is true only for `IntelliJIdea`; new IDE products must set it truthfully |
+| `ContentModuleClasspathTest` fails with "JAR(s) on filesystem but not in classpath" after an IDE upgrade | IDE release bundled a new unloaded content module (e.g. `tailwindcss.ruby.jar` in 2026.1.1) | Add the JAR path to `UNLOADED_CONTENT_MODULES_IU_261` with a one-line rationale |
 
 ## Key Types
 
