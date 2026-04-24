@@ -21,9 +21,11 @@ Input parameters:
 - `project_name` (string) — project name from `steroid_list_projects`
 - `task_id` (string) — your task id; reuse across related calls
 - `reason` (string, optional) — one-line summary
-- `hunks` (array of objects) — each with `path`, `old_string`, `new_string` (all strings)
+- `hunks` (array of objects) — each with `file_path`, `old_string`, `new_string` (all strings)
 
-Example hunks: `[{"path": "/abs/A.java", "old_string": "old", "new_string": "new"}, {"path": "/abs/B.java", "old_string": "other", "new_string": "replacement"}]`.
+Field names match Claude Code `Edit` exactly (`file_path`, `old_string`, `new_string`) — agents that already know `Edit` can re-use their knowledge directly.
+
+Example hunks: `[{"file_path": "/abs/A.java", "old_string": "old", "new_string": "new"}, {"file_path": "/abs/B.java", "old_string": "other", "new_string": "replacement"}]`.
 
 Return: human-readable audit — `N hunks across M file(s) applied
 atomically` + per-hunk `path:line:col (oldLen→newLen chars)`.

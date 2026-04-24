@@ -36,9 +36,9 @@ import kotlinx.serialization.json.*
  *   "task_id": "feature-x",
  *   "reason": "rename logger name across services",
  *   "hunks": [
- *     {"path": "/abs/A.java", "old_string": "foo", "new_string": "bar"},
- *     {"path": "/abs/A.java", "old_string": "baz", "new_string": "qux"},
- *     {"path": "/abs/B.java", "old_string": "log1", "new_string": "log2"}
+ *     {"file_path": "/abs/A.java", "old_string": "foo", "new_string": "bar"},
+ *     {"file_path": "/abs/A.java", "old_string": "baz", "new_string": "qux"},
+ *     {"file_path": "/abs/B.java", "old_string": "log1", "new_string": "log2"}
  *   ]
  * }
  * ```
@@ -77,9 +77,9 @@ class ApplyPatchToolHandler : McpRegistrar {
                         putJsonObject("items") {
                             put("type", "object")
                             putJsonObject("properties") {
-                                putJsonObject("path") {
+                                putJsonObject("file_path") {
                                     put("type", "string")
-                                    put("description", "Absolute filesystem path.")
+                                    put("description", "Absolute filesystem path. Matches Claude Code `Edit`'s `file_path` field.")
                                 }
                                 putJsonObject("old_string") {
                                     put("type", "string")
@@ -91,7 +91,7 @@ class ApplyPatchToolHandler : McpRegistrar {
                                 }
                             }
                             putJsonArray("required") {
-                                add("path")
+                                add("file_path")
                                 add("old_string")
                                 add("new_string")
                             }
@@ -122,13 +122,13 @@ class ApplyPatchToolHandler : McpRegistrar {
 
         val hunks = hunksJson.mapIndexed { i, el ->
             val o = (el as? JsonObject) ?: return errorResult("hunks[$i] is not an object")
-            val path = o["path"]?.jsonPrimitive?.contentOrNull
-                ?: return errorResult("hunks[$i].path is required")
+            val filePath = o["file_path"]?.jsonPrimitive?.contentOrNull
+                ?: return errorResult("hunks[$i].file_path is required")
             val oldString = o["old_string"]?.jsonPrimitive?.contentOrNull
                 ?: return errorResult("hunks[$i].old_string is required")
             val newString = o["new_string"]?.jsonPrimitive?.contentOrNull
                 ?: return errorResult("hunks[$i].new_string is required")
-            ApplyPatchHunk(filePath = path, oldString = oldString, newString = newString)
+            ApplyPatchHunk(filePath = filePath, oldString = oldString, newString = newString)
         }
 
         val (project, availableNames) = readAction {
