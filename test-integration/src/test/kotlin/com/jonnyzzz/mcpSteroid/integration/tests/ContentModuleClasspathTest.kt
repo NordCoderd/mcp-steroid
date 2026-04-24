@@ -205,6 +205,10 @@ class ContentModuleClasspathTest {
                 "plugins/spring-boot-plugin/lib/modules/intellij.spring.boot.rewrite.jar",
                 // Station AI assistant — loaded on demand
                 "plugins/station-plugin/lib/modules/intellij.station.aia.jar",
+                // Tailwind CSS Ruby integration — loaded only when the Ruby plugin is
+                // active (e.g. in RubyMine or IU with Ruby plugin installed). IU has
+                // no Ruby plugin bundled, so this module stays unloaded.
+                "plugins/tailwindcss/lib/modules/intellij.tailwindcss.ruby.jar",
                 // YAML Helm support — loaded when Helm files are detected
                 "plugins/yaml/lib/modules/intellij.yaml.helm.jar",
             ))
