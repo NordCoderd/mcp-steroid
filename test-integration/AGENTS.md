@@ -81,6 +81,75 @@ In 2 of 6 scenarios, `Build errors: false` is correctly reported (modal may have
 3. **JDK list is printed in first call** but agents still try wrong JDKs via Bash
 4. **"Build errors: true" false positive** wastes 1 exec_code + 1 Bash call per scenario
 
+## Configuring the IDE — always via `mcpExecuteCode`, never via XML
+
+Every piece of IDE state that a test relies on (JDKs, trusted paths,
+project open, module SDKs, …) must be set up by calling the IntelliJ API
+through `session.mcpSteroid.mcpExecuteCode(code = …)` — **never** by
+hand-writing config XML into `$configGuestDir/options/*.xml`.
+
+Rationale: we tried the XML route for JDK registration and it failed
+silently. A single unescaped `"` in an attribute made
+`FileBasedStorage` reject `jdk.table.xml` with `WARN Cannot read …`,
+which in turn left the JDK table empty, which made
+`UnknownSdkStartupChecker` fire a download-consent modal at project
+open — and that modal deadlocked the test run in headless Docker for
+10+ minutes before any assertion ever ran. XML writes are far too
+fragile for this: no typed feedback, no compile checks, no unit tests
+reach deep enough to catch a malformed attribute.
+
+The `mcpExecuteCode` path is strictly better: Kotlin is type-checked at
+runtime, the canonical IntelliJ API (`JavaSdk.createJdk(name, path,
+false)` / `ProjectJdkTable.addJdk` inside `writeAction { }`, or
+`SdkConfigurationUtil.createAndAddSDK`) does all of the classpath /
+`jrt://` wiring for us, and every failure lands as a normal exception
+in the script output instead of a silent WARN.
+
+Pattern:
+
+```kotlin
+session.mcpSteroid.mcpExecuteCode(
+    code = """
+        import com.intellij.openapi.projectRoots.JavaSdk
+        import com.intellij.openapi.projectRoots.ProjectJdkTable
+
+        val sdk = JavaSdk.getInstance().createJdk("21", "/usr/lib/jvm/temurin-21-jdk-arm64", false)
+        com.intellij.openapi.application.writeAction {
+            ProjectJdkTable.getInstance().addJdk(sdk)
+        }
+        "done"
+    """.trimIndent(),
+    taskId = "register-jdks",
+    reason = "Register Temurin JDK 21 via IntelliJ API",
+)
+```
+
+See `McpSteroidDriver.mcpRegisterJdks` for the production version — it
+registers every discovered Temurin dir under three names (`"21"`,
+`"corretto-21"`, `"temurin-21"`) so projects checked into VCS with
+vendor-pinned `project-jdk-name="corretto-21"` find a matching entry.
+
+### Still-acceptable XML touches
+
+The launch-time startup XML we write from Kotlin (
+`options/AIOnboardingPromoWindowAdvisor.xml`, trusted-paths, consent,
+early-access-registry) stay because they control bits that must be set
+**before** the IDE starts — so there is no MCP server to talk to yet.
+Keep those small, copy them verbatim from IntelliJ's own defaults, and
+never let them carry user-provided values that could go wrong at
+render time.
+
+### Modal dialogs must never block the harness
+
+As belt-and-suspenders against the Corretto-consent modal, the IDE
+`.vmoptions` sets `-Dunknown.sdk=false` and
+`-Dunknown.sdk.auto=false`. These are the two registry keys
+`UnknownSdkTracker` checks at `UnknownSdkTracker.java:57,76` — when
+either is false the tracker short-circuits before creating any
+`UnknownSdkFixActionDownloadBase`, so `collectConsent` is never
+called. `waitForIdeWindow` fails fast on any modal detected during
+startup — see `IntelliJContainer.kt`.
+
 ## Architecture
 
 ```

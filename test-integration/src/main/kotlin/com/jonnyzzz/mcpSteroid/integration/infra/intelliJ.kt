@@ -71,8 +71,17 @@ class IntelliJDriver(
         writeStartupProperties()
         writeEarlyAccessRegistry()
         writeAiPromoState()
-        writeJdkTable()
         generateVmOptions()
+        // JDK registration is NOT done via jdk.table.xml — that path is too
+        // fragile (any malformed attribute silently empties the table, triggering
+        // the `UnknownSdkStartupChecker` consent modal). Instead:
+        //   1. VM options `-Dunknown.sdk.auto=false` / `-Dunknown.sdk=false`
+        //      short-circuit `UnknownSdkTrackerQueue` before it instantiates any
+        //      `UnknownSdkFixActionDownloadBase` — no modal path ever taken.
+        //      See `generateVmOptions()` + `UnknownSdkTracker.java:57,76`.
+        //   2. `McpSteroidDriver.mcpRegisterJdks` runs after the IDE is up and
+        //      calls `SdkConfigurationUtil.createAndAddSDK` / `JavaSdk.createJdk`
+        //      via `steroid_execute_code` — canonical IntelliJ API.
 
         driver.log("Starting ${ideProduct.displayName}...")
         val launcherPath = "$intelliJGuestHomeDir/bin/${ideProduct.launcherExecutable}"
@@ -201,6 +210,18 @@ class IntelliJDriver(
             appendLine("-Dide.newUsersOnboarding=false")
             appendLine("-Dnosplash=true")
             appendLine()
+            appendLine("# Belt-and-suspenders vs the Corretto-download consent modal:")
+            appendLine("# * UnknownSdkTracker.isEnabled() (UnknownSdkTracker.java:57) short-circuits when")
+            appendLine("#   `unknown.sdk` is false — no tracker activity at all, no download fixes ever created.")
+            appendLine("# * UnknownSdkTracker.createCollector() (UnknownSdkTracker.java:76) returns null when")
+            appendLine("#   `unknown.sdk.auto` is false — tracker exists but never runs the lookup, so")
+            appendLine("#   UnknownSdkTrackerQueue.queue skips onLookupCompleted (UnknownSdkTrackerQueue.kt:44)")
+            appendLine("#   and never instantiates UnknownSdkFixActionDownloadBase → no collectConsent modal.")
+            appendLine("# Default for both is true; we force-disable so the Docker IDE cannot prompt.")
+            appendLine("# jdk.table.xml (see writeJdkTable) is the primary mechanism — this is the safety net.")
+            appendLine("-Dunknown.sdk=false")
+            appendLine("-Dunknown.sdk.auto=false")
+            appendLine()
             appendLine("# Suppress telemetry, update checks, and async network startup activities")
             appendLine("-Didea.suppress.statistics.report=true")
             appendLine("-Didea.local.statistics.without.report=true")
@@ -311,118 +332,6 @@ class IntelliJDriver(
             "$configGuestDir/options/AIOnboardingPromoWindowAdvisor.xml",
             xml,
         )
-    }
-
-    /**
-     * Pre-register all Temurin JDKs installed in the container in IntelliJ's global SDK table.
-     *
-     * Writes `$configGuestDir/options/jdk.table.xml` before the IDE starts so that:
-     * - Maven/Gradle import has a valid JDK from the very first run (no "Project SDK not defined")
-     * - `ProjectJdkTable.getInstance().getSdksOfType(JavaSdk)` returns populated results
-     * - The mcpSetupJdkAndWaitForImport runtime call only needs to call `applyJdkToProject`,
-     *   not scan the filesystem or call createAndAddSDK.
-     *
-     * Detects the container CPU architecture first (x86_64 → amd64, aarch64 → arm64) so that
-     * only the correct-arch JDK paths are registered.
-     */
-    private fun writeJdkTable() {
-        // Detect container CPU architecture
-        val uname = driver.startProcessInContainer {
-            this.args("uname", "-m").timeoutSeconds(5).quietly().description("detect container arch")
-        }.awaitForProcessFinish()
-        val temurinArch = when (uname.stdout.trim()) {
-            "aarch64", "arm64" -> "arm64"
-            else -> "amd64"
-        }
-
-        // Modules to include for Java 9+ classpath (covers Spring Boot / Jakarta EE)
-        val jrt9Modules = listOf(
-            "java.base", "java.compiler", "java.desktop", "java.instrument",
-            "java.logging", "java.management", "java.naming", "java.net.http",
-            "java.rmi", "java.scripting", "java.se", "java.security.jgss",
-            "java.sql", "java.xml", "jdk.unsupported",
-        )
-
-        fun jdk9PlusEntry(name: String, path: String, version: String): String {
-            val roots = jrt9Modules.joinToString("\n") { mod ->
-                "            <root url=\"jrt://$path!/$mod\" type=\"simple\" />"
-            }
-            return """
-    <jdk version="2">
-      <name value="$name" />
-      <type value="JavaSDK" />
-      <version value="$version" />
-      <homePath value="$path" />
-      <roots>
-        <annotationsPath><root type="composite" /></annotationsPath>
-        <classPath>
-          <root type="composite">
-$roots
-          </root>
-        </classPath>
-        <javadocPath><root type="composite" /></javadocPath>
-        <sourcePath><root type="composite" /></sourcePath>
-      </roots>
-    </jdk>"""
-        }
-
-        fun jdk8Entry(name: String, path: String): String = """
-    <jdk version="2">
-      <name value="$name" />
-      <type value="JavaSDK" />
-      <version value="java version &quot;1.8&quot;" />
-      <homePath value="$path" />
-      <roots>
-        <annotationsPath><root type="composite" /></annotationsPath>
-        <classPath>
-          <root type="composite">
-            <root url="jar://$path/jre/lib/rt.jar!/" type="simple" />
-            <root url="jar://$path/lib/tools.jar!/" type="simple" />
-          </root>
-        </classPath>
-        <javadocPath><root type="composite" /></javadocPath>
-        <sourcePath><root type="composite" /></sourcePath>
-      </roots>
-    </jdk>"""
-
-        // Note: apt package temurin-N-jdk creates /usr/lib/jvm/temurin-N-jdk-<arch>.
-        // Primary names are just the version number ("8", "11", "17", "21", "25") so
-        // mcpSetupJdkAndWaitForImport can easily match by name.
-        //
-        // We additionally register distribution-qualified aliases (e.g. `corretto-21`,
-        // `temurin-21`) pointing at the same path. Reason: projects checked into VCS
-        // frequently write `project-jdk-name="corretto-21"` into `.idea/misc.xml`
-        // (that's the name IntelliJ assigns after a user imports a Corretto install
-        // from their local machine). If no JDK with that exact name exists in
-        // `ProjectJdkTable` when the project opens, `UnknownSdkStartupChecker` fires
-        // `UnknownSdkTracker.updateUnknownSdks()`, which offers a modal consent dialog
-        // to download Amazon Corretto — blocks headless Docker tests indefinitely.
-        // Pre-registering the alias names avoids the entire code path.
-        val entries = buildString {
-            appendLine(jdk8Entry("8", "/usr/lib/jvm/temurin-8-jdk-$temurinArch"))
-            appendLine(jdk9PlusEntry("11", "/usr/lib/jvm/temurin-11-jdk-$temurinArch", "java version \"11\""))
-            appendLine(jdk9PlusEntry("17", "/usr/lib/jvm/temurin-17-jdk-$temurinArch", "java version \"17\""))
-            appendLine(jdk9PlusEntry("21", "/usr/lib/jvm/temurin-21-jdk-$temurinArch", "java version \"21\""))
-            appendLine(jdk9PlusEntry("25", "/usr/lib/jvm/temurin-25-jdk-$temurinArch", "java version \"25\""))
-            // Distribution-qualified aliases for projects that pin a specific vendor name.
-            for (version in listOf(11, 17, 21, 25)) {
-                val path = "/usr/lib/jvm/temurin-$version-jdk-$temurinArch"
-                val ver = "java version \"$version\""
-                appendLine(jdk9PlusEntry("corretto-$version", path, ver))
-                appendLine(jdk9PlusEntry("temurin-$version", path, ver))
-            }
-            appendLine(jdk8Entry("corretto-8", "/usr/lib/jvm/temurin-8-jdk-$temurinArch"))
-            appendLine(jdk8Entry("temurin-8", "/usr/lib/jvm/temurin-8-jdk-$temurinArch"))
-        }
-
-        val xml = """<?xml version="1.0" encoding="UTF-8"?>
-<application>
-  <component name="ProjectJdkTable">
-$entries  </component>
-</application>
-"""
-        driver.writeFileInContainer("$configGuestDir/options/jdk.table.xml", xml)
-        println("[IDE-AGENT] Pre-registered Temurin JDKs (8/11/17/21/25) for arch=$temurinArch in jdk.table.xml")
     }
 
     private fun writeTrustedPaths() {
