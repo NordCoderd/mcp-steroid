@@ -662,17 +662,22 @@ fun IntelliJContainer.Companion.create(
     // activities run. If `SdkLookup.findJdk(sdkName)` runs before our JDK registration
     // hits `ProjectJdkTable`, it proposes a download and blocks the EDT on a
     // `MessageDialogBuilder$YesNo.ask` consent modal — making the test un-runnable.
-    // Polling for the project to appear in `mcpListProjects` first so `mcpExecuteCode`
-    // can target it; most of the time this succeeds within ~1s of MCP readiness.
-    console.writeInfo("Registering JDKs early (racing project-open SdkLookup)...")
-    try {
-        waitFor(30_000L, "project appears in MCP list") {
-            mcpSteroidDriver.mcpListProjects().any { it.path == ijDriver.getGuestProjectDir() }
+    // Only runs for Java-capable IDEs: `mcpListJdks`/`mcpAddJdk` import
+    // `com.intellij.openapi.projectRoots.JavaSdk`, which is only on the classpath
+    // when the target IDE bundles `com.intellij.java` (see IdeProduct.hasJavaSdk).
+    if (ideProduct.hasJavaSdk) {
+        console.writeInfo("Registering JDKs early (racing project-open SdkLookup)...")
+        try {
+            waitFor(30_000L, "project appears in MCP list") {
+                mcpSteroidDriver.mcpListProjects().any { it.path == ijDriver.getGuestProjectDir() }
+            }
+            mcpSteroidDriver.mcpRegisterJdks(ijDriver.getGuestProjectDir())
+            console.writeSuccess("Early JDK registration complete")
+        } catch (e: Throwable) {
+            console.writeInfo("Early JDK registration failed: ${e.message} (will retry in waitForProjectReady)")
         }
-        mcpSteroidDriver.mcpRegisterJdks(ijDriver.getGuestProjectDir())
-        console.writeSuccess("Early JDK registration complete")
-    } catch (e: Throwable) {
-        console.writeInfo("Early JDK registration failed: ${e.message} (will retry in waitForProjectReady)")
+    } else {
+        console.writeInfo("Skipping early JDK registration — ${ideProduct.displayName} has no Java plugin (IdeProduct.hasJavaSdk=false)")
     }
 
     val resolvedMcpConnectionMode: McpConnectionMode = mcpConnectionMode ?: when (aiMode) {

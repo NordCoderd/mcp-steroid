@@ -20,7 +20,7 @@ class IntelliJDriver(
     private val lifetime: CloseableStack,
     private val driver: ContainerDriver,
     private val guestDir: String,
-    private val ideProduct: IdeProduct,
+    val ideProduct: IdeProduct,
     private val skipChangedFilesScanOnStartup: Boolean = false,
 ) {
     private val intelliJGuestHomeDir = "/opt/idea"

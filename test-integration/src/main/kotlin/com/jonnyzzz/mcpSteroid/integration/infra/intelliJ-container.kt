@@ -140,7 +140,9 @@ class IntelliJContainer(
         console.writeSuccess("Window layout applied")
 
         // Step 3: Register JDKs (earliest — before any import)
-        if (projectJdkVersion != null) {
+        // Only for Java-capable IDEs: `mcpRegisterJdks` / `mcpSetProjectSdk` use
+        // `JavaSdk` which isn't on the script classpath in PyCharm/GoLand/WebStorm/Rider.
+        if (projectJdkVersion != null && intellijDriver.ideProduct.hasJavaSdk) {
             console.writeStep(3, "Registering JDKs via IntelliJ API...")
             mcpSteroid.mcpRegisterJdks(guestProjectDir)
             console.writeSuccess("JDK registration complete")
@@ -149,6 +151,8 @@ class IntelliJContainer(
             console.writeStep(4, "Setting project SDK to JDK $projectJdkVersion...")
             mcpSteroid.mcpSetProjectSdk(guestProjectDir, projectJdkVersion)
             console.writeSuccess("Project SDK set to $projectJdkVersion")
+        } else if (projectJdkVersion != null) {
+            console.writeStep(3, "Skipping JDK setup — ${intellijDriver.ideProduct.displayName} has no Java plugin")
         } else {
             console.writeStep(3, "Skipping JDK setup (projectJdkVersion=null)")
         }
