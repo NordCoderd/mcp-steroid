@@ -338,9 +338,10 @@ if (toInstall.isEmpty()) {
     /**
      * Apply the project JDK (if not already set) and wait for Maven/Gradle import to complete.
      *
-     * JDKs are pre-registered in jdk.table.xml before the IDE starts (see [IntelliJDriver.writeJdkTable]).
+     * JDKs are registered via [mcpRegisterJdks] from `IntelliJ_factoryKt.create` right after
+     * `waitForMcpReady`, so by the time this function runs the `ProjectJdkTable` is populated.
      * This function:
-     * 1. Finds the pre-registered SDK matching JAVA_HOME (or any valid one)
+     * 1. Finds the registered SDK matching JAVA_HOME (or any valid one)
      * 2. Sets it as the project SDK if not already configured
      * 3. Triggers Maven re-sync if JDK was just applied (initial import may have failed without JDK)
      * 4. Waits for Maven/Gradle configuration to complete via Observation.awaitConfiguration

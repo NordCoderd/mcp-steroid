@@ -223,9 +223,9 @@ class IntelliJContainer(
                 // linger; now the test surfaces them immediately with a screenshot.
                 error(
                     "Blocking modal dialog detected while waiting for $waitLabel. " +
-                            "This is an infrastructure bug — modals must be prevented up-front (e.g. pre-register " +
-                            "JDKs in jdk.table.xml, pre-write trusted paths, suppress welcome dialogs), not " +
-                            "killed reactively. " +
+                            "This is an infrastructure bug — modals must be prevented up-front (e.g. seed " +
+                            "`ProjectJdkTable` via `mcpRegisterJdks` in the factory, pre-write trusted paths, " +
+                            "suppress welcome dialogs), not killed reactively. " +
                             problemDetailsWithScreenshot("projectWindows=${projectWindows.size}")
                 )
             }
