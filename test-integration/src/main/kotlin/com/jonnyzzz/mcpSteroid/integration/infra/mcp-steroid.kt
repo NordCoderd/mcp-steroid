@@ -422,22 +422,48 @@ println("[JDK-REGISTER] Newly registered: ${"\$"}registered")
     }
 
     /**
-     * Trigger [UnknownSdkTracker.updateUnknownSdks] and wait for SDK resolution to complete.
-     * This prevents the "Resolving SDKs..." modal from firing during ProjectTaskManager.build(),
-     * which causes false-positive "Build errors: true" in 10/17 arena scenarios.
+     * Resolve unknown module SDK references to already-registered `ProjectJdkTable`
+     * entries WITHOUT ever offering to download a new JDK.
+     *
+     * Why not `UnknownSdkTracker.updateUnknownSdks()`: that API runs every fixer
+     * extension point, including ones whose `UnknownSdkFixActionDownloadBase.
+     * collectConsent` shows a modal "Download Amazon Corretto?" dialog via
+     * `MessageDialogBuilder.YesNo.ask`. In headless Docker tests there is no user
+     * to click "Yes" and the EDT deadlocks indefinitely (observed in
+     * DialogKillerIntegrationTest at >10 min hang, April 2026).
+     *
+     * Instead: collect unknown SDK names via `UnknownSdkCollector`, then run
+     * `SdkLookup.newLookupBuilder()` per SDK with `onDownloadableSdkSuggested {
+     * SdkLookupDecision.STOP }` so the download path is never taken. If no local
+     * `ProjectJdkTable` entry matches, the SDK stays unresolved — preferred over
+     * a UI deadlock.
      */
     fun mcpResolveUnknownSdks(projectPath: String) {
         val projectName = resolveProjectName(projectPath) ?: return
 
-        val code = """
-import com.intellij.openapi.projectRoots.impl.UnknownSdkTracker
+        val code = $$"""
+import com.intellij.openapi.projectRoots.impl.UnknownSdkCollector
+import com.intellij.openapi.roots.ui.configuration.SdkLookup
+import com.intellij.openapi.roots.ui.configuration.SdkLookupDecision
 import kotlinx.coroutines.delay
 
-println("[SDK-RESOLVE] Triggering UnknownSdkTracker.updateUnknownSdks()...")
-UnknownSdkTracker.getInstance(project).updateUnknownSdks()
-// Allow time for the background task to fire and complete
-delay(5_000L)
-println("[SDK-RESOLVE] Wait complete — SDKs should now be resolved")
+println("[SDK-RESOLVE] Collecting unknown SDKs (download fixes REJECTED)...")
+val snapshot = readAction { UnknownSdkCollector(project).collectSdksBlocking() }
+val unknowns = snapshot.resolvableSdks
+println("[SDK-RESOLVE] Unknown SDKs: ${unknowns.joinToString { it.sdkName ?: "<null>" }}")
+
+for (unknown in unknowns) {
+    val sdkName = unknown.sdkName ?: continue
+    println("[SDK-RESOLVE] Looking up '$sdkName' (local only)...")
+    SdkLookup.newLookupBuilder()
+        .withProject(project)
+        .withSdkName(sdkName)
+        .onDownloadableSdkSuggested { SdkLookupDecision.STOP }
+        .onLocalSdkSuggested { SdkLookupDecision.CONTINUE }
+        .executeLookup()
+}
+delay(500L)
+println("[SDK-RESOLVE] Wait complete — resolved via local ProjectJdkTable only")
 "done"
 """.trimIndent()
 
