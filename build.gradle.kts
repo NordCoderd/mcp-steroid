@@ -1,8 +1,5 @@
 @file:Suppress("HasPlatformType")
 
-import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-
 plugins {
     id("de.undercouch.download") version "5.6.0" apply false
     id("org.jetbrains.intellij.platform") version "2.13.1" apply false
@@ -89,15 +86,27 @@ if (providedBuildVersion != null) {
 
 // Local/dev builds — no CI counter available. Use the literal "19999-SNAPSHOT" in place
 // of the CI counter so the shape stays <VERSION>.<counter>-...-<hash>, sorts after any
-// realistic CI run, and is obviously not an official build. Keep the per-invocation
-// timestamp so two successive local builds still get distinct version strings (useful
-// when pushing local snapshots into a Maven cache or a plugin install dir).
+// realistic CI run, and is obviously not an official build.
+//
+// The timestamp is injected ONLY when deployPlugin is explicitly requested. This resolves
+// the tension between two conflicting requirements:
+//   * TDD speed: stable version → generateMetadata UP-TO-DATE → compileKotlin skipped
+//   * Hot-reload: the IDE's Plugin Hot Reload checks the version string in plugin.xml;
+//     same version on two consecutive deploys → no reload. A per-second timestamp ensures
+//     every deploy is recognized as newer.
+// Checking startParameter.taskNames is safe at configuration time: the deploy tasks live
+// in :ij-plugin, which reads the version from rootProject.version after this block runs.
+val isDeployBuild = gradle.startParameter.taskNames.any {
+    it.contains("deployPlugin", ignoreCase = true)
+}
 val localBuildCounter = "19999-SNAPSHOT"
-val snapshotTimestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+val snapshotTimestamp = if (isDeployBuild) {
+    "-" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
+} else ""
 version = when {
     isReleaseBuild -> "$baseVersion-$gitHash"
     providedBuildVersion != null -> providedBuildVersion
-    else -> "$baseVersion.$localBuildCounter-$snapshotTimestamp-$gitHash"
+    else -> "$baseVersion.$localBuildCounter$snapshotTimestamp-$gitHash"
 }
 val releaseNotesVersion = providers.gradleProperty("mcp.release.notes.version").orElse(baseVersion).get()
 val releaseNotesFile = layout.projectDirectory.file("release/notes/$releaseNotesVersion.md")
