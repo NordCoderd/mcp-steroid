@@ -4,6 +4,7 @@ package com.jonnyzzz.mcpSteroid.server
 import com.intellij.openapi.application.readAction
 import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.thisLogger
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.ProjectManager.getInstance
 import com.jonnyzzz.mcpSteroid.mcp.ContentItem
 import com.jonnyzzz.mcpSteroid.mcp.McpServerCore
@@ -112,16 +113,18 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
             getInstance().openProjects.find { it.name == projectName }
         } ?: return errorResult("Project not found: $projectName")
 
-        runCatching {
+        try {
             val executionStorage = project.service<ExecutionStorage>()
             val executionId = executionStorage.writeExecutionFeedback(taskId = taskId, params)
             if (code != null) {
                 executionStorage.writeCodeExecutionData(executionId, "script.kts", code)
             }
 
-            if (explanation != null) {
-                executionStorage.writeCodeExecutionData(executionId, "explanation.txt", explanation)
-            }
+            executionStorage.writeCodeExecutionData(executionId, "explanation.txt", explanation)
+        } catch (e: ProcessCanceledException) {
+            throw e
+        } catch (e: Exception) {
+            log.error("Failed to store execution feedback for task_id=$taskId", e)
         }
 
         // Capture feedback event
@@ -130,7 +133,7 @@ class ExecuteFeedbackToolHandler : McpRegistrar {
             project = project,
             properties = mapOf(
                 "success_rating" to successRating,
-                "has_explanation" to (explanation != null),
+                "has_explanation" to explanation.isNotBlank(),
                 "has_code" to (code != null)
             )
         )
