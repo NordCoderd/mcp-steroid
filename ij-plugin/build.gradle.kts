@@ -344,6 +344,7 @@ artifacts {
 }
 
 // Verify bundled libraries in plugin/lib folder
+val pluginVersion = version.toString()
 val verifyBundledLibraries by tasks.registering {
     group = "verification"
     description = "List and verify libraries bundled in plugin lib folder"
@@ -387,8 +388,8 @@ val verifyBundledLibraries by tasks.registering {
         check(ocrFiles.contains("ocr-tesseract/bin/ocr-tesseract.bat")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
         check(ocrFiles.contains("ocr-tesseract/tessdata/eng.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
         check(ocrFiles.contains("ocr-tesseract/tessdata/osd.traineddata")) { "ocr-tesseract must be included in " + ocrFiles.joinToString { "\n $it" } }
-        check(ocrFiles.any { it.startsWith("ocr-tesseract/lib/ocr-common-${project.version}.jar") }) { "ocr-common jar must be included in ocr-tesseract" }
-        check(ocrFiles.any { it.startsWith("ocr-tesseract/lib/ocr-tesseract-${project.version}.jar") }) { "ocr-tesseract jar must be included in ocr-tesseract" }
+        check(ocrFiles.any { it.startsWith("ocr-tesseract/lib/ocr-common-$pluginVersion.jar") }) { "ocr-common jar must be included in ocr-tesseract" }
+        check(ocrFiles.any { it.startsWith("ocr-tesseract/lib/ocr-tesseract-$pluginVersion.jar") }) { "ocr-tesseract jar must be included in ocr-tesseract" }
 
         allFiles = (allFiles - ocrFiles).toCollection(sortedSetOf())
 
@@ -398,12 +399,12 @@ val verifyBundledLibraries by tasks.registering {
             "EULA",
 
             //our binaires
-            "lib/ai-agents-${project.version}.jar",
-            "lib/ij-plugin-${project.version}.jar",
-            "lib/kotlin-cli-${project.version}.jar",
-            "lib/ocr-common-${project.version}.jar",
-            "lib/prompts-api-${project.version}.jar",
-            "lib/prompts-${project.version}.jar",
+            "lib/ai-agents-$pluginVersion.jar",
+            "lib/ij-plugin-$pluginVersion.jar",
+            "lib/kotlin-cli-$pluginVersion.jar",
+            "lib/ocr-common-$pluginVersion.jar",
+            "lib/prompts-api-$pluginVersion.jar",
+            "lib/prompts-$pluginVersion.jar",
 
             //libraries
             "lib/config-1.4.3.jar",
