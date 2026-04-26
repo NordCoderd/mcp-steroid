@@ -122,6 +122,7 @@ class ContentModuleClasspathTest {
                 "plugins/fullLine/lib/modules/intellij.fullLine.ruby.local.jar",
                 "plugins/fullLine/lib/modules/intellij.fullLine.rust.local.jar",
                 "plugins/fullLine/lib/modules/intellij.fullLine.terraform.local.jar",
+                "plugins/fullLine/lib/modules/intellij.fullLine.yaml.jar",
                 "plugins/fullLine/lib/modules/intellij.ml.llm.chat.completion.jar",
                 "plugins/fullLine/lib/modules/intellij.ml.llm.cpp.completion.jar",
                 "plugins/fullLine/lib/modules/intellij.ml.llm.css.completion.jar",
