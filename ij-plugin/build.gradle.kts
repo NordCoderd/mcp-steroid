@@ -6,6 +6,7 @@ import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URLEncoder
 import java.util.*
 
 plugins {
@@ -481,21 +482,25 @@ val deployPlugin by tasks.registering {
                 lines[0] to lines[1]
             }?.distinctBy { it.first } ?: emptyList()
 
-        if (endpoints.isEmpty()) { println("No running IDEs found"); return@doLast }
+        require(endpoints.isNotEmpty()) { "No running IDEs found" }
 
         endpoints.forEach { (url, token) ->
-            println("\n→ $url")
-            val conn = (URI(url).toURL().openConnection() as HttpURLConnection).apply {
-                requestMethod = "POST"; doOutput = true
+            val encodedPath = URLEncoder.encode(zip.absolutePath, Charsets.UTF_8)
+            val fileUrl = "$url?local-disk-file=$encodedPath"
+            println("\n→ $fileUrl")
+            val conn = (URI(fileUrl).toURL().openConnection() as HttpURLConnection).apply {
+                requestMethod = "POST"; doOutput = false; doInput = true
                 setRequestProperty("Authorization", token)
-                setRequestProperty("Content-Type", "application/octet-stream")
                 connectTimeout = 5000; readTimeout = 300000
             }
-            conn.outputStream.use { out -> zip.inputStream().use { it.copyTo(out) } }
-            if (conn.responseCode in 200..299) {
-                conn.inputStream.bufferedReader().forEachLine { println("  $it") }
+            val responseLines = if (conn.responseCode in 200..299) {
+                conn.inputStream.bufferedReader().readLines()
             } else {
-                println("  ✗ HTTP ${conn.responseCode}")
+                conn.errorStream?.bufferedReader()?.readLines().orEmpty()
+            }
+            responseLines.forEach { println("  $it") }
+            require(conn.responseCode in 200..299 && responseLines.lastOrNull() == "SUCCESS") {
+                "Deploy failed (HTTP ${conn.responseCode}): ${responseLines.lastOrNull()}"
             }
         }
     }
