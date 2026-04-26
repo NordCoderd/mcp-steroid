@@ -904,6 +904,21 @@ the Karpathy-style optimization loop prompts.
 | `test-experiments/.../arena/ArenaTestRunner.kt` (`buildPrompt()`) | Arena task prompt | High — agents follow recipes |
 | `prompts/src/main/prompts/skill/*.md` | MCP resources | Low — never read by agents |
 
+### Active DPAIA Working Notes
+
+- Use `TASKS.md` for the active DPAIA/autoresearch task list and `MEMORY.md` for factual handoff notes.
+- New DPAIA ideas must also be logged in a TODO-style file; current pointer is `TODO-DPAIA.md`.
+- Direction changes require 3 `run-agent.sh` reviews and consensus before selecting the next low-hanging fruit.
+- Current consensus (2026-04-26): prune contradictory DPAIA MCP prompt guidance in
+  `ArenaTestRunner.buildPrompt()` first; keep Gradle-specific prompt resources as a larger follow-up.
+- Latest measured run (2026-04-26 UTC, run dir `run-20260427-003310-dpaia__spring__petclinic__rest-37-mcp`):
+  `DpaiaPetclinicRest37Test.claude with mcp` fixed the task in 101s and passed 184/184 tests.
+  The current arena prompt produced 1 `steroid_apply_patch`, 0 native Edit calls, 2 Bash calls, and
+  0 tool errors. `ArenaPromptContractTest` now guards the prompt against broad "run at most once"
+  wording and keeps the `steroid_apply_patch` schema on `file_path`. Next candidate: Gradle-focused
+  MCP prompt/resource work, selected by measurement rather than broad refactoring.
+- Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
+
 ### Git Remotes Sync
 
 **Sync direction rules:**
