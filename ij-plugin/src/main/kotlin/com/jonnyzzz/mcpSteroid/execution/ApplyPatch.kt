@@ -8,6 +8,7 @@ import com.intellij.openapi.application.readAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
+import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiDocumentManager
@@ -30,12 +31,13 @@ import kotlinx.coroutines.withContext
  *   `Document.replaceString` call combines into one undoable step. Multi-hunk
  *   edits in the same file are applied in **descending offset order** so earlier
  *   edits don't shift later ones.
- * - Commit: `PsiDocumentManager.commitAllDocuments()` flushes into PSI so any
- *   subsequent semantic query in the same script sees the new tree.
+ * - Commit + save: `PsiDocumentManager.commitAllDocuments()` flushes into PSI
+ *   and every touched document is saved so native tools and build processes see
+ *   the updated file bytes immediately after the tool returns.
  * - Tail-of-exec VFS refresh (non-blocking) is already scheduled by
  *   `ExecutionManager`; callers never need to force one.
  */
-class ApplyPatchException(message: String) : RuntimeException(message)
+class ApplyPatchException(message: String, cause: Throwable? = null) : RuntimeException(message, cause)
 
 data class ApplyPatchHunk(val filePath: String, val oldString: String, val newString: String)
 
@@ -123,6 +125,11 @@ internal suspend fun executeApplyPatch(
                 ?: throw ApplyPatchException(
                     "Hunk #$index: file not found: ${hunk.filePath}"
                 )
+            if (!vf.isWritable) {
+                throw ApplyPatchException(
+                    "Hunk #$index: file is read-only: ${hunk.filePath}"
+                )
+            }
             val document = FileDocumentManager.getInstance().getDocument(vf)
                 ?: throw ApplyPatchException(
                     "Hunk #$index: no Document available for ${hunk.filePath}"
@@ -180,9 +187,26 @@ internal suspend fun executeApplyPatch(
     // deadlock here).
     withContext(Dispatchers.EDT + ModalityState.nonModal().asContextElement()) {
         WriteCommandAction.runWriteCommandAction(project, commandName, null, Runnable {
+            val fileDocumentManager = FileDocumentManager.getInstance()
             for ((_, hunksInFile) in groupedDescending) {
                 for (h in hunksInFile) {
                     h.document.replaceString(h.offset, h.offset + h.oldLen, h.newString)
+                }
+            }
+            PsiDocumentManager.getInstance(project).commitAllDocuments()
+            for ((document, hunksInFile) in groupedDescending) {
+                val filePath = hunksInFile.first().filePath
+                try {
+                    fileDocumentManager.saveDocument(document)
+                } catch (e: ProcessCanceledException) {
+                    throw e
+                } catch (e: RuntimeException) {
+                    throw ApplyPatchException("Failed to save patched document to disk: $filePath", e)
+                }
+                if (fileDocumentManager.isDocumentUnsaved(document)) {
+                    throw ApplyPatchException(
+                        "Failed to save patched document to disk: $filePath"
+                    )
                 }
             }
             PsiDocumentManager.getInstance(project).commitAllDocuments()

@@ -1,8 +1,6 @@
 /* Copyright 2025-2026 Eugene Petrenko (mcp@jonnyzzz.com); Copyright 2025-2026 JetBrains. Use of this source code is governed by the Apache 2.0 license. */
 package com.jonnyzzz.mcpSteroid.execution
 
-import com.intellij.openapi.application.edtWriteAction
-import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -88,19 +86,9 @@ class ApplyPatchTest : BasePlatformTestCase() {
         return path
     }
 
-    /**
-     * Read the file content *through the IDE* rather than directly from disk.
-     *
-     * `executeApplyPatch` mutates the in-memory [com.intellij.openapi.editor.Document]
-     * and commits PSI, but leaves the on-disk copy stale until the platform's next
-     * VFS refresh / document save cycle. Production callers see consistent content
-     * because the post-exec async VFS refresh covers that; tests must read via VFS
-     * (or explicitly save the document) to observe the patched content.
-     */
     private suspend fun Path.readViaIde(): String {
         val vf = LocalFileSystem.getInstance().findFileByNioFile(this)
             ?: error("VFS cannot resolve $this")
-        edtWriteAction { FileDocumentManager.getInstance().saveAllDocuments() }
         return String(vf.contentsToByteArray(), vf.charset)
     }
 
@@ -121,6 +109,17 @@ class ApplyPatchTest : BasePlatformTestCase() {
         assertEquals(11, h.column)
         assertEquals(9, h.oldLen)  // "int x = 1".length
         assertEquals(10, h.newLen) // "int x = 42".length
+    }
+
+    fun testSingleHunkPersistsToDiskBeforeReturning(): Unit = timeoutRunBlocking(30.seconds) {
+        val ctx = createContext()
+        val vf = writeTempFile("Persist.java", "class Persist { int x = 1; }\n")
+
+        ctx.applyPatch {
+            hunk(vf.toString(), "int x = 1", "int x = 42")
+        }
+
+        assertEquals("class Persist { int x = 42; }\n", Files.readString(vf))
     }
 
     fun testMultiHunkSameFileDescendingOrder(): Unit = timeoutRunBlocking(30.seconds) {
@@ -168,6 +167,34 @@ class ApplyPatchTest : BasePlatformTestCase() {
         assertEquals("int count = 200;\n", b.readViaIde())
         assertEquals(2, result.hunkCount)
         assertEquals(2, result.fileCount)
+    }
+
+    fun testReadOnlyFileFailsBeforeEditingDisk(): Unit = timeoutRunBlocking(30.seconds) {
+        val ctx = createContext()
+        val vf = writeTempFile("ReadOnly.java", "class ReadOnly { int value = 1; }\n")
+        val file = vf.toFile()
+        assertTrue("Test setup should make the file read-only", file.setWritable(false))
+        LocalFileSystem.getInstance().refreshAndFindFileByNioFile(vf)
+
+        try {
+            val err = try {
+                ctx.applyPatch {
+                    hunk(vf.toString(), "value = 1", "value = 100")
+                }
+                null
+            } catch (e: ApplyPatchException) {
+                e
+            }
+
+            assertNotNull("Expected ApplyPatchException for read-only file", err)
+            assertTrue(
+                "Error explains read-only or save failure: ${err!!.message}",
+                err.message!!.contains("file is read-only") || err.message!!.contains("Failed to save"),
+            )
+            assertEquals("class ReadOnly { int value = 1; }\n", Files.readString(vf))
+        } finally {
+            file.setWritable(true)
+        }
     }
 
     fun testOldStringMissingFailsCleanlyNoPartialEdit(): Unit = timeoutRunBlocking(30.seconds) {
