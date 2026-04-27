@@ -952,6 +952,20 @@ the Karpathy-style optimization loop prompts.
   Claude, Codex, and Gemini approved. The next low-hanging item by 2/3 reviewers is to measure
   `DpaiaMicroshop2Test.claude with mcp` against the 136s JDK-fixed baseline and check whether the new resource reduces
   Gradle Bash calls or hand-rolled Gradle snippets; Gemini's alternate candidate was a PSI refactoring recipe resource.
+- Gradle resource measurement (2026-04-27, run dir
+  `run-20260427-135940-dpaia__spring__boot__microshop-2-mcp`): the host test passed and the agent emitted
+  `ARENA_FIX_APPLIED: yes`, but it fetched 0 MCP resources and did not use `mcp-steroid://skill/execute-code-gradle`.
+  Metrics regressed versus the 136s JDK-fixed baseline: 170.8s agent time, 28 total calls, 5 Bash calls, 2 tool errors,
+  and 1,458,578 tokens. The agent used `steroid_apply_patch`, then an IDE build returned `Build errors: false, aborted: true`,
+  then it fell back to Bash Gradle with the correct JDK. Treat this as evidence that the resource content is OK but
+  discoverability/routing is the next problem.
+- Gradle resource routing fix (2026-04-27): after review under
+  `/tmp/mcp-steroid-review/gradle-resource-measurement-20260427/runs/`, Gradle arena prompts now explicitly call
+  `steroid_fetch_resource` for `mcp-steroid://skill/execute-code-gradle`, Maven prompts route build-abort sync to
+  `mcp-steroid://skill/execute-code-maven`, and execute-code prompt resources tell agents to sync before Bash fallback
+  on `errors=false, aborted=true`. Validation passed for `ArenaPromptContractTest` plus changed prompt KtBlocks and
+  `MarkdownArticleContractTest`. Next measurement should rerun Microshop-2 and first check `fetch_resource_calls >= 1`;
+  do not over-interpret runtime from a single Microshop-2 run because recent variance is wide.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

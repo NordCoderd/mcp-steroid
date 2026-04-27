@@ -234,3 +234,29 @@
 - Validation: IntelliJ Gradle runner passed `:prompts:generatePrompts :prompts:test --tests 'com.jonnyzzz.mcpSteroid.prompts.GradlePromptContractTest' --tests '*ExecuteCodeGradleKtBlocksCompilationTest*' --tests 'com.jonnyzzz.mcpSteroid.prompts.MarkdownArticleContractTest' --warning-mode all`. The first run failed on two non-kotlin fences; those were converted to prose/inline commands and the rerun exited 0.
 - Review artifacts: `/tmp/mcp-steroid-review/gradle-prompt-resource-20260427/runs/`. Claude, Codex, and Gemini approved.
 - Next low-hanging consensus: measure `DpaiaMicroshop2Test.claude with mcp` with this resource in place and compare to the 136s JDK-fixed baseline. Track full-suite pass/fail, Bash Gradle calls, any resource fetch/use, nested `ProcessBuilder`, token count, tool errors, and wall time.
+
+## 2026-04-27 - Gradle Prompt Resource Measurement
+
+- Scenario: `DpaiaMicroshop2Test.claude with mcp`.
+- Run dir: `test-experiments/build/test-logs/test/run-20260427-135940-dpaia__spring__boot__microshop-2-mcp`.
+- Host Gradle run: IntelliJ Gradle runner with API keys injected into the run configuration environment.
+- Result: host test passed, agent emitted `ARENA_FIX_APPLIED: yes`, and the full in-project Gradle suite passed. Agent time was 170.8s.
+- Raw metrics: 28 total calls, 4 MCP calls, 24 native calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, 12 Read, 3 Glob, 3 Write, 5 Bash, 2 tool errors, 1,458,578 total tokens, 0 resource fetches.
+- Delta versus the 136s JDK-fixed baseline: agent time 136s -> 170.8s, Bash 2 -> 5, total calls 15 -> 28, tokens 979,647 -> 1,458,578, native Edit stayed 0, `steroid_apply_patch` stayed true.
+- Agent behavior: it did not fetch `mcp-steroid://skill/execute-code-gradle`; it used `steroid_apply_patch`, then `steroid_execute_code` for an IDE build that returned `Build errors: false, aborted: true`, then fell back to Bash Gradle with the correct JDK.
+- Lesson: the new resource is valid but not discoverable enough for this arena path. The next low-hanging work should route the Gradle resource URI through high-impact prompts or execution failure guidance when Gradle verification is needed after an IDE build abort.
+
+## 2026-04-27 - Gradle Resource Routing After Measurement
+
+- Review artifacts: `/tmp/mcp-steroid-review/gradle-resource-measurement-20260427/runs/`.
+- Claude, Codex, and Gemini approved the measurement interpretation.
+- Reviewer split:
+  - Claude recommended high-impact arena prompt routing because resources are low-priority unless a higher-priority prompt tells agents to fetch them.
+  - Codex recommended result-boundary guidance for `steroid_execute_code` outputs that show `errors=false, aborted=true`.
+  - Gemini recommended sync-before-Bash abort guidance in arena/resource prompts and produced a rough edit.
+- Implemented the narrow common path first: Gradle arena prompts now tell agents to call `steroid_fetch_resource` for `mcp-steroid://skill/execute-code-gradle` before Gradle sync/test work inside `steroid_execute_code`; Maven prompts route aborted IDE builds to `mcp-steroid://skill/execute-code-maven` and do not mention the Gradle resource.
+- Prompt resources `execute-code-tool-description.md` and `execute-code-overview.md` now say `errors=false, aborted=true` should run the matching sync pattern before Bash fallback, using full Maven/Gradle resource URIs.
+- Regression coverage: `ArenaPromptContractTest` asserts Gradle prompts contain the Gradle URI and Maven prompts do not. Changed prompt resources are covered by generated KtBlocks compilation tests plus `MarkdownArticleContractTest`.
+- Validation: `ArenaPromptContractTest` passed through IntelliJ Gradle; `:prompts:generatePrompts :prompts:test --tests '*ExecuteCodeToolDescriptionKtBlocksCompilationTest*' --tests '*ExecuteCodeOverviewKtBlocksCompilationTest*' --tests 'com.jonnyzzz.mcpSteroid.prompts.MarkdownArticleContractTest' --warning-mode all` passed through IntelliJ Gradle.
+- Validation caution: one combined multi-module Gradle run accidentally launched `DpaiaArenaTest.codex without mcp`; a thread dump was captured at `/tmp/gradle-resource-routing-worker-dump-20260427.txt`, the wrong run was stopped, and scoped module reruns were used for the valid result.
+- Next measurement: rerun `DpaiaMicroshop2Test.claude with mcp`; the first success criterion is `fetch_resource_calls >= 1` for `mcp-steroid://skill/execute-code-gradle`, not a single-run runtime win because recent Microshop-2 token/runtime variance is large.

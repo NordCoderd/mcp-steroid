@@ -19,4 +19,6 @@
 - [x] Investigate the remaining severe Kotlin FIR resolve logs observed during the green IntelliJ monorepo `thisLogger` lookup.
 - [x] Add decoded-log regression coverage so Microshop-2 MCP runs do not use Java 21 or wildcard JAVA_HOME assignments for Gradle.
 - [x] Add a Gradle-focused MCP prompt resource modeled after the Maven patterns.
-- [ ] Measure the Gradle-focused MCP prompt resource on `DpaiaMicroshop2Test.claude with mcp` against the 136s JDK-fixed baseline.
+- [x] Measure the Gradle-focused MCP prompt resource on `DpaiaMicroshop2Test.claude with mcp` against the 136s JDK-fixed baseline.
+- [x] Review the Microshop-2 measurement and improve Gradle resource discovery/routing so agents actually fetch or receive `mcp-steroid://skill/execute-code-gradle` before falling back to Bash Gradle.
+- [ ] Rerun `DpaiaMicroshop2Test.claude with mcp` after Gradle resource routing; target full-suite pass and `fetch_resource_calls >= 1` for `mcp-steroid://skill/execute-code-gradle`.
