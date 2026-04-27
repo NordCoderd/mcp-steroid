@@ -973,6 +973,14 @@ the Karpathy-style optimization loop prompts.
   `Build errors: false, aborted: true`, mentioned Gradle sync, then chose Bash directly. Next low-hanging fix:
   result-boundary guidance from `steroid_execute_code` for aborted builds, using generated Maven/Gradle prompt article
   classes rather than hardcoded MCP URI strings.
+- Aborted-build result-boundary guidance (2026-04-27): `ExecuteCodeToolHandler` now appends a `HINT` when tool output
+  contains `Build errors: false, aborted: true` or `Compile errors: false, aborted: true`. The hint points agents to
+  `steroid_fetch_resource` for the detected Gradle/Maven resource before Bash fallback. Production code uses
+  `ExecuteCodeGradlePromptArticle().uri` and `ExecuteCodeMavenPromptArticle().uri`; `ExecuteCodeBuildAbortGuidanceTest`
+  covers Gradle, Maven, mixed/unknown/null roots, successful-build no-op, and result preservation. Review under
+  `/tmp/mcp-steroid-review/build-abort-guidance-20260427/runs/` approved by Claude/Codex/Gemini; scoped `:ij-plugin:test`
+  with that test plus `NoHardcodedMcpSteroidUriUsageTest` passed. Next measurement is Microshop-2 with
+  `fetch_resource_calls >= 1` as the first criterion.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

@@ -270,3 +270,14 @@
 - Delta versus the 170.8s post-resource run: total calls 28 -> 10, Bash 5 -> 2, tool errors 2 -> 0, tokens 1,458,578 -> 764,238, runtime 170.8s -> 142.0s. Delta versus the 136s JDK-fixed baseline: Bash stayed 2, tool errors stayed 0, but runtime and tokens still did not beat baseline.
 - Agent behavior: after the IDE build printed `Build errors: false, aborted: true`, the decoded log says it needed Gradle sync but then used Bash Gradle directly. The raw thinking mentions fetching the Gradle skill, but no `steroid_fetch_resource` tool call was made.
 - Lesson: arena/prompt routing helped with waste, but did not satisfy the resource-use criterion. The next low-hanging fix is Codex's reviewed result-boundary idea: when `steroid_execute_code` output reports an aborted build without errors, append a short resource/sync hint directly to that tool result, using generated prompt article classes instead of hardcoded MCP URIs in production Kotlin.
+
+## 2026-04-27 - Aborted Build Result-Boundary Guidance
+
+- Implemented the next low-hanging fix after the 0-resource-fetch Microshop-2 routing measurement.
+- `ExecuteCodeToolHandler` now post-processes successful tool results: if text output contains `Build errors: false, aborted: true` or `Compile errors: false, aborted: true`, it appends a `HINT` telling agents to call `steroid_fetch_resource` for the detected Gradle/Maven resource before falling back to Bash, run sync/configuration, and retry the IDE build/test.
+- Build-system detection is intentionally local and cheap: root `settings.gradle*`, `build.gradle*`, or `gradlew` selects the Gradle article URI; root `pom.xml` selects the Maven article URI; ambiguous, missing, or null base paths list both resources as "the matching resource".
+- Production Kotlin uses `ExecuteCodeGradlePromptArticle().uri` and `ExecuteCodeMavenPromptArticle().uri`; no hardcoded `mcp-steroid://...` resource strings were added.
+- Tests: `ExecuteCodeBuildAbortGuidanceTest` covers Gradle, Maven, mixed roots, unknown roots, null base paths, successful build no-op, and preservation of the original tool result.
+- Validation: `./gradlew :ij-plugin:test --tests 'com.jonnyzzz.mcpSteroid.server.ExecuteCodeBuildAbortGuidanceTest' --tests 'com.jonnyzzz.mcpSteroid.NoHardcodedMcpSteroidUriUsageTest' --rerun-tasks --warning-mode all` passed.
+- Review artifacts: `/tmp/mcp-steroid-review/build-abort-guidance-20260427/runs/`; Claude, Codex, and Gemini approved. Claude/Codex suggested optional ambiguous/null coverage, which was added before commit.
+- Next measurement: rerun `DpaiaMicroshop2Test.claude with mcp`; first success criterion is `fetch_resource_calls >= 1` at the aborted-build boundary while keeping the full Gradle suite green.
