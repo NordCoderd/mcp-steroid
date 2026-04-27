@@ -223,3 +223,14 @@
   - Initial pass: `/tmp/mcp-steroid-review/thislogger-fir-20260427/runs/`. Gemini and Claude approved; Codex requested the explicit strategy-marker assertion and stale `CLAUDE.md` consensus cleanup.
   - Follow-up pass: `/tmp/mcp-steroid-review/thislogger-fir-20260427/followup/runs/`. Claude, Codex, and Gemini approved.
 - Next low-hanging consensus: add the Gradle-focused MCP prompt resource by 2/3 reviewers (Codex + Gemini). Maven fallback JDK guidance remains Claude's candidate.
+
+## 2026-04-27 - Gradle Prompt Resource
+
+- Added `mcp-steroid://skill/execute-code-gradle` as a focused prompt resource for Gradle sync/test work inside `steroid_execute_code`.
+- The resource routes agents to `ExternalSystemUtil.refreshProject(...)` plus `Observation.awaitConfiguration(project)` after Gradle file edits, and to `ExternalSystemUtil.runTask(...)` with `GradleConstants.SYSTEM_ID` for Gradle tests.
+- It explicitly keeps `ProcessBuilder("./gradlew")` banned inside `steroid_execute_code` and scopes Bash `./gradlew` fallback to shell-level final verification or IDE-runner fallback outside `steroid_execute_code`.
+- Routing links were added from `execute-code-overview.md`, `execute-code-tool-description.md`, and `coding-with-intellij.md`.
+- Regression coverage: `GradlePromptContractTest` checks the rendered prompt anchors and overview link; generated `ExecuteCodeGradleKtBlocksCompilationTest` compiled all Kotlin blocks for IDEA and IDEA EAP.
+- Validation: IntelliJ Gradle runner passed `:prompts:generatePrompts :prompts:test --tests 'com.jonnyzzz.mcpSteroid.prompts.GradlePromptContractTest' --tests '*ExecuteCodeGradleKtBlocksCompilationTest*' --tests 'com.jonnyzzz.mcpSteroid.prompts.MarkdownArticleContractTest' --warning-mode all`. The first run failed on two non-kotlin fences; those were converted to prose/inline commands and the rerun exited 0.
+- Review artifacts: `/tmp/mcp-steroid-review/gradle-prompt-resource-20260427/runs/`. Claude, Codex, and Gemini approved.
+- Next low-hanging consensus: measure `DpaiaMicroshop2Test.claude with mcp` with this resource in place and compare to the 136s JDK-fixed baseline. Track full-suite pass/fail, Bash Gradle calls, any resource fetch/use, nested `ProcessBuilder`, token count, tool errors, and wall time.

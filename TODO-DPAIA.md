@@ -18,4 +18,5 @@
 - [x] Review IntelliJ checkout ZIP/cache precedence so `MCP_STEROID_INTELLIJ_CHECKOUT_DIR` does not silently lose to an older cached TeamCity ZIP when a local checkout was explicitly configured.
 - [x] Investigate the remaining severe Kotlin FIR resolve logs observed during the green IntelliJ monorepo `thisLogger` lookup.
 - [x] Add decoded-log regression coverage so Microshop-2 MCP runs do not use Java 21 or wildcard JAVA_HOME assignments for Gradle.
-- [ ] Add a Gradle-focused MCP prompt resource modeled after the Maven patterns.
+- [x] Add a Gradle-focused MCP prompt resource modeled after the Maven patterns.
+- [ ] Measure the Gradle-focused MCP prompt resource on `DpaiaMicroshop2Test.claude with mcp` against the 136s JDK-fixed baseline.

@@ -945,8 +945,13 @@ the Karpathy-style optimization loop prompts.
 - Historical review consensus for the earlier exception-capture/checkout fixes selected Gradle/JDK prompt guidance as
   the next item; that Gradle/JDK work is now complete. Do not treat that historical note as the current next task.
 - Current review consensus for the FIR follow-up: Claude/Codex/Gemini approved the diff after Codex-requested cleanup.
-  The next low-hanging item by 2/3 reviewers is a Gradle-focused MCP prompt resource modeled after the Maven patterns;
-  Maven fallback JDK guidance remains the alternate candidate.
+  The selected Gradle-focused MCP prompt resource is now implemented as `mcp-steroid://skill/execute-code-gradle`.
+  It routes Gradle sync/test work inside `steroid_execute_code` to IntelliJ ExternalSystem APIs, keeps Bash `./gradlew`
+  outside `steroid_execute_code`, and keeps `ProcessBuilder("./gradlew")` banned inside `steroid_execute_code`.
+- Gradle resource review (2026-04-27, `/tmp/mcp-steroid-review/gradle-prompt-resource-20260427/runs/`):
+  Claude, Codex, and Gemini approved. The next low-hanging item by 2/3 reviewers is to measure
+  `DpaiaMicroshop2Test.claude with mcp` against the 136s JDK-fixed baseline and check whether the new resource reduces
+  Gradle Bash calls or hand-rolled Gradle snippets; Gemini's alternate candidate was a PSI refactoring recipe resource.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync
