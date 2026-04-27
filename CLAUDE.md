@@ -936,10 +936,17 @@ the Karpathy-style optimization loop prompts.
 - Follow-up fixes from that monorepo run (2026-04-27): `ExceptionCaptureService` now handles JUL severe records with
   null `LogRecord.parameters` without masking the original IDE error, and IntelliJ checkout setup now honors explicit
   configured ZIPs/checkouts before reusing the cached TeamCity archive, while preserving the checkout's real `origin`
-  remote for in-container fetches. The remaining open item is the Kotlin FIR severe resolve log itself.
-- Review consensus for those follow-up fixes: current diff approved by Claude/Codex/Gemini via `run-agent.sh`; next
-  low-hanging item by 2/3 reviewers is Gradle/JDK prompt guidance so DPAIA agents use the configured JDK before the
-  first Bash Gradle call.
+  remote for in-container fetches.
+- FIR follow-up from that monorepo run (2026-04-27): `IntelliJThisLoggerLookupTest` now fails if lookup-time logs contain
+  the known Kotlin FIR severe signatures. The test avoids triggering `KaFirReferenceResolver` on the whole monorepo by
+  using `CacheManager.getVirtualFilesWithWord(..., UsageSearchContext.IN_CODE, ...)` plus Kotlin PSI `KtCallExpression`
+  filtering for actual `thisLogger()` call sites; the fixed run found 2670 calls across 1522 files with no FIR severe
+  logs after the lookup started.
+- Historical review consensus for the earlier exception-capture/checkout fixes selected Gradle/JDK prompt guidance as
+  the next item; that Gradle/JDK work is now complete. Do not treat that historical note as the current next task.
+- Current review consensus for the FIR follow-up: Claude/Codex/Gemini approved the diff after Codex-requested cleanup.
+  The next low-hanging item by 2/3 reviewers is a Gradle-focused MCP prompt resource modeled after the Maven patterns;
+  Maven fallback JDK guidance remains the alternate candidate.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

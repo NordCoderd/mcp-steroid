@@ -122,7 +122,7 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
 
 - [ ] Add a Gradle-focused MCP prompt resource modeled after the Maven patterns.
   - Files likely under `prompts/src/main/prompts/skill/`.
-  - Consensus status: Gemini recommended this; Microshop-2 measurement now gives a concrete baseline.
+  - Consensus status: the follow-up `thisLogger` FIR review selected this by 2/3 reviewers (Codex + Gemini); Maven fallback JDK guidance remains Claude's candidate.
   - Expected effect: fewer Bash Gradle cold starts and fewer hand-rolled IntelliJ Gradle snippets.
 
 - [x] Next low-hanging Gradle improvement: make JDK choice harder to miss in DPAIA prompts.
@@ -140,11 +140,12 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
   - Regression coverage: `ExtractDecodedLogMetricsTest.microshop gradle bash commands use configured jdk without wildcard` and `ExtractDecodedLogMetricsTest.detects gradle bash commands with lower jdk or wildcard java home`.
   - Validation: `./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ArenaPromptContractTest' --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ExtractDecodedLogMetricsTest' --rerun-tasks --warning-mode all` passed.
 
-- [ ] Investigate severe Kotlin FIR resolve logs from the IntelliJ monorepo `thisLogger` lookup.
+- [x] Investigate severe Kotlin FIR resolve logs from the IntelliJ monorepo `thisLogger` lookup.
   - Evidence: the green lookup run logged `KaFirReferenceResolver` / `Expected FirResolvedContractDescription but FirLazyContractDescriptionImpl` errors, followed by an `ExceptionCaptureService` null-pointer while capturing the IDE error.
-  - Current state: the local `ExceptionCaptureService` null-parameters crash is fixed and tested; the remaining issue is the Kotlin plugin severe resolve error itself.
+  - Fix: the monorepo test now asserts no lookup-time FIR severe logs, and the MCP script avoids the Kotlin FIR resolve path by using `CacheManager.getVirtualFilesWithWord(..., UsageSearchContext.IN_CODE, ...)` plus Kotlin PSI `KtCallExpression` filtering for real `thisLogger()` calls.
   - Consensus: final Gradle/JDK review selected this as the next low-hanging task by 2/3 reviewers; Maven fallback JDK guidance remains the other candidate.
-  - Target: keep the test real but remove or isolate IDE-side severe errors instead of treating them as harmless noise.
+  - Validation: the old `ReferencesSearch` TDD run failed on the new FIR log assertion; the fixed run passed with `THISLOGGER_LOOKUP_STRATEGY=INDEXED_WORD_PLUS_KOTLIN_PSI`, `THISLOGGER_REFERENCE_COUNT=2670`, and `THISLOGGER_FILE_COUNT=1522`.
+  - Review: first pass had Gemini/Claude approve and Codex request a strategy-marker assertion plus stale `CLAUDE.md` note cleanup; follow-up Claude/Codex/Gemini pass approved.
 
 - [x] Make IntelliJ monorepo test setup prefer an explicitly configured local checkout when appropriate.
   - Evidence: the `MCP_STEROID_INTELLIJ_CHECKOUT_DIR=/Users/jonnyzzz/Work/intellij` run still reused an existing cached TeamCity ZIP before updating the checkout in-container.

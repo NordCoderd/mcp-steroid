@@ -208,3 +208,18 @@
   - First final pass: `/tmp/mcp-steroid-review/gradle-jdk-prompt-20260427/final-runs/`. Codex requested changes for copyable Gradle examples without `JAVA_HOME` and absolute `gradlew` paths missed by decoded-log detection.
   - Follow-up final pass: `/tmp/mcp-steroid-review/gradle-jdk-prompt-20260427/final-runs-2/`. Claude, Codex, and Gemini approved.
 - Next low-hanging consensus: investigate the Kotlin FIR severe logs next (Claude + Gemini); Maven fallback JDK guidance remains the other reviewed candidate (Codex).
+
+## 2026-04-27 - IntelliJ Monorepo thisLogger FIR Avoidance
+
+- Reproduced the remaining `IntelliJThisLoggerLookupTest` problem with TDD: the existing `ReferencesSearch.search(target, scope)` script still found 4192 references but emitted severe Kotlin FIR logs (`KaFirReferenceResolver`, `Expected FirResolvedContractDescription but FirLazyContractDescriptionImpl`), and the new test assertion failed on those post-lookup log lines.
+- Reviewed `~/Work/intellij` search APIs before changing the test: `CacheManager.getVirtualFilesWithWord` is the low-level IdIndex-backed word lookup used by IntelliJ/Kotlin search code to narrow candidates without resolving every reference.
+- Fix: keep the real IntelliJ Ultimate monorepo and `Observation.awaitConfiguration(project)` + `smartReadAction(project)` flow, but replace full Kotlin reference resolution with `CacheManager.getVirtualFilesWithWord(target.name!!, UsageSearchContext.IN_CODE, scope, true)` and `KtCallExpression` PSI filtering for actual `thisLogger()` call sites. The test now asserts the lookup window does not log the FIR severe signatures.
+- Validation:
+  - Compile check via IntelliJ Gradle run config: `:test-experiments:compileTestKotlin --warning-mode all` passed.
+  - Failing TDD run: `test-experiments/build/test-logs/test/run-20260427-124607-intellij-thislogger-lookup` failed on the FIR severe-log assertion after the `ReferencesSearch` script emitted the Kotlin FIR exception.
+  - Fixed run: `MCP_STEROID_INTELLIJ_CHECKOUT_DIR=/Users/jonnyzzz/Work/intellij ./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.IntelliJThisLoggerLookupTest' --rerun-tasks --warning-mode all` passed in 21m40s.
+  - Fixed markers: `THISLOGGER_LOOKUP_STRATEGY=INDEXED_WORD_PLUS_KOTLIN_PSI`, `THISLOGGER_REFERENCE_COUNT=2670`, `THISLOGGER_FILE_COUNT=1522`.
+- Review artifacts:
+  - Initial pass: `/tmp/mcp-steroid-review/thislogger-fir-20260427/runs/`. Gemini and Claude approved; Codex requested the explicit strategy-marker assertion and stale `CLAUDE.md` consensus cleanup.
+  - Follow-up pass: `/tmp/mcp-steroid-review/thislogger-fir-20260427/followup/runs/`. Claude, Codex, and Gemini approved.
+- Next low-hanging consensus: add the Gradle-focused MCP prompt resource by 2/3 reviewers (Codex + Gemini). Maven fallback JDK guidance remains Claude's candidate.
