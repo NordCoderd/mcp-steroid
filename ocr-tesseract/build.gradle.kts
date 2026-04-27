@@ -70,7 +70,7 @@ tasks.test {
 }
 
 // Tessdata download configuration
-val tessdataDownloadDir = layout.buildDirectory.dir("tessdata-download")
+val tessdataDownloadDir = layout.buildDirectory.dir("tessdata-download/$tessdataVersion")
 val tessdataDir = layout.buildDirectory.dir("tessdata-data")
 val downloadConnectTimeoutMs = 30_000
 val downloadReadTimeoutMs = 15 * 60_000
