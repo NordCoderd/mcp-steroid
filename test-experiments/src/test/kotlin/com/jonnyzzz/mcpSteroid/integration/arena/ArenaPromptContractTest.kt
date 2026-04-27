@@ -54,6 +54,31 @@ class ArenaPromptContractTest {
         )
     }
 
+    @Test
+    fun `gradle prompt batches targeted tests across subprojects`() {
+        val prompt = ArenaTestRunner(
+            container = ContainerDriver(
+                logPrefix = "prompt-test",
+                containerId = "unused",
+                startRequest = StartContainerRequest(),
+            ),
+            projectGuestDir = "/workspace",
+        ).buildPrompt(testCase = sampleGradleTestCase(), projectDir = "/home/agent/project-home", withMcp = true)
+
+        assertTrue(
+            prompt.contains("Batch Gradle targeted tests across subprojects"),
+            "Gradle prompt should tell agents to batch multi-subproject targeted test runs",
+        )
+        assertTrue(
+            prompt.contains("repeated `:subproject:test --tests FQCN` pairs"),
+            "Gradle prompt should describe the batching shape without relying on a single module",
+        )
+        assertTrue(
+            prompt.contains("then keep the full suite as the final separate run"),
+            "Batching targeted tests must not weaken the final full-suite requirement",
+        )
+    }
+
     private fun sampleMavenTestCase() = DpaiaTestCase(
         instanceId = "dpaia__sample",
         issueNumbers = listOf("1"),
@@ -73,5 +98,15 @@ class ArenaPromptContractTest {
         isMaven = true,
         buildSystem = "maven",
         testArgs = "",
+    )
+
+    private fun sampleGradleTestCase() = sampleMavenTestCase().copy(
+        tags = listOf("Spring", "Gradle"),
+        isMaven = false,
+        buildSystem = "gradle",
+        failToPass = listOf(
+            "com.example.alpha.AlphaTest",
+            "com.example.beta.BetaTest",
+        ),
     )
 }
