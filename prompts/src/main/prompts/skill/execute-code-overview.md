@@ -52,6 +52,18 @@ writeAction { VfsUtil.saveText(vf, updated) }  // write INSIDE writeAction
 
 ---
 
+## Multi-Site Literal Edits: Use `steroid_apply_patch`
+
+When you need two or more literal substitutions in one file or across many files, use the dedicated
+`steroid_apply_patch` MCP tool instead of chaining native `Edit` calls or compiling a
+`steroid_execute_code` script just to call the older script-context apply-patch DSL.
+
+`steroid_apply_patch` validates all hunks before writing, applies them as one undoable IDE command,
+commits PSI, and avoids kotlinc compile overhead. Read
+`mcp-steroid://skill/apply-patch-tool-description` for the JSON schema.
+
+---
+
 ## ❌ BANNED: ProcessBuilder for Builds and Tests
 
 **`ProcessBuilder("./mvnw", ...)` and `ProcessBuilder("./gradlew", ...)` inside `steroid_execute_code` are BANNED** for build and test execution.
