@@ -37,6 +37,18 @@ data class JdkInfo(
     val versionString: String?,
 )
 
+internal fun ProcessResult.resolveJavaHomeLookup(jdkVersion: String): String {
+    val javaHome = stdout.lineSequence()
+        .map { it.trim() }
+        .firstOrNull { it.startsWith("/") }
+    if (javaHome != null) return javaHome
+
+    require(exitCode == 0) {
+        "[COMPILE] JDK $jdkVersion not found under /usr/lib/jvm; stdout=${stdout.take(500)} stderr=${stderr.take(500)}"
+    }
+    error("[COMPILE] JDK $jdkVersion lookup returned no path; stdout=${stdout.take(500)} stderr=${stderr.take(500)}")
+}
+
 class McpSteroidDriver(
     private val driver: ContainerDriver,
     private val ijDriver: IntelliJDriver,
@@ -546,6 +558,7 @@ println("[SDK-RESOLVE] Wait complete — resolved via local ProjectJdkTable only
 
     /**
      * Set the project SDK to a registered JDK by version name (e.g. "21", "17").
+     * If the project already has a different SDK, replace it with the requested version.
      * JDKs must have been registered first via [mcpRegisterJdks].
      */
     fun mcpSetProjectSdk(projectPath: String, jdkVersion: String) {
@@ -559,18 +572,27 @@ import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.application.edtWriteAction
 
 val currentSdk = ProjectRootManager.getInstance(project).projectSdk
-if (currentSdk != null) {
+val requestedVersion = "$jdkVersion"
+fun matchesRequestedVersion(sdkName: String): Boolean =
+    sdkName == requestedVersion ||
+            sdkName == "temurin-${'$'}requestedVersion" ||
+            sdkName == "corretto-${'$'}requestedVersion"
+
+if (currentSdk != null && matchesRequestedVersion(currentSdk.name)) {
     println("[SDK] Project SDK already set: ${'$'}{currentSdk.name}")
 } else {
     val javaSdks = ProjectJdkTable.getInstance().getSdksOfType(JavaSdk.getInstance())
     println("[SDK] Available SDKs: ${'$'}{javaSdks.map { it.name }}")
-    val sdk = javaSdks.firstOrNull { it.name == "$jdkVersion" }
-        ?: javaSdks.firstOrNull { it.name.contains("$jdkVersion") }
+    val sdk = javaSdks.firstOrNull { matchesRequestedVersion(it.name) }
     if (sdk != null) {
-        println("[SDK] Applying SDK: ${'$'}{sdk.name} at ${'$'}{sdk.homePath}")
+        if (currentSdk == null) {
+            println("[SDK] Applying SDK: ${'$'}{sdk.name} at ${'$'}{sdk.homePath}")
+        } else {
+            println("[SDK] Replacing project SDK ${'$'}{currentSdk.name} with ${'$'}{sdk.name} at ${'$'}{sdk.homePath}")
+        }
         edtWriteAction { JavaSdkUtil.applyJdkToProject(project, sdk) }
     } else {
-        println("[SDK] WARNING: No SDK matching version $jdkVersion found")
+        error("[SDK] No SDK matching version $jdkVersion found")
     }
 }
 "done"
@@ -584,7 +606,8 @@ if (currentSdk != null) {
                 timeout = 30,
             )
         } catch (e: Exception) {
-            println("[SDK] Warning: Project SDK setup failed: ${e.message}")
+            println("[SDK] Project SDK setup failed: ${e.message}")
+            throw e
         }
     }
 
@@ -775,24 +798,34 @@ println("[IMPORT] Smart mode reached — import + indexing complete")
      * For Gradle: `./gradlew testClasses`
      * For NONE: skip
      *
-     * Runs inside the container with the correct JAVA_HOME.
+     * Runs inside the container with the configured JAVA_HOME when [javaHomeVersion] is set.
      * This is a pre-agent warmup step — ensures all sources compile and deps are downloaded.
      */
-    fun mcpCompileProject(projectPath: String, buildSystem: BuildSystem) {
+    fun mcpCompileProject(projectPath: String, buildSystem: BuildSystem, javaHomeVersion: String? = "21") {
         if (buildSystem == BuildSystem.NONE) {
             println("[COMPILE] Build system is NONE — skipping compilation")
             return
         }
 
-        // Resolve JAVA_HOME from the temurin-21 JDK dir
-        val javaHome = try {
+        val javaHome = javaHomeVersion?.let { jdkVersion ->
             driver.startProcessInContainer {
-                this.args("ls", "-d", "/usr/lib/jvm/temurin-21-*")
+                this.args(
+                    "bash",
+                    "-c",
+                    """
+                    for dir in /usr/lib/jvm/temurin-$jdkVersion-* /usr/lib/jvm/java-$jdkVersion-* /usr/lib/jvm/corretto-$jdkVersion-*; do
+                      if [ -x "${'$'}dir/bin/javac" ]; then
+                        printf '%s\n' "${'$'}dir"
+                        exit 0
+                      fi
+                    done
+                    printf 'JDK $jdkVersion not found under /usr/lib/jvm\n' >&2
+                    exit 1
+                    """.trimIndent(),
+                )
                     .timeoutSeconds(5)
-                    .description("Find JDK 21 path")
-            }.awaitForProcessFinish().stdout.trim().lines().first()
-        } catch (_: Exception) {
-            "/usr/lib/jvm/java-21-default"
+                    .description("Find JDK $jdkVersion path")
+            }.awaitForProcessFinish().resolveJavaHomeLookup(jdkVersion)
         }
         println("[COMPILE] JAVA_HOME=$javaHome, buildSystem=$buildSystem")
 
@@ -805,7 +838,7 @@ println("[IMPORT] Smart mode reached — import + indexing complete")
 
         val compileResult = driver.startProcessInContainer {
             this
-                .args("bash", "-c", "export JAVA_HOME=$javaHome && $command")
+                .args("bash", "-c", "${if (javaHome == null) "" else "export JAVA_HOME=$javaHome && "}$command")
                 .workingDirInContainer(projectPath)
                 .timeoutSeconds(600)
                 .description("Compile project ($buildSystem)")

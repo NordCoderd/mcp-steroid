@@ -175,7 +175,7 @@ class IntelliJContainer(
         // Step 8: Compile project (optional)
         if (compileProject) {
             console.writeStep(8, "Compiling project ($buildSystem)...")
-            mcpSteroid.mcpCompileProject(guestProjectDir, buildSystem)
+            mcpSteroid.mcpCompileProject(guestProjectDir, buildSystem, projectJdkVersion)
             console.writeSuccess("Compilation complete")
         }
 
