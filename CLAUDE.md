@@ -1001,6 +1001,18 @@ the Karpathy-style optimization loop prompts.
   followed by Bash Gradle at line 747. Metrics: 19 total calls, 4 MCP calls, 2 Bash calls, 1 native Read error,
   1,255,211 tokens. Stop iterating on fetch-only wording for this scenario; next review should choose inline minimal
   Gradle sync guidance at the boundary versus removing/replacing the failed hint.
+- Gradle abort root-cause fix (2026-04-27): review under
+  `/tmp/mcp-steroid-review/gradle-jdk24-finaltasks-20260427/runs/` approved by Claude/Codex/Gemini. Gradle import
+  setup now sets the linked Gradle JVM from the configured project SDK and waits for
+  `ProjectDataImportListener.onFinalTasksFinished` before smart mode; this follows IntelliJ's own Gradle wait pattern.
+  DPAIA Microshop Gradle cases now use JDK 24 because Gradle 8.14.3 rejects Java 25 as the daemon JVM, and the Docker
+  IDE base installs Temurin 24. Validation: `GradleCompileTest` passed with `GRADLE_JVM=25`, `BUILD_ERRORS=false`,
+  `BUILD_ABORTED=false`; Microshop-2 MCP run `run-20260427-161050-dpaia__spring__boot__microshop-2-mcp` passed with
+  `Recommended JAVA_HOME: /usr/lib/jvm/temurin-24-jdk-arm64` and `Build errors: false, aborted: false`.
+- Current next low-hanging item from that review: reduce native Gradle exploration now that IDE Gradle builds are
+  reliable. Update/in-line IDE-native Gradle build/sync guidance, especially replacing stale Gradle
+  `Observation.awaitConfiguration(project)` sync guidance in `execute-code-gradle.md` with the final-tasks listener
+  pattern, then remeasure `DpaiaMicroshop2Test.claude with mcp`.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

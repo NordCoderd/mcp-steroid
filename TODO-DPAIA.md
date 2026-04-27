@@ -27,4 +27,6 @@
 - [x] Run 3-agent review of the failed fetch-resource boundary measurement and select the next low-hanging correction.
 - [x] Make aborted-build guidance name Claude's exact `mcp__mcp-steroid__steroid_fetch_resource` tool and render on its own line.
 - [x] Rerun `DpaiaMicroshop2Test.claude with mcp` after the explicit boundary hint; target `fetch_resource_calls >= 1`.
-- [ ] Run 3-agent review of the explicit-hint failure and choose inline Gradle sync guidance versus removing/replacing the failed fetch-only hint.
+- [x] Run 3-agent review of the explicit-hint failure and choose inline Gradle sync guidance versus removing/replacing the failed fetch-only hint.
+- [ ] Update Gradle arena/resource guidance so agents use the now-working IDE-native Gradle build/sync path instead of native Read/Glob/Bash exploration.
+- [ ] Rerun `DpaiaMicroshop2Test.claude with mcp` after the Gradle guidance update; target fewer native Read/Glob/Bash calls, no build abort, and no tool errors.

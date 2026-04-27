@@ -258,8 +258,18 @@
 - Prompt resources `execute-code-tool-description.md` and `execute-code-overview.md` now say `errors=false, aborted=true` should run the matching sync pattern before Bash fallback, using full Maven/Gradle resource URIs.
 - Regression coverage: `ArenaPromptContractTest` asserts Gradle prompts contain the Gradle URI and Maven prompts do not. Changed prompt resources are covered by generated KtBlocks compilation tests plus `MarkdownArticleContractTest`.
 - Validation: `ArenaPromptContractTest` passed through IntelliJ Gradle; `:prompts:generatePrompts :prompts:test --tests '*ExecuteCodeToolDescriptionKtBlocksCompilationTest*' --tests '*ExecuteCodeOverviewKtBlocksCompilationTest*' --tests 'com.jonnyzzz.mcpSteroid.prompts.MarkdownArticleContractTest' --warning-mode all` passed through IntelliJ Gradle.
-- Validation caution: one combined multi-module Gradle run accidentally launched `DpaiaArenaTest.codex without mcp`; a thread dump was captured at `/tmp/gradle-resource-routing-worker-dump-20260427.txt`, the wrong run was stopped, and scoped module reruns were used for the valid result.
-- Next measurement: rerun `DpaiaMicroshop2Test.claude with mcp`; the first success criterion is `fetch_resource_calls >= 1` for `mcp-steroid://skill/execute-code-gradle`, not a single-run runtime win because recent Microshop-2 token/runtime variance is large.
+
+## 2026-04-27 - Gradle Final-Tasks Wait and Microshop JDK 24
+
+- The explicit fetch-resource boundary hint was not the real Microshop-2 build-abort root cause. Two focused runs showed the IDE Gradle build aborted because DPAIA Microshop cases were configured for Java 25 while Gradle 8.14.3 reports `The maximum compatible Gradle JVM version is 24`.
+- `mcpTriggerImportAndWait()` now sets the linked Gradle JVM to the configured project SDK before refresh and waits for `ProjectDataImportListener.onFinalTasksFinished` plus `waitForSmartMode()` for Gradle imports. This follows IntelliJ source patterns in `ImportGradleProjectCommand.java` and `GradleOperationUtil.kt`; `ProjectDataManagerImpl.java` emits `onImportFinished` before final tasks and `onFinalTasksFinished` after them.
+- Docker IDE base now installs Temurin 24, and DPAIA Microshop Gradle cases use `projectJdkVersion = "24"` so Gradle 8.14.3 can run under a compatible daemon JVM.
+- Validation:
+  - `./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.arena.DpaiaConfigTest' --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ArenaPromptContractTest' --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ExtractDecodedLogMetricsTest' --rerun-tasks --warning-mode all` passed.
+  - `./gradlew :test-integration:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.GradleCompileTest' --rerun-tasks --warning-mode all` passed in run `test-integration/build/test-logs/test/run-20260427-162138-gradle-compile` with `GRADLE_JVM=25`, `BUILD_ERRORS=false`, and `BUILD_ABORTED=false`.
+  - `DpaiaMicroshop2Test.claude with mcp` run `test-experiments/build/test-logs/test/run-20260427-161050-dpaia__spring__boot__microshop-2-mcp` passed with `Recommended JAVA_HOME: /usr/lib/jvm/temurin-24-jdk-arm64`, IDE Gradle using Temurin 24, and `Build errors: false, aborted: false`.
+- Metrics after the JDK24/final-tasks fix: 1,773,570 tokens, 36 calls, 3 MCP calls, 33 native calls, 5 Bash calls, 0 tool errors. Correctness is fixed, but native exploration is now the next bottleneck.
+- Review artifacts: `/tmp/mcp-steroid-review/gradle-jdk24-finaltasks-20260427/runs/`. Claude, Codex, and Gemini approved the patch with no blockers. Next low-hanging direction from the review: update Gradle arena/resource guidance so agents use the working IDE-native Gradle path, and update `execute-code-gradle.md` away from stale `Observation.awaitConfiguration(project)` Gradle sync guidance toward `ProjectDataImportListener.onFinalTasksFinished`.
 
 ## 2026-04-27 - Gradle Resource Routing Measurement
 
