@@ -911,12 +911,15 @@ the Karpathy-style optimization loop prompts.
 - Direction changes require 3 `run-agent.sh` reviews and consensus before selecting the next low-hanging fruit.
 - Current consensus (2026-04-26): prune contradictory DPAIA MCP prompt guidance in
   `ArenaTestRunner.buildPrompt()` first; keep Gradle-specific prompt resources as a larger follow-up.
-- Latest measured run (2026-04-26 UTC, run dir `run-20260427-003310-dpaia__spring__petclinic__rest-37-mcp`):
-  `DpaiaPetclinicRest37Test.claude with mcp` fixed the task in 101s and passed 184/184 tests.
-  The current arena prompt produced 1 `steroid_apply_patch`, 0 native Edit calls, 2 Bash calls, and
-  0 tool errors. `ArenaPromptContractTest` now guards the prompt against broad "run at most once"
-  wording and keeps the `steroid_apply_patch` schema on `file_path`. Next candidate: Gradle-focused
-  MCP prompt/resource work, selected by measurement rather than broad refactoring.
+- Follow-up 3-agent review (2026-04-27, `/tmp/mcp-steroid-review/runs-next-20260427/`) selected
+  global apply-patch prompt-resource routing before Gradle-resource work. The issue: the arena prompt
+  used dedicated `steroid_apply_patch`, but `execute-code-tool-description.md` still taught the slower
+  `steroid_execute_code` + script-context `applyPatch` DSL as the default.
+- Latest measured run (2026-04-27 UTC, run dir `run-20260427-073953-dpaia__spring__petclinic__rest-37-mcp`):
+  `DpaiaPetclinicRest37Test.claude with mcp` fixed the task in 116s and passed 184/184 tests.
+  The global prompt-resource routing produced 1 `steroid_apply_patch`, 0 native Edit calls, 2 Bash calls,
+  10 total tool calls, and 0 tool errors. Next step: pick and measure one Gradle DPAIA scenario before
+  changing Gradle guidance.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

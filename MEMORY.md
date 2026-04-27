@@ -100,3 +100,28 @@
   - Full-suite success remains required before `ARENA_FIX_APPLIED: yes`.
 - Validation: `./gradlew :test-experiments:test --tests '*ArenaPromptContractTest*' --warning-mode all` passed.
 - Next candidate: Gradle-focused MCP prompt/resource work, but measure one Gradle scenario first or add a similarly narrow prompt contract before broad resource changes.
+
+## 2026-04-27 - Next-Step Review: Apply-Patch Routing First
+
+- Review artifacts: `/tmp/mcp-steroid-review/runs-next-20260427/`.
+- Claude, Codex, and Gemini all selected `update-apply-patch-tool-description-routing` as the next low-hanging fruit.
+- Rationale: `ArenaTestRunner.buildPrompt()` already routes multi-site edits to the dedicated `steroid_apply_patch` tool, but the global `execute-code-tool-description.md` still taught the slower `steroid_execute_code` + script-context `applyPatch` DSL as the default. This contradiction affects every MCP session before a Gradle-specific resource is read.
+- Implemented resource changes:
+  - `prompts/src/main/prompts/skill/execute-code-tool-description.md` now recommends `steroid_apply_patch` for 2+ literal edit sites and keeps the script-context DSL as a fallback only when the patch must run inside the same `steroid_execute_code` script.
+  - `prompts/src/main/prompts/skill/execute-code-overview.md` and `prompts/src/main/prompts/skill/coding-with-intellij.md` now point multi-site literal edits at `steroid_apply_patch`.
+  - `prompts/src/main/prompts/ide/apply-patch.md` now frames the DSL as the lower-level fallback and links the dedicated tool description.
+  - `PromptRoutingContractTest` guards the global execute-code tool description against routing ordinary multi-site edits back through `steroid_execute_code`.
+- Validation: scoped `:prompts:test` selection passed via IntelliJ Gradle runner:
+  `*PromptRoutingContractTest*`, `*MarkdownArticleContractTest*`, and `*ExecuteCodeToolDescriptionKtBlocksCompilationTest*` with `--warning-mode all`.
+- Next measurement target: repeat `DpaiaPetclinicRest37Test.claude with mcp`; target 184/184 tests, 0 native Edit, `steroid_apply_patch` used, 0 tool errors, and no regression versus the 101s run.
+
+## 2026-04-27 - Apply-Patch Routing Measurement
+
+- Scenario: `DpaiaPetclinicRest37Test.claude with mcp`.
+- Run dir: `test-experiments/build/test-logs/test/run-20260427-073953-dpaia__spring__petclinic__rest-37-mcp`.
+- Command: `ANTHROPIC_API_KEY=$(cat ~/.anthropic) GEMINI_API_KEY=$(cat ~/.vertex) OPENAI_API_KEY=$(cat ~/.openai) ./gradlew :test-experiments:test --tests '*DpaiaPetclinicRest37Test.claude with mcp' --rerun-tasks --warning-mode all`.
+- Result: agent fixed the task in 116s, used MCP, and passed 184/184 Maven tests.
+- Arena summary JSON: `agent_duration_ms=116000`, `exec_code_calls=2`, `read_calls=2`, `edit_calls=0`, `write_calls=0`, `bash_calls=2`, `glob_calls=0`, `grep_calls=1`.
+- Raw NDJSON metrics: 10 total calls, 3 MCP Steroid calls, 7 native calls, 1 `mcp__mcp-steroid__steroid_apply_patch`, 2 `mcp__mcp-steroid__steroid_execute_code`, 2 Bash, 0 tool errors.
+- Delta from the prior 101s run: native Edit stayed 0, `steroid_apply_patch` stayed true, Bash stayed 2, total tool calls improved 11 -> 10, and runtime moved 101s -> 116s. This is acceptable PetclinicRest37 variance and does not show a prompt-routing regression.
+- Next low-hanging fruit: pick and measure one Gradle DPAIA scenario before changing Gradle guidance, then add or tighten a Gradle-focused MCP prompt resource based on observed failures.

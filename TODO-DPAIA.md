@@ -7,4 +7,6 @@
 - [x] Tighten DPAIA verification guidance to reduce duplicate Maven/Bash runs while preserving 184/184 pass behavior.
 - [x] Measure the DPAIA verification-guidance tweak on `DpaiaPetclinicRest37Test.claude with mcp`; target Bash <=2, Edit 0, apply_patch true, 184/184 tests.
 - [x] Add a prompt regression test for the DPAIA arena MCP block after the verification-guidance measurement.
-- [ ] Pick the next Gradle DPAIA scenario or prompt resource target before changing Gradle guidance.
+- [x] Run 3-agent review for the next low-hanging fruit after arena prompt regression; consensus is to fix global apply-patch prompt-resource routing before Gradle-resource work.
+- [x] Measure the dedicated apply-patch routing resource change on `DpaiaPetclinicRest37Test.claude with mcp`.
+- [ ] Pick the next Gradle DPAIA scenario and measure it before changing Gradle guidance.
