@@ -178,6 +178,8 @@ class ExecuteCodeToolHandler : McpRegistrar {
 }
 
 internal object ExecuteCodeBuildAbortGuidance {
+    private const val CLAUDE_FETCH_RESOURCE_TOOL = "mcp__mcp-steroid__steroid_fetch_resource"
+
     private val abortedWithoutErrorsPattern = Regex(
         pattern = """(?im)\b(?:Build|Compile)\s+errors:\s*false,\s*aborted:\s*true\b"""
     )
@@ -187,16 +189,16 @@ internal object ExecuteCodeBuildAbortGuidance {
             .filterIsInstance<ContentItem.Text>()
             .joinToString("\n") { it.text }
         val guidance = guidanceFor(outputText, projectBasePath) ?: return result
-        return result.copy(content = result.content + ContentItem.Text(guidance))
+        return result.copy(content = result.content + ContentItem.Text("\n$guidance"))
     }
 
     fun guidanceFor(outputText: String, projectBasePath: Path?): String? {
         if (!abortedWithoutErrorsPattern.containsMatchIn(outputText)) return null
 
         val resourceTarget = resourceTargetText(projectBasePath)
-        return "HINT: IDE build was aborted without compiler errors. " +
-            "Call steroid_fetch_resource for $resourceTarget before falling back to Bash, " +
-            "run its sync/configuration pattern, then retry the IDE build/test. " +
+        return "REQUIRED ACTION: IDE build was aborted without compiler errors. " +
+            "NEXT TOOL CALL must be $CLAUDE_FETCH_RESOURCE_TOOL with URI $resourceTarget before using Bash. " +
+            "Then run the fetched sync/configuration pattern and retry the IDE build/test. " +
             "Use Bash only if sync fails or times out."
     }
 

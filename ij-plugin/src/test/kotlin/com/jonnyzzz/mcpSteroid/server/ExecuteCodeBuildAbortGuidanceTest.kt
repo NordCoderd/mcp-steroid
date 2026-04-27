@@ -16,6 +16,8 @@ import kotlin.io.path.createTempDirectory
 import kotlin.io.path.writeText
 
 class ExecuteCodeBuildAbortGuidanceTest {
+    private val claudeFetchResourceTool = "mcp__mcp-steroid__steroid_fetch_resource"
+
     private val tempDirs = mutableListOf<Path>()
 
     @After
@@ -34,10 +36,12 @@ class ExecuteCodeBuildAbortGuidanceTest {
         )
 
         assertNotNull(guidance)
-        assertTrue("should name the fetch tool: $guidance", guidance!!.contains("steroid_fetch_resource"))
+        assertTrue("should make the recovery mandatory: $guidance", guidance!!.contains("REQUIRED ACTION"))
+        assertTrue("should name Claude's fetch tool: $guidance", guidance.contains(claudeFetchResourceTool))
+        assertTrue("should identify that tool as the next call: $guidance", guidance.contains("NEXT TOOL CALL"))
         assertTrue("should include Gradle resource URI: $guidance", guidance.contains(ExecuteCodeGradlePromptArticle().uri))
         assertFalse("should not include Maven URI for a Gradle project: $guidance", guidance.contains(ExecuteCodeMavenPromptArticle().uri))
-        assertTrue("should tell the agent not to jump straight to Bash: $guidance", guidance.contains("before falling back to Bash"))
+        assertTrue("should tell the agent not to jump straight to Bash: $guidance", guidance.contains("before using Bash"))
     }
 
     @Test
@@ -62,6 +66,19 @@ class ExecuteCodeBuildAbortGuidanceTest {
 
         val guidance = ExecuteCodeBuildAbortGuidance.guidanceFor(
             outputText = "Build errors: false, aborted: false",
+            projectBasePath = root,
+        )
+
+        assertNull(guidance)
+    }
+
+    @Test
+    fun `compiler-error build result does not add guidance`() {
+        val root = tempProjectRoot()
+        root.resolve("settings.gradle").writeText("""rootProject.name = "sample"""")
+
+        val guidance = ExecuteCodeBuildAbortGuidance.guidanceFor(
+            outputText = "Build errors: true, aborted: true",
             projectBasePath = root,
         )
 
@@ -126,6 +143,23 @@ class ExecuteCodeBuildAbortGuidanceTest {
         assertFalse("result should stay non-error", updated.isError)
         assertTrue("original text should remain: $text", text.contains("execution_id: test"))
         assertTrue("guidance should be appended: $text", text.contains(ExecuteCodeGradlePromptArticle().uri))
+    }
+
+    @Test
+    fun `appended guidance starts on its own line`() {
+        val root = tempProjectRoot()
+        root.resolve("build.gradle.kts").writeText("plugins { java }")
+        val original = ToolCallResult(
+            content = listOf(ContentItem.Text("Build errors: false, aborted: true")),
+            isError = false,
+        )
+
+        val updated = ExecuteCodeBuildAbortGuidance.appendTo(original, root)
+        val text = updated.content.filterIsInstance<ContentItem.Text>().joinToString("") { it.text }
+
+        assertFalse("guidance should not be glued to the aborted flag: $text", text.contains("trueREQUIRED ACTION"))
+        assertTrue("guidance should start on a separate line: $text", text.contains("true\nREQUIRED ACTION"))
+        assertTrue("guidance should name Claude's fetch tool: $text", text.contains(claudeFetchResourceTool))
     }
 
     private fun tempProjectRoot(): Path {
