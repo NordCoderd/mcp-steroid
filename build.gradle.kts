@@ -88,25 +88,14 @@ if (providedBuildVersion != null) {
 // of the CI counter so the shape stays <VERSION>.<counter>-...-<hash>, sorts after any
 // realistic CI run, and is obviously not an official build.
 //
-// The timestamp is injected ONLY when deployPlugin is explicitly requested. This resolves
-// the tension between two conflicting requirements:
-//   * TDD speed: stable version → generateMetadata UP-TO-DATE → compileKotlin skipped
-//   * Hot-reload: the IDE's Plugin Hot Reload checks the version string in plugin.xml;
-//     same version on two consecutive deploys → no reload. A per-second timestamp ensures
-//     every deploy is recognized as newer.
-// Checking startParameter.taskNames is safe at configuration time: the deploy tasks live
-// in :ij-plugin, which reads the version from rootProject.version after this block runs.
-val isDeployBuild = gradle.startParameter.taskNames.any {
-    it.contains("deployPlugin", ignoreCase = true)
-}
+// The version is stable across runs so generateMetadata stays UP-TO-DATE
+// compileKotlin is only re-run when sources actually change.
+// The git hash is the only freshness signal.
 val localBuildCounter = "19999-SNAPSHOT"
-val snapshotTimestamp = if (isDeployBuild) {
-    "-" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss"))
-} else ""
 version = when {
     isReleaseBuild -> "$baseVersion-$gitHash"
     providedBuildVersion != null -> providedBuildVersion
-    else -> "$baseVersion.$localBuildCounter$snapshotTimestamp-$gitHash"
+    else -> "$baseVersion.$localBuildCounter-$gitHash"
 }
 val releaseNotesVersion = providers.gradleProperty("mcp.release.notes.version").orElse(baseVersion).get()
 val releaseNotesFile = layout.projectDirectory.file("release/notes/$releaseNotesVersion.md")
