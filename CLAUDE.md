@@ -927,7 +927,8 @@ the Karpathy-style optimization loop prompts.
 - IntelliJ monorepo lookup note (2026-04-27): for MCP scripts that need indexed reads after initial import,
   prefer `Observation.awaitConfiguration(project)` followed by one `smartReadAction(project)` around the whole query.
   `waitForSmartMode()` is not a stable handoff; IntelliJ source explicitly says another dumb mode can begin before
-  the next statement. The green regression test is `IntelliJThisLoggerLookupTest`.
+  the next statement. The green regression test is `IntelliJThisLoggerLookupTest`. MCP server/resource guidance now
+  routes `IndexNotReadyException` and indexed PSI reads to that pattern.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

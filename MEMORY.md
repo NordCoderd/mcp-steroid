@@ -161,3 +161,11 @@
 - Validation: `MCP_STEROID_INTELLIJ_CHECKOUT_DIR=/Users/jonnyzzz/Work/intellij ./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.IntelliJThisLoggerLookupTest' --rerun-tasks --warning-mode all` passed in 8m41s.
 - Successful markers: `CONFIGURATION_COMPLETE=false`, `LOGGER_FILE=/home/agent/project-home/community/platform/util/src/com/intellij/openapi/diagnostic/logger.kt`, `THISLOGGER_REFERENCE_COUNT=4191`, `THISLOGGER_FILE_COUNT=1526`.
 - Follow-ups: the green run still logged severe Kotlin FIR resolve errors and an `ExceptionCaptureService` NPE while capturing them; also, IntelliJ checkout setup reused a cached TeamCity ZIP even when `MCP_STEROID_INTELLIJ_CHECKOUT_DIR` was set.
+
+## 2026-04-27 - Indexing Guidance Resource Fix
+
+- Fixed MCP server/resource guidance that treated `waitForSmartMode()` as a stable handoff for indexed reads.
+- `ExecutionSuggestionService` now gives `IndexNotReadyException` / dumb-mode failures the actionable hint: after project open/import/sync/configuration, call `Observation.awaitConfiguration(project)`, then keep the whole indexed PSI query inside `smartReadAction { }`.
+- Updated `McpScriptContext` KDoc plus prompt resources `prompt/skill.md`, `coding-with-intellij-intro.md`, `coding-with-intellij-patterns.md`, `coding-with-intellij-psi.md`, and `coding-with-intellij-threading.md`.
+- Added `IndexingGuidanceContractTest` so prompt resources do not reintroduce "smart mode is confirmed for the duration" or "safe to use indices immediately" wording.
+- Validation: `SkillReferenceHintTest` passed; scoped prompt contract and changed Kt-block tests passed after forced `:prompts:generatePrompts --rerun-tasks`.

@@ -123,12 +123,15 @@ interface McpScriptContext {
     /**
      * Wait for indexing to complete (smart mode).
      * The exec_code call invokes waitForSmartMode() automatically before your script runs.
-     * Call this only if you need to wait again after triggering indexing.
+     * This is only a point-in-time wait: another dumb-mode pass may begin before
+     * the next statement. Prefer smartReadAction { } for index-dependent reads.
+     * After project import/sync/configuration, use Observation.awaitConfiguration(project)
+     * before the indexed read.
      *
      * ```kotlin
      * // If you trigger indexing mid-script:
      * waitForSmartMode()
-     * // Now safe to use indices and PSI
+     * // Then keep indexed PSI work inside smartReadAction { ... }
      * ```
      */
     suspend fun waitForSmartMode()
@@ -300,7 +303,8 @@ interface McpScriptContext {
 
     /**
      * Execute a read action that automatically waits for smart mode.
-     * Combines waitForSmartMode() + readAction {} in one call.
+     * Runs the action under IntelliJ's smart-mode read constraint, so the
+     * indexed read is performed while the project is smart.
      *
      * ```kotlin
      * val classes = smartReadAction {
