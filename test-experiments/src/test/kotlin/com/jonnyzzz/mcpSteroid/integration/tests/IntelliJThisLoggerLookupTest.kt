@@ -15,7 +15,9 @@ import java.util.concurrent.TimeUnit
  * Monorepo-scale symbol lookup smoke test for MCP Steroid on the IntelliJ Ultimate checkout.
  *
  * This intentionally mirrors the DPAIA container flow: deploy a real multi-module project,
- * wait for IDEA indexing, then perform the semantic query through `steroid_execute_code`.
+ * wait for IDEA indexing, then perform an indexed lookup through `steroid_execute_code`.
+ * The lookup is syntactic call-site search by design; full Kotlin reference resolution is
+ * intentionally avoided because it triggers severe FIR resolver logs on this monorepo.
  * The smaller [ThisLoggerComparisonTest] checks agent behavior on a toy project; this test
  * verifies that the IDE-side lookup works against the real IntelliJ monorepo.
  */
@@ -37,6 +39,7 @@ class IntelliJThisLoggerLookupTest {
             performPostSetup = false,
         )
 
+        val logLineCountBeforeLookup = session.intellijDriver.readLogs().size
         val result = session.mcpSteroid.mcpExecuteCode(
             taskId = "intellij-thislogger-lookup",
             reason = "Find thisLogger references in the IntelliJ monorepo",
@@ -46,11 +49,14 @@ class IntelliJThisLoggerLookupTest {
                 import com.intellij.openapi.fileEditor.FileDocumentManager
                 import com.intellij.platform.backend.observation.Observation
                 import com.intellij.psi.PsiManager
+                import com.intellij.psi.impl.cache.CacheManager
                 import com.intellij.psi.search.FilenameIndex
                 import com.intellij.psi.search.GlobalSearchScope
-                import com.intellij.psi.search.searches.ReferencesSearch
+                import com.intellij.psi.search.UsageSearchContext
                 import com.intellij.psi.util.PsiTreeUtil
                 import kotlinx.coroutines.withTimeout
+                import org.jetbrains.kotlin.psi.KtCallExpression
+                import org.jetbrains.kotlin.psi.KtFile
                 import org.jetbrains.kotlin.psi.KtNamedFunction
 
                 println("WAITING_FOR_CONFIGURATION")
@@ -73,21 +79,27 @@ class IntelliJThisLoggerLookupTest {
                         .firstOrNull { it.name == "thisLogger" && it.valueParameters.isEmpty() }
                         ?: error("Could not find zero-argument thisLogger function in ${'$'}{loggerFile.path}")
 
-                    val foundHits = ReferencesSearch.search(target, scope)
-                        .findAll()
-                        .mapNotNull { reference ->
-                            val element = reference.element
-                            val virtualFile = element.containingFile?.virtualFile ?: return@mapNotNull null
+                    val candidateFiles = CacheManager.getInstance(project)
+                        .getVirtualFilesWithWord(target.name!!, UsageSearchContext.IN_CODE, scope, true)
+
+                    val foundHits = buildList {
+                        for (virtualFile in candidateFiles) {
+                            val ktFile = PsiManager.getInstance(project).findFile(virtualFile) as? KtFile ?: continue
                             val document = FileDocumentManager.getInstance().getDocument(virtualFile)
-                            val line = document?.getLineNumber(element.textOffset)?.plus(1) ?: -1
-                            "${'$'}{virtualFile.path}:${'$'}line"
+                            for (call in PsiTreeUtil.findChildrenOfType(ktFile, KtCallExpression::class.java)) {
+                                if (call.calleeExpression?.text == target.name) {
+                                    val line = document?.getLineNumber(call.textOffset)?.plus(1) ?: -1
+                                    add("${'$'}{virtualFile.path}:${'$'}line")
+                                }
+                            }
                         }
-                        .filterNot { it.contains("/com/intellij/openapi/diagnostic/logger.kt:") }
+                    }.filterNot { it.contains("/com/intellij/openapi/diagnostic/logger.kt:") }
                         .distinct()
                         .sorted()
                     loggerFile.path to foundHits
                 }
                 val files = hits.map { it.substringBeforeLast(":") }.distinct()
+                println("THISLOGGER_LOOKUP_STRATEGY=INDEXED_WORD_PLUS_KOTLIN_PSI")
                 println("LOGGER_FILE=${'$'}loggerPath")
                 println("THISLOGGER_REFERENCE_COUNT=${'$'}{hits.size}")
                 println("THISLOGGER_FILE_COUNT=${'$'}{files.size}")
@@ -102,9 +114,15 @@ class IntelliJThisLoggerLookupTest {
 
         val referenceCount = markerInt(result.stdout, "THISLOGGER_REFERENCE_COUNT")
         val fileCount = markerInt(result.stdout, "THISLOGGER_FILE_COUNT")
+        val lookupLogs = session.intellijDriver.readLogs().drop(logLineCountBeforeLookup)
 
+        assertTrue(
+            result.stdout.lineSequence().any { it == "THISLOGGER_LOOKUP_STRATEGY=INDEXED_WORD_PLUS_KOTLIN_PSI" },
+            "Expected thisLogger lookup to use indexed word plus Kotlin PSI strategy:\n${result.stdout}",
+        )
         assertTrue(referenceCount >= 500, "Expected at least 500 thisLogger references, got $referenceCount")
         assertTrue(fileCount >= 300, "Expected at least 300 files with thisLogger references, got $fileCount")
+        assertNoKotlinFirSevereLogs(lookupLogs)
     }
 
     private fun markerInt(output: String, marker: String): Int =
@@ -114,4 +132,18 @@ class IntelliJThisLoggerLookupTest {
             ?.trim()
             ?.toIntOrNull()
             ?: error("Missing integer marker $marker in output:\n$output")
+
+    private fun assertNoKotlinFirSevereLogs(logLines: List<String>) {
+        // Exact failure signature from IU-261.23567.138 when ReferencesSearch forced Kotlin FIR reference resolution.
+        val firFailures = logLines.filter { line ->
+            line.contains("KaFirReferenceResolver") ||
+                    line.contains("Expected FirResolvedContractDescription") ||
+                    line.contains("FirLazyContractDescriptionImpl")
+        }
+
+        assertTrue(
+            firFailures.isEmpty(),
+            "thisLogger lookup should not emit Kotlin FIR severe logs:\n${firFailures.take(20).joinToString("\n")}",
+        )
+    }
 }
