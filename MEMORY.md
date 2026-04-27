@@ -292,3 +292,15 @@
 - Raw metrics: 15 total calls, 4 MCP calls, 11 native calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, 3 Read, 3 Write, 1 Glob, 3 Bash, 0 tool errors, 985,678 total tokens, 0 resource fetches.
 - Delta versus the 142.0s prompt-routing run: time 142.0s -> 169.6s, total calls 10 -> 15, Bash 2 -> 3, tokens 764,238 -> 985,678, errors stayed 0. Delta versus the 136s JDK-fixed baseline: Bash 2 -> 3 and runtime/tokens worse.
 - Lesson: putting the resource URI in the tool result made the guidance visible but still did not cause Claude to call `steroid_fetch_resource`. The next change needs stronger actionability at the boundary, likely either naming the exact Claude MCP tool call or embedding the minimal Gradle sync recipe inline instead of requiring a fetch.
+
+## 2026-04-27 - Explicit Aborted Build Boundary Hint Measurement
+
+- Review artifacts: `/tmp/mcp-steroid-review/build-abort-boundary-measurement-20260427/runs/`.
+- Claude, Codex, and Gemini all selected the same low-cost next step: make the boundary hint forceful and Claude-specific by naming `mcp__mcp-steroid__steroid_fetch_resource`, while still sourcing Maven/Gradle resource URIs from generated prompt article classes.
+- Implemented in `c29e13b4` (`ij-plugin: make build abort guidance explicit`): `ExecuteCodeBuildAbortGuidance` now emits `REQUIRED ACTION` / `NEXT TOOL CALL` wording and prepends a newline before appended guidance so decoded logs no longer join `aborted: true` to the instruction.
+- Focused validation passed through the IntelliJ Gradle runner: `:ij-plugin:test --tests 'com.jonnyzzz.mcpSteroid.server.ExecuteCodeBuildAbortGuidanceTest' --tests 'com.jonnyzzz.mcpSteroid.NoHardcodedMcpSteroidUriUsageTest' --rerun-tasks --warning-mode all`.
+- Measurement run dir: `test-experiments/build/test-logs/test/run-20260427-151926-dpaia__spring__boot__microshop-2-mcp`.
+- Result: host test passed, agent emitted `ARENA_FIX_APPLIED: yes`, and the full Gradle suite passed. Agent time was 174.0s.
+- Decoded evidence: line 743 showed `Build errors: false, aborted: true`; line 744 showed the separate-line `REQUIRED ACTION ... NEXT TOOL CALL must be mcp__mcp-steroid__steroid_fetch_resource ...`; line 747 immediately used Bash Gradle anyway.
+- Raw metrics: 19 total calls, 4 MCP calls, 15 native calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, 5 Read, 2 Glob, 4 Write, 2 Bash, 1 native Read error, 1,255,211 total tokens, 0 resource fetches.
+- Lesson: fetch-only boundary wording has failed even with the exact Claude tool name. Stop iterating on wording for this scenario; the next reviewed low-hanging correction should choose between inline minimal Gradle sync guidance at the boundary and removing/replacing the failed hint.

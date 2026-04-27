@@ -989,6 +989,18 @@ the Karpathy-style optimization loop prompts.
   Metrics: 15 total calls, 4 MCP calls, 0 tool errors, 985,678 tokens. Treat the fetch-only boundary hint as a failed
   hypothesis; next low-hanging correction needs stronger actionability, such as an exact next tool call name or an
   inline minimal Gradle sync recipe.
+- Explicit aborted-build boundary hint (2026-04-27): review under
+  `/tmp/mcp-steroid-review/build-abort-boundary-measurement-20260427/runs/` reached 3/3 consensus to try exact
+  Claude tool-name wording first. Commit `c29e13b4` changed the hint to `REQUIRED ACTION` / `NEXT TOOL CALL must be
+  mcp__mcp-steroid__steroid_fetch_resource` and prepended a newline before appended guidance so decoded logs do not
+  show `trueHINT`. Focused `:ij-plugin:test` for `ExecuteCodeBuildAbortGuidanceTest` plus
+  `NoHardcodedMcpSteroidUriUsageTest` passed through the IntelliJ Gradle runner.
+- Explicit hint measurement (2026-04-27): run
+  `run-20260427-151926-dpaia__spring__boot__microshop-2-mcp` passed the full Gradle suite in 174.0s agent time, but
+  still made 0 `steroid_fetch_resource` calls. The decoded log shows the separate-line `REQUIRED ACTION` at line 744,
+  followed by Bash Gradle at line 747. Metrics: 19 total calls, 4 MCP calls, 2 Bash calls, 1 native Read error,
+  1,255,211 tokens. Stop iterating on fetch-only wording for this scenario; next review should choose inline minimal
+  Gradle sync guidance at the boundary versus removing/replacing the failed hint.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

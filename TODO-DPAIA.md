@@ -24,4 +24,7 @@
 - [x] Rerun `DpaiaMicroshop2Test.claude with mcp` after Gradle resource routing; target full-suite pass and `fetch_resource_calls >= 1` for `mcp-steroid://skill/execute-code-gradle`.
 - [x] Add result-boundary guidance for `steroid_execute_code` build results with `errors=false, aborted=true`, because prompt-only routing still produced 0 `steroid_fetch_resource` calls.
 - [x] Rerun `DpaiaMicroshop2Test.claude with mcp` after result-boundary guidance; target full-suite pass and `fetch_resource_calls >= 1`.
-- [ ] Run 3-agent review of the failed fetch-resource boundary measurement and select the next low-hanging correction.
+- [x] Run 3-agent review of the failed fetch-resource boundary measurement and select the next low-hanging correction.
+- [x] Make aborted-build guidance name Claude's exact `mcp__mcp-steroid__steroid_fetch_resource` tool and render on its own line.
+- [x] Rerun `DpaiaMicroshop2Test.claude with mcp` after the explicit boundary hint; target `fetch_resource_calls >= 1`.
+- [ ] Run 3-agent review of the explicit-hint failure and choose inline Gradle sync guidance versus removing/replacing the failed fetch-only hint.
