@@ -14,15 +14,15 @@ class DpaiaConfigTest {
     }
 
     @Test
-    fun `microshop cases use JDK 25`() {
+    fun `microshop cases use JDK 24`() {
         val microshop18 = DpaiaCuratedCases.CASE_CONFIGS["dpaia__spring__boot__microshop-18"]
-        assertEquals("25", microshop18?.projectJdkVersion)
+        assertEquals("24", microshop18?.projectJdkVersion)
 
         val microshop2 = DpaiaCuratedCases.CASE_CONFIGS["dpaia__spring__boot__microshop-2"]
-        assertEquals("25", microshop2?.projectJdkVersion)
+        assertEquals("24", microshop2?.projectJdkVersion)
 
         val microshop1 = DpaiaCuratedCases.CASE_CONFIGS["dpaia__spring__boot__microshop-1"]
-        assertEquals("25", microshop1?.projectJdkVersion)
+        assertEquals("24", microshop1?.projectJdkVersion)
     }
 
     @Test

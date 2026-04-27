@@ -133,14 +133,14 @@ class ExtractDecodedLogMetricsTest {
     @Test
     fun `extracts decoded bash commands`() {
         val log = """
-            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64 ./gradlew test)
+            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-arm64 ./gradlew test)
             Some build output
             >> Bash (./mvnw test)
         """.trimIndent()
 
         assertEquals(
             listOf(
-                "JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64 ./gradlew test",
+                "JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-arm64 ./gradlew test",
                 "./mvnw test",
             ),
             extractDecodedBashCommands(log),
@@ -150,20 +150,20 @@ class ExtractDecodedLogMetricsTest {
     @Test
     fun `microshop gradle bash commands use configured jdk without wildcard`() {
         val log = """
-            Recommended JAVA_HOME: /usr/lib/jvm/temurin-25-jdk-arm64
-            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64 ./gradlew :microservices:product-service:test --rerun-tasks --no-daemon --console=plain)
+            Recommended JAVA_HOME: /usr/lib/jvm/temurin-24-jdk-arm64
+            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-arm64 ./gradlew :microservices:product-service:test --rerun-tasks --no-daemon --console=plain)
             BUILD SUCCESSFUL in 11s
-            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64 /home/agent/project-home/gradlew test --no-daemon --console=plain)
+            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-arm64 /home/agent/project-home/gradlew test --no-daemon --console=plain)
             BUILD SUCCESSFUL in 9s
         """.trimIndent()
 
         val bashCommands = extractDecodedBashCommands(log)
         assertEquals(2, bashCommands.size)
-        assertTrue(bashCommands.all { it.contains("JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64") })
-        assertFalse(bashCommands.any { it.contains("temurin-21") || it.contains("JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*") })
+        assertTrue(bashCommands.all { it.contains("JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-arm64") })
+        assertFalse(bashCommands.any { it.contains("temurin-21") || it.contains("JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-*") })
         assertEquals(
             emptyList<String>(),
-            findDecodedGradleCommandsWithUnexpectedJavaHome(log, expectedJavaHomePrefix = "/usr/lib/jvm/temurin-25-jdk-"),
+            findDecodedGradleCommandsWithUnexpectedJavaHome(log, expectedJavaHomePrefix = "/usr/lib/jvm/temurin-24-jdk-"),
         )
     }
 
@@ -171,19 +171,19 @@ class ExtractDecodedLogMetricsTest {
     fun `detects gradle bash commands with lower jdk or wildcard java home`() {
         val log = """
             >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-arm64 ./gradlew test --no-daemon --console=plain)
-            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-* ./gradlew test --no-daemon --console=plain)
+            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-* ./gradlew test --no-daemon --console=plain)
             >> Bash (/home/agent/project-home/gradlew test --no-daemon --console=plain)
-            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64 ./gradlew test --no-daemon --console=plain)
+            >> Bash (JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-arm64 ./gradlew test --no-daemon --console=plain)
         """.trimIndent()
 
         val unsafe = findDecodedGradleCommandsWithUnexpectedJavaHome(
             decodedLogText = log,
-            expectedJavaHomePrefix = "/usr/lib/jvm/temurin-25-jdk-",
+            expectedJavaHomePrefix = "/usr/lib/jvm/temurin-24-jdk-",
         )
 
         assertEquals(3, unsafe.size)
         assertTrue(unsafe[0].contains("temurin-21"))
-        assertTrue(unsafe[1].contains("temurin-25-jdk-*"))
+        assertTrue(unsafe[1].contains("temurin-24-jdk-*"))
         assertTrue(unsafe[2].contains("/home/agent/project-home/gradlew"))
     }
 }

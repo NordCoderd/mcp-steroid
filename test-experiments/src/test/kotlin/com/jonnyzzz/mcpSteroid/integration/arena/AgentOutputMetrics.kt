@@ -195,7 +195,7 @@ fun extractDecodedBashCommands(decodedLogText: String): List<String> {
  *
  * This guards DPAIA Gradle runs against two measured failure modes:
  * using a lower JDK such as `temurin-21`, and using a literal wildcard assignment
- * such as `JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*` (Bash does not expand globs in
+ * such as `JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-*` (Bash does not expand globs in
  * assignment words).
  */
 fun findDecodedGradleCommandsWithUnexpectedJavaHome(

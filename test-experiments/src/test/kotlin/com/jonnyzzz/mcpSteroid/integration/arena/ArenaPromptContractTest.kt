@@ -137,7 +137,7 @@ class ArenaPromptContractTest {
         ).buildPrompt(testCase = sampleMicroshopGradleTestCase(), projectDir = "/home/agent/project-home", withMcp = true)
 
         assertTrue(
-            prompt.contains("Configured project JDK version: **25**"),
+            prompt.contains("Configured project JDK version: **24**"),
             "Microshop Gradle prompt should expose the case-configured JDK version",
         )
         assertTrue(
@@ -165,7 +165,7 @@ class ArenaPromptContractTest {
             "Prompt should not include copyable Gradle examples without JAVA_HOME",
         )
         assertFalse(
-            prompt.contains("JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*"),
+            prompt.contains("JAVA_HOME=/usr/lib/jvm/temurin-24-jdk-*"),
             "Bash does not expand globs in assignment words; prompt must not offer a wildcard JAVA_HOME command",
         )
         assertTrue(
@@ -173,7 +173,7 @@ class ArenaPromptContractTest {
             "First MCP call should resolve the configured JDK path instead of requiring a Bash JDK search",
         )
         assertTrue(
-            prompt.contains("must start with `/usr/lib/jvm/temurin-25-jdk-`"),
+            prompt.contains("must start with `/usr/lib/jvm/temurin-24-jdk-`"),
             "Prompt should bind the printed JAVA_HOME back to the case-configured JDK version",
         )
         assertTrue(

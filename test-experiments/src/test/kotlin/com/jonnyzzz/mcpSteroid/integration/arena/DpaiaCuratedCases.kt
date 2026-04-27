@@ -79,7 +79,7 @@ object DpaiaCuratedCases {
             taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.LOW,
         ),
         "dpaia__spring__boot__microshop-1" to CaseConfig(
-            projectJdkVersion = "25",
+            projectJdkVersion = "24",
             taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.UNKNOWN,
         ),
         // Batch 2
@@ -97,11 +97,11 @@ object DpaiaCuratedCases {
         ),
         "dpaia__spring__boot__microshop-18" to CaseConfig(
             projectReadyTimeoutMs = 1_200_000L,
-            projectJdkVersion = "25",
+            projectJdkVersion = "24",
             taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.UNKNOWN,
         ),
         "dpaia__spring__boot__microshop-2" to CaseConfig(
-            projectJdkVersion = "25",
+            projectJdkVersion = "24",
             taskType = TaskType.NAVIGATE_MODIFY, mcpBenefit = McpBenefit.HIGH,
         ),
         "dpaia__spring__petclinic-27" to CaseConfig(
