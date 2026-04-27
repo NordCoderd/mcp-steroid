@@ -183,3 +183,28 @@
   - Initial pass: `/tmp/mcp-steroid-review/exception-checkout-20260427/runs/`. Codex requested changes for hidden `ProcessCanceledException` handling and the host-only `file:///Users/...` origin in local-checkout ZIPs.
   - Follow-up pass: `/tmp/mcp-steroid-review/exception-checkout-20260427/runs-followup/` plus replacement Claude run under `/tmp/mcp-steroid-review/exception-checkout-20260427/runs-followup-2/`.
 - Final review consensus: Claude, Codex, and Gemini approved the current diff. Next low-hanging fruit is Gradle/JDK prompt guidance by 2/3 reviewers; Kotlin FIR severe-log investigation remains tracked separately.
+
+## 2026-04-27 - Gradle/JDK Prompt Guidance Measurement
+
+- Fixed the Microshop-2 Java 21 dead-end by routing DPAIA prompts through the case-configured JDK version.
+- `ArenaTestRunner.buildPrompt()` now prints `Configured project JDK version`, makes the first MCP call resolve and print `Recommended JAVA_HOME`, and tells Bash Gradle commands to use the exact printed path. It explicitly forbids wildcard JAVA_HOME assignments because Bash does not expand globs in assignment words.
+- Regression coverage: `ArenaPromptContractTest.gradle prompt exposes configured jdk before first bash gradle call`.
+- Validation: `./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ArenaPromptContractTest' --rerun-tasks --warning-mode all` passed.
+- Review artifacts:
+  - Initial pass: `/tmp/mcp-steroid-review/gradle-jdk-prompt-20260427/runs/`. Codex requested changes for the bad `JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*` copyable command.
+  - Follow-up pass: `/tmp/mcp-steroid-review/gradle-jdk-prompt-20260427/runs-followup/`. Claude, Codex, and Gemini approved.
+- Measurement: `ANTHROPIC_API_KEY=$(cat ~/.anthropic) GEMINI_API_KEY=$(cat ~/.vertex) OPENAI_API_KEY=$(cat ~/.openai) ./gradlew :test-experiments:test --tests '*DpaiaMicroshop2Test.claude with mcp' --rerun-tasks --warning-mode all`.
+- Run dir: `test-experiments/build/test-logs/test/run-20260427-115129-dpaia__spring__boot__microshop-2-mcp`.
+- Result: agent fixed the task, used MCP, exited 0, and full Gradle suite passed. Agent time 136s.
+- First MCP output: `Recommended JAVA_HOME: /usr/lib/jvm/temurin-25-jdk-arm64`.
+- Decoded log check: both Bash Gradle calls used `JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64`; no `temurin-21` Gradle call and no `invalid source release: 24`.
+- Raw metrics: 15 total calls, 4 MCP calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, estimated 8 patch hunks, 0 native Edit, 3 Read, 3 Write, 2 Glob, 2 Bash, 0 tool errors, total tokens 979,647.
+- Delta versus the 171s baseline: Bash 4 -> 2, agent time 171s -> 136s, total tokens 1,052,439 -> 979,647, tool errors stayed 0, native Edit stayed 0.
+- Prompt hardening after review: all copyable Gradle test templates/examples now include `JAVA_HOME=<Recommended JAVA_HOME>` before `./gradlew`.
+- Decoded-log guard added after the measurement: `AgentOutputMetrics.findDecodedGradleCommandsWithUnexpectedJavaHome()` now flags Gradle Bash commands that omit `JAVA_HOME`, use a literal wildcard, or use a path outside the expected JDK prefix, including absolute `gradlew` wrapper paths.
+- Regression coverage: `ExtractDecodedLogMetricsTest.microshop gradle bash commands use configured jdk without wildcard` and `ExtractDecodedLogMetricsTest.detects gradle bash commands with lower jdk or wildcard java home`.
+- Validation after the guard: `./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ArenaPromptContractTest' --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ExtractDecodedLogMetricsTest' --rerun-tasks --warning-mode all` passed.
+- Final review artifacts:
+  - First final pass: `/tmp/mcp-steroid-review/gradle-jdk-prompt-20260427/final-runs/`. Codex requested changes for copyable Gradle examples without `JAVA_HOME` and absolute `gradlew` paths missed by decoded-log detection.
+  - Follow-up final pass: `/tmp/mcp-steroid-review/gradle-jdk-prompt-20260427/final-runs-2/`. Claude, Codex, and Gemini approved.
+- Next low-hanging consensus: investigate the Kotlin FIR severe logs next (Claude + Gemini); Maven fallback JDK guidance remains the other reviewed candidate (Codex).

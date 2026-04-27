@@ -125,15 +125,25 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
   - Consensus status: Gemini recommended this; Microshop-2 measurement now gives a concrete baseline.
   - Expected effect: fewer Bash Gradle cold starts and fewer hand-rolled IntelliJ Gradle snippets.
 
-- [ ] Next low-hanging Gradle improvement: make JDK choice harder to miss in DPAIA prompts.
+- [x] Next low-hanging Gradle improvement: make JDK choice harder to miss in DPAIA prompts.
   - Evidence: Microshop-2 eventually chose JDK 25 and passed, but first tried `JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-arm64` and hit `invalid source release: 24`.
-  - Candidate fix: have the arena prompt emit a concrete `JAVA_HOME=/usr/lib/jvm/temurin-25-...` line from the prewarm/case config, not just a generic "pick the lowest JDK >= N" rule.
+  - Fix: the arena prompt now exposes the case-configured JDK version, has the first MCP call print `Recommended JAVA_HOME`, and tells agents to use the exact printed value instead of wildcard assignments or lower JDKs.
   - Consensus: follow-up Claude and Codex review selected this over Kotlin FIR investigation as the next low-risk item; Gemini selected Kotlin FIR, so this is a 2/3 consensus.
-  - Target: remove the wasted Java 21 Bash call while preserving 0 native Edit and 0 tool errors.
+  - Review: initial Codex pass caught the invalid copyable `JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*` assignment; follow-up Claude/Codex/Gemini pass approved the wildcard-free prompt.
+  - Validation: `./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ArenaPromptContractTest' --rerun-tasks --warning-mode all` passed.
+  - Measurement: `DpaiaMicroshop2Test.claude with mcp` run `test-experiments/build/test-logs/test/run-20260427-115129-dpaia__spring__boot__microshop-2-mcp` passed in 136s agent time. First MCP call printed `Recommended JAVA_HOME: /usr/lib/jvm/temurin-25-jdk-arm64`; both Bash Gradle calls used `JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-arm64`; no `invalid source release: 24`.
+  - Delta versus the 171s baseline: Bash 4 -> 2, agent time 171s -> 136s, native Edit stayed 0, tool errors stayed 0, full Gradle suite passed.
+
+- [x] Add a decoded-log regression check for Microshop-2 JDK usage.
+  - Evidence: the measured run's decoded log shows both Bash Gradle calls used `/usr/lib/jvm/temurin-25-jdk-arm64`; reviewers suggested pinning this so `temurin-21` or literal `*` does not return.
+  - Fix: `AgentOutputMetrics` now extracts decoded Bash commands and flags Gradle commands that omit `JAVA_HOME`, use a literal wildcard, or do not start with the expected JDK prefix, including absolute `gradlew` wrapper paths.
+  - Regression coverage: `ExtractDecodedLogMetricsTest.microshop gradle bash commands use configured jdk without wildcard` and `ExtractDecodedLogMetricsTest.detects gradle bash commands with lower jdk or wildcard java home`.
+  - Validation: `./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ArenaPromptContractTest' --tests 'com.jonnyzzz.mcpSteroid.integration.arena.ExtractDecodedLogMetricsTest' --rerun-tasks --warning-mode all` passed.
 
 - [ ] Investigate severe Kotlin FIR resolve logs from the IntelliJ monorepo `thisLogger` lookup.
   - Evidence: the green lookup run logged `KaFirReferenceResolver` / `Expected FirResolvedContractDescription but FirLazyContractDescriptionImpl` errors, followed by an `ExceptionCaptureService` null-pointer while capturing the IDE error.
   - Current state: the local `ExceptionCaptureService` null-parameters crash is fixed and tested; the remaining issue is the Kotlin plugin severe resolve error itself.
+  - Consensus: final Gradle/JDK review selected this as the next low-hanging task by 2/3 reviewers; Maven fallback JDK guidance remains the other candidate.
   - Target: keep the test real but remove or isolate IDE-side severe errors instead of treating them as harmless noise.
 
 - [x] Make IntelliJ monorepo test setup prefer an explicitly configured local checkout when appropriate.
