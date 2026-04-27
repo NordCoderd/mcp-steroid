@@ -79,6 +79,12 @@ class ArenaTestRunner(
      */
     fun buildPrompt(testCase: DpaiaTestCase, projectDir: String, withMcp: Boolean = true): String = buildString {
         val buildWrapper = if (testCase.buildSystem == "maven") "./mvnw" else "./gradlew"
+        val buildSystemResourceUri = if (testCase.buildSystem == "gradle") {
+            "mcp-steroid://skill/execute-code-gradle"
+        } else {
+            "mcp-steroid://skill/execute-code-maven"
+        }
+        val buildSystemName = if (testCase.buildSystem == "gradle") "Gradle" else "Maven"
         val javaHomeAssignment = if (withMcp) "JAVA_HOME=<Recommended JAVA_HOME>" else "JAVA_HOME=<configured JAVA_HOME>"
         val bashBuildWrapper = "$javaHomeAssignment $buildWrapper"
         val projectJdkVersion = DpaiaCuratedCases.CASE_CONFIGS[testCase.instanceId]?.projectJdkVersion
@@ -229,7 +235,7 @@ class ArenaTestRunner(
             appendLine("  // NOTE: output may include '=== MODAL DIALOG DETECTED ===' — that is the dialog-killer log, NOT a compile error.")
             appendLine("  // A successful build says: Build errors: false, aborted: false")
             appendLine("  // A compile error says: Build errors: true, aborted: false")
-            appendLine("  // An SDK/modal block says: Build errors: false, aborted: true  ← only then fall back to Maven")
+            appendLine("  // An aborted build says: Build errors: false, aborted: true  ← likely missing $buildSystemName sync")
             appendLine("  println(\"Build errors: ${'$'}{result?.hasErrors()}, aborted: ${'$'}{result?.isAborted}\")")
             appendLine("  if (result?.hasErrors() == true) {")
             appendLine("      // Read IntelliJ problem list for the actual error messages")
@@ -238,7 +244,7 @@ class ArenaTestRunner(
             appendLine("      println(\"Check the editor — build errors present, read the failing files for syntax issues\")")
             appendLine("  }")
             appendLine("  ```")
-            appendLine("  **If `buildAllModules()` returns `isAborted=true`** (IntelliJ blocked by an SDK resolution modal): fall back to `./mvnw test-compile -Dspotless.check.skip=true` via Bash for that compilation check only. Do NOT retry `buildAllModules` in a loop.")
+            appendLine("  **If `buildAllModules()` returns `isAborted=true`** (IntelliJ build runner couldn't start): call `steroid_fetch_resource` for `$buildSystemResourceUri` and run its sync pattern. Only fall back to Bash `$compileCommand` if sync itself fails or times out.")
             appendLine("  **IMPORTANT**: `=== MODAL DIALOG DETECTED ===` in the output is normal — it means the dialog-killer suppressed a transient dialog. It does NOT mean the build failed. Only `Build errors: true` means a compile error.")
             appendLine("- For multi-file edits (renames, annotation changes, identical changes across N files), use the `steroid_apply_patch` JSON tool described above — NOT the older `applyPatch {}` DSL inside `steroid_execute_code`, and NOT a chain of native `Edit` calls. Still use steroid for the mandatory first call and compilation check.")
             appendLine("- **First call recipe** — combine readiness + Docker + VCS changes + **build environment** in ONE `steroid_execute_code` call (saves ~60s vs 3 separate calls):")
@@ -302,6 +308,7 @@ class ArenaTestRunner(
         appendLine("- Implement the requested behavior with minimal code changes.")
         appendLine("- FAIL_TO_PASS tests must pass — run them with `$runClassCommand` and confirm `BUILD SUCCESS`.")
         if (testCase.buildSystem == "gradle") {
+            appendLine("- **Gradle MCP resource**: before running Gradle sync/tests from `steroid_execute_code`, call `steroid_fetch_resource` for `mcp-steroid://skill/execute-code-gradle` and follow its `ExternalSystemUtil` recipes. Bash `./gradlew` remains the final verification/fallback path outside `steroid_execute_code`.")
             appendLine("- **Gradle UP-TO-DATE pitfall**: After writing new source files, always add `--rerun-tasks` to the FIRST Gradle test invocation (e.g. `$bashBuildWrapper :module:test --tests <Class> --rerun-tasks --no-daemon`). Without it, Gradle may return `UP-TO-DATE` and skip tests entirely while still printing `BUILD SUCCESSFUL`. If you see `BUILD SUCCESSFUL` with no `Tests run:` line, immediately rerun with `--rerun-tasks`.")
             appendLine("- **Multi-module Gradle test targeting**: `$bashBuildWrapper test --tests ClassName` silently finds NO tests when the class is in a submodule. ALWAYS use the subproject prefix: `$bashBuildWrapper :submodule:test --tests com.example.ClassName --rerun-tasks`. Find the correct subproject prefix by inspecting `settings.gradle` or using `ProjectRootManager.contentSourceRoots` — each root's path reveals its module.")
             appendLine("- **Batch Gradle targeted tests across subprojects**: If FAIL_TO_PASS lists 2+ Gradle test classes in different subprojects, run them in ONE command with repeated `:subproject:test --tests FQCN` pairs, then keep the full suite as the final separate run. Example: `$bashBuildWrapper :a:test --tests a.FooTest :b:test --tests b.BarTest --rerun-tasks --no-daemon --console=plain`.")

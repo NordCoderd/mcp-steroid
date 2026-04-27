@@ -80,6 +80,52 @@ class ArenaPromptContractTest {
     }
 
     @Test
+    fun `gradle mcp prompt routes gradle work through gradle resource`() {
+        val prompt = ArenaTestRunner(
+            container = ContainerDriver(
+                logPrefix = "prompt-test",
+                containerId = "unused",
+                startRequest = StartContainerRequest(),
+            ),
+            projectGuestDir = "/workspace",
+        ).buildPrompt(testCase = sampleGradleTestCase(), projectDir = "/home/agent/project-home", withMcp = true)
+
+        assertTrue(
+            prompt.contains("call `steroid_fetch_resource` for `mcp-steroid://skill/execute-code-gradle`"),
+            "Gradle MCP prompt should route Gradle sync/test work through the dedicated resource",
+        )
+        assertTrue(
+            prompt.contains("follow its `ExternalSystemUtil` recipes"),
+            "Gradle resource guidance should point agents at the IDE Gradle runner recipes",
+        )
+        assertFalse(
+            prompt.contains("mcp-steroid://skill/execute-code-maven"),
+            "Gradle-specific arena prompts should not ask agents to fetch the Maven resource",
+        )
+    }
+
+    @Test
+    fun `maven mcp prompt does not fetch gradle resource on build abort`() {
+        val prompt = ArenaTestRunner(
+            container = ContainerDriver(
+                logPrefix = "prompt-test",
+                containerId = "unused",
+                startRequest = StartContainerRequest(),
+            ),
+            projectGuestDir = "/workspace",
+        ).buildPrompt(testCase = sampleMavenTestCase(), projectDir = "/home/agent/project-home", withMcp = true)
+
+        assertTrue(
+            prompt.contains("call `steroid_fetch_resource` for `mcp-steroid://skill/execute-code-maven`"),
+            "Maven MCP prompt should route aborted IDE builds through the Maven sync resource",
+        )
+        assertFalse(
+            prompt.contains("mcp-steroid://skill/execute-code-gradle"),
+            "Maven-specific arena prompts should not ask agents to fetch the Gradle resource",
+        )
+    }
+
+    @Test
     fun `gradle prompt exposes configured jdk before first bash gradle call`() {
         val prompt = ArenaTestRunner(
             container = ContainerDriver(

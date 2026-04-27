@@ -83,6 +83,7 @@ commits PSI, and avoids kotlinc compile overhead. Read
 | Maven sync after pom.xml edit | `MavenProjectsManager.scheduleUpdateAllMavenProjects()` + `Observation.awaitConfiguration()` | [Maven sync](mcp-steroid://skill/execute-code-maven) |
 | Gradle sync after build.gradle.kts edit | `ExternalSystemUtil.refreshProject(path, ImportSpecBuilder(project, GradleConstants.SYSTEM_ID).build())` | [Gradle patterns](mcp-steroid://skill/execute-code-gradle) |
 | Check Docker availability | `java.io.File("/var/run/docker.sock").exists()` — no process spawn needed | [Spring patterns](mcp-steroid://skill/coding-with-intellij-spring) |
+| Build aborted with `errors=false, aborted=true` | Run the matching Maven/Gradle sync pattern before Bash fallback | [Maven sync](mcp-steroid://skill/execute-code-maven), [Gradle patterns](mcp-steroid://skill/execute-code-gradle) |
 | Docker inspect/exec operations | **Bash tool** (outside steroid_execute_code) — e.g. `docker inspect`, `docker exec` | — |
 | `dependency:resolve` workaround | `MavenProjectsManager.getInstance(project).forceUpdateAllProjectsOrFindAllAvailablePomFiles()` | [Maven sync](mcp-steroid://skill/execute-code-maven) |
 

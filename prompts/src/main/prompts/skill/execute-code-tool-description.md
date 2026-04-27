@@ -29,6 +29,7 @@ Pre-flight catches missing or non-unique anchors before any edit lands, so keep 
 | **Read file content (any size)** | `String(findProjectFile(p)!!.contentsToByteArray(), charset)` — stays inside the IDE; the next semantic query sees what you read |
 | **Grep content inside project files** | `FilenameIndex.getAllFilesByExt(project, ext, scope).flatMap { vf -> Regex(pat).findAll(String(vf.contentsToByteArray(), vf.charset)) … }` in ONE call |
 | **Run Maven / Gradle tests** | IDE runner — see `mcp-steroid://skill/execute-code-maven` and `mcp-steroid://skill/execute-code-gradle`; Bash is only for shell-level final verification or IDE-runner fallback |
+| **IDE build aborted (`errors=false, aborted=true`)** | Fetch `mcp-steroid://skill/execute-code-gradle` or `mcp-steroid://skill/execute-code-maven` and run the matching sync pattern before Bash fallback. |
 | **Compile check after an edit** | `ProjectTaskManager.getInstance(project).buildAllModules().await()` |
 | **Git / Docker CLI / shell** | native `Bash` — genuinely outside the IDE |
 
@@ -64,6 +65,11 @@ import org.jetbrains.concurrency.await
 
 val result = ProjectTaskManager.getInstance(project).buildAllModules().await()
 println("Compile errors: ${result.hasErrors()}, aborted: ${result.isAborted()}")
+
+// If aborted == true and errors == false, the IDE build runner did not start.
+// In Maven/Gradle projects, first fetch mcp-steroid://skill/execute-code-gradle
+// or mcp-steroid://skill/execute-code-maven and run Sync + Observation.awaitConfiguration(project).
+// Use Bash only if sync fails or times out.
 ```
 
 **Run tests via the IDE runner, not Bash.** `./mvnw test` / `./gradlew test` cold-start ~31 s per invocation. The IDE runner keeps the JVM warm and returns structured pass/fail:
