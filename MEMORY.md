@@ -281,3 +281,14 @@
 - Validation: `./gradlew :ij-plugin:test --tests 'com.jonnyzzz.mcpSteroid.server.ExecuteCodeBuildAbortGuidanceTest' --tests 'com.jonnyzzz.mcpSteroid.NoHardcodedMcpSteroidUriUsageTest' --rerun-tasks --warning-mode all` passed.
 - Review artifacts: `/tmp/mcp-steroid-review/build-abort-guidance-20260427/runs/`; Claude, Codex, and Gemini approved. Claude/Codex suggested optional ambiguous/null coverage, which was added before commit.
 - Next measurement: rerun `DpaiaMicroshop2Test.claude with mcp`; first success criterion is `fetch_resource_calls >= 1` at the aborted-build boundary while keeping the full Gradle suite green.
+
+## 2026-04-27 - Aborted Build Boundary Measurement
+
+- Scenario: `DpaiaMicroshop2Test.claude with mcp`.
+- First attempt run dir: `test-experiments/build/test-logs/test/run-20260427-144355-dpaia__spring__boot__microshop-2-mcp`. It failed before the agent ran because the Docker IDE container disappeared during repository setup (`docker exec test -d /repo-cache/...` timed out, then `git clone` saw "container ... is not running"). Do not use it as a benchmark result.
+- Valid run dir: `test-experiments/build/test-logs/test/run-20260427-150914-dpaia__spring__boot__microshop-2-mcp`.
+- Result: host test passed, agent emitted `ARENA_FIX_APPLIED: yes`, and the full Gradle suite passed. Agent time was 169.6s.
+- The new hint appeared exactly at the build-abort boundary: `Build errors: false, aborted: true` followed by `HINT: IDE build was aborted without compiler errors. Call steroid_fetch_resource for mcp-steroid://skill/execute-code-gradle before falling back to Bash...`.
+- Raw metrics: 15 total calls, 4 MCP calls, 11 native calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, 3 Read, 3 Write, 1 Glob, 3 Bash, 0 tool errors, 985,678 total tokens, 0 resource fetches.
+- Delta versus the 142.0s prompt-routing run: time 142.0s -> 169.6s, total calls 10 -> 15, Bash 2 -> 3, tokens 764,238 -> 985,678, errors stayed 0. Delta versus the 136s JDK-fixed baseline: Bash 2 -> 3 and runtime/tokens worse.
+- Lesson: putting the resource URI in the tool result made the guidance visible but still did not cause Claude to call `steroid_fetch_resource`. The next change needs stronger actionability at the boundary, likely either naming the exact Claude MCP tool call or embedding the minimal Gradle sync recipe inline instead of requiring a fetch.

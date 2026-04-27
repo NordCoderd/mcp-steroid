@@ -981,6 +981,14 @@ the Karpathy-style optimization loop prompts.
   `/tmp/mcp-steroid-review/build-abort-guidance-20260427/runs/` approved by Claude/Codex/Gemini; scoped `:ij-plugin:test`
   with that test plus `NoHardcodedMcpSteroidUriUsageTest` passed. Next measurement is Microshop-2 with
   `fetch_resource_calls >= 1` as the first criterion.
+- Aborted-build boundary measurement (2026-04-27): first run
+  `run-20260427-144355-dpaia__spring__boot__microshop-2-mcp` failed before the agent ran because the Docker IDE
+  container disappeared during repository setup. Valid run `run-20260427-150914-dpaia__spring__boot__microshop-2-mcp`
+  passed the full Gradle suite in 169.6s agent time. The new hint was visible directly after
+  `Build errors: false, aborted: true`, but Claude still made 0 `steroid_fetch_resource` calls and used 3 Bash calls.
+  Metrics: 15 total calls, 4 MCP calls, 0 tool errors, 985,678 tokens. Treat the fetch-only boundary hint as a failed
+  hypothesis; next low-hanging correction needs stronger actionability, such as an exact next tool call name or an
+  inline minimal Gradle sync recipe.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync
