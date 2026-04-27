@@ -169,3 +169,17 @@
 - Updated `McpScriptContext` KDoc plus prompt resources `prompt/skill.md`, `coding-with-intellij-intro.md`, `coding-with-intellij-patterns.md`, `coding-with-intellij-psi.md`, and `coding-with-intellij-threading.md`.
 - Added `IndexingGuidanceContractTest` so prompt resources do not reintroduce "smart mode is confirmed for the duration" or "safe to use indices immediately" wording.
 - Validation: `SkillReferenceHintTest` passed; scoped prompt contract and changed Kt-block tests passed after forced `:prompts:generatePrompts --rerun-tasks`.
+
+## 2026-04-27 - Exception Capture and IntelliJ Checkout Follow-ups
+
+- Fixed the local failure behind the green `IntelliJThisLoggerLookupTest` run's secondary NPE: `ExceptionCaptureService` no longer assumes `LogRecord.parameters` is non-null, logs capture failures to stderr, and still rethrows `ProcessCanceledException`.
+- Regression coverage: `ExceptionCaptureServiceTest.testJulSevereErrorWithNullParametersIsCaptured`.
+- Validation: `./gradlew :ij-plugin:test --tests 'com.jonnyzzz.mcpSteroid.execution.ExceptionCaptureServiceTest' --rerun-tasks --warning-mode all` passed.
+- The Kotlin FIR severe error itself remains a follow-up: `KaFirReferenceResolver` / `Expected FirResolvedContractDescription but FirLazyContractDescriptionImpl` came from the Kotlin plugin during the monorepo semantic lookup.
+- Fixed IntelliJ checkout cache precedence: explicit configured ZIPs and checkout directories now win before reusing `ultimate-git-clone-linux.zip` from cache, local checkout packaging uses `Path.toUri()` so `git clone` receives a `file:///...` URL, and the generated ZIP preserves the source checkout's real `origin` remote for in-container fetches.
+- Regression coverage: `IntelliJGitCloneZipTest.configured checkout replaces stale cached archive`.
+- Validation: `./gradlew :test-integration:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.IntelliJGitCloneZipTest' --rerun-tasks --warning-mode all` passed.
+- Review artifacts:
+  - Initial pass: `/tmp/mcp-steroid-review/exception-checkout-20260427/runs/`. Codex requested changes for hidden `ProcessCanceledException` handling and the host-only `file:///Users/...` origin in local-checkout ZIPs.
+  - Follow-up pass: `/tmp/mcp-steroid-review/exception-checkout-20260427/runs-followup/` plus replacement Claude run under `/tmp/mcp-steroid-review/exception-checkout-20260427/runs-followup-2/`.
+- Final review consensus: Claude, Codex, and Gemini approved the current diff. Next low-hanging fruit is Gradle/JDK prompt guidance by 2/3 reviewers; Kotlin FIR severe-log investigation remains tracked separately.

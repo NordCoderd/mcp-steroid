@@ -14,5 +14,6 @@
 - [x] Add a real IntelliJ Ultimate monorepo `thisLogger` lookup regression test using `Observation.awaitConfiguration` plus `smartReadAction`.
 - [x] Update MCP server/resource indexing guidance to use `Observation.awaitConfiguration(project)` plus `smartReadAction { }` instead of treating `waitForSmartMode()` as a stable handoff.
 - [ ] Tighten Gradle/JDK prompt guidance so DPAIA agents use the configured JDK path before the first Bash Gradle call.
-- [ ] Investigate severe Kotlin FIR resolve logs and `ExceptionCaptureService` NPE observed during the green IntelliJ monorepo `thisLogger` lookup.
-- [ ] Review IntelliJ checkout ZIP/cache precedence so `MCP_STEROID_INTELLIJ_CHECKOUT_DIR` does not silently lose to an older cached TeamCity ZIP when a local checkout was explicitly configured.
+- [x] Fix the `ExceptionCaptureService` null-parameters crash observed during the green IntelliJ monorepo `thisLogger` lookup.
+- [x] Review IntelliJ checkout ZIP/cache precedence so `MCP_STEROID_INTELLIJ_CHECKOUT_DIR` does not silently lose to an older cached TeamCity ZIP when a local checkout was explicitly configured.
+- [ ] Investigate the remaining severe Kotlin FIR resolve logs observed during the green IntelliJ monorepo `thisLogger` lookup.

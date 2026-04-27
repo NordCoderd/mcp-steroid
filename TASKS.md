@@ -74,6 +74,20 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
   - Fix: `IndexNotReadyException` and smart-mode hints now recommend `Observation.awaitConfiguration(project)` after import/sync/configuration and `smartReadAction { }` around the whole indexed PSI query.
   - Validation: `:ij-plugin:test --tests 'com.jonnyzzz.mcpSteroid.server.SkillReferenceHintTest' --rerun-tasks --warning-mode all` passed; scoped `:prompts:test` for `IndexingGuidanceContractTest`, `MarkdownArticleContractTest`, and changed Kt blocks passed after forced prompt regeneration.
 
+- [x] Harden IDE exception capture for JUL records with null parameters.
+  - Evidence: the green IntelliJ monorepo `thisLogger` lookup logged Kotlin FIR severe errors, then `ExceptionCaptureService` crashed while reading a nullable `LogRecord.parameters` array.
+  - Files: `ExceptionCaptureService.kt`, `ExceptionCaptureServiceTest.kt`.
+  - Fix: capture failures now log to stderr instead of breaking the original IDE error path, `ProcessCanceledException` is still rethrown, and null parameters are handled explicitly.
+  - Validation: `./gradlew :ij-plugin:test --tests 'com.jonnyzzz.mcpSteroid.execution.ExceptionCaptureServiceTest' --rerun-tasks --warning-mode all` passed.
+  - Review: initial Codex pass caught hidden `ProcessCanceledException` handling in plugin-id lookup; follow-up Claude/Codex/Gemini pass approved.
+
+- [x] Make IntelliJ monorepo test setup prefer explicitly configured local checkouts over stale cached ZIPs.
+  - Evidence: `MCP_STEROID_INTELLIJ_CHECKOUT_DIR=/Users/jonnyzzz/Work/intellij` still reused an older cached TeamCity ZIP before updating in-container.
+  - Files: `intelliJ-git.kt`, `IntelliJGitCloneZipTest.kt`.
+  - Fix: configured ZIPs and configured checkout directories now win before cache reuse; local checkout ZIP creation uses a proper `file:///` clone URI and preserves the source checkout's real `origin` remote for in-container fetches.
+  - Validation: `./gradlew :test-integration:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.IntelliJGitCloneZipTest' --rerun-tasks --warning-mode all` passed.
+  - Review: initial Codex pass caught the container-unusable `file:///Users/...` origin in generated ZIPs; follow-up Claude/Codex/Gemini pass approved.
+
 ## Next Candidates
 
 - [x] Reduce redundant Maven verification in the DPAIA arena prompt.
@@ -114,15 +128,17 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
 - [ ] Next low-hanging Gradle improvement: make JDK choice harder to miss in DPAIA prompts.
   - Evidence: Microshop-2 eventually chose JDK 25 and passed, but first tried `JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-arm64` and hit `invalid source release: 24`.
   - Candidate fix: have the arena prompt emit a concrete `JAVA_HOME=/usr/lib/jvm/temurin-25-...` line from the prewarm/case config, not just a generic "pick the lowest JDK >= N" rule.
+  - Consensus: follow-up Claude and Codex review selected this over Kotlin FIR investigation as the next low-risk item; Gemini selected Kotlin FIR, so this is a 2/3 consensus.
   - Target: remove the wasted Java 21 Bash call while preserving 0 native Edit and 0 tool errors.
 
-- [ ] Investigate severe Kotlin resolve logs from the IntelliJ monorepo `thisLogger` lookup.
+- [ ] Investigate severe Kotlin FIR resolve logs from the IntelliJ monorepo `thisLogger` lookup.
   - Evidence: the green lookup run logged `KaFirReferenceResolver` / `Expected FirResolvedContractDescription but FirLazyContractDescriptionImpl` errors, followed by an `ExceptionCaptureService` null-pointer while capturing the IDE error.
+  - Current state: the local `ExceptionCaptureService` null-parameters crash is fixed and tested; the remaining issue is the Kotlin plugin severe resolve error itself.
   - Target: keep the test real but remove or isolate IDE-side severe errors instead of treating them as harmless noise.
 
-- [ ] Make IntelliJ monorepo test setup prefer an explicitly configured local checkout when appropriate.
+- [x] Make IntelliJ monorepo test setup prefer an explicitly configured local checkout when appropriate.
   - Evidence: the `MCP_STEROID_INTELLIJ_CHECKOUT_DIR=/Users/jonnyzzz/Work/intellij` run still reused an existing cached TeamCity ZIP before updating the checkout in-container.
-  - Candidate fix: review `ensureIntelliJGitCloneZipInCache()` precedence and add unit coverage before changing cache behavior.
+  - Fix: `ensureIntelliJGitCloneZipInCache()` honors configured ZIPs/checkouts before cache reuse, preserves the source checkout's real `origin` remote in generated ZIPs, and has explicit regression coverage.
 
 ## Recent PR Follow-up
 

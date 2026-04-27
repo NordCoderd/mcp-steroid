@@ -929,6 +929,13 @@ the Karpathy-style optimization loop prompts.
   `waitForSmartMode()` is not a stable handoff; IntelliJ source explicitly says another dumb mode can begin before
   the next statement. The green regression test is `IntelliJThisLoggerLookupTest`. MCP server/resource guidance now
   routes `IndexNotReadyException` and indexed PSI reads to that pattern.
+- Follow-up fixes from that monorepo run (2026-04-27): `ExceptionCaptureService` now handles JUL severe records with
+  null `LogRecord.parameters` without masking the original IDE error, and IntelliJ checkout setup now honors explicit
+  configured ZIPs/checkouts before reusing the cached TeamCity archive, while preserving the checkout's real `origin`
+  remote for in-container fetches. The remaining open item is the Kotlin FIR severe resolve log itself.
+- Review consensus for those follow-up fixes: current diff approved by Claude/Codex/Gemini via `run-agent.sh`; next
+  low-hanging item by 2/3 reviewers is Gradle/JDK prompt guidance so DPAIA agents use the configured JDK before the
+  first Bash Gradle call.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync
