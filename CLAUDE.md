@@ -966,6 +966,13 @@ the Karpathy-style optimization loop prompts.
   on `errors=false, aborted=true`. Validation passed for `ArenaPromptContractTest` plus changed prompt KtBlocks and
   `MarkdownArticleContractTest`. Next measurement should rerun Microshop-2 and first check `fetch_resource_calls >= 1`;
   do not over-interpret runtime from a single Microshop-2 run because recent variance is wide.
+- Gradle resource routing measurement (2026-04-27, run dir
+  `run-20260427-142637-dpaia__spring__boot__microshop-2-mcp`): the host test passed and the full Gradle suite passed
+  in 142.0s agent time, with 10 total calls, 4 MCP calls, 2 Bash calls, 0 tool errors, and 764,238 tokens. This improved
+  over the 170.8s post-resource run, but `fetch_resource_calls` was still 0. The decoded log shows the agent saw
+  `Build errors: false, aborted: true`, mentioned Gradle sync, then chose Bash directly. Next low-hanging fix:
+  result-boundary guidance from `steroid_execute_code` for aborted builds, using generated Maven/Gradle prompt article
+  classes rather than hardcoded MCP URI strings.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

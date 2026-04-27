@@ -21,4 +21,5 @@
 - [x] Add a Gradle-focused MCP prompt resource modeled after the Maven patterns.
 - [x] Measure the Gradle-focused MCP prompt resource on `DpaiaMicroshop2Test.claude with mcp` against the 136s JDK-fixed baseline.
 - [x] Review the Microshop-2 measurement and improve Gradle resource discovery/routing so agents actually fetch or receive `mcp-steroid://skill/execute-code-gradle` before falling back to Bash Gradle.
-- [ ] Rerun `DpaiaMicroshop2Test.claude with mcp` after Gradle resource routing; target full-suite pass and `fetch_resource_calls >= 1` for `mcp-steroid://skill/execute-code-gradle`.
+- [x] Rerun `DpaiaMicroshop2Test.claude with mcp` after Gradle resource routing; target full-suite pass and `fetch_resource_calls >= 1` for `mcp-steroid://skill/execute-code-gradle`.
+- [ ] Add result-boundary guidance for `steroid_execute_code` build results with `errors=false, aborted=true`, because prompt-only routing still produced 0 `steroid_fetch_resource` calls.

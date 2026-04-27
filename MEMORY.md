@@ -260,3 +260,13 @@
 - Validation: `ArenaPromptContractTest` passed through IntelliJ Gradle; `:prompts:generatePrompts :prompts:test --tests '*ExecuteCodeToolDescriptionKtBlocksCompilationTest*' --tests '*ExecuteCodeOverviewKtBlocksCompilationTest*' --tests 'com.jonnyzzz.mcpSteroid.prompts.MarkdownArticleContractTest' --warning-mode all` passed through IntelliJ Gradle.
 - Validation caution: one combined multi-module Gradle run accidentally launched `DpaiaArenaTest.codex without mcp`; a thread dump was captured at `/tmp/gradle-resource-routing-worker-dump-20260427.txt`, the wrong run was stopped, and scoped module reruns were used for the valid result.
 - Next measurement: rerun `DpaiaMicroshop2Test.claude with mcp`; the first success criterion is `fetch_resource_calls >= 1` for `mcp-steroid://skill/execute-code-gradle`, not a single-run runtime win because recent Microshop-2 token/runtime variance is large.
+
+## 2026-04-27 - Gradle Resource Routing Measurement
+
+- Scenario: `DpaiaMicroshop2Test.claude with mcp`.
+- Run dir: `test-experiments/build/test-logs/test/run-20260427-142637-dpaia__spring__boot__microshop-2-mcp`.
+- Result: host test passed, agent emitted `ARENA_FIX_APPLIED: yes`, and the full Gradle suite passed. Agent time was 142.0s.
+- Raw metrics: 10 total calls, 4 MCP calls, 6 native calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, 3 Write, 2 Bash, 0 tool errors, 764,238 total tokens, 0 resource fetches.
+- Delta versus the 170.8s post-resource run: total calls 28 -> 10, Bash 5 -> 2, tool errors 2 -> 0, tokens 1,458,578 -> 764,238, runtime 170.8s -> 142.0s. Delta versus the 136s JDK-fixed baseline: Bash stayed 2, tool errors stayed 0, but runtime and tokens still did not beat baseline.
+- Agent behavior: after the IDE build printed `Build errors: false, aborted: true`, the decoded log says it needed Gradle sync but then used Bash Gradle directly. The raw thinking mentions fetching the Gradle skill, but no `steroid_fetch_resource` tool call was made.
+- Lesson: arena/prompt routing helped with waste, but did not satisfy the resource-use criterion. The next low-hanging fix is Codex's reviewed result-boundary idea: when `steroid_execute_code` output reports an aborted build without errors, append a short resource/sync hint directly to that tool result, using generated prompt article classes instead of hardcoded MCP URIs in production Kotlin.
