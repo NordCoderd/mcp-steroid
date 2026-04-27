@@ -22,8 +22,20 @@ class GradlePromptContractTest {
             "Gradle prompt should use the Gradle external system id",
         )
         assertTrue(
+            prompt.contains("ProjectDataImportListener"),
+            "Gradle prompt should wait for Gradle import events before indexed work",
+        )
+        assertTrue(
+            prompt.contains("onFinalTasksFinished"),
+            "Gradle prompt should use final import tasks as the sync boundary",
+        )
+        assertTrue(
+            prompt.contains("waitForSmartMode()"),
+            "Gradle prompt should wait for smart mode after final import tasks",
+        )
+        assertFalse(
             prompt.contains("Observation.awaitConfiguration(project)"),
-            "Gradle prompt should wait for Gradle sync/configuration before indexed work",
+            "Gradle prompt should not use the flaky Observation await path for Gradle sync",
         )
         assertTrue(
             prompt.contains("--rerun-tasks"),

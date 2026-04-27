@@ -80,7 +80,7 @@ class ArenaPromptContractTest {
     }
 
     @Test
-    fun `gradle mcp prompt routes gradle work through gradle resource`() {
+    fun `gradle mcp prompt inlines ide build before gradle resource fallback`() {
         val prompt = ArenaTestRunner(
             container = ContainerDriver(
                 logPrefix = "prompt-test",
@@ -91,12 +91,20 @@ class ArenaPromptContractTest {
         ).buildPrompt(testCase = sampleGradleTestCase(), projectDir = "/home/agent/project-home", withMcp = true)
 
         assertTrue(
-            prompt.contains("call `steroid_fetch_resource` for `mcp-steroid://skill/execute-code-gradle`"),
-            "Gradle MCP prompt should route Gradle sync/test work through the dedicated resource",
+            prompt.contains("Gradle IDE build first"),
+            "Gradle MCP prompt should put the IDE build path before Bash fallback",
         )
         assertTrue(
-            prompt.contains("follow its `ExternalSystemUtil` recipes"),
-            "Gradle resource guidance should point agents at the IDE Gradle runner recipes",
+            prompt.contains("ProjectTaskManager.getInstance(project).build(*modules).await()"),
+            "Gradle MCP prompt should include the working IDE-native build recipe",
+        )
+        assertTrue(
+            prompt.contains("If this prints `Build errors: false, aborted: false`, do not run Bash Gradle just to compile"),
+            "Gradle MCP prompt should prevent duplicate Bash compile checks after a successful IDE build",
+        )
+        assertTrue(
+            prompt.contains("ProjectDataImportListener.onFinalTasksFinished"),
+            "Gradle resource fallback should point agents at the final-tasks sync recipe",
         )
         assertFalse(
             prompt.contains("mcp-steroid://skill/execute-code-maven"),

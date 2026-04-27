@@ -8,24 +8,55 @@ Use this resource when a `steroid_execute_code` script must run Gradle work from
 
 ## Sync after build.gradle.kts Change
 
-After modifying `build.gradle`, `build.gradle.kts`, or `settings.gradle.kts`, trigger a Gradle re-import and wait for configuration before compiling, running tests, or using indexed PSI:
+After modifying `build.gradle`, `build.gradle.kts`, or `settings.gradle.kts`, trigger a Gradle re-import and wait for final import tasks before compiling, running tests, or using indexed PSI:
 
 ```kotlin[IU]
 import com.intellij.openapi.externalSystem.importing.ImportSpecBuilder
+import com.intellij.openapi.externalSystem.service.project.manage.ProjectDataImportListener
 import com.intellij.openapi.externalSystem.util.ExternalSystemUtil
-import com.intellij.platform.backend.observation.Observation
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.withTimeout
 import org.jetbrains.plugins.gradle.util.GradleConstants
+import kotlin.time.Duration.Companion.minutes
+
+val gradleProjectPath = project.basePath ?: error("Project base path is not set")
+val importDone = CompletableDeferred<Unit>()
+val importConnection = project.messageBus.connect(disposable)
+
+fun isCurrentGradleProject(path: String?): Boolean =
+    path == null || path == gradleProjectPath
+
+importConnection.subscribe(
+    ProjectDataImportListener.TOPIC,
+    object : ProjectDataImportListener {
+        override fun onFinalTasksFinished(projectPath: String?) {
+            if (isCurrentGradleProject(projectPath)) {
+                importDone.complete(Unit)
+            }
+        }
+
+        override fun onImportFailed(projectPath: String?, t: Throwable) {
+            if (isCurrentGradleProject(projectPath)) {
+                importDone.completeExceptionally(t)
+            }
+        }
+    }
+)
+importDone.invokeOnCompletion { importConnection.disconnect() }
 
 ExternalSystemUtil.refreshProject(
-    project.basePath!!,
+    gradleProjectPath,
     ImportSpecBuilder(project, GradleConstants.SYSTEM_ID).build()
 )
-Observation.awaitConfiguration(project)
+withTimeout(8.minutes) { importDone.await() }
+waitForSmartMode()
 println("Gradle sync complete")
 ```
 
 Key points:
-- `Observation.awaitConfiguration(project)` is required after Gradle sync before indexed reads.
+- `ProjectDataImportListener.onFinalTasksFinished` is the Gradle import boundary; `onImportFinished` is too early because final import tasks still run afterward.
+- Subscribe before calling `ExternalSystemUtil.refreshProject(...)` so the listener cannot miss a fast import event.
+- `waitForSmartMode()` after final tasks lets indexing settle before follow-up indexed reads.
 - Use the two-argument `ExternalSystemUtil.refreshProject(path, importSpec)` form; older overloads are deprecated.
 - If sync fails, fix the Gradle/JDK/import problem. Do not continue with unresolved dependencies.
 
