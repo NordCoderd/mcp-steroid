@@ -59,6 +59,8 @@ val npmBuild = tasks.register<NpmTask>("npmBuild") {
     inputs.files(fileTree(projectDir.resolve("src")))
     inputs.file(projectDir.resolve("esbuild.config.mjs"))
     inputs.file(projectDir.resolve("package.json"))
+    inputs.file(projectDir.resolve("package-lock.json"))
+    inputs.file(projectDir.resolve("tsconfig.json"))
     outputs.dir(projectDir.resolve("dist"))
 }
 
