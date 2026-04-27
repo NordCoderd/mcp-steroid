@@ -81,6 +81,9 @@ fun Download.configureReliableDownload() {
     connectTimeout(downloadConnectTimeoutMs)
     readTimeout(downloadReadTimeoutMs)
     retries(downloadRetryCount)
+    // Used for atomic download under name "${dest}.part" and rename to the final name only on success.
+    // necessary for not using corrupted downloaded artifacts
+    tempAndMove(true)
 }
 
 // Download tessdata files
