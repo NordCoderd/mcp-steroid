@@ -314,3 +314,16 @@
 - Decoded evidence: line 743 showed `Build errors: false, aborted: true`; line 744 showed the separate-line `REQUIRED ACTION ... NEXT TOOL CALL must be mcp__mcp-steroid__steroid_fetch_resource ...`; line 747 immediately used Bash Gradle anyway.
 - Raw metrics: 19 total calls, 4 MCP calls, 15 native calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, 5 Read, 2 Glob, 4 Write, 2 Bash, 1 native Read error, 1,255,211 total tokens, 0 resource fetches.
 - Lesson: fetch-only boundary wording has failed even with the exact Claude tool name. Stop iterating on wording for this scenario; the next reviewed low-hanging correction should choose between inline minimal Gradle sync guidance at the boundary and removing/replacing the failed hint.
+
+## 2026-04-27 - Gradle IDE Guidance Measurement
+
+- Patch review artifacts: `/tmp/mcp-steroid-review/gradle-ide-guidance-20260427/runs/`. Claude, Codex, and Gemini approved the prompt/resource patch with no blockers.
+- The patch updated `mcp-steroid://skill/execute-code-gradle` to use `ProjectDataImportListener.onFinalTasksFinished` as the Gradle sync boundary instead of `Observation.awaitConfiguration(project)`. It also inlined a first IDE-native Gradle build recipe in Gradle DPAIA arena prompts and kept the Gradle resource fetch as the aborted-build fallback.
+- Validation passed through the IntelliJ Gradle runner:
+  - `:prompts:generatePrompts :prompts:test --tests com.jonnyzzz.mcpSteroid.prompts.GradlePromptContractTest --tests '*ExecuteCodeGradleKtBlocksCompilationTest*' --tests com.jonnyzzz.mcpSteroid.prompts.MarkdownArticleContractTest --warning-mode all`
+  - `:test-experiments:test --tests com.jonnyzzz.mcpSteroid.integration.arena.ArenaPromptContractTest --warning-mode all`
+- Measurement scenario: `DpaiaMicroshop2Test.claude with mcp`, run dir `test-experiments/build/test-logs/test/run-20260427-185422-dpaia__spring__boot__microshop-2-mcp`.
+- Result: host test passed, agent emitted `ARENA_FIX_APPLIED: yes`, the inline IDE build printed `Build errors: false, aborted: false`, and the full Gradle suite passed. Agent time was 145s.
+- Raw metrics: 1,370,218 total tokens, 26 total calls, 4 MCP calls, 22 native calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, 12 Read, 4 Glob, 3 Write, 2 Bash, 0 tool errors, and 0 resource fetches.
+- Delta versus the post-JDK24/final-tasks baseline (`run-20260427-161050-dpaia__spring__boot__microshop-2-mcp`): tokens 1,773,570 -> 1,370,218, calls 36 -> 26, native calls 33 -> 22, Bash 5 -> 2, Read 17 -> 12, Glob 7 -> 4, errors stayed 0.
+- Measurement review artifacts: `/tmp/mcp-steroid-review/gradle-ide-guidance-measurement-20260427/runs/`. Claude, Codex, and Gemini approved the patch and converged on the next low-hanging improvement: batch source discovery and related file reads in one IDE/VFS `steroid_execute_code` pass before falling back to native `Glob`/`Read`.

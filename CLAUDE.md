@@ -1009,10 +1009,20 @@ the Karpathy-style optimization loop prompts.
   IDE base installs Temurin 24. Validation: `GradleCompileTest` passed with `GRADLE_JVM=25`, `BUILD_ERRORS=false`,
   `BUILD_ABORTED=false`; Microshop-2 MCP run `run-20260427-161050-dpaia__spring__boot__microshop-2-mcp` passed with
   `Recommended JAVA_HOME: /usr/lib/jvm/temurin-24-jdk-arm64` and `Build errors: false, aborted: false`.
-- Current next low-hanging item from that review: reduce native Gradle exploration now that IDE Gradle builds are
-  reliable. Update/in-line IDE-native Gradle build/sync guidance, especially replacing stale Gradle
-  `Observation.awaitConfiguration(project)` sync guidance in `execute-code-gradle.md` with the final-tasks listener
-  pattern, then remeasure `DpaiaMicroshop2Test.claude with mcp`.
+- Gradle IDE guidance update (2026-04-27): review under
+  `/tmp/mcp-steroid-review/gradle-ide-guidance-20260427/runs/` approved by Claude/Codex/Gemini.
+  `execute-code-gradle.md` now uses `ProjectDataImportListener.onFinalTasksFinished` as the Gradle sync boundary,
+  and Gradle arena prompts inline an IDE-native `ProjectTaskManager.build(*modules).await()` check before Bash fallback.
+  Validation passed for the scoped prompt tests and `ArenaPromptContractTest`.
+- Gradle IDE guidance measurement (2026-04-27): Microshop-2 MCP run
+  `run-20260427-185422-dpaia__spring__boot__microshop-2-mcp` passed with `ARENA_FIX_APPLIED: yes`,
+  `Build errors: false, aborted: false`, and full Gradle suite success. Metrics: 1,370,218 tokens, 26 calls,
+  4 MCP calls, 22 native calls, 12 Read, 4 Glob, 3 Write, 2 Bash, 0 errors, 0 resource fetches. Delta versus the
+  post-JDK24/final-tasks baseline: tokens 1,773,570 -> 1,370,218, calls 36 -> 26, Bash 5 -> 2.
+- Current next low-hanging item from the follow-up measurement review
+  (`/tmp/mcp-steroid-review/gradle-ide-guidance-measurement-20260427/runs/`): batch source discovery and related file
+  reads with IDE/VFS APIs in one `steroid_execute_code` call before falling back to native `Glob`/`Read`. All three
+  reviewers approved the current patch and picked this same next target.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

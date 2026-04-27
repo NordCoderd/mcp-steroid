@@ -28,5 +28,7 @@
 - [x] Make aborted-build guidance name Claude's exact `mcp__mcp-steroid__steroid_fetch_resource` tool and render on its own line.
 - [x] Rerun `DpaiaMicroshop2Test.claude with mcp` after the explicit boundary hint; target `fetch_resource_calls >= 1`.
 - [x] Run 3-agent review of the explicit-hint failure and choose inline Gradle sync guidance versus removing/replacing the failed fetch-only hint.
-- [ ] Update Gradle arena/resource guidance so agents use the now-working IDE-native Gradle build/sync path instead of native Read/Glob/Bash exploration.
-- [ ] Rerun `DpaiaMicroshop2Test.claude with mcp` after the Gradle guidance update; target fewer native Read/Glob/Bash calls, no build abort, and no tool errors.
+- [x] Update Gradle arena/resource guidance so agents use the now-working IDE-native Gradle build/sync path instead of Bash compile fallback.
+- [x] Rerun `DpaiaMicroshop2Test.claude with mcp` after the Gradle guidance update; result: fewer native Read/Glob/Bash calls, no build abort, and no tool errors.
+- [x] Run 3-agent review of the Gradle guidance measurement and choose the next low-hanging correction.
+- [ ] Reduce native source discovery/read calls in Gradle DPAIA prompts/resources with a batched IDE/VFS `steroid_execute_code` recipe.
