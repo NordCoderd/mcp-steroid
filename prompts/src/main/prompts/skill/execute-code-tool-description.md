@@ -28,7 +28,7 @@ Pre-flight catches missing or non-unique anchors before any edit lands, so keep 
 | **Find all references to a symbol** | `ReferencesSearch.search(psiElement, projectScope())` — type-aware; Grep over source text is a fallback |
 | **Read file content (any size)** | `String(findProjectFile(p)!!.contentsToByteArray(), charset)` — stays inside the IDE; the next semantic query sees what you read |
 | **Grep content inside project files** | `FilenameIndex.getAllFilesByExt(project, ext, scope).flatMap { vf -> Regex(pat).findAll(String(vf.contentsToByteArray(), vf.charset)) … }` in ONE call |
-| **Run Maven / Gradle tests** | IDE runner — see the Maven / Gradle recipes below; Bash `./mvnw test` is last resort |
+| **Run Maven / Gradle tests** | IDE runner — see `mcp-steroid://skill/execute-code-maven` and `mcp-steroid://skill/execute-code-gradle`; Bash is only for shell-level final verification or IDE-runner fallback |
 | **Compile check after an edit** | `ProjectTaskManager.getInstance(project).buildAllModules().await()` |
 | **Git / Docker CLI / shell** | native `Bash` — genuinely outside the IDE |
 
