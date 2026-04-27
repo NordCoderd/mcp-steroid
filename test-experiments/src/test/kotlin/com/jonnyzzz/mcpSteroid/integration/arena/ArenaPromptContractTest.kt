@@ -79,6 +79,63 @@ class ArenaPromptContractTest {
         )
     }
 
+    @Test
+    fun `gradle prompt exposes configured jdk before first bash gradle call`() {
+        val prompt = ArenaTestRunner(
+            container = ContainerDriver(
+                logPrefix = "prompt-test",
+                containerId = "unused",
+                startRequest = StartContainerRequest(),
+            ),
+            projectGuestDir = "/workspace",
+        ).buildPrompt(testCase = sampleMicroshopGradleTestCase(), projectDir = "/home/agent/project-home", withMcp = true)
+
+        assertTrue(
+            prompt.contains("Configured project JDK version: **25**"),
+            "Microshop Gradle prompt should expose the case-configured JDK version",
+        )
+        assertTrue(
+            prompt.contains("Recommended JAVA_HOME"),
+            "First MCP call should print the exact JAVA_HOME agents must reuse for Bash Gradle commands",
+        )
+        assertTrue(
+            prompt.contains("JAVA_HOME=<Recommended JAVA_HOME> ./gradlew ..."),
+            "Gradle Bash guidance should use the exact printed JAVA_HOME placeholder",
+        )
+        assertTrue(
+            prompt.contains("FAIL_TO_PASS tests must pass — run them with `JAVA_HOME=<Recommended JAVA_HOME> ./gradlew test --tests <TestClass> --console=plain`"),
+            "Targeted Gradle test template should carry the required JAVA_HOME assignment",
+        )
+        assertTrue(
+            prompt.contains("e.g. `JAVA_HOME=<Recommended JAVA_HOME> ./gradlew :module:test --tests <Class> --rerun-tasks --no-daemon`"),
+            "Copyable Gradle rerun example should carry the required JAVA_HOME assignment",
+        )
+        assertTrue(
+            prompt.contains("`JAVA_HOME=<Recommended JAVA_HOME> ./gradlew test`, NO `-Dtest=` filter"),
+            "Full-suite Gradle template should carry the required JAVA_HOME assignment",
+        )
+        assertFalse(
+            prompt.contains("e.g. `./gradlew :module:test"),
+            "Prompt should not include copyable Gradle examples without JAVA_HOME",
+        )
+        assertFalse(
+            prompt.contains("JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*"),
+            "Bash does not expand globs in assignment words; prompt must not offer a wildcard JAVA_HOME command",
+        )
+        assertTrue(
+            prompt.contains("temurin-\$configuredJdkVersion-jdk-"),
+            "First MCP call should resolve the configured JDK path instead of requiring a Bash JDK search",
+        )
+        assertTrue(
+            prompt.contains("must start with `/usr/lib/jvm/temurin-25-jdk-`"),
+            "Prompt should bind the printed JAVA_HOME back to the case-configured JDK version",
+        )
+        assertTrue(
+            prompt.contains("Do NOT try `JAVA_HOME=/usr/lib/jvm/temurin-21-...` first"),
+            "Prompt should directly prevent the measured Microshop Java 21 dead-end",
+        )
+    }
+
     private fun sampleMavenTestCase() = DpaiaTestCase(
         instanceId = "dpaia__sample",
         issueNumbers = listOf("1"),
@@ -108,5 +165,9 @@ class ArenaPromptContractTest {
             "com.example.alpha.AlphaTest",
             "com.example.beta.BetaTest",
         ),
+    )
+
+    private fun sampleMicroshopGradleTestCase() = sampleGradleTestCase().copy(
+        instanceId = "dpaia__spring__boot__microshop-2",
     )
 }

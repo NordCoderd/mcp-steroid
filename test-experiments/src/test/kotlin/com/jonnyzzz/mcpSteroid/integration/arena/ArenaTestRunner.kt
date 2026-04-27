@@ -79,16 +79,22 @@ class ArenaTestRunner(
      */
     fun buildPrompt(testCase: DpaiaTestCase, projectDir: String, withMcp: Boolean = true): String = buildString {
         val buildWrapper = if (testCase.buildSystem == "maven") "./mvnw" else "./gradlew"
+        val javaHomeAssignment = if (withMcp) "JAVA_HOME=<Recommended JAVA_HOME>" else "JAVA_HOME=<configured JAVA_HOME>"
+        val bashBuildWrapper = "$javaHomeAssignment $buildWrapper"
+        val projectJdkVersion = DpaiaCuratedCases.CASE_CONFIGS[testCase.instanceId]?.projectJdkVersion
+            ?: DpaiaCuratedCases.CaseConfig().projectJdkVersion
+        val configuredJavaHomePrefix = "/usr/lib/jvm/temurin-$projectJdkVersion-jdk-"
         val compileCommand = if (testCase.buildSystem == "maven") {
-            "./mvnw -DskipTests compile"
+            "$bashBuildWrapper -DskipTests compile"
         } else {
-            "./gradlew compileJava compileTestJava --console=plain"
+            "$bashBuildWrapper compileJava compileTestJava --console=plain"
         }
         val runClassCommand = if (testCase.buildSystem == "maven") {
-            "./mvnw test -Dtest=<TestClass>"
+            "$bashBuildWrapper test -Dtest=<TestClass>"
         } else {
-            "./gradlew test --tests <TestClass> --console=plain"
+            "$bashBuildWrapper test --tests <TestClass> --console=plain"
         }
+        val fullSuiteCommand = "$bashBuildWrapper test"
 
         appendLine("You are working on a Java Spring project located at: `$projectDir`")
         appendLine()
@@ -137,6 +143,12 @@ class ArenaTestRunner(
         appendLine("- Build system: **${testCase.buildSystem}**")
         appendLine("- Use the project wrapper only: `$buildWrapper`")
         appendLine("- Test-class command template: `$runClassCommand`")
+        appendLine("- Configured project JDK version: **$projectJdkVersion**")
+        if (withMcp) {
+            appendLine("- Bash build/test commands must use the exact `Recommended JAVA_HOME` printed by the first MCP call: `JAVA_HOME=<Recommended JAVA_HOME> $buildWrapper ...`. The value must start with `$configuredJavaHomePrefix`; do not use wildcard JAVA_HOME assignments and do not try a lower JDK first.")
+        } else {
+            appendLine("- Bash build/test commands must use JDK $projectJdkVersion first. Resolve a concrete path whose name starts with `$configuredJavaHomePrefix`, then run `JAVA_HOME=<that exact path> $buildWrapper ...`; do not use wildcard JAVA_HOME assignments and do not try a lower JDK first.")
+        }
         if (testCase.buildSystem == "maven") {
             appendLine("- **NEVER use `$buildWrapper install -am`** (also-make). The `-am` flag builds ALL upstream dependencies (potentially 48+ modules) and causes OOM in the container. Install only what you need: `$buildWrapper install -pl <module> -DskipTests`.")
             appendLine("- **Maven wrapper not found / `./mvnw` permission error**: If `./mvnw` is missing or not executable from the project root, use the bundled Maven directly: `JAVA_HOME=/usr/lib/jvm/temurin-17-<arch> /opt/idea/plugins/maven/lib/maven3/bin/mvn -f $projectDir/pom.xml ...`. Do NOT spend more than 2 Bash calls searching for the wrapper — fall back to the bundled mvn immediately.")
@@ -240,8 +252,12 @@ class ArenaTestRunner(
             appendLine("  println(\"Maven: ${'$'}{if (java.io.File(mavenBin).exists()) mavenBin else \"NOT FOUND\"}\")")
             appendLine("  val gradlew = java.io.File(project.basePath + \"/gradlew\")")
             appendLine("  println(\"Gradlew: ${'$'}{if (gradlew.exists()) gradlew.absolutePath else \"NOT FOUND\"}\")")
+            appendLine("  val configuredJdkVersion = \"$projectJdkVersion\"")
             appendLine("  val jvmDir = java.io.File(\"/usr/lib/jvm\")")
-            appendLine("  println(\"JDKs: ${'$'}{jvmDir.listFiles()?.map { it.name }?.filter { it.startsWith(\"temurin\") }?.joinToString(\", \") ?: \"none\"}\")")
+            appendLine("  val temurinJdks = jvmDir.listFiles()?.filter { it.name.startsWith(\"temurin\") }?.sortedBy { it.name } ?: emptyList()")
+            appendLine("  println(\"JDKs: ${'$'}{if (temurinJdks.isEmpty()) \"none\" else temurinJdks.joinToString(\", \") { it.name }}\")")
+            appendLine("  val recommendedJavaHome = temurinJdks.firstOrNull { it.name.startsWith(\"temurin-${'$'}configuredJdkVersion-jdk-\") }?.absolutePath")
+            appendLine("  println(\"Recommended JAVA_HOME: ${'$'}{recommendedJavaHome ?: \"NOT FOUND for JDK ${'$'}configuredJdkVersion\"}\")")
             appendLine("  println(\"Current JAVA_HOME: ${'$'}{System.getProperty(\"java.home\")}\")")
             appendLine("  val changes = readAction {")
             appendLine("      com.intellij.openapi.vcs.changes.ChangeListManager.getInstance(project)")
@@ -253,8 +269,8 @@ class ArenaTestRunner(
             appendLine("  //   val vf = findProjectFile(path) ?: run { println(\"NOT FOUND: \$path\"); continue }")
             appendLine("  //   val c = VfsUtil.loadText(vf); if (c.isEmpty()) { println(\"EMPTY: \$path\"); continue }")
             appendLine("  ```")
-            appendLine("  **USE THE PRINTED Maven/Gradlew/JDK paths for ALL subsequent Bash build commands** — never run `find /opt -name mvn` or `ls /usr/lib/jvm/` after this. The first call tells you everything you need.")
-            appendLine("  **JDK SELECTION**: Read pom.xml java.version (or maven.compiler.source) to find the required Java version N. Then from the printed JDK list, pick the LOWEST temurin version >= N. Example: project needs Java 24, JDKs available are 8,11,17,21,25 — use JAVA_HOME=/usr/lib/jvm/temurin-25-jdk-*. NEVER try lower JDKs first.")
+            appendLine("  **USE THE PRINTED Maven/Gradlew/Recommended JAVA_HOME paths for ALL subsequent Bash build commands** — never run `find /opt -name mvn` or `ls /usr/lib/jvm/` after this. The first call tells you everything you need.")
+            appendLine("  **JDK SELECTION**: Use the printed `Recommended JAVA_HOME` for this case's configured JDK $projectJdkVersion on the first Bash build/test command. Do NOT try `JAVA_HOME=/usr/lib/jvm/temurin-21-...` first when the configured version is higher. Only switch JDKs after a real compiler/toolchain error proves the configured JDK is incompatible.")
             appendLine("  If `dockerOk=false`: still **run the FAIL_TO_PASS tests first via Bash** (many use H2, no Docker needed).")
             appendLine("  Only treat Docker as a blocker if the test explicitly fails with a `DockerException` / `Could not find a valid Docker environment` error.")
             appendLine("  **HARD STOP ON DOCKER FAILURES**: If ANY test fails with `Could not find a valid Docker environment`, `BadRequestException Status 400`, `HTTP 400`, or `docker.sock` errors — this is an INFRASTRUCTURE problem, NOT your code. Do NOT retry, do NOT investigate DOCKER_HOST, do NOT probe docker.sock, do NOT try environment variables. Instead: verify your code compiles (ProjectTaskManager or ./mvnw test-compile) and output ARENA_FIX_APPLIED: yes. Maximum 2 Bash calls for Docker — after that, STOP.")
@@ -286,11 +302,11 @@ class ArenaTestRunner(
         appendLine("- Implement the requested behavior with minimal code changes.")
         appendLine("- FAIL_TO_PASS tests must pass — run them with `$runClassCommand` and confirm `BUILD SUCCESS`.")
         if (testCase.buildSystem == "gradle") {
-            appendLine("- **Gradle UP-TO-DATE pitfall**: After writing new source files, always add `--rerun-tasks` to the FIRST Gradle test invocation (e.g. `./gradlew :module:test --tests <Class> --rerun-tasks --no-daemon`). Without it, Gradle may return `UP-TO-DATE` and skip tests entirely while still printing `BUILD SUCCESSFUL`. If you see `BUILD SUCCESSFUL` with no `Tests run:` line, immediately rerun with `--rerun-tasks`.")
-            appendLine("- **Multi-module Gradle test targeting**: `./gradlew test --tests ClassName` silently finds NO tests when the class is in a submodule. ALWAYS use the subproject prefix: `./gradlew :submodule:test --tests com.example.ClassName --rerun-tasks`. Find the correct subproject prefix by inspecting `settings.gradle` or using `ProjectRootManager.contentSourceRoots` — each root's path reveals its module.")
-            appendLine("- **Batch Gradle targeted tests across subprojects**: If FAIL_TO_PASS lists 2+ Gradle test classes in different subprojects, run them in ONE command with repeated `:subproject:test --tests FQCN` pairs, then keep the full suite as the final separate run. Example: `./gradlew :a:test --tests a.FooTest :b:test --tests b.BarTest --rerun-tasks --no-daemon --console=plain`.")
+            appendLine("- **Gradle UP-TO-DATE pitfall**: After writing new source files, always add `--rerun-tasks` to the FIRST Gradle test invocation (e.g. `$bashBuildWrapper :module:test --tests <Class> --rerun-tasks --no-daemon`). Without it, Gradle may return `UP-TO-DATE` and skip tests entirely while still printing `BUILD SUCCESSFUL`. If you see `BUILD SUCCESSFUL` with no `Tests run:` line, immediately rerun with `--rerun-tasks`.")
+            appendLine("- **Multi-module Gradle test targeting**: `$bashBuildWrapper test --tests ClassName` silently finds NO tests when the class is in a submodule. ALWAYS use the subproject prefix: `$bashBuildWrapper :submodule:test --tests com.example.ClassName --rerun-tasks`. Find the correct subproject prefix by inspecting `settings.gradle` or using `ProjectRootManager.contentSourceRoots` — each root's path reveals its module.")
+            appendLine("- **Batch Gradle targeted tests across subprojects**: If FAIL_TO_PASS lists 2+ Gradle test classes in different subprojects, run them in ONE command with repeated `:subproject:test --tests FQCN` pairs, then keep the full suite as the final separate run. Example: `$bashBuildWrapper :a:test --tests a.FooTest :b:test --tests b.BarTest --rerun-tasks --no-daemon --console=plain`.")
         }
-        appendLine("- **Run the full test suite ONCE as the LAST step** (`$buildWrapper test`, NO `-Dtest=` filter).")
+        appendLine("- **Run the full test suite ONCE as the LAST step** (`$fullSuiteCommand`, NO `-Dtest=` filter).")
         appendLine("  Do NOT run full suites as intermediate checks during development — run only targeted tests (`$runClassCommand`) while iterating.")
         appendLine("  A full test suite run takes 60-90s; running it twice costs 2× that. A targeted test rerun solely to recover hidden `BUILD SUCCESS` output is also waste; reruns after fixes, failures, incomplete output, or Gradle skipped tests are required.")
         appendLine("  Service/validation changes often break other test classes (e.g., `Abstract*Tests`, `*JdbcTests`, `*JpaTests`, `*SpringDataJpaTests`).")
