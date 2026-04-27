@@ -147,3 +147,17 @@
 - Raw metrics: 12 total calls, 4 MCP calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, estimated 8 patch hunks, 0 native Edit, 0 Read, 3 Write for new files, 4 Bash, 0 tool errors, total tokens 1,052,439.
 - Delta versus the earlier stale-disk Microshop-2 failure: 248s -> 171s, 41 calls -> 12 calls, native Edit 14 -> 0, Read 11 -> 0, errors 7 -> 0. The agent no longer reported that `steroid_apply_patch` failed to persist to disk.
 - Remaining low-hanging issue: the agent still wasted one Bash call with `JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-arm64`, got `invalid source release: 24`, then corrected to JDK 25. Prompt/prewarm output should expose the exact configured JDK path more directly.
+
+## 2026-04-27 - IntelliJ Monorepo thisLogger Readiness
+
+- Added `IntelliJThisLoggerLookupTest` as a Docker integration regression for MCP-driven semantic search on `IntelliJProject.IntelliJMasterProject`.
+- Initial implementation with `waitForProjectReady(requireIndexingComplete = true)` plus `waitForSmartMode()` still failed with `IndexNotReadyException`; GitHub issue #29 tracks the failed readiness contract and the rejected `repeat(12)` retry workaround.
+- Marinade guidance says to wait for project initialization, no indexing, no modal dialogs, and no startup/indexing background tasks. IntelliJ source adds the missing API contract: `waitForSmartMode()` does not guarantee another dumb mode will not begin before the next statement; for initial import/configuration, use `Observation.awaitConfiguration(project)`, and for indexed reads use `smartReadAction(project)`.
+- `~/Work/intellij` references checked:
+  - `DumbService.kt`: `waitForSmartMode()` explicitly has no post-return smart-mode guarantee and points at `Observation.awaitConfiguration`.
+  - `coroutines.kt`: `smartReadAction(project)` runs through `ReadConstraint.inSmartMode(project)`.
+  - `IndexingTestUtil` / `TestObservation`: test-framework helpers, not appropriate for a normal MCP script running inside the IDE.
+- A `run-agent.sh` Codex review from Marinade artifacts (`/Users/jonnyzzz/Work/marinade/runs/run_20260427-083709-8424`) agreed with this approach.
+- Validation: `MCP_STEROID_INTELLIJ_CHECKOUT_DIR=/Users/jonnyzzz/Work/intellij ./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.IntelliJThisLoggerLookupTest' --rerun-tasks --warning-mode all` passed in 8m41s.
+- Successful markers: `CONFIGURATION_COMPLETE=false`, `LOGGER_FILE=/home/agent/project-home/community/platform/util/src/com/intellij/openapi/diagnostic/logger.kt`, `THISLOGGER_REFERENCE_COUNT=4191`, `THISLOGGER_FILE_COUNT=1526`.
+- Follow-ups: the green run still logged severe Kotlin FIR resolve errors and an `ExceptionCaptureService` NPE while capturing them; also, IntelliJ checkout setup reused a cached TeamCity ZIP even when `MCP_STEROID_INTELLIJ_CHECKOUT_DIR` was set.

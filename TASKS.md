@@ -63,6 +63,12 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
   - Fixes: project SDK replacement now updates mismatched SDKs, compile warmup receives the case's configured JDK, and JAVA_HOME lookup fails fast unless a JDK path with `bin/javac` is emitted.
   - Validation: `:test-integration:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.IdeTestHelpersTest' --rerun-tasks --warning-mode all` passed.
 
+- [x] Add a real IntelliJ Ultimate monorepo `thisLogger` lookup regression test.
+  - Files: `test-experiments/src/test/kotlin/com/jonnyzzz/mcpSteroid/integration/tests/IntelliJThisLoggerLookupTest.kt`.
+  - Research: Marinade's MCP Steroid guide waits for `projectInitialized`, `indexingInProgress == false`, and no modal/background indexing, but IntelliJ's own API docs warn that `waitForSmartMode()` has no guarantee another dumb mode will not start before the next statement.
+  - Fix direction from `~/Work/intellij`: use `Observation.awaitConfiguration(project)` for initial import/configuration readiness, then run the whole indexed lookup inside `smartReadAction(project)`.
+  - Validation: `MCP_STEROID_INTELLIJ_CHECKOUT_DIR=/Users/jonnyzzz/Work/intellij ./gradlew :test-experiments:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.IntelliJThisLoggerLookupTest' --rerun-tasks --warning-mode all` passed in 8m41s with 4,191 references across 1,526 files.
+
 ## Next Candidates
 
 - [x] Reduce redundant Maven verification in the DPAIA arena prompt.
@@ -104,6 +110,14 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
   - Evidence: Microshop-2 eventually chose JDK 25 and passed, but first tried `JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-arm64` and hit `invalid source release: 24`.
   - Candidate fix: have the arena prompt emit a concrete `JAVA_HOME=/usr/lib/jvm/temurin-25-...` line from the prewarm/case config, not just a generic "pick the lowest JDK >= N" rule.
   - Target: remove the wasted Java 21 Bash call while preserving 0 native Edit and 0 tool errors.
+
+- [ ] Investigate severe Kotlin resolve logs from the IntelliJ monorepo `thisLogger` lookup.
+  - Evidence: the green lookup run logged `KaFirReferenceResolver` / `Expected FirResolvedContractDescription but FirLazyContractDescriptionImpl` errors, followed by an `ExceptionCaptureService` null-pointer while capturing the IDE error.
+  - Target: keep the test real but remove or isolate IDE-side severe errors instead of treating them as harmless noise.
+
+- [ ] Make IntelliJ monorepo test setup prefer an explicitly configured local checkout when appropriate.
+  - Evidence: the `MCP_STEROID_INTELLIJ_CHECKOUT_DIR=/Users/jonnyzzz/Work/intellij` run still reused an existing cached TeamCity ZIP before updating the checkout in-container.
+  - Candidate fix: review `ensureIntelliJGitCloneZipInCache()` precedence and add unit coverage before changing cache behavior.
 
 ## Recent PR Follow-up
 

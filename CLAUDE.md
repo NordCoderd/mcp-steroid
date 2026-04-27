@@ -924,6 +924,10 @@ the Karpathy-style optimization loop prompts.
   fixed the task in 171s and the full Gradle suite passed. Metrics: 12 total tool calls, 3 `steroid_execute_code`,
   1 `steroid_apply_patch` with 8 hunks, 0 native Edit, 0 Read, 3 Write, 4 Bash, 0 tool errors, 1.05M tokens.
   Next step: tighten Gradle/JDK prompt guidance so agents use the configured JDK 25 path before the first Bash call.
+- IntelliJ monorepo lookup note (2026-04-27): for MCP scripts that need indexed reads after initial import,
+  prefer `Observation.awaitConfiguration(project)` followed by one `smartReadAction(project)` around the whole query.
+  `waitForSmartMode()` is not a stable handoff; IntelliJ source explicitly says another dumb mode can begin before
+  the next statement. The green regression test is `IntelliJThisLoggerLookupTest`.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync
