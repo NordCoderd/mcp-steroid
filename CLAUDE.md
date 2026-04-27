@@ -915,11 +915,15 @@ the Karpathy-style optimization loop prompts.
   global apply-patch prompt-resource routing before Gradle-resource work. The issue: the arena prompt
   used dedicated `steroid_apply_patch`, but `execute-code-tool-description.md` still taught the slower
   `steroid_execute_code` + script-context `applyPatch` DSL as the default.
-- Latest measured run (2026-04-27 UTC, run dir `run-20260427-073953-dpaia__spring__petclinic__rest-37-mcp`):
-  `DpaiaPetclinicRest37Test.claude with mcp` fixed the task in 116s and passed 184/184 tests.
-  The global prompt-resource routing produced 1 `steroid_apply_patch`, 0 native Edit calls, 2 Bash calls,
-  10 total tool calls, and 0 tool errors. Next step: pick and measure one Gradle DPAIA scenario before
-  changing Gradle guidance.
+- Apply-patch persistence fix (2026-04-27): `steroid_apply_patch` now saves every touched document before
+  returning, and `ApplyPatchToolIntegrationTest` verifies success and failure cases through the actual MCP
+  HTTP tool with direct disk reads. Reference checked in `~/Work/intellij`: IntelliJ's patch path saves the
+  document after changing it.
+- Latest measured Gradle run (2026-04-27 UTC, run dir
+  `run-20260427-090258-dpaia__spring__boot__microshop-2-mcp`): `DpaiaMicroshop2Test.claude with mcp`
+  fixed the task in 171s and the full Gradle suite passed. Metrics: 12 total tool calls, 3 `steroid_execute_code`,
+  1 `steroid_apply_patch` with 8 hunks, 0 native Edit, 0 Read, 3 Write, 4 Bash, 0 tool errors, 1.05M tokens.
+  Next step: tighten Gradle/JDK prompt guidance so agents use the configured JDK 25 path before the first Bash call.
 - Constraints for this track: do not add `McpSteroid*` interface methods and do not add MCP tools.
 
 ### Git Remotes Sync

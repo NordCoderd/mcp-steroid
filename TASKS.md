@@ -51,6 +51,18 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
   - Expected effect: stop teaching the slower `steroid_execute_code` + script-context `applyPatch` route as the default after DPAIA showed the dedicated MCP tool applies multi-file patches in tens of ms.
   - Validation: `:prompts:test --tests '*PromptRoutingContractTest*' --tests '*MarkdownArticleContractTest*' --tests '*ExecuteCodeToolDescriptionKtBlocksCompilationTest*' --warning-mode all` passed via IntelliJ Gradle runner.
 
+- [x] Make `steroid_apply_patch` save touched documents before returning and cover disk persistence with integration tests.
+  - Reference checked: after updating `~/Work/intellij`, IntelliJ's `ApplyTextFilePatch.updateDocumentContent()` uses `Document.setText(...)` followed by `FileDocumentManager.saveDocument(document)`.
+  - Files: `ij-plugin/src/main/kotlin/com/jonnyzzz/mcpSteroid/execution/ApplyPatch.kt`, `ApplyPatchTest.kt`, `ApplyPatchToolIntegrationTest.kt`.
+  - Coverage: single hunk, same-file multi-hunk descending offsets, multiple files, empty hunks, missing file, missing old string, non-unique old string, read-only/save failure, and direct disk reads after the MCP HTTP tool returns.
+  - Validation: `:ij-plugin:test --tests 'com.jonnyzzz.mcpSteroid.execution.ApplyPatchTest' --tests 'com.jonnyzzz.mcpSteroid.server.ApplyPatchToolIntegrationTest' --rerun-tasks --warning-mode all` passed.
+  - Review: three-agent pass approved the persistence fix direction and requested explicit save-failure/read-only coverage; the hardening was implemented.
+
+- [x] Configure DPAIA Microshop cases to use JDK 25 during IDE setup and compile warmup.
+  - Files: `DpaiaCuratedCases.kt`, DPAIA runner/comparison setup call sites, `intelliJ-container.kt`, `mcp-steroid.kt`, `DpaiaConfigTest.kt`, `IdeTestHelpersTest.kt`.
+  - Fixes: project SDK replacement now updates mismatched SDKs, compile warmup receives the case's configured JDK, and JAVA_HOME lookup fails fast unless a JDK path with `bin/javac` is emitted.
+  - Validation: `:test-integration:test --tests 'com.jonnyzzz.mcpSteroid.integration.tests.IdeTestHelpersTest' --rerun-tasks --warning-mode all` passed.
+
 ## Next Candidates
 
 - [x] Reduce redundant Maven verification in the DPAIA arena prompt.
@@ -75,14 +87,23 @@ Current focus: make MCP Steroid measurably better than vanilla agent runs on DPA
   - Measured prerequisite: the verification-guidance tweak succeeded on the 101s run, so this is now the next low-hanging fruit.
   - Implemented in `ArenaPromptContractTest`; validation: `./gradlew :test-experiments:test --tests '*ArenaPromptContractTest*' --warning-mode all` passed.
 
-- [ ] Pick and measure one Gradle DPAIA scenario before changing Gradle guidance.
+- [x] Pick and measure one Gradle DPAIA scenario before changing Gradle guidance.
   - Goal: establish a concrete baseline for Gradle cold-starts, skipped-test behavior, and IntelliJ Gradle runner errors before editing prompt resources.
-  - Candidate follow-up: then add or tighten a Gradle-focused MCP prompt resource modeled after the Maven patterns.
+  - Scenario: `DpaiaMicroshop2Test.claude with mcp`.
+  - Run dir: `test-experiments/build/test-logs/test/run-20260427-090258-dpaia__spring__boot__microshop-2-mcp`.
+  - Result: fix claimed, MCP used, full Gradle suite passed, agent time 171s.
+  - Raw metrics: 12 total calls, 4 MCP calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, 8 patch hunks, 0 native Edit, 0 Read, 3 Write for new files, 4 Bash, 0 tool errors, 1.05M tokens.
+  - Delta versus the stale-disk failure run: 248s -> 171s, tool errors 7 -> 0, native Edit 14 -> 0, Read 11 -> 0. The "apply_patch did not persist" fallback disappeared.
 
 - [ ] Add a Gradle-focused MCP prompt resource modeled after the Maven patterns.
   - Files likely under `prompts/src/main/prompts/skill/`.
-  - Consensus status: Gemini recommended this; it is now the next candidate after measuring a Gradle DPAIA baseline.
+  - Consensus status: Gemini recommended this; Microshop-2 measurement now gives a concrete baseline.
   - Expected effect: fewer Bash Gradle cold starts and fewer hand-rolled IntelliJ Gradle snippets.
+
+- [ ] Next low-hanging Gradle improvement: make JDK choice harder to miss in DPAIA prompts.
+  - Evidence: Microshop-2 eventually chose JDK 25 and passed, but first tried `JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-arm64` and hit `invalid source release: 24`.
+  - Candidate fix: have the arena prompt emit a concrete `JAVA_HOME=/usr/lib/jvm/temurin-25-...` line from the prewarm/case config, not just a generic "pick the lowest JDK >= N" rule.
+  - Target: remove the wasted Java 21 Bash call while preserving 0 native Edit and 0 tool errors.
 
 ## Recent PR Follow-up
 

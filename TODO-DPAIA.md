@@ -9,4 +9,6 @@
 - [x] Add a prompt regression test for the DPAIA arena MCP block after the verification-guidance measurement.
 - [x] Run 3-agent review for the next low-hanging fruit after arena prompt regression; consensus is to fix global apply-patch prompt-resource routing before Gradle-resource work.
 - [x] Measure the dedicated apply-patch routing resource change on `DpaiaPetclinicRest37Test.claude with mcp`.
-- [ ] Pick the next Gradle DPAIA scenario and measure it before changing Gradle guidance.
+- [x] Add disk-persistence integration tests for `steroid_apply_patch` success/failure cases.
+- [x] Pick the next Gradle DPAIA scenario and measure it before changing Gradle guidance.
+- [ ] Tighten Gradle/JDK prompt guidance so DPAIA agents use the configured JDK path before the first Bash Gradle call.

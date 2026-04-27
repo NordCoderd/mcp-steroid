@@ -125,3 +125,25 @@
 - Raw NDJSON metrics: 10 total calls, 3 MCP Steroid calls, 7 native calls, 1 `mcp__mcp-steroid__steroid_apply_patch`, 2 `mcp__mcp-steroid__steroid_execute_code`, 2 Bash, 0 tool errors.
 - Delta from the prior 101s run: native Edit stayed 0, `steroid_apply_patch` stayed true, Bash stayed 2, total tool calls improved 11 -> 10, and runtime moved 101s -> 116s. This is acceptable PetclinicRest37 variance and does not show a prompt-routing regression.
 - Next low-hanging fruit: pick and measure one Gradle DPAIA scenario before changing Gradle guidance, then add or tighten a Gradle-focused MCP prompt resource based on observed failures.
+
+## 2026-04-27 - Apply-Patch Persistence Fix
+
+- Updated and inspected `~/Work/intellij` before touching our implementation. Reference point: IntelliJ's `ApplyTextFilePatch.updateDocumentContent()` calls `Document.setText(...)` and then `FileDocumentManager.saveDocument(document)`.
+- Bug evidence: a new TDD test read the patched file with `Files.readString(...)` immediately after `ctx.applyPatch { ... }` returned; it failed before the fix because only the IDE document/PSI had changed.
+- Fix: `executeApplyPatch()` now saves every touched document before returning, verifies that the document is no longer unsaved, wraps save failures in `ApplyPatchException`, and rethrows `ProcessCanceledException`.
+- Added coverage:
+  - `ApplyPatchTest.testSingleHunkPersistsToDiskBeforeReturning`
+  - read-only/save-failure coverage in `ApplyPatchTest`
+  - `ApplyPatchToolIntegrationTest` over actual MCP HTTP `tools/call`, with direct disk assertions for single hunk, multi-hunk same file, multiple files, missing old string, non-unique old string, missing file, read-only/save failure, and empty hunks.
+- Validation: `./gradlew :ij-plugin:test --tests 'com.jonnyzzz.mcpSteroid.execution.ApplyPatchTest' --tests 'com.jonnyzzz.mcpSteroid.server.ApplyPatchToolIntegrationTest' --rerun-tasks --warning-mode all` passed.
+- Review artifacts: `/tmp/mcp-steroid-review/apply-patch-persistence-20260427/runs/`. Claude/Codex/Gemini approved the core fix direction; Claude/Codex specifically requested save-failure/read-only hardening, which was added.
+
+## 2026-04-27 - Gradle Microshop-2 Measurement After Persistence Fix
+
+- Scenario: `DpaiaMicroshop2Test.claude with mcp`.
+- Run dir: `test-experiments/build/test-logs/test/run-20260427-090258-dpaia__spring__boot__microshop-2-mcp`.
+- Result: agent fixed the task, used MCP, exited 0, and full Gradle suite passed. Agent time 171s.
+- Arena summary: `exec_code=3`, `Read/Edit/Write=0/0/3`, `Glob/Grep/Bash=0/0/4`.
+- Raw metrics: 12 total calls, 4 MCP calls, 3 `steroid_execute_code`, 1 `steroid_apply_patch`, estimated 8 patch hunks, 0 native Edit, 0 Read, 3 Write for new files, 4 Bash, 0 tool errors, total tokens 1,052,439.
+- Delta versus the earlier stale-disk Microshop-2 failure: 248s -> 171s, 41 calls -> 12 calls, native Edit 14 -> 0, Read 11 -> 0, errors 7 -> 0. The agent no longer reported that `steroid_apply_patch` failed to persist to disk.
+- Remaining low-hanging issue: the agent still wasted one Bash call with `JAVA_HOME=/usr/lib/jvm/temurin-21-jdk-arm64`, got `invalid source release: 24`, then corrected to JDK 25. Prompt/prewarm output should expose the exact configured JDK path more directly.
