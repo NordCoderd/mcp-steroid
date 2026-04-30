@@ -45,6 +45,11 @@ If your next instinct is a native `Read` / `Edit` / `Grep` / `Glob` / `Bash` cal
 - `waitForSmartMode()` runs automatically
 - Available: `project`, `println()`, `printJson()`, `progress()`
 
+**Output rules — the #1 reason agents think a call "returned empty":**
+- The last expression's value is NOT auto-printed (this is a Kotlin script, not a REPL).
+- To surface anything to the caller, wrap it in `println(value)` for plain text or `printJson(value)` for structured data.
+- A script that ends with `myList` (or any bare expression) prints nothing — you will see only `execution_id: …` in the response, identical to a script that returned no value at all. Always end with an explicit `println(...)` or `printJson(...)` of what the agent needs to see.
+
 **Threading rules — apply preventively, not after an error:**
 
 | You are about to… | Wrap the call in… |
